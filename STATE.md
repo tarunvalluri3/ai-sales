@@ -8,15 +8,9 @@ Last updated: 2026-08-11
 
 ## 1. Current phase
 
-**Phase 4 — Business onboarding**
+**Phase 5 — Products / Services / FAQs**
 
-Phase 3 (Supabase + PostgreSQL foundation) is complete and fully verified, including both grant-hardening follow-ups — see §2. No product features exist yet; `businesses` rows are never created by any app code so far. This phase is the flow through which an authenticated owner creates their business record and is associated as its owner.
-
-Per `docs/phases.md`: exact fields are decided in this phase's own prompt. Per `AGENTS.md` §5, write the prompt, get approval, then implement — the usual workflow.
-
-Two things this phase will need to design, not carried over as settled decisions from earlier phases:
-- The INSERT path for `businesses` — Phase 3 deliberately left only a `SELECT` RLS policy in place (see §2's Phase 3 entry, Decision list) because no creation flow existed yet. This phase must add an `INSERT` policy (and decide whether creation goes through an authenticated INSERT policy or a deliberate service-role server action) and, if a policy, remember the grants lesson below.
-- Grants: per §2/§8, this project's database had (and has now fixed) a default-privileges gap — any new table this phase adds should get the same grant treatment as `businesses`: enable+force RLS, explicit `GRANT` for exactly the privileges needed, then **verify actual grants after applying**, don't assume the default-privileges fix (confirmed working via a throwaway table, not yet re-confirmed against a real new table) is sufficient without checking.
+Phase 4 (Business onboarding) is complete and fully verified by the user — see §2. No prompt written yet for Phase 5; hold off per explicit user instruction until asked. Per `docs/phases.md`: business-owned structured knowledge (products, services, FAQs), CRUD, validation, tenant isolation, and these records must be reachable by retrieval later (Phase 6+). Per `docs/phases.md`'s exit criterion, isolation tests are required for every new table this phase adds.
 
 ---
 
@@ -79,11 +73,20 @@ Two things this phase will need to design, not carried over as settled decisions
 - Decisions made this phase: scoped to `public` schema, `TABLES` only — not sequences/functions/other schemas (add if the same pattern shows up elsewhere); `service_role` untouched — see `prompts/default-privileges-least-privilege.md`.
 - Known gaps carried forward: none. Recommended (not required) to re-confirm with a real table at Phase 5 as further end-to-end proof, since the verification so far used a throwaway table rather than a table created by a "real" phase migration.
 
+### Phase 4 — Business onboarding — completed 2026-08-11, fully verified
+- What exists now: migration `supabase/migrations/20260811151559_add_businesses_insert_policy.sql` grants `insert` on `businesses` to `authenticated` and adds policy `businesses_insert_own_org` (org-match only, same shape as the existing `SELECT` policy — no role check in RLS, see decision below). `lib/business.ts` (server-only): `getBusinessForOrg(orgId)` and `createBusinessForOrg(orgId, name)`, both querying with an explicit `clerk_org_id` filter in addition to RLS; a duplicate insert (unique-violation, Postgres code `23505`) throws `BusinessAlreadyExistsError`, a distinct internal control-flow signal, not a user-facing `AppError`. `lib/auth.ts`'s `requireAuthContext()` gained an optional `{ role: "org:admin" }` parameter forwarded to `auth.protect()` — existing no-args call sites unaffected. `app/onboarding/page.tsx` (protected): no `orgId` → redirect to the existing choose-organization task; business already exists for the org → redirect to `/dashboard`; non-admin org member with no business → static "ask your admin" message; org admin with no business → renders `app/onboarding/onboarding-form.tsx` (client component, `useActionState`). `app/onboarding/actions.ts` (`"use server"`): Zod-validates `name` (trimmed, 2–120 chars), calls `requireAuthContext({ role: "org:admin" })`, creates the row, treats `BusinessAlreadyExistsError` as idempotent success, redirects to `/dashboard`. `app/dashboard/page.tsx` now looks up the business for the org and redirects to `/onboarding` if none exists; renders the business name instead of the old raw Clerk-field dump. pgTAP test `supabase/tests/database/002_businesses_insert_policy.sql` written (not executed — see below) asserting org A can insert its own row and cannot insert a row claiming org B.
+- Key files: `supabase/migrations/20260811151559_add_businesses_insert_policy.sql`, `supabase/tests/database/002_businesses_insert_policy.sql`, `lib/business.ts`, `lib/auth.ts`, `app/onboarding/page.tsx`, `app/onboarding/onboarding-form.tsx`, `app/onboarding/actions.ts`, `app/dashboard/page.tsx`.
+- Migrations applied: **applied and verified by user 2026-08-11.** Grants confirmed: `authenticated` → `SELECT, INSERT`; `anon` → none.
+- Env vars added: none.
+- Decisions made this phase: "owner" = the Clerk user who is `org:admin` of the org linked via `clerk_org_id` — no new `businesses` column for it, consistent with Phase 3's "Clerk owns membership" decision. The new `INSERT` RLS policy is scoped to org match only (RLS's actual job, tenant isolation); "must be an org admin to create" is enforced at the application layer via `auth.protect({ role: "org:admin" })` rather than a hand-parsed `o.rol` JWT claim whose exact string format had never been observed live — verified against the installed `@clerk/nextjs` 7.7.3 / `@clerk/shared` type definitions before implementation (not memory): the default Clerk org roles are `org:admin`/`org:member`, and `auth.protect({ role })` is a real, current overload. `businesses` gained no new columns — only `name` was in scope; a richer business-profile shape was deliberately deferred (not specified in `PRODUCT.md`). Full reasoning: `prompts/phase-4-business-onboarding.md`.
+- **Manual verification confirmed by user 2026-08-11 (all steps in `prompts/phase-4-business-onboarding.md`):** org-admin create flow works end-to-end; empty-name validation blocks creation; re-visiting `/onboarding` after a business exists redirects to `/dashboard`; non-admin member sees the "ask your admin" message, not the form; negative RLS check confirmed an `authenticated` session cannot insert a row for a different org; double-submit race handled idempotently (one row, no error shown). **Direct-POST bypass (Server Action invoked outside the UI, replayed under a non-admin session) confirmed `auth.protect({ role: "org:admin" })` rejects server-side, independent of the page-level UI gate — no `businesses` row was created for the non-admin's org.** Verification method: absence of a row for that org, not an inspected response — the exact status code/response shape was observed live but not recorded, and is documented as an honest gap in `docs/architecture.md`'s Authentication section rather than guessed at. Re-run the devtools replay later if the precise shape is ever needed.
+- Known gaps carried forward: `supabase test db` (pgTAP `001_businesses_tenant_isolation.sql` and `002_businesses_insert_policy.sql`) still has not been executed by anyone — same standing gap as Phase 3, superseded in practice by the manual SQL-editor/direct-POST verification above, which covers the same ground.
+
 ---
 
 ## 3. Next up
 
-Phase 4 — Business onboarding is current (see §1). No prompt written yet — follow the standard `AGENTS.md` §5 workflow: read `PRODUCT.md` for onboarding-relevant scope, inspect current code (`lib/auth.ts`'s `requireAuthContext()`, `lib/supabase/server.ts`, the `businesses` migration), decide the exact business fields and the INSERT-policy-vs-service-role-action question (§1), write the prompt, get approval.
+Phase 5 — Products / Services / FAQs is current (see §1). No prompt written yet — **hold off writing it until the user explicitly asks**, per direct instruction. When asked: follow the standard `AGENTS.md` §5 workflow, inspect the `businesses` table/RLS pattern from Phases 3–4 as the template for tenant-scoped CRUD, and add isolation tests for every new table per `docs/phases.md`'s Phase 5 exit criterion.
 
 ---
 
@@ -124,12 +127,13 @@ Still planned, not yet required (see `docs/security.md` §5):
 
 ## 6. Database state
 
-Migrations applied and verified (all three, 2026-08-11):
+Migrations applied and verified (2026-08-11):
 1. `supabase/migrations/20260811124354_create_businesses_table.sql` — creates `public.businesses`, RLS, SELECT policy.
 2. `supabase/migrations/20260811145006_tighten_businesses_grants.sql` — revokes excess `anon`/`authenticated` grants on `businesses` down to `authenticated: SELECT` only.
 3. `supabase/migrations/20260811150450_default_privileges_least_privilege.sql` — `ALTER DEFAULT PRIVILEGES` so future tables in `public` no longer inherit broad grants automatically.
+4. `supabase/migrations/20260811151559_add_businesses_insert_policy.sql` — grants `insert` on `businesses` to `authenticated`; adds policy `businesses_insert_own_org` (org-match only, same shape as the `SELECT` policy).
 
-Tables: `public.businesses` — columns `id` (uuid pk), `clerk_org_id` (text, unique), `name`, `created_at`, `updated_at` (auto-maintained via trigger). RLS enabled + forced. One policy: `SELECT` for `authenticated`, scoped to `clerk_org_id = (select auth.jwt()) -> 'o' ->> 'id'`. Grants: `authenticated` = `SELECT` only; `anon` = none; `service_role` = default (bypasses RLS, unrestricted, as intended). No `INSERT`/`UPDATE`/`DELETE` policy or path exists yet — no app code writes to this table (Phase 4's job). Zero rows currently (no business has been created through the app).
+Tables: `public.businesses` — columns `id` (uuid pk), `clerk_org_id` (text, unique), `name`, `created_at`, `updated_at` (auto-maintained via trigger). RLS enabled + forced. Two active policies: `SELECT` for `authenticated` (scoped to `clerk_org_id = (select auth.jwt()) -> 'o' ->> 'id'`) and `INSERT` for `authenticated` (same org-match condition via `with check`). Grants: `authenticated` = `SELECT, INSERT`; `anon` = none; `service_role` = default (bypasses RLS, unrestricted, as intended). Rows now exist as real businesses are created through the onboarding flow.
 
 No other tables exist.
 
@@ -146,6 +150,7 @@ No other tables exist.
 | `prompts/phase-3-supabase-postgres-foundation.md` | 3 | implemented |
 | `prompts/tighten-businesses-table-grants.md` | — (Phase 3 fix) | implemented |
 | `prompts/default-privileges-least-privilege.md` | — (Phase 3 fix) | implemented |
+| `prompts/phase-4-business-onboarding.md` | 4 | implemented |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
@@ -176,6 +181,9 @@ Status values: `draft` · `approved` · `implemented` · `superseded`
 - Data API reachability for `authenticated` confirmed working. ✓
 - Grants hardened to least privilege and re-verified twice (see the two grant-fix entries in §2): `authenticated` = `SELECT` only, `anon` = none, `TRUNCATE` denied for both, isolation still holds after tightening, and a throwaway table proved the schema-wide default-privileges fix applies to future tables too.
 - **Still genuinely unconfirmed (low-stakes, not blocking):** the exact internal mechanism pgTAP's `001_businesses_tenant_isolation.sql` assumes (`auth.jwt()` reading `request.jwt.claims` via `set_config`) was never independently verified against this project's live instance, because the manual SQL-editor spot-check was used instead of running that test file. If `supabase test db` is ever run and that specific test fails, treat it as "go verify the claims-simulation technique in that file," not "the RLS policy itself is wrong" — the policy is proven correct by the manual verification above, independent of whether that particular test file works.
+
+**Phase 4 exit criterion (docs/phases.md) — met and fully verified by user 2026-08-11:**
+"A new user can go from sign-up to an owned business record with no manual database work." ✓ Confirmed end-to-end: org-admin create flow, empty-name validation, re-onboarding redirect, non-admin "ask your admin" gate, negative RLS insert check, double-submit race handling, and a direct-POST Server Action bypass (replayed under a non-admin session, outside the UI) all passed — see the Phase 4 entry in §2 for the full list. The role-check behavior of `auth.protect({ role: "org:admin" })` for an authenticated-but-unauthorized Server Action caller, previously only type-verified, is now confirmed live: it rejects server-side and no `businesses` row was created for the non-admin's org. Exact observed status/response recorded in `docs/architecture.md`'s Authentication section.
 
 ---
 

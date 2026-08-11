@@ -34,7 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       >
         <body className="min-h-full flex flex-col">
-          <header className="flex items-center justify-end gap-4 p-4">
+          <header className="flex items-center justify-end gap-4 border-b border-zinc-200 bg-zinc-50 p-4">
             <Show when="signed-out">
               <Link href="/sign-in" className="text-sm">
                 Sign in

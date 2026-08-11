@@ -70,7 +70,25 @@ resource. Behavior differs by request type:
 
 `auth.protect()` also accepts a role/permission check
 (`auth.protect({ role: 'org:admin' })`) for authorization, not just
-authentication — not needed yet, add when a route actually requires it.
+authentication. First used in Phase 4 (`lib/auth.ts`'s `requireAuthContext()`
+takes an optional `{ role: "org:admin" }`, used by
+`app/onboarding/actions.ts`'s Server Action). `"org:admin"` is Clerk's
+default organization-admin role slug, confirmed against the installed
+`@clerk/nextjs` 7.7.3 / `@clerk/shared` type definitions before
+implementation (not memory).
+
+Confirmed live in Phase 4 by directly replaying the onboarding Server
+Action's POST request (captured via browser devtools, per this file's own
+guidance above that render-time gating is not a security boundary) under a
+signed-in **non-admin** org member's session, bypassing the UI entirely:
+`auth.protect({ role: "org:admin" })` rejected the request server-side and
+no `businesses` row was created for that member's org — the authorization
+check holds independent of the page-level gate. **Honest gap:** the exact
+status code / response shape returned to the replayed request was observed
+live during this test but not recorded, and is not documented here. If the
+precise shape matters later (e.g. building client-side handling for a
+role-rejected Server Action), re-run the devtools replay described above
+rather than assuming a value.
 
 ## Database
 
