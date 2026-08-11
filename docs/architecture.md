@@ -46,6 +46,32 @@ Established in Phase 1 via `app/api/health/route.ts`. Route handlers:
   through `lib/errors.ts`'s `AppError` / `logAndGetUserMessage`, and return
   it via `jsonError` with a safe message and an appropriate status code.
 
+## Authentication
+
+Established in Phase 2, migrated to the resource-based pattern immediately
+after (see `prompts/clerk-resource-based-auth.md`) once Clerk deprecated
+the alternative.
+
+`proxy.ts` (the Next.js 16 network-boundary file) only runs
+`clerkMiddleware()` to establish the auth context for downstream `auth()`
+calls — it does **not** perform path-based route protection.
+`createRouteMatcher` is deprecated by Clerk and is not used.
+
+Every protected Server Component, Route Handler, or Server Action calls
+`auth.protect()` directly (or, where Clerk-level identity is also needed,
+`lib/auth.ts`'s `requireAuthContext()`, which wraps it) at the top of the
+resource. Behavior differs by request type:
+
+- **Document requests (pages):** an unauthenticated visitor is redirected
+  to sign-in.
+- **Non-document requests (Route Handlers, Server Actions):** an
+  unauthenticated caller gets a `404`, not a redirect — plan API error
+  handling around this when Phase 11 adds protected routes.
+
+`auth.protect()` also accepts a role/permission check
+(`auth.protect({ role: 'org:admin' })`) for authorization, not just
+authentication — not needed yet, add when a route actually requires it.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

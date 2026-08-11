@@ -9,13 +9,13 @@ export type AuthContext = {
 };
 
 /**
- * Clerk-level identity only. Does not resolve `business_id` — that
- * requires the Supabase business/org link introduced in Phase 3/4.
+ * Protects the calling resource (Server Component, Route Handler, or
+ * Server Action) via `auth.protect()` and returns the authenticated
+ * identity. Clerk-level identity only — does not resolve `business_id`,
+ * which requires the Supabase business/org link introduced in Phase 3/4.
  */
-export async function getAuthContext(): Promise<AuthContext | null> {
-  const session = await auth();
-
-  if (!session.isAuthenticated) return null;
+export async function requireAuthContext(): Promise<AuthContext> {
+  const session = await auth.protect();
 
   return {
     userId: session.userId,

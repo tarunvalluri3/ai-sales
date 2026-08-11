@@ -12,7 +12,7 @@ Last updated: 2026-08-11
 
 Phase 2 is complete — its exit criterion in `docs/phases.md` confirmed met, see §2. No product features exist yet.
 
-Resolve decision **D2** (RLS strategy) before writing migrations.
+Decision **D2** (RLS strategy) is resolved — see §4.
 
 ---
 
@@ -36,17 +36,26 @@ Resolve decision **D2** (RLS strategy) before writing migrations.
 
 ### Phase 2 — Clerk authentication — completed 2026-08-11
 - What exists now: Clerk installed with Organizations as the tenant boundary. `proxy.ts` (Next.js 16 network-boundary file, not `middleware.ts`) protects `/dashboard(.*)` via `clerkMiddleware()`; everything else (`/`, `/api/health`, `/sign-in`, `/sign-up`, `/session-tasks/choose-organization`) stays public. `lib/auth.ts` exports `getAuthContext()` — a `server-only` helper returning Clerk-level identity (`userId`, `orgId`, `orgSlug`, `orgRole`) from a validated session; it does **not** resolve `business_id` (no Supabase business table exists until Phase 3/4). `app/dashboard/page.tsx` is a placeholder that independently redirects unauthenticated visitors via `getAuthContext()` (defense in depth, not relying on `proxy.ts` alone). `app/layout.tsx` wraps the app in `ClerkProvider` with `taskUrls` for the `choose-organization` session task, and adds a minimal unstyled header (sign-in link when signed out; `OrganizationSwitcher` + `UserButton` when signed in).
+  **Superseded same day** by `prompts/clerk-resource-based-auth.md`: `proxy.ts` no longer does path-based protection (bare `clerkMiddleware()` now), and `lib/auth.ts`'s helper was renamed `getAuthContext()` → `requireAuthContext()`, now wrapping `auth.protect()`. See that prompt's own entry below.
 - Key files: `proxy.ts`, `lib/auth.ts`, `app/layout.tsx`, `app/dashboard/page.tsx`, `app/sign-in/[[...sign-in]]/page.tsx`, `app/sign-up/[[...sign-up]]/page.tsx`, `app/session-tasks/choose-organization/page.tsx`.
 - Migrations applied: none.
 - Env vars added: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — now actually required (see §5). A local `.env.local` with real values already exists (gitignored, verified not to contain a placeholder — confirmed working via a live redirect to a Clerk `accounts.dev` instance during manual testing).
 - Decisions made this phase: Membership mode = "Membership required" (Clerk Dashboard setting, not code — assumed set); middleware strategy = public-first, protecting only `/dashboard(.*)`; `lib/auth.ts` deliberately scoped to Clerk-level identity only, not the full `{ userId, businessId }` helper from `docs/security.md` §2 (that lands once Phase 3/4 links a business to an org) — see `prompts/phase-2-clerk-authentication.md` for full reasoning on all seven decisions.
-- Known gaps carried forward: see §8 (Clerk's `createRouteMatcher` deprecation warning).
+- Known gaps carried forward: none — the `createRouteMatcher` deprecation was resolved same day, see next entry.
+
+### Clerk resource-based auth migration — completed 2026-08-11
+- What exists now: `proxy.ts` reduced to bare `clerkMiddleware()` (context-establishment only, no path-based protection); `lib/auth.ts`'s helper renamed `getAuthContext()` → `requireAuthContext()`, now wrapping `auth.protect()` (redirects unauthenticated document requests to sign-in; would 404 non-document requests, per Clerk's documented behavior — not yet exercised, no protected Route Handler exists); `app/dashboard/page.tsx` calls `requireAuthContext()` directly instead of a manual null-check + `redirect()`. `docs/architecture.md` gained an "Authentication" section documenting this as the pattern for all future protected pages/routes/actions.
+- Key files: `proxy.ts`, `lib/auth.ts`, `app/dashboard/page.tsx`, `docs/architecture.md`.
+- Migrations applied: none.
+- Env vars added: none.
+- Decisions made this phase: kept `proxy.ts` (still required to establish auth context) rather than deleting it; did not add a non-throwing/nullable identity variant since nothing needs one yet — see `prompts/clerk-resource-based-auth.md`.
+- Known gaps carried forward: none.
 
 ---
 
 ## 3. Next up
 
-Phase 3 is now in progress (current phase, see §1). Decision D2 must be resolved first.
+Phase 3 is now in progress (current phase, see §1). Decision D2 is resolved.
 
 ---
 
@@ -56,7 +65,6 @@ These must be resolved before the phase noted. **Do not implement past a decisio
 
 | # | Decision | Needed by | Status | Recommended default |
 |---|---|---|---|---|
-| D2 | Tenant isolation enforcement: Postgres RLS vs. application-layer only | Phase 3 | **OPEN** | Defense in depth: RLS enabled on every business-owned table, plus a mandatory `business_id` filter in the data-access layer. Note that the Supabase service role key bypasses RLS, so if all server access uses it, RLS protects nothing on its own. |
 | D3 | Embedding model and vector dimension | Phase 7 | **OPEN** | Confirm the current Gemini embedding model and its output dimension from live provider docs at the start of Phase 7. Pin both here and in `.env.example` before writing the migration. Never guess the dimension. |
 | D4 | Public chat widget identity mechanism | Phase 11 | **OPEN** | Per-business public widget key, resolved server-side to `business_id`, with an origin allowlist and rate limiting. See `docs/security.md` §4. |
 | D5 | Approved knowledge source types for v1 | Phase 6 | **OPEN** | Start with pasted/typed text and structured records (products, services, FAQs) only. Add file upload and URL ingestion as separate, explicitly scheduled work. |
@@ -67,6 +75,7 @@ These must be resolved before the phase noted. **Do not implement past a decisio
 | # | Decision | Resolved | Outcome |
 |---|---|---|---|
 | D1 | Tenancy model: Clerk Organizations vs. one business per user | 2026-08-11 | **Clerk Organizations.** Multi-member businesses are already specified in `PRODUCT.md` §3, and retrofitting orgs after Phase 3's schema exists would be expensive. |
+| D2 | Tenant isolation enforcement: Postgres RLS vs. application-layer only | 2026-08-11 | **Defense in depth.** RLS enabled on every business-owned table, plus mandatory `business_id` filtering in the application data-access layer, with Clerk session tokens wired into Supabase so RLS policies can see the caller. |
 
 ---
 
@@ -97,6 +106,7 @@ Tables: _none_
 | `prompts/phase-0-foundation.md` | 0 | implemented |
 | `prompts/phase-1-application-architecture.md` | 1 | implemented |
 | `prompts/phase-2-clerk-authentication.md` | 2 | implemented |
+| `prompts/clerk-resource-based-auth.md` | — (Phase 2 cleanup) | implemented |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
@@ -117,9 +127,9 @@ Status values: `draft` · `approved` · `implemented` · `superseded`
 - A request flows through a route handler with validated input, a typed result, and a controlled error response — confirmed via `GET /api/health`: valid requests return HTTP 200 with a typed JSON body; an invalid `verbose` value returns HTTP 400 with a safe error body containing no leaked internals (manually verified with curl, see prompt's manual testing steps).
 
 **Phase 2 exit criterion (docs/phases.md) — met:**
-- An unauthenticated visitor cannot reach `/dashboard` by any path — verified: `curl -i http://localhost:3000/dashboard` while signed out returns `307` redirecting to the Clerk-hosted sign-in URL. Server code reliably obtains the authenticated identity via `lib/auth.ts`'s `getAuthContext()`.
-- **Not independently verified end-to-end:** the full sign-up → choose/create-organization → land-on-`/dashboard`-with-correct-identity flow, and sign-out, were not driven through a real browser session in this environment (no interactive browser available here). The negative case (unauthenticated redirect) and the public-route reachability checks were verified via `curl`. Recommend you run through the full manual testing steps in `prompts/phase-2-clerk-authentication.md` yourself before treating this phase as fully verified.
-- Clerk emitted a deprecation warning at dev-server startup: `createRouteMatcher` (used in `proxy.ts`) is deprecated in favor of "resource-based auth checks" (per-page/route). It still functions correctly today (confirmed by the redirect test above) and `app/dashboard/page.tsx` already does its own resource-level check via `getAuthContext()` as defense in depth, per `docs/security.md` §2's explicit warning that middleware alone isn't sufficient. No action taken this phase — noted here so future route/page additions keep including their own auth check rather than leaning on `proxy.ts` path-matching alone, and so this can be revisited before Clerk actually removes `createRouteMatcher`.
+- An unauthenticated visitor cannot reach `/dashboard` by any path — verified: `curl -i http://localhost:3000/dashboard` while signed out returns `307` redirecting to the Clerk-hosted sign-in URL. Server code reliably obtains the authenticated identity via `lib/auth.ts`'s `requireAuthContext()`.
+- **Signed-in click-through confirmed by user 2026-08-11:** `/dashboard` renders the correct `userId`/`orgId`/`orgSlug` for a real test account, both before and after the resource-based auth migration below.
+- **Resolved 2026-08-11** (`prompts/clerk-resource-based-auth.md`): Clerk's `createRouteMatcher` deprecation warning is gone. `proxy.ts` now only runs bare `clerkMiddleware()` (no path-based protection); `lib/auth.ts`'s `requireAuthContext()` wraps `auth.protect()` and is called directly in `app/dashboard/page.tsx`, matching Clerk's current recommended pattern. Redirect behavior for unauthenticated visitors confirmed unchanged (same sign-in URL as before). `docs/architecture.md` gained an "Authentication" section documenting the per-resource pattern, including the document-vs-non-document (redirect vs. 404) behavior difference Phase 11 will need.
 
 ---
 

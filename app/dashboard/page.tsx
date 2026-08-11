@@ -1,10 +1,7 @@
-import { redirect } from "next/navigation";
-import { getAuthContext } from "@/lib/auth";
+import { requireAuthContext } from "@/lib/auth";
 
 export default async function DashboardPage() {
-  const context = await getAuthContext();
-
-  if (!context) redirect("/sign-in");
+  const context = await requireAuthContext();
 
   if (!context.orgId) {
     return (
