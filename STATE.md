@@ -10,9 +10,7 @@ Last updated: 2026-08-11
 
 **Phase 3 — Supabase + PostgreSQL foundation**
 
-Phase 2 is complete — its exit criterion in `docs/phases.md` confirmed met, see §2. No product features exist yet.
-
-Decision **D2** (RLS strategy) is resolved — see §4.
+Implemented; **pending your verification.** No Docker/Supabase CLI access in the implementation environment, so the migration was never applied and the tenant-isolation test was never run by the agent — see §8 for exactly what's verified vs. not. Phase 2 is complete, see §2.
 
 ---
 
@@ -51,11 +49,19 @@ Decision **D2** (RLS strategy) is resolved — see §4.
 - Decisions made this phase: kept `proxy.ts` (still required to establish auth context) rather than deleting it; did not add a non-throwing/nullable identity variant since nothing needs one yet — see `prompts/clerk-resource-based-auth.md`.
 - Known gaps carried forward: none.
 
+### Phase 3 — Supabase + PostgreSQL foundation — implemented 2026-08-11, pending user verification
+- What exists now: `supabase/` scaffold (`supabase init`) with `[auth.third_party.clerk]` enabled in `config.toml` (domain observed live during Phase 2 testing — confirm against your Clerk Dashboard). Migration `supabase/migrations/20260811124354_create_businesses_table.sql` creates `public.businesses` (`id uuid pk`, `clerk_org_id text` unique-indexed, `name`, `created_at`/`updated_at` with an update trigger), enables + forces RLS, grants `SELECT` to `authenticated` (required in addition to RLS — new tables aren't auto-exposed to Data API roles by default), and a policy scoping `SELECT` to the caller's Clerk org via `(select auth.jwt()) -> 'o' ->> 'id'` (current Clerk v2 claim shape, not the deprecated flat `org_id`). `lib/supabase/server.ts` exports `createServerSupabaseClient()` (server-only, per-request client using Supabase's native third-party-auth `accessToken` callback wired to Clerk). `lib/supabase/types.ts` has a hand-written `Business` type. A pgTAP tenant-isolation test exists at `supabase/tests/database/001_businesses_tenant_isolation.sql`.
+- Key files: `supabase/config.toml`, `supabase/migrations/20260811124354_create_businesses_table.sql`, `supabase/tests/database/000_setup.sql`, `supabase/tests/database/001_businesses_tenant_isolation.sql`, `lib/supabase/server.ts`, `lib/supabase/types.ts`.
+- Migrations applied: **written, not applied by the agent** — no Docker/Supabase CLI project access in this environment. User will apply via `supabase link` + `supabase db push` against the real project.
+- Env vars added: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — now required (see §5). `SUPABASE_SECRET_KEY` still planned, not required (no privileged-access code yet).
+- Decisions made this phase: imperative migrations, not declarative; UUID primary key per `docs/security.md` §3 (declined the best-practices skill's UUIDv7/bigint suggestion — table is low-cardinality); "membership link" = `businesses.clerk_org_id`, no separate members table (Clerk owns membership); SELECT-only RLS policy this phase (no INSERT/UPDATE path exists until Phase 4's onboarding flow); Clerk JWT claims read as `o.id`/`sub` (verified current v2 shape, not deprecated flat `org_id`); pgTAP test uses manual `set_config`/`set local role` simulation, not `basejump`'s `tests.authenticate_as()` (that helper targets Supabase's own `auth.users` model, doesn't fit Clerk third-party claims); no browser or service-role Supabase client yet; Supabase env var naming corrected to current `publishable`/`secret` key system in `.env.example` and `docs/security.md` §5 (legacy `anon`/`service_role` naming is being deprecated by Supabase by end of 2026) — full reasoning in `prompts/phase-3-supabase-postgres-foundation.md`.
+- Known gaps carried forward: see §8 — tenant-isolation verification method, and the unconfirmed `auth.jwt()`/`request.jwt.claims` mechanism underlying the pgTAP test.
+
 ---
 
 ## 3. Next up
 
-Phase 3 is now in progress (current phase, see §1). Decision D2 is resolved.
+Phase 4 — Business onboarding, once you confirm Phase 3's migration and tenant-isolation verification succeeded.
 
 ---
 
@@ -86,16 +92,19 @@ Only variables actually required by implemented phases. Keep in sync with `.env.
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — client-safe. Required since Phase 2.
 - `CLERK_SECRET_KEY` — **secret**, server-only. Required since Phase 2.
 
+- `NEXT_PUBLIC_SUPABASE_URL` — client-safe. Required since Phase 3.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — client-safe. Required since Phase 3.
+
 Still planned, not yet required (see `docs/security.md` §5):
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_EMBEDDING_MODEL`
+`SUPABASE_SECRET_KEY`, `GOOGLE_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_EMBEDDING_MODEL`
 
 ---
 
 ## 6. Database state
 
-Migrations applied: _none_
+Migrations applied: _none by the agent_ — `supabase/migrations/20260811124354_create_businesses_table.sql` is written and pending your `supabase db push`.
 
-Tables: _none_
+Tables: `public.businesses` (pending apply) — `id`, `clerk_org_id` (unique), `name`, `created_at`, `updated_at`; RLS enabled + forced, one `SELECT` policy scoped to the caller's Clerk org.
 
 ---
 
@@ -107,6 +116,7 @@ Tables: _none_
 | `prompts/phase-1-application-architecture.md` | 1 | implemented |
 | `prompts/phase-2-clerk-authentication.md` | 2 | implemented |
 | `prompts/clerk-resource-based-auth.md` | — (Phase 2 cleanup) | implemented |
+| `prompts/phase-3-supabase-postgres-foundation.md` | 3 | implemented |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
@@ -130,6 +140,12 @@ Status values: `draft` · `approved` · `implemented` · `superseded`
 - An unauthenticated visitor cannot reach `/dashboard` by any path — verified: `curl -i http://localhost:3000/dashboard` while signed out returns `307` redirecting to the Clerk-hosted sign-in URL. Server code reliably obtains the authenticated identity via `lib/auth.ts`'s `requireAuthContext()`.
 - **Signed-in click-through confirmed by user 2026-08-11:** `/dashboard` renders the correct `userId`/`orgId`/`orgSlug` for a real test account, both before and after the resource-based auth migration below.
 - **Resolved 2026-08-11** (`prompts/clerk-resource-based-auth.md`): Clerk's `createRouteMatcher` deprecation warning is gone. `proxy.ts` now only runs bare `clerkMiddleware()` (no path-based protection); `lib/auth.ts`'s `requireAuthContext()` wraps `auth.protect()` and is called directly in `app/dashboard/page.tsx`, matching Clerk's current recommended pattern. Redirect behavior for unauthenticated visitors confirmed unchanged (same sign-in URL as before). `docs/architecture.md` gained an "Authentication" section documenting the per-resource pattern, including the document-vs-non-document (redirect vs. 404) behavior difference Phase 11 will need.
+
+**Phase 3 exit criterion (docs/phases.md) — implementation done, verification split between agent and user:**
+- `npm run lint`, `npm run build`, `npx tsc --noEmit` — all pass (this is pure TypeScript; it does not touch the database).
+- **"Migrations apply cleanly from scratch" and "a tenant-isolation test proves Business A cannot read Business B's rows" — NOT verified by the agent.** This environment has no Docker and no linked Supabase project, so `supabase db push`/`supabase test db` were never run here. Per your instruction, verification is happening on your side via `supabase link` + `supabase db push` against the real project, plus the manual SQL-editor spot-check (two rows, two simulated sessions) from the prompt's manual testing steps 1–4 — **not** the automated `supabase test db` pgTAP run, which remains written and reviewed but unexecuted. Please report back whether both the migration applied cleanly and the cross-tenant SELECT was actually blocked before this phase is treated as done.
+- The `set_config('request.jwt.claims', ...)` + `set local role authenticated` technique the pgTAP test relies on is extremely standard Supabase practice but was **not independently confirmed against this project's actual `auth.jwt()` definition** during research (see the prompt's "Not independently confirmed" note). If you do run `supabase test db` at some point, treat a failure there as "go verify the claims-simulation technique," not necessarily "the RLS policy is wrong."
+- `businesses`' reachability via the Data API for the `authenticated` role (the explicit `GRANT` in the migration) is also unverified — worth confirming in the same pass.
 
 ---
 

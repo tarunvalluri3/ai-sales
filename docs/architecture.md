@@ -72,6 +72,42 @@ resource. Behavior differs by request type:
 (`auth.protect({ role: 'org:admin' })`) for authorization, not just
 authentication — not needed yet, add when a route actually requires it.
 
+## Database
+
+Established in Phase 3. No ORM — Supabase migrations under
+`supabase/migrations/` are the schema source of truth (imperative, not
+declarative: `supabase migration new <name>`, then hand-authored SQL).
+Tests live under `supabase/tests/database/` (pgTAP, run via
+`supabase test db`).
+
+`lib/supabase/server.ts` exports `createServerSupabaseClient()` —
+`server-only`-guarded, builds a **new client per call** authenticated as
+the current Clerk session via Supabase's native third-party auth
+integration (`accessToken: async () => (await auth()).getToken()`). Never
+share one client instance across requests for different users.
+
+Tenant isolation is RLS-first (resolved decision D2, `STATE.md` §4): every
+business-owned table has RLS enabled and forced, with a policy scoped to
+the caller's Clerk organization, plus an application-layer `business_id`/
+tenant-link filter as defense in depth — never rely on application code
+alone.
+
+RLS policies read the caller's Clerk identity from `auth.jwt()`. Clerk's
+current (v2, since 2025-04-14) session token nests organization claims
+under `o`: `(select auth.jwt()) -> 'o' ->> 'id'` for the org id (not the
+deprecated flat `org_id`), `(select auth.jwt()) ->> 'sub'` for the user
+id. Always wrap `auth.jwt()` in `(select ...)` so Postgres caches it once
+per statement instead of calling it per row.
+
+New tables are **not** auto-exposed to Data API roles by default
+(`supabase/config.toml`'s `[api] auto_expose_new_tables`) — an explicit
+`grant select/insert/update/delete on <table> to authenticated;` is
+required in addition to RLS policies, or the policy has nothing to act on.
+
+A hand-written type per table lives in `lib/supabase/types.ts` (e.g.
+`Business`). Switch to `supabase gen types` once there are enough tables
+to justify the generation step.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

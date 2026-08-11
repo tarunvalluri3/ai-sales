@@ -90,13 +90,15 @@ Core set:
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | yes |
 | `CLERK_SECRET_KEY` | **no** |
 | `NEXT_PUBLIC_SUPABASE_URL` | yes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes |
-| `SUPABASE_SERVICE_ROLE_KEY` | **no — bypasses RLS** |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes |
+| `SUPABASE_SECRET_KEY` | **no — bypasses RLS** |
 | `GOOGLE_API_KEY` | **no** |
 | `GEMINI_CHAT_MODEL` | config |
 | `GEMINI_EMBEDDING_MODEL` | config |
 
 Add a variable only when a feature actually requires it. Razorpay and WhatsApp variables are deferred to their phases. Keep the live list in `STATE.md` §5 in sync.
+
+Supabase key names above reflect the current `publishable`/`secret` key system (Phase 3), not the legacy `anon`/`service_role` naming, which Supabase is deprecating by end of 2026.
 
 Validate required env vars at startup and fail loudly rather than at first use.
 
