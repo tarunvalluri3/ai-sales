@@ -189,3 +189,13 @@ Significant UI prompts must specify layout, hierarchy, typography, spacing, resp
 Read `STATE.md` → read `PRODUCT.md` → identify the phase → read only the relevant docs → inspect the code → preserve the approved architecture → keep the change small → write the prompt → ask for approval → implement → run checks → report honestly → update `STATE.md`.
 
 If a requirement is ambiguous **and** it materially affects architecture or product behavior, ask one focused question before writing the prompt. Otherwise decide from the rules already written here.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

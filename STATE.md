@@ -2,44 +2,35 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: _(set on first update)_
+Last updated: 2026-08-11
 
 ---
 
 ## 1. Current phase
 
-**Phase 0 — Project foundation**
+**Phase 1 — Next.js application architecture**
 
-Nothing has been implemented yet. No product features exist.
+Phase 0 is complete — all exit criteria in `docs/phases.md` confirmed met, see §2. No product features exist yet.
 
-Goal of this phase: a clean, running Next.js 16 + TypeScript + Tailwind app with the folder architecture, environment-variable structure, server/client boundaries, validation and error conventions, and the `prompts/` workflow in place. No product features.
-
-Exit criteria are in `docs/phases.md`.
+Exit criteria for Phase 1 are in `docs/phases.md`.
 
 ---
 
 ## 2. Completed phases
 
-_None yet._
-
-<!--
-Append one entry per completed phase, newest last. Keep entries short.
-
-### Phase 0 — Project foundation — completed YYYY-MM-DD
-- What exists now: ...
-- Key files: ...
-- Migrations applied: ...
-- Env vars added: ...
-- Known gaps carried forward: ...
--->
+### Phase 0 — Project foundation — completed 2026-08-11
+- What exists now: `create-next-app` boilerplate replaced (metadata, home page); `.env.example` documenting the full planned core env var set (no real values); `docs/architecture.md` documenting the no-`src/` layout, `lib/` server-only convention, validation convention (deferred), and error-handling convention; `lib/errors.ts` (`AppError` + `logAndGetUserMessage`), server-only-guarded.
+- Key files: `app/layout.tsx`, `app/page.tsx`, `.env.example`, `docs/architecture.md`, `lib/errors.ts`.
+- Migrations applied: none.
+- Env vars added: none actually wired — `.env.example` documents the planned set only; still none required by any implemented phase.
+- Decisions made this phase: kept top-level `app/` (no `src/`); deferred installing Zod to Phase 1 (no runtime boundary exists yet — see `prompts/phase-0-foundation.md` "Decisions and assumptions" for full reasoning); added `server-only` package now since it has an immediate use (`lib/errors.ts`) and directly serves the phase's server/client-boundary goal; `eslint.config.mjs` updated (trivial-change exemption) to ignore `.agents/**` and `.claude/**` so lint reflects application code only.
+- Known gaps carried forward: none.
 
 ---
 
 ## 3. Next up
 
-Phase 1 — Next.js application architecture.
-
-Do not start it until Phase 0 is approved as complete by the user.
+Phase 1 is now in progress (current phase, see §1). Zod will be installed as part of it (deferred from Phase 0 — see §2 above).
 
 ---
 
@@ -71,7 +62,7 @@ _None yet._
 
 Only variables actually required by implemented phases. Keep in sync with `.env.example`.
 
-_None yet — added during Phase 0._
+_None yet._ Phase 0 added `.env.example` documenting the full planned core set below as placeholders (no real values) — no variable is actually required/read by the app yet.
 
 Planned core set (see `docs/security.md` §5):
 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_EMBEDDING_MODEL`
@@ -90,15 +81,20 @@ Tables: _none_
 
 | Prompt file | Phase | Status |
 |---|---|---|
-| _none yet_ | | |
+| `prompts/phase-0-foundation.md` | 0 | implemented |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
 ---
 
-## 8. Known limitations / debt
+- `npm run build` and `npx tsc --noEmit` both pass cleanly.
+- `npm run lint` previously reported 15 errors / 304 warnings, all inside `.agents/` and `.claude/` skill-package files (not application code). Fixed 2026-08-11 under the trivial-change exemption: `eslint.config.mjs` now ignores `.agents/**` and `.claude/**` (they are skill packages, not app code, and were never intended to be linted as part of this project). `npm run lint` now reports zero errors and zero warnings across the whole repo.
 
-_None recorded yet._
+**Phase 0 exit criteria (docs/phases.md) — all met:**
+- `npm run lint` passes on a clean checkout — confirmed, zero errors/warnings.
+- `npm run build` passes — confirmed.
+- `.env.example` exists — confirmed.
+- Folder conventions are documented — confirmed, `docs/architecture.md`.
 
 ---
 
