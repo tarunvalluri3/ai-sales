@@ -21,15 +21,30 @@ state of the repo when this convention was written, and `tsconfig.json`'s
 ## Validation
 
 Zod is the required validation library at every runtime boundary
-(`AGENTS.md` §2, §9), but it is not installed in Phase 0 — there is no
-runtime boundary yet (no route handler, form, or webhook). It is added in
-Phase 1, where the first request flows through a route handler.
+(`AGENTS.md` §2, §9). Installed starting Phase 1, where the first request
+flows through a route handler (`app/api/health/route.ts`).
 
-Convention once introduced: Zod schemas are colocated with the route
-handler or server action that owns the boundary they validate, not
-centralized in a generic `lib/validation.ts` grab-bag. A schema shared by
-more than one boundary can move to a `lib/` module named for what it
-validates (e.g. `lib/schemas/lead.ts`), not a catch-all file.
+Convention: Zod schemas are colocated with the route handler or server
+action that owns the boundary they validate, not centralized in a generic
+`lib/validation.ts` grab-bag. A schema shared by more than one boundary can
+move to a `lib/` module named for what it validates (e.g.
+`lib/schemas/lead.ts`), not a catch-all file.
+
+## Route handler conventions
+
+Established in Phase 1 via `app/api/health/route.ts`. Route handlers:
+
+- Stay thin — parse/validate input, call into `lib/` (or, from Phase 3 on,
+  a service module) for any real logic, and shape the response. No business
+  logic inline in the handler once such logic exists.
+- Validate all input (query params, body, headers) with a Zod schema
+  colocated in the same file, per the Validation convention above.
+- Return responses through `lib/api-response.ts`'s `jsonSuccess`/`jsonError`
+  helpers, so every endpoint shares one JSON envelope shape
+  (`{ ok: true, data }` / `{ ok: false, error }`).
+- Never let a thrown error reach the client directly — catch it, convert it
+  through `lib/errors.ts`'s `AppError` / `logAndGetUserMessage`, and return
+  it via `jsonError` with a safe message and an appropriate status code.
 
 ## Error handling
 

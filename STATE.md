@@ -8,11 +8,11 @@ Last updated: 2026-08-11
 
 ## 1. Current phase
 
-**Phase 1 — Next.js application architecture**
+**Phase 2 — Clerk authentication**
 
-Phase 0 is complete — all exit criteria in `docs/phases.md` confirmed met, see §2. No product features exist yet.
+Phase 1 is complete — its exit criterion in `docs/phases.md` confirmed met, see §2. No product features exist yet.
 
-Exit criteria for Phase 1 are in `docs/phases.md`.
+Resolve decision **D1** (Clerk Organizations vs. one business per user) before starting Phase 2 work.
 
 ---
 
@@ -26,11 +26,19 @@ Exit criteria for Phase 1 are in `docs/phases.md`.
 - Decisions made this phase: kept top-level `app/` (no `src/`); deferred installing Zod to Phase 1 (no runtime boundary exists yet — see `prompts/phase-0-foundation.md` "Decisions and assumptions" for full reasoning); added `server-only` package now since it has an immediate use (`lib/errors.ts`) and directly serves the phase's server/client-boundary goal; `eslint.config.mjs` updated (trivial-change exemption) to ignore `.agents/**` and `.claude/**` so lint reflects application code only.
 - Known gaps carried forward: none.
 
+### Phase 1 — Next.js application architecture — completed 2026-08-11
+- What exists now: `GET /api/health` — a real, permanent (not disposable) health-check route handler validating an optional `verbose` query param with Zod, returning a typed JSON success shape via a shared response helper, and a controlled 400/500 JSON error shape on failure, with no internal detail leaked. `lib/api-response.ts` (`jsonSuccess`/`jsonError`) establishes the shared response-envelope convention for all future route handlers. `docs/architecture.md` gained a "Route handler conventions" section and its Validation section now reflects Zod as installed.
+- Key files: `app/api/health/route.ts`, `lib/api-response.ts`, `docs/architecture.md`.
+- Migrations applied: none.
+- Env vars added: none.
+- Decisions made this phase: `/api/health` chosen as the vehicle proving the route-handler/validation/error pattern (legitimate permanent infra, not product logic); query params read via `request.nextUrl.searchParams`, not `new URL(request.url)`; no `error.tsx`/`loading.tsx` added (no page yet fetches data or can fail) — see `prompts/phase-1-application-architecture.md` for full reasoning.
+- Known gaps carried forward: none.
+
 ---
 
 ## 3. Next up
 
-Phase 1 is now in progress (current phase, see §1). Zod will be installed as part of it (deferred from Phase 0 — see §2 above).
+Phase 2 is now in progress (current phase, see §1). Decision D1 must be resolved first.
 
 ---
 
@@ -40,7 +48,6 @@ These must be resolved before the phase noted. **Do not implement past a decisio
 
 | # | Decision | Needed by | Status | Recommended default |
 |---|---|---|---|---|
-| D1 | Tenancy model: Clerk Organizations vs. one business per user | Phase 2 | **OPEN** | Clerk Organizations. `PRODUCT.md` requires multiple members per business, and retrofitting orgs after Phase 3 rewrites the schema and every auth call. |
 | D2 | Tenant isolation enforcement: Postgres RLS vs. application-layer only | Phase 3 | **OPEN** | Defense in depth: RLS enabled on every business-owned table, plus a mandatory `business_id` filter in the data-access layer. Note that the Supabase service role key bypasses RLS, so if all server access uses it, RLS protects nothing on its own. |
 | D3 | Embedding model and vector dimension | Phase 7 | **OPEN** | Confirm the current Gemini embedding model and its output dimension from live provider docs at the start of Phase 7. Pin both here and in `.env.example` before writing the migration. Never guess the dimension. |
 | D4 | Public chat widget identity mechanism | Phase 11 | **OPEN** | Per-business public widget key, resolved server-side to `business_id`, with an origin allowlist and rate limiting. See `docs/security.md` §4. |
@@ -49,12 +56,9 @@ These must be resolved before the phase noted. **Do not implement past a decisio
 
 ### Resolved decisions
 
-_None yet._
-
-<!--
 | # | Decision | Resolved | Outcome |
 |---|---|---|---|
--->
+| D1 | Tenancy model: Clerk Organizations vs. one business per user | 2026-08-11 | **Clerk Organizations.** Multi-member businesses are already specified in `PRODUCT.md` §3, and retrofitting orgs after Phase 3's schema exists would be expensive. |
 
 ---
 
@@ -82,19 +86,25 @@ Tables: _none_
 | Prompt file | Phase | Status |
 |---|---|---|
 | `prompts/phase-0-foundation.md` | 0 | implemented |
+| `prompts/phase-1-application-architecture.md` | 1 | implemented |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
 ---
 
-- `npm run build` and `npx tsc --noEmit` both pass cleanly.
-- `npm run lint` previously reported 15 errors / 304 warnings, all inside `.agents/` and `.claude/` skill-package files (not application code). Fixed 2026-08-11 under the trivial-change exemption: `eslint.config.mjs` now ignores `.agents/**` and `.claude/**` (they are skill packages, not app code, and were never intended to be linted as part of this project). `npm run lint` now reports zero errors and zero warnings across the whole repo.
+## 8. Known limitations / debt
+
+- `npm run build` and `npx tsc --noEmit` pass cleanly as of Phase 1.
+- `npm run lint` previously reported 15 errors / 304 warnings, all inside `.agents/` and `.claude/` skill-package files (not application code). Fixed 2026-08-11 under the trivial-change exemption: `eslint.config.mjs` now ignores `.agents/**` and `.claude/**` (they are skill packages, not app code, and were never intended to be linted as part of this project). `npm run lint` reports zero errors and zero warnings across the whole repo.
 
 **Phase 0 exit criteria (docs/phases.md) — all met:**
 - `npm run lint` passes on a clean checkout — confirmed, zero errors/warnings.
 - `npm run build` passes — confirmed.
 - `.env.example` exists — confirmed.
 - Folder conventions are documented — confirmed, `docs/architecture.md`.
+
+**Phase 1 exit criterion (docs/phases.md) — met:**
+- A request flows through a route handler with validated input, a typed result, and a controlled error response — confirmed via `GET /api/health`: valid requests return HTTP 200 with a typed JSON body; an invalid `verbose` value returns HTTP 400 with a safe error body containing no leaked internals (manually verified with curl, see prompt's manual testing steps).
 
 ---
 
