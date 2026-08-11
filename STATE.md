@@ -8,9 +8,23 @@ Last updated: 2026-08-11
 
 ## 1. Current phase
 
-**Phase 5 — Products / Services / FAQs**
+**Phase 5 — Products / Services / FAQs — implemented, awaiting migration + manual verification**
 
-Phase 4 (Business onboarding) is complete and fully verified by the user — see §2. No prompt written yet for Phase 5; hold off per explicit user instruction until asked. Per `docs/phases.md`: business-owned structured knowledge (products, services, FAQs), CRUD, validation, tenant isolation, and these records must be reachable by retrieval later (Phase 6+). Per `docs/phases.md`'s exit criterion, isolation tests are required for every new table this phase adds.
+Implemented per `prompts/phase-5-products-services-faqs.md`. **Not yet moved to §2** — the three new migrations have not been applied to the live Supabase project, and the pgTAP isolation tests have not been run (no Docker/Supabase CLI project access in this environment, same standing gap as every prior phase). Do not advance to Phase 6 until the user applies the migrations and confirms the manual testing steps in the prompt; move this entry into §2 at that point.
+
+**What exists now:** three new tables (`products`, `services`, `faqs`), each `business_id`-scoped (not `clerk_org_id` directly — the first tables to use this join-through-`businesses` RLS shape), RLS enabled + forced with four policies each (select/insert/update/delete), indexed on `business_id`, `updated_at` trigger reusing the existing `set_updated_at()` function. `lib/business-context.ts` adds `requireBusinessContext()` — the `{ userId, businessId }` helper `docs/security.md` §2 has been asking for since Phase 3/4; resolves org → business and redirects (not throws) when either is missing. `lib/products.ts`, `lib/services.ts`, `lib/faqs.ts` — server-only CRUD data-access modules, each query explicitly filtered by `business_id` in addition to RLS; update/delete return `boolean` (affected-or-not) rather than distinguishing "not found" from "belongs to another tenant," so no existence information leaks. `lib/schemas/catalog.ts` holds the Zod fields shared by products/services (name/description/price — price blank submits as `null`, never `0`). Minimal functional CRUD pages at `app/dashboard/{products,services,faqs}` (list + create form) and `app/dashboard/{products,services,faqs}/[id]/edit` (edit form), plus a shared `DeleteButton` client component — deliberately not integrated into any dashboard nav/chrome, since that's Phase 13's scope.
+
+**Key files:** `supabase/migrations/20260811170015_create_products_table.sql`, `..._create_services_table.sql`, `..._create_faqs_table.sql`, `supabase/tests/database/003_products_tenant_isolation.sql`, `004_services_tenant_isolation.sql`, `005_faqs_tenant_isolation.sql`, `lib/business-context.ts`, `lib/products.ts`, `lib/services.ts`, `lib/faqs.ts`, `lib/schemas/catalog.ts`, `lib/supabase/types.ts` (added `Product`/`Service`/`Faq`), `app/dashboard/products/**`, `app/dashboard/services/**`, `app/dashboard/faqs/**`, `app/dashboard/_components/delete-button.tsx`, `docs/architecture.md`.
+
+**Migrations applied:** none yet — written and reviewed only, not run against the live project. **Must be applied and grants verified** (per `docs/architecture.md`'s standing "verify actual grants after every table-creating migration" rule) before this phase can be marked complete.
+
+**Env vars added:** none.
+
+**Decisions made this phase:** (1) three separate tables, not one polymorphic table; (2) new `requireBusinessContext()` helper, not built earlier because Phase 4 only ever scoped by `clerk_org_id` directly; (3) no `is_active`/status column — confirmed by user, a deliberate follow-up migration later if Phase 6/8 needs to distinguish retrievable-vs-not, not built speculatively now; (4) **any authenticated org member — not just `org:admin` — may CRUD their business's products/services/FAQs.** Confirmed by user as a real authorization decision, recorded as resolved decision D7 in §4, not just an implementation detail; (5) minimal functional CRUD pages, not a dashboard section (Phase 13 owns dashboard integration); (6) no REST API surface, Server Actions only; (7) hard delete, no soft-delete/archive; (8) blank price submits as `null`, never `0`. Full reasoning: `prompts/phase-5-products-services-faqs.md`.
+
+**Checks run:** `npm run lint` — pass, zero errors/warnings. `npx tsc --noEmit` — pass. `npm run build` — pass, all new routes (`/dashboard/products`, `/dashboard/products/[id]/edit`, `/dashboard/services`, `/dashboard/services/[id]/edit`, `/dashboard/faqs`, `/dashboard/faqs/[id]/edit`) compile and are listed in the route manifest. `supabase test db` — **not run** (no Docker/Supabase CLI project access in this environment).
+
+**Known gaps carried forward:** migrations not applied to the live project; pgTAP tests not executed; no live manual click-through yet. All three are the user's next step before this phase can close.
 
 ---
 
@@ -86,7 +100,7 @@ Phase 4 (Business onboarding) is complete and fully verified by the user — see
 
 ## 3. Next up
 
-Phase 5 — Products / Services / FAQs is current (see §1). No prompt written yet — **hold off writing it until the user explicitly asks**, per direct instruction. When asked: follow the standard `AGENTS.md` §5 workflow, inspect the `businesses` table/RLS pattern from Phases 3–4 as the template for tenant-scoped CRUD, and add isolation tests for every new table per `docs/phases.md`'s Phase 5 exit criterion.
+Phase 5 is implemented but not yet closed (see §1). Immediate next step: user applies the three new migrations (`supabase link` + `supabase db push`, matching the Phase 3/4 workflow), verifies grants, and runs the manual testing steps in `prompts/phase-5-products-services-faqs.md`. Once confirmed, move the §1 entry into §2, update §6 with the new tables, and advance §1 to Phase 6 — Knowledge ingestion.
 
 ---
 
@@ -107,6 +121,7 @@ These must be resolved before the phase noted. **Do not implement past a decisio
 |---|---|---|---|
 | D1 | Tenancy model: Clerk Organizations vs. one business per user | 2026-08-11 | **Clerk Organizations.** Multi-member businesses are already specified in `PRODUCT.md` §3, and retrofitting orgs after Phase 3's schema exists would be expensive. |
 | D2 | Tenant isolation enforcement: Postgres RLS vs. application-layer only | 2026-08-11 | **Defense in depth.** RLS enabled on every business-owned table, plus mandatory `business_id` filtering in the application data-access layer, with Clerk session tokens wired into Supabase so RLS policies can see the caller. |
+| D7 | Products/services/FAQs CRUD authorization: any org member vs. `org:admin`-only | 2026-08-11 | **Any authenticated org member.** `PRODUCT.md` §3 defers the full role model to a later phase and doesn't distinguish owner/member for structured-knowledge CRUD; RLS policies gate on org match only, same shape as `businesses`' existing policies. Confirmed explicitly by the user as a real authorization decision, not just an implementation default — revisit if a stricter model is ever wanted. |
 
 ---
 
@@ -151,6 +166,7 @@ No other tables exist.
 | `prompts/tighten-businesses-table-grants.md` | — (Phase 3 fix) | implemented |
 | `prompts/default-privileges-least-privilege.md` | — (Phase 3 fix) | implemented |
 | `prompts/phase-4-business-onboarding.md` | 4 | implemented |
+| `prompts/phase-5-products-services-faqs.md` | 5 | implemented (migrations not yet applied — see §1) |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
@@ -184,6 +200,9 @@ Status values: `draft` · `approved` · `implemented` · `superseded`
 
 **Phase 4 exit criterion (docs/phases.md) — met and fully verified by user 2026-08-11:**
 "A new user can go from sign-up to an owned business record with no manual database work." ✓ Confirmed end-to-end: org-admin create flow, empty-name validation, re-onboarding redirect, non-admin "ask your admin" gate, negative RLS insert check, double-submit race handling, and a direct-POST Server Action bypass (replayed under a non-admin session, outside the UI) all passed — see the Phase 4 entry in §2 for the full list. The role-check behavior of `auth.protect({ role: "org:admin" })` for an authenticated-but-unauthorized Server Action caller, previously only type-verified, is now confirmed live: it rejects server-side and no `businesses` row was created for the non-admin's org. Exact observed status/response recorded in `docs/architecture.md`'s Authentication section.
+
+**Phase 5 exit criterion (docs/phases.md) — not yet met, implementation complete:**
+"Full CRUD works for each type, all queries are tenant-scoped, and isolation tests cover every new table." Code-complete and passing `npm run lint` / `npx tsc --noEmit` / `npm run build` (see §1), but the exit criterion itself requires live verification — migrations not yet applied, pgTAP tests not yet run, no manual click-through yet. See §1 and §3 for what's left.
 
 ---
 

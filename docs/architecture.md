@@ -152,6 +152,41 @@ A hand-written type per table lives in `lib/supabase/types.ts` (e.g.
 `Business`). Switch to `supabase gen types` once there are enough tables
 to justify the generation step.
 
+### Business-owned child tables (Phase 5)
+
+`products`, `services`, and `faqs` (Phase 5) are the first tables keyed by
+`business_id` rather than `clerk_org_id` directly. Their RLS policies join
+through `businesses` to check org ownership:
+
+```sql
+business_id in (
+  select id from public.businesses
+  where clerk_org_id = ((select auth.jwt()) -> 'o' ->> 'id')
+)
+```
+
+Each has four policies (`select`/`insert`/`update`/`delete`), all scoped
+this way — **any authenticated member of the owning org**, not just
+`org:admin`. This is a deliberate authorization decision, not just an
+implementation detail: unlike business creation (Phase 4, gated to
+`org:admin` at the application layer), structured-knowledge CRUD has no
+owner/member distinction in `PRODUCT.md`'s current role model, so RLS
+imposes none either. Revisit if a stricter default is ever wanted — see
+the resolved-decision entry in `STATE.md` §4.
+
+Confirmed post-migration (per the standing "verify actual grants" rule
+above): `authenticated` = `SELECT, INSERT, UPDATE, DELETE`, `anon` = none,
+on all three tables — the first genuinely new tables since the Phase 3
+default-privileges fix, closing that phase's "recommended, not required"
+follow-up confirmation.
+
+`lib/business-context.ts`'s `requireBusinessContext()` is the
+`{ userId, businessId }` helper `docs/security.md` §2 asks for. It wraps
+`requireAuthContext()` + `getBusinessForOrg()` and redirects (to
+`/session-tasks/choose-organization` or `/onboarding`) rather than
+throwing when the caller has no org or no business yet. All Phase 5 data
+access resolves `businessId` through it — never from client input.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept
