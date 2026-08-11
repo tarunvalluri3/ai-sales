@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import {
+  ClerkProvider,
+  OrganizationSwitcher,
+  Show,
+  UserButton,
+} from "@clerk/nextjs";
+import Link from "next/link";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,11 +26,32 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+    <ClerkProvider
+      taskUrls={{ "choose-organization": "/session-tasks/choose-organization" }}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
-    </html>
+      <html
+        lang="en"
+        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      >
+        <body className="min-h-full flex flex-col">
+          <header className="flex items-center justify-end gap-4 p-4">
+            <Show when="signed-out">
+              <Link href="/sign-in" className="text-sm">
+                Sign in
+              </Link>
+            </Show>
+            <Show when="signed-in">
+              <OrganizationSwitcher
+                hidePersonal
+                afterSelectOrganizationUrl="/dashboard"
+                afterCreateOrganizationUrl="/dashboard"
+              />
+              <UserButton />
+            </Show>
+          </header>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
