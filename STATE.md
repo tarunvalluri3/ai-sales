@@ -8,9 +8,15 @@ Last updated: 2026-08-11
 
 ## 1. Current phase
 
-**Phase 3 — Supabase + PostgreSQL foundation**
+**Phase 4 — Business onboarding**
 
-Implemented; **pending your verification.** No Docker/Supabase CLI access in the implementation environment, so the migration was never applied and the tenant-isolation test was never run by the agent — see §8 for exactly what's verified vs. not. Phase 2 is complete, see §2.
+Phase 3 (Supabase + PostgreSQL foundation) is complete and fully verified, including both grant-hardening follow-ups — see §2. No product features exist yet; `businesses` rows are never created by any app code so far. This phase is the flow through which an authenticated owner creates their business record and is associated as its owner.
+
+Per `docs/phases.md`: exact fields are decided in this phase's own prompt. Per `AGENTS.md` §5, write the prompt, get approval, then implement — the usual workflow.
+
+Two things this phase will need to design, not carried over as settled decisions from earlier phases:
+- The INSERT path for `businesses` — Phase 3 deliberately left only a `SELECT` RLS policy in place (see §2's Phase 3 entry, Decision list) because no creation flow existed yet. This phase must add an `INSERT` policy (and decide whether creation goes through an authenticated INSERT policy or a deliberate service-role server action) and, if a policy, remember the grants lesson below.
+- Grants: per §2/§8, this project's database had (and has now fixed) a default-privileges gap — any new table this phase adds should get the same grant treatment as `businesses`: enable+force RLS, explicit `GRANT` for exactly the privileges needed, then **verify actual grants after applying**, don't assume the default-privileges fix (confirmed working via a throwaway table, not yet re-confirmed against a real new table) is sufficient without checking.
 
 ---
 
@@ -49,19 +55,35 @@ Implemented; **pending your verification.** No Docker/Supabase CLI access in the
 - Decisions made this phase: kept `proxy.ts` (still required to establish auth context) rather than deleting it; did not add a non-throwing/nullable identity variant since nothing needs one yet — see `prompts/clerk-resource-based-auth.md`.
 - Known gaps carried forward: none.
 
-### Phase 3 — Supabase + PostgreSQL foundation — implemented 2026-08-11, pending user verification
-- What exists now: `supabase/` scaffold (`supabase init`) with `[auth.third_party.clerk]` enabled in `config.toml` (domain observed live during Phase 2 testing — confirm against your Clerk Dashboard). Migration `supabase/migrations/20260811124354_create_businesses_table.sql` creates `public.businesses` (`id uuid pk`, `clerk_org_id text` unique-indexed, `name`, `created_at`/`updated_at` with an update trigger), enables + forces RLS, grants `SELECT` to `authenticated` (required in addition to RLS — new tables aren't auto-exposed to Data API roles by default), and a policy scoping `SELECT` to the caller's Clerk org via `(select auth.jwt()) -> 'o' ->> 'id'` (current Clerk v2 claim shape, not the deprecated flat `org_id`). `lib/supabase/server.ts` exports `createServerSupabaseClient()` (server-only, per-request client using Supabase's native third-party-auth `accessToken` callback wired to Clerk). `lib/supabase/types.ts` has a hand-written `Business` type. A pgTAP tenant-isolation test exists at `supabase/tests/database/001_businesses_tenant_isolation.sql`.
+### Phase 3 — Supabase + PostgreSQL foundation — completed 2026-08-11, fully verified
+- What exists now: `supabase/` scaffold (`supabase init`) with `[auth.third_party.clerk]` enabled in `config.toml` (domain observed live during Phase 2 testing). Migration `supabase/migrations/20260811124354_create_businesses_table.sql` creates `public.businesses` (`id uuid pk`, `clerk_org_id text` unique-indexed, `name`, `created_at`/`updated_at` with an update trigger), enables + forces RLS, and a policy scoping `SELECT` to the caller's Clerk org via `(select auth.jwt()) -> 'o' ->> 'id'` (current Clerk v2 claim shape — org claims are nested under `o` (`o.id`/`o.slg`/`o.rol`), **not** the deprecated flat `org_id`/`org_slug`/`org_role`). `lib/supabase/server.ts` exports `createServerSupabaseClient()` (server-only, per-request client using Supabase's native third-party-auth `accessToken` callback wired to Clerk — this is the current, non-deprecated Clerk↔Supabase integration; the old JWT-template approach was deprecated 2025-04-01). `lib/supabase/types.ts` has a hand-written `Business` type. A pgTAP tenant-isolation test exists at `supabase/tests/database/001_businesses_tenant_isolation.sql` (written, not run — see the two grant-fix entries below for what *was* independently verified).
 - Key files: `supabase/config.toml`, `supabase/migrations/20260811124354_create_businesses_table.sql`, `supabase/tests/database/000_setup.sql`, `supabase/tests/database/001_businesses_tenant_isolation.sql`, `lib/supabase/server.ts`, `lib/supabase/types.ts`.
-- Migrations applied: **written, not applied by the agent** — no Docker/Supabase CLI project access in this environment. User will apply via `supabase link` + `supabase db push` against the real project.
-- Env vars added: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — now required (see §5). `SUPABASE_SECRET_KEY` still planned, not required (no privileged-access code yet).
-- Decisions made this phase: imperative migrations, not declarative; UUID primary key per `docs/security.md` §3 (declined the best-practices skill's UUIDv7/bigint suggestion — table is low-cardinality); "membership link" = `businesses.clerk_org_id`, no separate members table (Clerk owns membership); SELECT-only RLS policy this phase (no INSERT/UPDATE path exists until Phase 4's onboarding flow); Clerk JWT claims read as `o.id`/`sub` (verified current v2 shape, not deprecated flat `org_id`); pgTAP test uses manual `set_config`/`set local role` simulation, not `basejump`'s `tests.authenticate_as()` (that helper targets Supabase's own `auth.users` model, doesn't fit Clerk third-party claims); no browser or service-role Supabase client yet; Supabase env var naming corrected to current `publishable`/`secret` key system in `.env.example` and `docs/security.md` §5 (legacy `anon`/`service_role` naming is being deprecated by Supabase by end of 2026) — full reasoning in `prompts/phase-3-supabase-postgres-foundation.md`.
-- Known gaps carried forward: see §8 — tenant-isolation verification method, and the unconfirmed `auth.jwt()`/`request.jwt.claims` mechanism underlying the pgTAP test.
+- Migrations applied: **applied and verified by user 2026-08-11.** Migration applied cleanly; cross-tenant SELECT isolation confirmed working (Business A cannot read Business B's row) — this is the Phase 3 exit criterion from `docs/phases.md`, confirmed met.
+- Env vars added: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — required since this phase (see §5). `SUPABASE_SECRET_KEY` still planned, not required (no privileged-access code yet).
+- Decisions made this phase: imperative migrations, not declarative; UUID primary key per `docs/security.md` §3 (declined the best-practices skill's UUIDv7/bigint suggestion — table is low-cardinality); "membership link" = `businesses.clerk_org_id`, no separate members table (Clerk owns membership); SELECT-only RLS policy this phase (INSERT is Phase 4's job — see §1); no browser or service-role Supabase client yet (add when a real caller needs one); Supabase env var naming corrected to current `publishable`/`secret` key system in `.env.example` and `docs/security.md` §5 (legacy `anon`/`service_role` naming is being deprecated by Supabase by end of 2026) — full reasoning in `prompts/phase-3-supabase-postgres-foundation.md`.
+- Known gaps carried forward: none — the two grant-hardening entries below closed the remaining gaps found after this phase.
+
+### Tighten businesses table grants — completed 2026-08-11
+- What exists now: user manually verified Data API exposure after Phase 3 and found `anon`/`authenticated` both held full CRUD plus `TRUNCATE`/`REFERENCES`/`TRIGGER` on `businesses` — broader than Phase 3's Decision 4 intended. Diagnosis: Postgres `GRANT` is additive, so Phase 3's explicit `grant select ... to authenticated` never overrode a pre-existing database-level `ALTER DEFAULT PRIVILEGES` from this project's provisioning (predating Supabase's April-2026 auto-expose opt-out default). Data was not actually exposed to unauthorized reads — RLS (enabled + forced, one `SELECT` policy) already gated `SELECT`/`INSERT`/`UPDATE`/`DELETE` regardless of the broad grants — but `TRUNCATE` bypasses RLS entirely (not a row-scoped operation), so the excess `TRUNCATE` grant was a real gap, not cosmetic. Migration `supabase/migrations/20260811145006_tighten_businesses_grants.sql` revokes all privileges from `anon` and revokes `INSERT`/`UPDATE`/`DELETE`/`TRUNCATE`/`REFERENCES`/`TRIGGER` from `authenticated`, leaving only the existing `SELECT` grant. `docs/architecture.md`'s "Database" section gained a note: verify actual grants after any migration that creates a table, don't assume the migration's explicit `GRANT` is the only one in effect.
+- Key files: `supabase/migrations/20260811145006_tighten_businesses_grants.sql`, `docs/architecture.md`.
+- Migrations applied: **applied and verified by user 2026-08-11.** Confirmed: `authenticated` has `SELECT` only, `anon` has zero grants, `TRUNCATE` is denied for both, and cross-tenant isolation still holds correctly.
+- Env vars added: none.
+- Decisions made this phase: scoped to `businesses` only, not a database-wide `ALTER DEFAULT PRIVILEGES` fix for future tables (separate follow-up, see next entry); `service_role` left untouched (expected to bypass RLS/hold broad privileges by design) — see `prompts/tighten-businesses-table-grants.md`.
+- Known gaps carried forward: none — fully verified.
+
+### Default privileges: least-privilege by default — completed 2026-08-11, fully verified
+- What exists now: migration `supabase/migrations/20260811150450_default_privileges_least_privilege.sql` runs `alter default privileges in schema public revoke all on tables from anon, authenticated;` so every table created from here on starts with zero default grants to those roles, instead of needing the `businesses`-style fix repeated per table. Not retroactive — doesn't affect `businesses` (already fixed separately) or anything created before this migration ran. `service_role` untouched. `docs/architecture.md`'s "Database" section documents this.
+- Key files: `supabase/migrations/20260811150450_default_privileges_least_privilege.sql`, `docs/architecture.md`.
+- Migrations applied: **applied and verified by user 2026-08-11.** A throwaway test table created after this migration had zero `anon`/`authenticated` grants, confirming the fix applies to the role that creates tables via this project's migrations — test table then dropped (not a permanent schema object).
+- Env vars added: none.
+- Decisions made this phase: scoped to `public` schema, `TABLES` only — not sequences/functions/other schemas (add if the same pattern shows up elsewhere); `service_role` untouched — see `prompts/default-privileges-least-privilege.md`.
+- Known gaps carried forward: none. Recommended (not required) to re-confirm with a real table at Phase 5 as further end-to-end proof, since the verification so far used a throwaway table rather than a table created by a "real" phase migration.
 
 ---
 
 ## 3. Next up
 
-Phase 4 — Business onboarding, once you confirm Phase 3's migration and tenant-isolation verification succeeded.
+Phase 4 — Business onboarding is current (see §1). No prompt written yet — follow the standard `AGENTS.md` §5 workflow: read `PRODUCT.md` for onboarding-relevant scope, inspect current code (`lib/auth.ts`'s `requireAuthContext()`, `lib/supabase/server.ts`, the `businesses` migration), decide the exact business fields and the INSERT-policy-vs-service-role-action question (§1), write the prompt, get approval.
 
 ---
 
@@ -102,9 +124,14 @@ Still planned, not yet required (see `docs/security.md` §5):
 
 ## 6. Database state
 
-Migrations applied: _none by the agent_ — `supabase/migrations/20260811124354_create_businesses_table.sql` is written and pending your `supabase db push`.
+Migrations applied and verified (all three, 2026-08-11):
+1. `supabase/migrations/20260811124354_create_businesses_table.sql` — creates `public.businesses`, RLS, SELECT policy.
+2. `supabase/migrations/20260811145006_tighten_businesses_grants.sql` — revokes excess `anon`/`authenticated` grants on `businesses` down to `authenticated: SELECT` only.
+3. `supabase/migrations/20260811150450_default_privileges_least_privilege.sql` — `ALTER DEFAULT PRIVILEGES` so future tables in `public` no longer inherit broad grants automatically.
 
-Tables: `public.businesses` (pending apply) — `id`, `clerk_org_id` (unique), `name`, `created_at`, `updated_at`; RLS enabled + forced, one `SELECT` policy scoped to the caller's Clerk org.
+Tables: `public.businesses` — columns `id` (uuid pk), `clerk_org_id` (text, unique), `name`, `created_at`, `updated_at` (auto-maintained via trigger). RLS enabled + forced. One policy: `SELECT` for `authenticated`, scoped to `clerk_org_id = (select auth.jwt()) -> 'o' ->> 'id'`. Grants: `authenticated` = `SELECT` only; `anon` = none; `service_role` = default (bypasses RLS, unrestricted, as intended). No `INSERT`/`UPDATE`/`DELETE` policy or path exists yet — no app code writes to this table (Phase 4's job). Zero rows currently (no business has been created through the app).
+
+No other tables exist.
 
 ---
 
@@ -117,6 +144,8 @@ Tables: `public.businesses` (pending apply) — `id`, `clerk_org_id` (unique), `
 | `prompts/phase-2-clerk-authentication.md` | 2 | implemented |
 | `prompts/clerk-resource-based-auth.md` | — (Phase 2 cleanup) | implemented |
 | `prompts/phase-3-supabase-postgres-foundation.md` | 3 | implemented |
+| `prompts/tighten-businesses-table-grants.md` | — (Phase 3 fix) | implemented |
+| `prompts/default-privileges-least-privilege.md` | — (Phase 3 fix) | implemented |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
@@ -141,11 +170,12 @@ Status values: `draft` · `approved` · `implemented` · `superseded`
 - **Signed-in click-through confirmed by user 2026-08-11:** `/dashboard` renders the correct `userId`/`orgId`/`orgSlug` for a real test account, both before and after the resource-based auth migration below.
 - **Resolved 2026-08-11** (`prompts/clerk-resource-based-auth.md`): Clerk's `createRouteMatcher` deprecation warning is gone. `proxy.ts` now only runs bare `clerkMiddleware()` (no path-based protection); `lib/auth.ts`'s `requireAuthContext()` wraps `auth.protect()` and is called directly in `app/dashboard/page.tsx`, matching Clerk's current recommended pattern. Redirect behavior for unauthenticated visitors confirmed unchanged (same sign-in URL as before). `docs/architecture.md` gained an "Authentication" section documenting the per-resource pattern, including the document-vs-non-document (redirect vs. 404) behavior difference Phase 11 will need.
 
-**Phase 3 exit criterion (docs/phases.md) — implementation done, verification split between agent and user:**
-- `npm run lint`, `npm run build`, `npx tsc --noEmit` — all pass (this is pure TypeScript; it does not touch the database).
-- **"Migrations apply cleanly from scratch" and "a tenant-isolation test proves Business A cannot read Business B's rows" — NOT verified by the agent.** This environment has no Docker and no linked Supabase project, so `supabase db push`/`supabase test db` were never run here. Per your instruction, verification is happening on your side via `supabase link` + `supabase db push` against the real project, plus the manual SQL-editor spot-check (two rows, two simulated sessions) from the prompt's manual testing steps 1–4 — **not** the automated `supabase test db` pgTAP run, which remains written and reviewed but unexecuted. Please report back whether both the migration applied cleanly and the cross-tenant SELECT was actually blocked before this phase is treated as done.
-- The `set_config('request.jwt.claims', ...)` + `set local role authenticated` technique the pgTAP test relies on is extremely standard Supabase practice but was **not independently confirmed against this project's actual `auth.jwt()` definition** during research (see the prompt's "Not independently confirmed" note). If you do run `supabase test db` at some point, treat a failure there as "go verify the claims-simulation technique," not necessarily "the RLS policy is wrong."
-- `businesses`' reachability via the Data API for the `authenticated` role (the explicit `GRANT` in the migration) is also unverified — worth confirming in the same pass.
+**Phase 3 exit criterion (docs/phases.md) — met and fully verified (by user, not the agent — this implementation environment has no Docker/Supabase CLI project access):**
+- Migration applied cleanly from scratch. ✓
+- Tenant-isolation proven: Business A cannot read Business B's row. ✓ (verified via `supabase link` + `supabase db push` + a manual SQL-editor spot-check — two rows, two simulated Clerk-org sessions — not the automated `supabase test db` pgTAP run, which remains written but never executed by anyone.)
+- Data API reachability for `authenticated` confirmed working. ✓
+- Grants hardened to least privilege and re-verified twice (see the two grant-fix entries in §2): `authenticated` = `SELECT` only, `anon` = none, `TRUNCATE` denied for both, isolation still holds after tightening, and a throwaway table proved the schema-wide default-privileges fix applies to future tables too.
+- **Still genuinely unconfirmed (low-stakes, not blocking):** the exact internal mechanism pgTAP's `001_businesses_tenant_isolation.sql` assumes (`auth.jwt()` reading `request.jwt.claims` via `set_config`) was never independently verified against this project's live instance, because the manual SQL-editor spot-check was used instead of running that test file. If `supabase test db` is ever run and that specific test fails, treat it as "go verify the claims-simulation technique in that file," not "the RLS policy itself is wrong" — the policy is proven correct by the manual verification above, independent of whether that particular test file works.
 
 ---
 

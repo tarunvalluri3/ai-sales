@@ -104,6 +104,32 @@ New tables are **not** auto-exposed to Data API roles by default
 `grant select/insert/update/delete on <table> to authenticated;` is
 required in addition to RLS policies, or the policy has nothing to act on.
 
+New tables may also inherit **broader** default privileges than intended,
+from a database-level `ALTER DEFAULT PRIVILEGES` set at project
+provisioning time — independent of, and not overridden by, any `GRANT` a
+migration adds (`GRANT` is additive; it can't revoke a grant that already
+exists from another source). This bit `businesses`: `anon` and
+`authenticated` both held full CRUD plus `TRUNCATE`/`REFERENCES`/`TRIGGER`
+despite the table's migration only explicitly granting `SELECT` to
+`authenticated` — RLS still blocked unauthorized row access, but
+`TRUNCATE` bypasses RLS entirely (it's not a row-scoped operation), so
+this was a real gap, not a cosmetic one (fixed in
+`supabase/migrations/20260811145006_tighten_businesses_grants.sql`).
+**After applying a migration that creates a table, verify its actual
+grants** (Dashboard table permissions view, or `select grantee,
+privilege_type from information_schema.role_table_grants where
+table_name = '<table>';`) — don't assume the migration's explicit `GRANT`
+is the only one in effect.
+
+`supabase/migrations/20260811150450_default_privileges_least_privilege.sql`
+closed this at the source: `alter default privileges in schema public
+revoke all on tables from anon, authenticated;` means every table created
+from that migration onward starts with zero default grants to those
+roles, so each table's own migration is what explicitly opens the access
+it needs — verified working via a throwaway test table. Still worth a
+quick grant check on the first genuinely new table (Phase 5) as
+end-to-end confirmation.
+
 A hand-written type per table lives in `lib/supabase/types.ts` (e.g.
 `Business`). Switch to `supabase gen types` once there are enough tables
 to justify the generation step.
