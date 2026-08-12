@@ -412,6 +412,67 @@ connection, if this table-level check ever turns up the same gap, the
 mitigation would similarly have to be per-table discipline, not a
 retried schema-wide `ALTER DEFAULT PRIVILEGES`.
 
+## AI orchestration: retrieval-to-generation pipeline (Phases 8-9)
+
+`lib/rag.ts` (`server-only`) is the retrieval-to-generation pipeline. It
+holds `KnowledgeRetriever` (a `@langchain/core` `BaseRetriever` wrapping
+Phase 7's `searchKnowledgeChunks()`, fixed to one `businessId` at
+construction time so every retrieval an instance performs stays
+tenant-scoped), `FALLBACK_MESSAGE`, and `askSalesEmployee()` — the single
+entry point that other code calls.
+
+**The zero-knowledge guarantee, unchanged since Phase 8:** if retrieval
+returns zero chunks for a business, `askSalesEmployee()` returns
+`FALLBACK_MESSAGE` immediately, with **no Gemini call at all** — not a
+model call working from an empty or near-empty context. This is the
+concrete mechanism behind `PRODUCT.md` §7 category 4's "never present a
+retrieval failure as an answer": there is no code path where the model
+generates an answer when there's nothing to ground it in, so there's
+nothing for the model to hallucinate around. Phase 9's richer persona
+(the business name is technically always available as category-1
+profile information) deliberately did **not** weaken this — a model
+call with only a business name to work with still risks generic-sounding
+filler that reads as invented specifics, so the hard bypass stays a
+hard bypass.
+
+**Persona and structured output (Phase 9):** when chunks *are* retrieved,
+the system prompt frames the model as an employee of the specific
+business (`businessName`, sourced from `requireBusinessContext()`, which
+already has the full `businesses` row in hand via `getBusinessForOrg()`
+— no extra query), states the four `PRODUCT.md` §7 information
+categories explicitly, and instructs the model on the category-4
+fallback, competitor/general-knowledge restrictions, and qualification
+framing. The model is invoked via
+`ChatGoogleGenerativeAI.withStructuredOutput(SalesEmployeeResponseSchema,
+{ name: "SalesEmployeeResponse" })` — confirmed via the installed
+`@langchain/google-genai` package's own `.d.ts` and documented example
+before use — so `{ answer, escalate, escalationReason }` comes back as a
+typed, Zod-validated object rather than parsed from free text.
+
+**Escalation scope, deliberately partial:** `escalate`/`escalationReason`
+only cover what a single turn can determine on its own (explicit request
+for a human; a complaint; a request for a commitment the AI isn't
+authorized to make). `PRODUCT.md` §7's other two triggers — "the AI hits
+the same unknown repeatedly" and a business-defined trigger — are not
+implemented: the former needs real persisted conversation state (Phase
+11 owns conversation/message persistence) to detect correctly rather
+than a guessed heuristic, and the latter has no configuration surface
+yet (Phase 13). `escalate` is a display/UI signal only — it authorizes
+nothing and triggers no real handoff mechanism (Phase 15's job).
+
+**Conversation context:** `askSalesEmployee()` accepts an optional,
+non-persisted `history: { role, content }[]` parameter (via a LangChain
+`MessagesPlaceholder`), so `PRODUCT.md` §7 category 3 (conversation
+information) can be honored once Phase 11 supplies real persisted
+history. No caller passes a non-empty history yet — `/dashboard/ai-test`
+(the same throwaway, un-navigated manual-test page from Phase 8) still
+tests single-turn only.
+
+Model output — `answer`, `escalate`, `escalationReason` — is untrusted
+input (`AGENTS.md` §3 rule 5, `docs/security.md` §8): rendered as
+display text/a UI flag only, never used to authorize anything, select a
+tenant, or execute a real-world action.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

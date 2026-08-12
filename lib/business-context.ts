@@ -7,6 +7,7 @@ export type BusinessContext = {
   userId: string;
   orgId: string;
   businessId: string;
+  businessName: string;
 };
 
 /**
@@ -29,5 +30,10 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
     redirect("/onboarding");
   }
 
-  return { userId: context.userId, orgId: context.orgId, businessId: business.id };
+  return {
+    userId: context.userId,
+    orgId: context.orgId,
+    businessId: business.id,
+    businessName: business.name,
+  };
 }

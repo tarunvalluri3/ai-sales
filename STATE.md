@@ -8,7 +8,7 @@ Last updated: 2026-08-12
 
 ## 1. Current phase
 
-**Phase 8 — LangChain RAG — completed and fully verified 2026-08-12.**
+**Phase 9 — Gemini AI Sales Employee — implemented, pending user manual verification.**
 
 Phases 6 and 7 are closed (see §2). The pending item that was blocking Phase 8 is now resolved (final outcome, not a retry candidate):
 
@@ -134,11 +134,21 @@ Phase 8's implementation prompt is being written this session, per the user's ex
 - **Manual verification confirmed by user 2026-08-12, all five steps in `prompts/phase-8-langchain-rag.md` passed:** (1) a zero-knowledge business got the fallback message with no Gemini call, confirmed via server logs; (2) a real test business ("Acme") got a grounded, correct answer with `sourceChunkIds` shown and traced back to its own chunks; (3) an unrelated question asked of Acme (return policy) was correctly declined rather than answered with a guess — validates Decision 4's no-hard-similarity-threshold approach, relying on the system prompt's own grounding instruction; (4) cross-tenant isolation held — a second test business ("Ghost Test Co.") never surfaced Acme's data and correctly fell back instead; (5) a forced `GEMINI_API_KEY` failure produced the safe generic error message, no raw provider error or stack trace, with the real key restored afterward. This satisfies Phase 8's exit criterion (`docs/phases.md`): a question with no supporting knowledge produces the fallback, not an invented answer — proven by test, not by inspection.
 - Known gaps carried forward: none. `GEMINI_API_KEY` naming was corrected mid-phase (see §8) — no residual gap, confirmed working end-to-end by the manual verification above, including the forced-failure/restore step.
 
+### Phase 9 — Gemini AI Sales Employee — implemented 2026-08-12, pending user manual verification
+
+- What exists now: `lib/rag.ts` extended in place — `answerFromKnowledge()` renamed to `askSalesEmployee(businessId, businessName, question, history?)`; `SYSTEM_TEMPLATE` rewritten into the full `PRODUCT.md` §7 persona (business identity, the four information categories, category-4 fallback instruction, competitor/general-knowledge restrictions, qualification framing, escalation instruction); a new `SalesEmployeeResponseSchema` (Zod) and `.withStructuredOutput()` (`@langchain/google-genai`) replace free-text generation, so the model returns `{ answer, escalate, escalationReason }` as a typed object, not parsed text. `askSalesEmployee()` accepts an optional, non-persisted `history: { role, content }[]` (via a LangChain `MessagesPlaceholder`) for future Phase 11 use — no current caller passes a non-empty one. The Phase 8 zero-knowledge hard bypass (`FALLBACK_MESSAGE`, no model call) is unchanged. `KnowledgeRetriever` is unchanged. `lib/business-context.ts`'s `BusinessContext`/`requireBusinessContext()` gained `businessName`, sourced from the `Business` row `getBusinessForOrg()` already fetches — no extra query. `app/dashboard/ai-test/{actions.ts,ask-form.tsx}` updated to call `askSalesEmployee()` and display the `escalate`/`escalationReason` signal. `docs/architecture.md` gained an "AI orchestration: retrieval-to-generation pipeline (Phases 8-9)" section.
+- Key files: `lib/rag.ts`, `lib/business-context.ts`, `app/dashboard/ai-test/actions.ts`, `app/dashboard/ai-test/ask-form.tsx`, `docs/architecture.md`.
+- Migrations applied: none. No new table, column, index, or RLS policy — same as Phase 8, this phase only changes what's sent to and read back from Gemini.
+- Env vars added: none new. Same `GEMINI_API_KEY`/`GEMINI_CHAT_MODEL` wired since Phase 8.
+- Decisions made this phase (see `prompts/phase-9-gemini-sales-employee.md` for full reasoning): (1) business profile context limited to `businesses.name` — no richer profile invented; (2) `requireBusinessContext()` extended with `businessName` at no extra query cost, following the Phase 4 low-risk-extension precedent; (3) `answerFromKnowledge` renamed to `askSalesEmployee` and extended in place, not split into a parallel module — `KnowledgeRetriever`/`FALLBACK_MESSAGE` stay in `lib/rag.ts`, no file move; (4) structured output via `withStructuredOutput()` + Zod, not text parsing; (5) escalation scoped to what a single turn can determine (explicit human request, complaint, unauthorized-commitment request) — "repeated unknown" (needs persisted conversation state, Phase 11) and business-configured triggers (needs config UI, Phase 13) explicitly deferred, not faked; (6) `history` parameter added for future Phase 11 use, but no multi-turn UI built this phase; (7) the Phase 8 zero-chunk hard bypass preserved exactly, including `escalate: false` on that path; (8) no lead extraction/persistence, D6 still open, not this phase's job.
+- Checks run: `npm run lint` — pass, zero errors/warnings. `npx tsc --noEmit` — pass. `npm run build` — pass, `/dashboard/ai-test` compiles and is listed in the route manifest.
+- Known gaps carried forward: **not yet manually verified by the user** — the nine manual testing steps in `prompts/phase-9-gemini-sales-employee.md` (cross-business exit criterion, persona/no-system-prompt-reveal, explicit-human-request escalation, complaint escalation, ordinary-question no-escalation, competitor-question decline, general-knowledge-question decline, zero-knowledge regression, forced-provider-failure regression) have not yet been run against the live Supabase/Gemini project. Phase 9 is not closed in the sense every prior phase's exit criterion was (user-confirmed, not just self-reported) until that happens.
+
 ---
 
 ## 3. Next up
 
-Phase 9 — Gemini AI Sales Employee. The user has flagged it as next but explicitly asked that its implementation prompt not be written until they give explicit approval to proceed — do not draft `prompts/phase-9-gemini-sales-employee.md` (or similarly named) until that approval arrives.
+Phase 9's nine manual testing steps (see `prompts/phase-9-gemini-sales-employee.md`) need to be run and confirmed by the user before this phase is truly closed. After that, Phase 10 — Lead extraction and creation — is next, blocked on open decision D6 (lead field specification), which must be resolved and written into `PRODUCT.md` §8 before that phase's prompt can be written.
 
 ---
 
@@ -230,6 +240,7 @@ All grants and cross-tenant RLS isolation confirmed by user: 2026-08-12 for `pro
 | `prompts/default-privileges-revoke-execute-functions-anon-authenticated.md` | — (corrective fix, pre-Phase-8) | implemented, **also found incomplete by live verification** — see next row |
 | `prompts/default-privileges-revoke-execute-functions-supabase-admin.md` | — (third/final corrective fix, pre-Phase-8) | implemented, **migration failed to apply** (`permission denied to change default privileges`, Postgres `42501`) — accepted as a platform constraint, not retried; see §1 and §8 |
 | `prompts/phase-8-langchain-rag.md` | 8 | implemented |
+| `prompts/phase-9-gemini-sales-employee.md` | 9 | implemented — pending user manual verification |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 

@@ -53,6 +53,11 @@ export function AskForm() {
           {state.sourceChunkIds && state.sourceChunkIds.length > 0 ? (
             <p className="text-xs text-zinc-500">Source chunk IDs: {state.sourceChunkIds.join(", ")}</p>
           ) : null}
+          {state.escalate ? (
+            <p className="text-xs font-medium text-amber-700">
+              Escalate: {state.escalationReason ?? "no reason given"}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

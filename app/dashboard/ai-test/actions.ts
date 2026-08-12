@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { requireBusinessContext } from "@/lib/business-context";
-import { answerFromKnowledge } from "@/lib/rag";
+import { askSalesEmployee } from "@/lib/rag";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 const questionSchema = z.string().trim().min(1).max(2000);
@@ -13,13 +13,15 @@ export type AskFormState = {
   answer?: string;
   grounded?: boolean;
   sourceChunkIds?: string[];
+  escalate?: boolean;
+  escalationReason?: string | null;
 };
 
 export async function askKnowledgeAction(
   _prevState: AskFormState,
   formData: FormData,
 ): Promise<AskFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, businessName } = await requireBusinessContext();
 
   const parsed = questionSchema.safeParse(formData.get("question"));
   if (!parsed.success) {
@@ -27,12 +29,14 @@ export async function askKnowledgeAction(
   }
 
   try {
-    const result = await answerFromKnowledge(businessId, parsed.data);
+    const result = await askSalesEmployee(businessId, businessName, parsed.data);
     return {
       question: parsed.data,
       answer: result.answer,
       grounded: result.grounded,
       sourceChunkIds: result.sourceChunkIds,
+      escalate: result.escalate,
+      escalationReason: result.escalationReason,
     };
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
