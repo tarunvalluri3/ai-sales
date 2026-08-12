@@ -446,8 +446,27 @@ framing. The model is invoked via
 `ChatGoogleGenerativeAI.withStructuredOutput(SalesEmployeeResponseSchema,
 { name: "SalesEmployeeResponse" })` — confirmed via the installed
 `@langchain/google-genai` package's own `.d.ts` and documented example
-before use — so `{ answer, escalate, escalationReason }` comes back as a
-typed, Zod-validated object rather than parsed from free text.
+before use — so `{ answer, usedContext, escalate, escalationReason }`
+comes back as a typed, Zod-validated object rather than parsed from
+free text.
+
+**`grounded` means "the answer used retrieved context," not "context
+was retrieved" — corrected post-Phase-9.** The first cut of this field
+was `documents.length > 0` — true whenever the retriever found *any*
+chunk, regardless of whether the model's answer actually drew on it.
+Manual testing caught the gap: a general-knowledge question (e.g.
+"what's the capital of France?") could retrieve a chunk via embedding
+similarity, get correctly declined per the persona rules, and still
+show as "grounded," which misrepresented a declined answer as
+data-backed. The fix adds `usedContext: boolean` to
+`SalesEmployeeResponseSchema` — model-self-reported, same trust level
+as `escalate` (`docs/security.md` §8: a display signal only, never used
+for tenant scoping or authorization) — and `grounded` is now
+`documents.length > 0 && result.usedContext`. `usedContext` is also
+exposed as its own field on `SalesEmployeeResponse`, separate from the
+collapsed `grounded` boolean, for finer-grained debugging. The
+zero-chunk hard bypass is unaffected: it never calls the model and
+always returns `grounded: false, usedContext: false`.
 
 **Escalation scope, deliberately partial:** `escalate`/`escalationReason`
 only cover what a single turn can determine on its own (explicit request

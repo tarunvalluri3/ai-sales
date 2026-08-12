@@ -12,6 +12,7 @@ export type AskFormState = {
   question?: string;
   answer?: string;
   grounded?: boolean;
+  usedContext?: boolean;
   sourceChunkIds?: string[];
   escalate?: boolean;
   escalationReason?: string | null;
@@ -34,6 +35,7 @@ export async function askKnowledgeAction(
       question: parsed.data,
       answer: result.answer,
       grounded: result.grounded,
+      usedContext: result.usedContext,
       sourceChunkIds: result.sourceChunkIds,
       escalate: result.escalate,
       escalationReason: result.escalationReason,

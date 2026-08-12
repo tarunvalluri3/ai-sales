@@ -50,6 +50,7 @@ export function AskForm() {
           <p className="text-xs text-zinc-500">
             {state.grounded ? "Grounded in retrieved knowledge." : "No matching knowledge -- fallback response."}
           </p>
+          <p className="text-xs text-zinc-500">usedContext: {String(state.usedContext ?? false)}</p>
           {state.sourceChunkIds && state.sourceChunkIds.length > 0 ? (
             <p className="text-xs text-zinc-500">Source chunk IDs: {state.sourceChunkIds.join(", ")}</p>
           ) : null}
