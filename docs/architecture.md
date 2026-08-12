@@ -327,35 +327,90 @@ policies still blocked any actual cross-tenant data access — this was a
 defense-in-depth failure, not a live data leak — but it's exactly the
 kind of gap that's invisible unless checked for explicitly.
 
-The first schema-wide attempt at closing this
-(`20260812191914_default_privileges_revoke_execute_on_functions.sql`,
-`revoke execute on functions from public;`) was **itself incomplete** —
-live verification (a throwaway function's `has_function_privilege()`
-still returning `true` for both `anon` and `authenticated`) found that
-this project's default ACL for functions in `public` explicitly grants
-`anon` and `authenticated` alongside `postgres`/`service_role`
-(confirmed via `pg_default_acl`), independent of the `PUBLIC` grant —
-the same class of provisioning-time artifact the Phase 3 table-grants
-gap was, not the SQL-standard default this note originally (incorrectly)
-assumed it was. **Closed correctly** by
-`supabase/migrations/20260812200105_default_privileges_revoke_execute_functions_anon_authenticated.sql`,
-which names `anon` and `authenticated` explicitly — `revoke execute on
-functions from anon, authenticated;` — mirroring the table-level fix's
-own scoping (`revoke all on tables from anon, authenticated;`) rather
-than relying on revoking `PUBLIC` alone. **Lesson for future grant
-fixes in this project: always name the actual roles explicitly in the
-`REVOKE`, verify live with `has_function_privilege()`/
-`pg_default_acl`/`information_schema`, and do not assume a `PUBLIC`-only
-revoke is sufficient just because it was for a different object type.**
+This took **three** migrations to actually close, and the first two
+diagnoses were each wrong in a different way — worth reading in full,
+since the same mistake pattern (assume the fix worked, don't verify
+against the actual system catalog) produced two false "fixed" states in
+a row.
 
-Neither migration is retroactive — neither affects
-`match_knowledge_chunks` (already fixed individually, re-verified
-unaffected by this gap) or anything created before they ran. Each new
-function's own migration remains responsible for its own explicit
-`grant execute ... to authenticated` (or whichever role actually needs
-it) — the default no longer opens access automatically to `anon` or
-`authenticated`, it just stops auto-opening it; nothing auto-grants the
-access a function actually needs.
+1. `20260812191914_default_privileges_revoke_execute_on_functions.sql`
+   (`revoke execute on functions from public;`) assumed the gap was
+   Postgres's ordinary SQL-standard `PUBLIC` default. **Wrong** — live
+   verification (`has_function_privilege()` on a throwaway function
+   still returning `true` for `anon`/`authenticated`) showed this
+   project's default ACL for functions in `public` explicitly grants
+   `anon`/`authenticated`, not just `PUBLIC`.
+2. `20260812200105_default_privileges_revoke_execute_functions_anon_authenticated.sql`
+   (`revoke execute on functions from anon, authenticated;`) corrected
+   *which roles* to name, but **still didn't work** — the same
+   `has_function_privilege()` check still returned `true` for both
+   roles. The real problem: neither migration specified `FOR ROLE`, so
+   both only ever edited the default ACL entry owned by the *current
+   session's role* (effectively `postgres`). `pg_default_acl` revealed
+   **two separate default ACL entries** for functions in `public` — one
+   owned by `postgres` (already effectively clean), one owned by
+   `supabase_admin` (grants `anon`/`authenticated`/`postgres`/`service_role`)
+   — and the `supabase_admin`-owned one is the one that actually governs
+   new objects, because **Supabase's own tooling provisions objects
+   under `supabase_admin`, not under whichever role a migration happens
+   to run as.**
+3. `20260812213356_default_privileges_revoke_execute_functions_supabase_admin.sql`
+   (`alter default privileges for role supabase_admin in schema public
+   revoke execute on functions from anon, authenticated;`) targeted the
+   actual owning role explicitly, diagnosed correctly from
+   `pg_default_acl` — but **failed to apply**: `npx supabase db push`
+   returned `permission denied to change default privileges` (Postgres
+   error `42501`). Nothing changed; the statement never took effect.
+
+**Final, corrected conclusion (not a retry candidate): a schema-wide
+`ALTER DEFAULT PRIVILEGES ... FOR ROLE supabase_admin` fix is not
+achievable at all through a normal migration connection on this
+project.** The two prior attempts' diagnosis was right —
+`supabase_admin` is genuinely the role whose default ACL governs
+newly-created functions — but altering *another* role's default
+privileges requires membership in that role (or superuser), and the
+`postgres` role a `db push` connects as has neither on managed
+Supabase: `supabase_admin` is reserved for Supabase's own internal
+provisioning tooling. This is a platform permission boundary, not a bug
+in the migration's SQL, and there is no equivalent normal-connection
+workaround — abandon the schema-wide approach for functions rather than
+attempting a fourth variant.
+
+All three migrations stay in `supabase/migrations/` as a record of the
+investigation. None are retroactive and none affect
+`match_knowledge_chunks` (already fixed individually via its own direct
+`revoke`, unaffected by any of this default-ACL confusion) or anything
+created before they ran. The first two applied cleanly but changed
+nothing that mattered (they edited the `postgres`-owned default ACL
+entry, not the `supabase_admin`-owned one that actually governs new
+functions); the third never applied at all, per the permission-denied
+error above.
+
+**Standing rule adopted instead of a schema-wide fix: every new
+Postgres function this project creates must get its own explicit
+`revoke execute ... from anon` (or equivalent least-privilege grant) in
+its own migration, verified live via `has_function_privilege()` after
+creation** — the same pattern already proven working for
+`match_knowledge_chunks`
+(`20260812163653_revoke_public_execute_on_match_knowledge_chunks.sql`).
+The default no longer auto-opens broader access than intended for
+*tables* (Phase 3's fix, confirmed working); for *functions*, per-object
+discipline is the mitigation, not a schema default — there is no
+"forget it once and it's still safe" guarantee for functions the way
+there is for tables, so this must be checked on every phase that adds
+one.
+
+**Still flagged, not yet done:** whether the Phase 3 table-level
+default-privileges fix (`20260811150450_default_privileges_least_privilege.sql`)
+has this same `supabase_admin`-vs-current-role gap has not been
+independently re-verified against `pg_default_acl`. Phase 5's
+throwaway-table verification found zero default grants, consistent
+with the table case being fine, but predates this session's discovery
+of the two-owning-roles issue. Given that a schema-wide fix for
+*functions* turned out to be structurally impossible via a normal
+connection, if this table-level check ever turns up the same gap, the
+mitigation would similarly have to be per-table discipline, not a
+retried schema-wide `ALTER DEFAULT PRIVILEGES`.
 
 ## Error handling
 

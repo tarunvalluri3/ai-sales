@@ -1,0 +1,24 @@
+-- Third and (per live pg_default_acl / has_function_privilege()
+-- verification) actually-correct attempt at closing this gap. Two
+-- separate default ACL entries exist for functions in schema public:
+-- one owned by postgres (grants only postgres/service_role -- already
+-- effectively clean), one owned by supabase_admin (grants
+-- anon/authenticated/postgres/service_role -- the one that actually
+-- governs new objects, since Supabase's own tooling provisions objects
+-- under supabase_admin, not under whichever role a migration happens to
+-- run as).
+--
+-- 20260812191914_default_privileges_revoke_execute_on_functions.sql and
+-- 20260812200105_default_privileges_revoke_execute_functions_anon_authenticated.sql
+-- both omitted a FOR ROLE clause, so both only ever edited the
+-- postgres-owned default -- neither touched the supabase_admin-owned
+-- one that was actually the problem. Confirmed by has_function_privilege()
+-- on a throwaway function still returning true for anon and
+-- authenticated after both prior migrations.
+--
+-- Not retroactive: does not affect match_knowledge_chunks (already
+-- fixed individually via its own direct revoke) or any function created
+-- before this migration runs. service_role untouched.
+
+alter default privileges for role supabase_admin in schema public
+revoke execute on functions from anon, authenticated;
