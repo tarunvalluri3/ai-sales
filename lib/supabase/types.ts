@@ -55,5 +55,6 @@ export type KnowledgeChunk = {
   chunk_index: number;
   content: string;
   char_count: number;
+  embedding: number[] | null;
   created_at: string;
 };

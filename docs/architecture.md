@@ -98,6 +98,16 @@ declarative: `supabase migration new <name>`, then hand-authored SQL).
 Tests live under `supabase/tests/database/` (pgTAP, run via
 `supabase test db`).
 
+**Verification fallback when the Supabase Dashboard is unavailable:**
+Phase 7 was fully verified (including grant checks and manual RLS/
+similarity spot-checks) via `npx supabase db query --linked` instead of
+the Dashboard's SQL editor, during a Supabase-side dashboard outage. This
+is a viable alternative any time the Dashboard is down or inconvenient —
+it runs arbitrary SQL against the linked live project from the CLI, so
+every ad hoc verification query this project's phases have used in the
+Dashboard's SQL editor (grant checks via `information_schema`,
+cross-tenant RLS spot-checks, etc.) works the same way through it.
+
 `lib/supabase/server.ts` exports `createServerSupabaseClient()` —
 `server-only`-guarded, builds a **new client per call** authenticated as
 the current Clerk session via Supabase's native third-party auth
@@ -247,6 +257,84 @@ Action (they're editing their own knowledge, or their own product/
 service/FAQ), so RLS already grants exactly the access needed. A
 service-role client is deferred until an actual decoupled/background job
 needs one (e.g. a future embedding backfill).
+
+### Embeddings + pgvector (Phase 7)
+
+`pgvector` is enabled (`create extension vector with schema extensions`,
+already on `search_path` per `supabase/config.toml`). `knowledge_chunks`
+gained a nullable `embedding vector(1536)` column — resolved decision D3
+(`STATE.md`): `gemini-embedding-001` truncated from its 3072-dimension
+default to 1536, which matches full-3072 MTEB retrieval quality via
+Google's MRL truncation, fits under pgvector's 2000-dimension HNSW index
+limit with the standard `vector` type (avoiding `halfvec`), and halves
+storage/memory versus 3072 at scale. Nullable because chunks created
+during Phase 6 (before this column existed) have no embedding yet and
+aren't backfilled — they get one the next time their parent document is
+saved, same pattern as the Phase 6 index-bug fix. No vector index yet
+(`docs/phases.md`: "create the vector index when the data volume
+justifies it, not reflexively") — the migration comment documents the
+exact `create index ... using hnsw (...)` command for whoever adds it
+once justified.
+
+**Critical, easy-to-miss detail:** `gemini-embedding-001` does **not**
+auto-normalize truncated (non-3072-dimension) output — this is
+documented Google behavior, not an assumption. Skipping normalization
+wouldn't throw an error, it would silently distort cosine-similarity
+rankings. `lib/embeddings.ts`'s `l2Normalize()` is applied to every
+embedding before storage; do not remove it, and do not assume a future
+model swap makes it redundant without re-checking that model's own
+normalization behavior.
+
+**LangChain client capability finding (Implementation Requirement 1 of
+the Phase 7 prompt):** the installed `@langchain/google-genai`'s
+`GoogleGenerativeAIEmbeddings` (v2.2.0, inspected directly from its
+`.d.ts`) exposes no dimension-control mechanism whatsoever — no
+`outputDimensionality` field on the constructor or on `embedQuery`/
+`embedDocuments`. Its own underlying dependency, the legacy
+`@google/generative-ai` SDK, doesn't support it either (confirmed the
+same way). The currently-maintained `@google/genai` SDK's
+`EmbedContentConfig.outputDimensionality` does. Since
+`@langchain/google-genai` therefore contributed zero functionality here,
+it was **removed** rather than kept as an unused dependency —
+`lib/embeddings.ts`'s `TruncatedGeminiEmbeddings` class extends
+`@langchain/core`'s `Embeddings` base directly (preserving the LangChain
+interface for Phase 8's future retriever/vector-store code) but calls
+`@google/genai` underneath for the actual API request. If a future
+LangChain release adds real dimension support to
+`GoogleGenerativeAIEmbeddings`, this is a candidate to revisit and
+simplify — re-check the installed package's types before assuming it's
+still needed.
+
+`match_knowledge_chunks(p_business_id, p_query_embedding, p_match_count)`
+is the tenant-scoped similarity search function, `security invoker` (not
+definer, so RLS still applies to the underlying `select`) plus an
+explicit `business_id` filter in the query body as defense-in-depth —
+the same "RLS is never the only tenant filter" pattern as every other
+table in this project. `lib/retrieval.ts`'s `searchKnowledgeChunks()` is
+its only caller so far; no chat/RAG logic consumes it yet (Phase 8).
+
+**Functions default to PUBLIC execute access — unlike tables in this
+project.** Postgres grants `EXECUTE` on every newly created function to
+`PUBLIC` by default. This project's tables default to *zero* grants
+(the Phase 3 `ALTER DEFAULT PRIVILEGES` migration closed that at the
+source — see above), which made it easy to assume the same is true of
+functions. It isn't: `match_knowledge_chunks`'s original migration
+granted `execute` to `authenticated` but never revoked the `PUBLIC`
+default, so the function was reachable by `anon` and by completely
+unauthenticated connections until
+`20260812163653_revoke_public_execute_on_match_knowledge_chunks.sql`
+fixed it. `security invoker` meant `knowledge_chunks`' RLS policies
+still blocked any actual cross-tenant data access — this was a
+defense-in-depth failure, not a live data leak — but it's exactly the
+kind of gap that's invisible unless checked for explicitly.
+**Whenever a new function is added, check
+`information_schema.role_routine_grants` for that function and revoke
+`PUBLIC`/`anon` execute access explicitly** — don't assume a `grant ...
+to authenticated` line is the only access path in effect, the same
+discipline this section already asks for on tables. A schema-wide
+`ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`
+(the function-level equivalent of the Phase 3 table fix) is still open
+as a near-term follow-up — see `STATE.md` §8.
 
 ## Error handling
 

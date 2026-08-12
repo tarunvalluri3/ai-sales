@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { KnowledgeChunk, KnowledgeDocument, KnowledgeSourceType } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { chunkText } from "@/lib/chunking";
+import { embedTexts } from "@/lib/embeddings";
 
 export type KnowledgeDocumentInput = {
   title: string;
@@ -200,13 +201,16 @@ export async function regenerateChunksForDocument(
     return;
   }
 
+  const embeddings = await embedTexts(chunks.map((chunk) => chunk.content));
+
   const { error: insertError } = await supabase.from("knowledge_chunks").insert(
-    chunks.map((chunk) => ({
+    chunks.map((chunk, index) => ({
       business_id: businessId,
       document_id: documentId,
       chunk_index: chunk.index,
       content: chunk.content,
       char_count: chunk.charCount,
+      embedding: embeddings[index],
     })),
   );
 
