@@ -2,12 +2,24 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
+import { syncGeneratedDocument, deleteGeneratedDocument } from "@/lib/knowledge-sync";
 
 export type ProductInput = {
   name: string;
   description: string | null;
   price: string | null;
 };
+
+function buildKnowledgeContent(input: ProductInput): string {
+  const parts = [input.name];
+  if (input.description) {
+    parts.push(input.description);
+  }
+  if (input.price) {
+    parts.push(`Price: ${input.price}`);
+  }
+  return parts.join("\n\n");
+}
 
 /** Looks up a single product, scoped to the given business. `null` if it doesn't exist or belongs to another business. */
 export async function getProduct(businessId: string, id: string): Promise<Product | null> {
@@ -70,6 +82,8 @@ export async function createProduct(
     );
   }
 
+  await syncGeneratedDocument(businessId, "product", data.id, data.name, buildKnowledgeContent(input));
+
   return data;
 }
 
@@ -100,7 +114,13 @@ export async function updateProduct(
     );
   }
 
-  return data.length > 0;
+  if (data.length === 0) {
+    return false;
+  }
+
+  await syncGeneratedDocument(businessId, "product", id, input.name, buildKnowledgeContent(input));
+
+  return true;
 }
 
 /** Deletes a product, scoped to the given business. See `updateProduct` for the not-found contract. */
@@ -121,5 +141,11 @@ export async function deleteProduct(businessId: string, id: string): Promise<boo
     );
   }
 
-  return data.length > 0;
+  if (data.length === 0) {
+    return false;
+  }
+
+  await deleteGeneratedDocument(businessId, "product", id);
+
+  return true;
 }

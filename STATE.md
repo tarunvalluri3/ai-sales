@@ -8,9 +8,23 @@ Last updated: 2026-08-12
 
 ## 1. Current phase
 
-**Phase 6 — Knowledge ingestion — not yet started**
+**Phase 6 — Knowledge ingestion — implemented, awaiting migration + manual verification**
 
-Phase 5 is closed (see §2). Implementation prompt for Phase 6 is being written per `docs/prompt-template.md` and requires approval before any code is written.
+Implemented per `prompts/phase-6-knowledge-ingestion.md`. **Not yet moved to §2** — the two new migrations have not been applied to the live Supabase project, and the pgTAP isolation tests have not been run (no Docker/Supabase CLI project access in this environment, same standing gap as every prior phase). Do not advance to Phase 7 until the user applies the migrations and confirms the manual testing steps in the prompt; move this entry into §2 at that point.
+
+**What exists now:** two new tables (`knowledge_documents`, `knowledge_chunks`), same `business_id`-scoped RLS/grant shape as Phase 5's tables. A `knowledge_documents` row is either `source_type = 'manual'` (pasted/typed text, CRUD via `/dashboard/knowledge`) or auto-generated from a product/service/FAQ row (`source_type = 'product'/'service'/'faq'`, `source_id` pointing at it, no FK — app-enforced integrity, partial unique index prevents duplicates). `knowledge_chunks` holds the split pieces of a document's content (no embedding column yet — Phase 7); no `update` policy/grant on this table since chunks are always deleted and reinserted, never updated in place. `lib/chunking.ts` — a hand-rolled, deterministic, pure `chunkText()` splitter (paragraph → sentence → hard-cutoff fallback, 1000-char target/150-char overlap defaults), not LangChain. `lib/knowledge.ts` — manual-document CRUD plus `regenerateChunksForDocument()` (delete-and-reinsert). `lib/knowledge-sync.ts` — `syncGeneratedDocument()`/`deleteGeneratedDocument()`, keeping generated documents in sync with structured records. `lib/products.ts`, `lib/services.ts`, `lib/faqs.ts` modified to call these after every successful create/update/delete, so every structured record stays reachable by retrieval without a manual step. Minimal functional CRUD pages at `app/dashboard/knowledge` (list + create form) and `app/dashboard/knowledge/[id]/edit` (edit form + read-only chunk preview), same un-navigated pattern as Phase 5.
+
+**Key files:** `supabase/migrations/20260812134819_create_knowledge_documents_table.sql`, `..._create_knowledge_chunks_table.sql`, `supabase/tests/database/006_knowledge_documents_tenant_isolation.sql`, `007_knowledge_chunks_tenant_isolation.sql`, `lib/chunking.ts`, `lib/knowledge.ts`, `lib/knowledge-sync.ts`, `lib/schemas/knowledge.ts`, `lib/supabase/types.ts` (added `KnowledgeDocument`/`KnowledgeChunk`/`KnowledgeSourceType`), `lib/products.ts`, `lib/services.ts`, `lib/faqs.ts` (sync calls added), `app/dashboard/knowledge/**`, `docs/architecture.md`.
+
+**Migrations applied:** none yet — written and reviewed only, not run against the live project. **Must be applied and grants verified** before this phase can be marked complete.
+
+**Env vars added:** none. No service-role client was introduced (see decision below) — no `SUPABASE_SECRET_KEY` needed yet.
+
+**Decisions made this phase:** (1) two tables (`knowledge_documents`, `knowledge_chunks`), not one — matches `PRODUCT.md` §6's documents → chunks model; (2) structured-record sync via application-layer calls (`lib/knowledge-sync.ts`) from the existing products/services/faqs data-access modules, not a DB trigger — keeps chunking logic in TypeScript, testable, matches this project's "no DB triggers beyond `set_updated_at()`" convention; (3) **no service-role Supabase client this phase**, confirmed by user — every ingestion event happens synchronously inside the authenticated business member's own Server Action, so the existing per-request Clerk-authenticated client already has the access it needs; deferred until an actual decoupled/background job needs one; (4) **chunking is hand-rolled (`lib/chunking.ts`), not LangChain**, confirmed by user — LangChain is Phase 8's job per `docs/phases.md`, and pure text splitting doesn't need an orchestration framework; (5) chunk size defaults: 1000-char target, 150-char overlap, character-based (no tokenizer wired in yet — D3, the embedding model, is still open, deadline Phase 7); (6) manual knowledge content capped at 20,000 characters; (7) chunk regeneration is delete-and-reinsert, not incremental diff — nothing depends on stable chunk IDs yet; (8) generated-document content format: product/service → `"{name}\n\n{description}\n\nPrice: {price}"` (blank fields omitted), FAQ → `"Q: {question}\n\nA: {answer}"`; (9) `source_id` has no FK constraint (can't reference three different tables with one FK) — integrity is app-enforced, with a partial unique index as a backstop against duplicates. Full reasoning: `prompts/phase-6-knowledge-ingestion.md`.
+
+**Checks run:** `npm run lint` — pass, zero errors/warnings. `npx tsc --noEmit` — pass. `npm run build` — pass, all new routes (`/dashboard/knowledge`, `/dashboard/knowledge/[id]/edit`) compile and are listed in the route manifest, alongside the unchanged products/services/faqs routes (confirming the sync-integration changes to those three `lib/` modules didn't break their existing build output). `supabase test db` — **not run** (no Docker/Supabase CLI project access in this environment).
+
+**Known gaps carried forward:** migrations not applied to the live project; pgTAP tests not executed; no live manual click-through yet, including the regression check on Phase 5's existing product/service/FAQ CRUD (now modified to call the new sync functions) called for explicitly in the approved prompt's manual testing steps. All are the user's next step before this phase can close.
 
 ---
 
@@ -95,7 +109,7 @@ Phase 5 is closed (see §2). Implementation prompt for Phase 6 is being written 
 
 ## 3. Next up
 
-Phase 6 — Knowledge ingestion. Prompt being written per `docs/prompt-template.md`, pending user approval before implementation.
+Phase 6 is implemented but not yet closed (see §1). Immediate next step: user applies the two new migrations (`supabase link` + `supabase db push`), verifies grants, and runs the manual testing steps in `prompts/phase-6-knowledge-ingestion.md` — including the explicit regression check on Phase 5's existing product/service/FAQ CRUD, since `lib/products.ts`/`services.ts`/`faqs.ts` were modified this phase. Once confirmed, move the §1 entry into §2, update §6 with the new tables, and advance §1 to Phase 7 — Embeddings + pgvector (resolve decision D3 first).
 
 ---
 
@@ -169,6 +183,7 @@ All grants and cross-tenant RLS isolation confirmed by user 2026-08-12 across al
 | `prompts/default-privileges-least-privilege.md` | — (Phase 3 fix) | implemented |
 | `prompts/phase-4-business-onboarding.md` | 4 | implemented |
 | `prompts/phase-5-products-services-faqs.md` | 5 | implemented |
+| `prompts/phase-6-knowledge-ingestion.md` | 6 | implemented (migrations not yet applied — see §1) |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
@@ -205,6 +220,9 @@ Status values: `draft` · `approved` · `implemented` · `superseded`
 
 **Phase 5 exit criterion (docs/phases.md) — met, per user confirmation 2026-08-12:**
 "Full CRUD works for each type, all queries are tenant-scoped, and isolation tests cover every new table." Migrations applied and grants verified; user confirmed a full regression pass across Phases 0–5 including real cross-tenant RLS verification. `supabase test db` (pgTAP) itself was not run — same standing gap as every prior phase, superseded by the manual verification described in the Phase 5 §2 entry.
+
+**Phase 6 exit criterion (docs/phases.md) — not yet met, implementation complete:**
+"A business can add knowledge and see it correctly chunked and stored against its own `business_id`." Code-complete and passing `npm run lint` / `npx tsc --noEmit` / `npm run build` (see §1), but the exit criterion itself requires live verification — migrations not yet applied, pgTAP tests not yet run, no manual click-through yet, including the Phase 5 regression check the approved prompt calls for (products/services/faqs `lib/` modules were modified to call the new knowledge-sync functions). See §1 and §3 for what's left.
 
 ---
 

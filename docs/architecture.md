@@ -187,6 +187,56 @@ follow-up confirmation.
 throwing when the caller has no org or no business yet. All Phase 5 data
 access resolves `businessId` through it — never from client input.
 
+### Knowledge ingestion (Phase 6)
+
+`knowledge_documents` and `knowledge_chunks` are the first ingestion
+tables: the retrievable unit of business knowledge (a document, split
+into chunks), with no embedding column yet — Phase 7 adds pgvector
+storage. Same RLS/grant shape as `products`/`services`/`faqs` (join
+through `businesses` via `business_id`), except `knowledge_chunks` has no
+`update` policy or grant — chunks are always deleted and reinserted on a
+content change (`lib/knowledge.ts`'s `regenerateChunksForDocument`), never
+updated in place, since nothing yet depends on stable chunk IDs across
+edits (no embeddings, no chunk-level references).
+
+A `knowledge_documents` row is either `source_type = 'manual'` (pasted/
+typed text, entered through `/dashboard/knowledge`, CRUD in
+`lib/knowledge.ts`) or generated from a product/service/FAQ row
+(`source_type = 'product'/'service'/'faq'`, `source_id` pointing at that
+row, kept in sync by `lib/knowledge-sync.ts`). `source_id` has no FK
+constraint — it references one of three different tables depending on
+`source_type`, which Postgres can't express as a single FK — so integrity
+for generated documents is entirely app-enforced: `lib/knowledge-sync.ts`
+is the only writer of non-null `source_id` rows, and a partial unique
+index on `(business_id, source_type, source_id)` (excluding `manual`)
+prevents duplicates per record.
+
+`lib/products.ts`, `lib/services.ts`, and `lib/faqs.ts` each call
+`syncGeneratedDocument()` after a successful create/update and
+`deleteGeneratedDocument()` after a successful delete, so every
+structured record stays reachable by retrieval without a separate manual
+step. If the sync call throws, the whole mutation is reported as failed
+to the user (the existing `logAndGetUserMessage` catch in each Server
+Action already does this) — a structured record is never left silently
+out of sync with its generated knowledge document.
+
+Chunking (`lib/chunking.ts`) is a hand-rolled, deterministic, pure text
+splitter (paragraph → sentence → hard-cutoff fallback, 1000-char target,
+150-char overlap by default) — not LangChain. LangChain is reserved for
+Phase 8 (`docs/phases.md`); Phase 6 is pure text splitting with no model
+call involved, so pulling in a LangChain package now would be premature
+per `AGENTS.md` §9's "install a dependency only when the current phase
+needs it."
+
+All ingestion in this phase runs through the existing per-request
+Clerk-authenticated Supabase client (`createServerSupabaseClient()`) —
+no service-role client was introduced. Every ingestion event happens
+synchronously inside the authenticated business member's own Server
+Action (they're editing their own knowledge, or their own product/
+service/FAQ), so RLS already grants exactly the access needed. A
+service-role client is deferred until an actual decoupled/background job
+needs one (e.g. a future embedding backfill).
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

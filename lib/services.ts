@@ -2,12 +2,24 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Service } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
+import { syncGeneratedDocument, deleteGeneratedDocument } from "@/lib/knowledge-sync";
 
 export type ServiceInput = {
   name: string;
   description: string | null;
   price: string | null;
 };
+
+function buildKnowledgeContent(input: ServiceInput): string {
+  const parts = [input.name];
+  if (input.description) {
+    parts.push(input.description);
+  }
+  if (input.price) {
+    parts.push(`Price: ${input.price}`);
+  }
+  return parts.join("\n\n");
+}
 
 /** Looks up a single service, scoped to the given business. `null` if it doesn't exist or belongs to another business. */
 export async function getService(businessId: string, id: string): Promise<Service | null> {
@@ -70,6 +82,8 @@ export async function createService(
     );
   }
 
+  await syncGeneratedDocument(businessId, "service", data.id, data.name, buildKnowledgeContent(input));
+
   return data;
 }
 
@@ -100,7 +114,13 @@ export async function updateService(
     );
   }
 
-  return data.length > 0;
+  if (data.length === 0) {
+    return false;
+  }
+
+  await syncGeneratedDocument(businessId, "service", id, input.name, buildKnowledgeContent(input));
+
+  return true;
 }
 
 /** Deletes a service, scoped to the given business. See `updateService` for the not-found contract. */
@@ -121,5 +141,11 @@ export async function deleteService(businessId: string, id: string): Promise<boo
     );
   }
 
-  return data.length > 0;
+  if (data.length === 0) {
+    return false;
+  }
+
+  await deleteGeneratedDocument(businessId, "service", id);
+
+  return true;
 }

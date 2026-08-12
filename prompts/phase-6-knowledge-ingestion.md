@@ -200,6 +200,8 @@ Everything server-only: `lib/chunking.ts`, `lib/knowledge.ts`, `lib/knowledge-sy
 6. Edit that product's description. Confirm the generated document's content and chunks update to match.
 7. Delete that product. Confirm its generated knowledge document and chunks are gone.
 8. Repeat steps 5–7 briefly for a service and a FAQ (formatted content differs per Decision 8).
+
+**Steps 5–8 double as a regression check on Phase 5's existing CRUD**, not just new-feature testing: `lib/products.ts`, `lib/services.ts`, and `lib/faqs.ts` are being modified to call the new sync functions, so a create/update/delete that worked before this phase and now fails (error shown, save blocked, etc.) is a sync-integration bug introduced by this phase's changes — confirm the product/service/FAQ save itself still succeeds and behaves exactly as it did in Phase 5, in addition to checking the generated knowledge document/chunks.
 9. **Negative/cross-tenant case:** as an `authenticated` session scoped to Business A (same technique as the Phase 5 SQL-editor spot-check), attempt to `select`/`update`/`delete` a `knowledge_documents` or `knowledge_chunks` row belonging to Business B. Confirm zero rows are visible/affected, and that a forged `insert` claiming Business B's `business_id` is rejected by RLS (`42501`), not silently accepted.
 
 ## Out of scope

@@ -2,11 +2,16 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Faq } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
+import { syncGeneratedDocument, deleteGeneratedDocument } from "@/lib/knowledge-sync";
 
 export type FaqInput = {
   question: string;
   answer: string;
 };
+
+function buildKnowledgeContent(input: FaqInput): string {
+  return `Q: ${input.question}\n\nA: ${input.answer}`;
+}
 
 /** Looks up a single FAQ, scoped to the given business. `null` if it doesn't exist or belongs to another business. */
 export async function getFaq(businessId: string, id: string): Promise<Faq | null> {
@@ -66,6 +71,8 @@ export async function createFaq(businessId: string, input: FaqInput): Promise<Fa
     );
   }
 
+  await syncGeneratedDocument(businessId, "faq", data.id, data.question, buildKnowledgeContent(input));
+
   return data;
 }
 
@@ -96,7 +103,13 @@ export async function updateFaq(
     );
   }
 
-  return data.length > 0;
+  if (data.length === 0) {
+    return false;
+  }
+
+  await syncGeneratedDocument(businessId, "faq", id, input.question, buildKnowledgeContent(input));
+
+  return true;
 }
 
 /** Deletes an FAQ, scoped to the given business. See `updateFaq` for the not-found contract. */
@@ -117,5 +130,11 @@ export async function deleteFaq(businessId: string, id: string): Promise<boolean
     );
   }
 
-  return data.length > 0;
+  if (data.length === 0) {
+    return false;
+  }
+
+  await deleteGeneratedDocument(businessId, "faq", id);
+
+  return true;
 }
