@@ -207,9 +207,20 @@ row, kept in sync by `lib/knowledge-sync.ts`). `source_id` has no FK
 constraint — it references one of three different tables depending on
 `source_type`, which Postgres can't express as a single FK — so integrity
 for generated documents is entirely app-enforced: `lib/knowledge-sync.ts`
-is the only writer of non-null `source_id` rows, and a partial unique
-index on `(business_id, source_type, source_id)` (excluding `manual`)
-prevents duplicates per record.
+is the only writer of non-null `source_id` rows, and a unique index on
+`(business_id, source_type, source_id)` prevents duplicates per record.
+Manual documents (`source_id` always `null`) never collide with each
+other or with generated rows under this index, since Postgres never
+treats `NULL = NULL` as a match in a unique constraint.
+
+**Fixed post-launch (`20260812143330_fix_knowledge_documents_generated_source_index.sql`):**
+the index was originally created as a *partial* index (`where source_type
+<> 'manual'`), which broke `syncGeneratedDocument()`'s `upsert({
+onConflict: ... })` — Postgres's `ON CONFLICT` inference requires the
+inference specification to match a partial index's predicate exactly,
+and `supabase-js`'s `upsert()` can only name columns, not a predicate, so
+every generated-document sync failed with `42P10`. The index is now
+non-partial (see above); do not reintroduce a partial predicate here.
 
 `lib/products.ts`, `lib/services.ts`, and `lib/faqs.ts` each call
 `syncGeneratedDocument()` after a successful create/update and
