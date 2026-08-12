@@ -8,9 +8,14 @@ Last updated: 2026-08-12
 
 ## 1. Current phase
 
-**Phase 8 — LangChain RAG — not yet started**
+**Phase 8 — LangChain RAG — not yet started, blocked on two pending items**
 
-Phases 6 and 7 are closed (see §2). The user has indicated Phase 8 is next but explicitly asked that its implementation prompt **not** be written yet — wait for explicit approval to proceed before drafting `prompts/phase-8-langchain-rag.md`.
+Phases 6 and 7 are closed (see §2). Before the Phase 8 prompt gets written, two things must land first, per the user's explicit sequencing:
+
+1. **A direct (not inferred) Phase 6 regression check:** a plain product edit-and-save on a real test business, no knowledge-document angle, confirming it still completes with no error. Requested because the prior Phase 6 closure relied on an inference from a related-but-not-identical observation during Phase 7 testing (see the Phase 6 §2 entry) — the user wants this closed with direct evidence instead. **Not yet done** — the user will run this (no live app/browser access exists in this implementation environment) and report back; this session's Phase 6 §2 entry will then be updated to reflect a direct check.
+2. **Default privileges: revoke EXECUTE on functions from PUBLIC — implemented, awaiting migration + verification.** Per `prompts/default-privileges-revoke-execute-on-functions.md`: `supabase/migrations/20260812191914_default_privileges_revoke_execute_on_functions.sql` runs `alter default privileges in schema public revoke execute on functions from public;` — the function-level equivalent of the Phase 3 `ALTER DEFAULT PRIVILEGES` table fix, closing at the source the class of gap `match_knowledge_chunks`'s individual fix (`20260812163653_...`) only closed for that one function. Not retroactive. `docs/architecture.md`'s Database section updated to record the fix. **Migration not yet applied** — checks run: `npm run lint` — pass; `npx tsc --noEmit` — pass; no application code changed, so `npm run build` wasn't re-run. Manual verification (throwaway function check, re-confirm `match_knowledge_chunks`'s grants are unaffected) per the prompt's steps is the user's next step.
+
+Once both are confirmed, this §1 entry updates to reflect Phase 8 as actually next, and the Phase 8 prompt gets drafted — not before, per the user's explicit instruction.
 
 ---
 
@@ -205,6 +210,7 @@ All grants and cross-tenant RLS isolation confirmed by user: 2026-08-12 for `pro
 | `prompts/phase-6-knowledge-ingestion.md` | 6 | implemented |
 | `prompts/phase-7-embeddings-pgvector.md` | 7 | implemented |
 | `prompts/fix-match-knowledge-chunks-public-execute-grant.md` | — (Phase 7 fix) | implemented |
+| `prompts/default-privileges-revoke-execute-on-functions.md` | — (schema-wide fix, pre-Phase-8) | implemented (migration not yet applied — see §1) |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
@@ -214,7 +220,7 @@ Status values: `draft` · `approved` · `implemented` · `superseded`
 
 - `npm run build` and `npx tsc --noEmit` pass cleanly as of Phase 1.
 - `npm run lint` previously reported 15 errors / 304 warnings, all inside `.agents/` and `.claude/` skill-package files (not application code). Fixed 2026-08-11 under the trivial-change exemption: `eslint.config.mjs` now ignores `.agents/**` and `.claude/**` (they are skill packages, not app code, and were never intended to be linted as part of this project). `npm run lint` reports zero errors and zero warnings across the whole repo.
-- **Open, near-term follow-up (added 2026-08-12):** a schema-wide `ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` — the function-level equivalent of the Phase 3 table-level default-privileges fix (`supabase/migrations/20260811150450_default_privileges_least_privilege.sql`) — has not been done. Postgres grants `EXECUTE` on new functions to `PUBLIC` by default, unlike this project's tables (which default to zero grants). This is exactly what caused the `match_knowledge_chunks` gap fixed by `prompts/fix-match-knowledge-chunks-public-execute-grant.md` (see the Phase 7 entry in §1) — that fix closed the one existing function's grant, but not the underlying default, so the same gap will silently reappear on the next function this project adds (likely Phase 8/9, as LangChain/RAG work tends to add more Postgres functions). Do this schema-wide fix before or immediately after the next function-creating migration, not reactively after the fact again.
+- **Resolved 2026-08-12, pending migration application (see §1):** the schema-wide `ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC` follow-up flagged here previously is now written (`supabase/migrations/20260812191914_default_privileges_revoke_execute_on_functions.sql`, per `prompts/default-privileges-revoke-execute-on-functions.md`), done proactively before Phase 8 at the user's request rather than reactively after Phase 8 adds its own functions. Not yet applied/verified against the live project — remove this bullet once §1's pending item is confirmed and this migration moves into §6's applied list.
 
 **Phase 0 exit criteria (docs/phases.md) — all met:**
 - `npm run lint` passes on a clean checkout — confirmed, zero errors/warnings.

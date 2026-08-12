@@ -327,14 +327,23 @@ fixed it. `security invoker` meant `knowledge_chunks`' RLS policies
 still blocked any actual cross-tenant data access — this was a
 defense-in-depth failure, not a live data leak — but it's exactly the
 kind of gap that's invisible unless checked for explicitly.
-**Whenever a new function is added, check
-`information_schema.role_routine_grants` for that function and revoke
-`PUBLIC`/`anon` execute access explicitly** — don't assume a `grant ...
-to authenticated` line is the only access path in effect, the same
-discipline this section already asks for on tables. A schema-wide
-`ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`
-(the function-level equivalent of the Phase 3 table fix) is still open
-as a near-term follow-up — see `STATE.md` §8.
+**Closed at the source** (matching the table-level fix's own history):
+`supabase/migrations/20260812191914_default_privileges_revoke_execute_on_functions.sql`
+runs `alter default privileges in schema public revoke execute on
+functions from public;`, so every function created from that migration
+onward starts with zero default `EXECUTE` grant to `PUBLIC` (and
+therefore to every role that inherits from it, including `authenticated`
+and `anon`). **This is not retroactive** — it doesn't affect
+`match_knowledge_chunks` (already fixed individually) or anything
+created before it ran. Each new function's own migration is still
+responsible for its own explicit `grant execute ... to authenticated`
+(or whichever role actually needs it) — the default no longer opens
+access automatically, it just stops auto-opening it to `PUBLIC`; nothing
+auto-grants the access a function actually needs. **Still worth a
+verification check on the first genuinely new function created after
+this migration**, the same "confirm the fix applies going forward, not
+just in theory" discipline the table-level equivalent used with a
+throwaway table.
 
 ## Error handling
 
