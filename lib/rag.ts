@@ -70,7 +70,7 @@ Rules:
 
 function getChatModel(): ChatGoogleGenerativeAI {
   return new ChatGoogleGenerativeAI({
-    apiKey: process.env.GOOGLE_API_KEY!,
+    apiKey: process.env.GEMINI_API_KEY!,
     model: process.env.GEMINI_CHAT_MODEL!,
     temperature: 0.2,
   });

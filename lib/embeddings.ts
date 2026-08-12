@@ -92,7 +92,7 @@ const EMBEDDING_DIMENSION = (() => {
 
 function getEmbeddingsClient(): TruncatedGeminiEmbeddings {
   return new TruncatedGeminiEmbeddings({
-    apiKey: process.env.GOOGLE_API_KEY!,
+    apiKey: process.env.GEMINI_API_KEY!,
     model: process.env.GEMINI_EMBEDDING_MODEL!,
     outputDimensionality: EMBEDDING_DIMENSION,
   });

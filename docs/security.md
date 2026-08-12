@@ -92,7 +92,7 @@ Core set:
 | `NEXT_PUBLIC_SUPABASE_URL` | yes |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes |
 | `SUPABASE_SECRET_KEY` | **no — bypasses RLS** |
-| `GOOGLE_API_KEY` | **no** |
+| `GEMINI_API_KEY` | **no** |
 | `GEMINI_CHAT_MODEL` | config |
 | `GEMINI_EMBEDDING_MODEL` | config |
 
