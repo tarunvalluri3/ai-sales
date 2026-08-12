@@ -8,7 +8,7 @@ Last updated: 2026-08-12
 
 ## 1. Current phase
 
-**Phase 8 — LangChain RAG — prompt being drafted.**
+**Phase 8 — LangChain RAG — implemented, pending user manual verification.**
 
 Phases 6 and 7 are closed (see §2). The pending item that was blocking Phase 8 is now resolved (final outcome, not a retry candidate):
 
@@ -123,11 +123,21 @@ Phase 8's implementation prompt is being written this session, per the user's ex
 - **Manual verification confirmed by user 2026-08-12, via `npx supabase db query --linked`:** L2 normalization confirmed working (norm ≈ 1 on all new embeddings). `match_knowledge_chunks` correctly ranks a chunk against itself at similarity 1.0, and correctly distinguishes semantically different content (0.60 similarity for an unrelated topic — a real, meaningful ranking gap, not a trivial pass/fail check). Legacy pre-Phase-7 chunks (created before the `embedding` column existed) confirmed to backfill correctly on re-save. Cross-tenant isolation and empty-result cases confirmed. The PUBLIC/anon execute-grant fix separately verified: permission denied for `anon`, success for `authenticated`.
 - Known gaps carried forward: `supabase test db` (pgTAP `008_match_knowledge_chunks_tenant_isolation.sql`) has not been executed as an automated pgTAP run — same standing gap as every prior phase — but its exact assertions (correct-business ranking, cross-tenant exclusion, empty result for no-knowledge business) were all independently confirmed live via `npx supabase db query --linked`, per the manual verification above. The schema-wide function-default-privileges fix (`ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC`) remains open — see §8.
 
+### Phase 8 — LangChain RAG — implemented 2026-08-12, pending user manual verification
+
+- What exists now: `lib/rag.ts` (server-only) — `KnowledgeRetriever`, a `@langchain/core` `BaseRetriever` subclass wrapping the existing (Phase 7) `searchKnowledgeChunks()`, fixed to one `businessId` at construction time; `answerFromKnowledge(businessId, question)` — the retrieval-to-generation pipeline: retrieves via the retriever, returns the exported `FALLBACK_MESSAGE` (implementing `PRODUCT.md` §7's category-4 behavior) immediately with `grounded: false` and no model call when zero chunks come back, otherwise builds a `ChatPromptTemplate` (deliberately minimal grounding-only system prompt — not the full sales persona, which is Phase 9's job) and invokes `ChatGoogleGenerativeAI` (`@langchain/google-genai`) with `GEMINI_CHAT_MODEL`, returning `{ answer, grounded: true, sourceChunkIds }`. Chat-generation failures are wrapped in `AppError`; the pre-existing `searchKnowledgeChunks` failure path is left as-is (already safe). `app/dashboard/ai-test/{page.tsx,actions.ts,ask-form.tsx}` — a minimal, unnavigated manual-test surface (same "not wired into dashboard nav" convention as Phases 5/6), protected via `requireBusinessContext()`, Zod-validates the question (1–2000 chars) in the Server Action, and displays the answer, groundedness, and source chunk IDs.
+- Key files: `lib/rag.ts`, `app/dashboard/ai-test/page.tsx`, `app/dashboard/ai-test/actions.ts`, `app/dashboard/ai-test/ask-form.tsx`, `.env.example`, `package.json`.
+- Migrations applied: none. No new table, column, index, or RLS policy — this phase only reads via the existing `match_knowledge_chunks` RPC through `searchKnowledgeChunks`.
+- Env vars added: none new. `GEMINI_CHAT_MODEL` (already pinned since Phase 7 by resolved decision D3) is now actually wired into code, per the user's explicit Decision-1 confirmation at approval time — `.env.example`'s note corrected from "not used until Phase 9" to "wired starting Phase 8." **Also fixed in passing:** `.env.example` line 30 had drifted to `GEMINI_API_KEY=` (not referenced anywhere in application code, docs, or `.env.local`, which all use `GOOGLE_API_KEY`) — corrected back to `GOOGLE_API_KEY` as part of this same edit, since it's the exact line this phase's changes touch.
+- Decisions made this phase (see `prompts/phase-8-langchain-rag.md` for full reasoning): (1) `GEMINI_CHAT_MODEL` wired starting this phase, not Phase 9 — confirmed explicitly by the user at approval time; (2) manual test surface is a throwaway `/dashboard/ai-test` page, not the Phase 11 chat API or Phase 12 chat UI; (3) chat model is `@langchain/google-genai`'s `ChatGoogleGenerativeAI` — inspected its installed `.d.ts` before use per Implementation Requirement 1, found no capability gap (unlike Phase 7's embeddings class, which lacked dimension control — that gap doesn't apply to chat), so no `@google/genai`-direct fallback was needed; (4) no numeric similarity threshold — "zero chunks retrieved" is the only pre-model fallback bypass, reliance on the system prompt's own grounding instruction as the second layer; (5) retrieval limit stays at the existing default of 5 chunks; (6) no conversation/message/lead persistence — single-turn pipeline only.
+- Checks run: `npm run lint` — pass, zero errors/warnings. `npx tsc --noEmit` — pass. `npm run build` — pass, `/dashboard/ai-test` compiles and is listed in the route manifest.
+- Known gaps carried forward: **not yet manually verified by the user** — the five manual testing steps in `prompts/phase-8-langchain-rag.md` (zero-knowledge fallback with no model call, grounded answer from real knowledge, unrelated-question non-fabrication, cross-tenant isolation on the test page, and a forced-provider-failure safe-error check) have not yet been run against the live Supabase/Gemini project. Phase 8 is not closed in the sense every prior phase's exit criterion was (user-confirmed, not just self-reported) until that happens.
+
 ---
 
 ## 3. Next up
 
-Phase 8 — LangChain RAG. The user has flagged it as next but explicitly asked that its implementation prompt not be written until they give explicit approval to proceed — do not draft `prompts/phase-8-langchain-rag.md` until that approval arrives.
+Phase 8's five manual testing steps (see `prompts/phase-8-langchain-rag.md`) need to be run and confirmed by the user before this phase is truly closed. After that, Phase 9 — Gemini AI Sales Employee — is next.
 
 ---
 
@@ -164,7 +174,7 @@ Only variables actually required by implemented phases. Keep in sync with `.env.
 
 Still planned, not yet required: `SUPABASE_SECRET_KEY` (see `docs/security.md` §5 — no service-role client exists yet; Phase 6 and Phase 7 both confirmed the per-request Clerk-authenticated client is sufficient).
 
-Pinned by resolved decision D3 (2026-08-12). `GOOGLE_API_KEY` and `GEMINI_EMBEDDING_MODEL=gemini-embedding-001`/`GEMINI_EMBEDDING_DIMENSION=1536` become required starting Phase 7 (embedding generation). `GEMINI_CHAT_MODEL=gemini-3.1-flash-lite` is pinned now but not required/wired until Phase 9 (chat generation) — per `docs/security.md` §5's "add a variable only when a feature actually requires it," it should not appear in a runtime env check before then, even though its value is already decided. Chat model string confirmed live against `ai.google.dev` during Phase 7 prompt-writing.
+Pinned by resolved decision D3 (2026-08-12). `GOOGLE_API_KEY` and `GEMINI_EMBEDDING_MODEL=gemini-embedding-001`/`GEMINI_EMBEDDING_DIMENSION=1536` required since Phase 7 (embedding generation). `GEMINI_CHAT_MODEL=gemini-3.1-flash-lite` — **required since Phase 8** (`lib/rag.ts`'s chat generation), not Phase 9 as previously noted here; that note was revised at the user's explicit request when approving the Phase 8 prompt, since Phase 8's own exit criterion (grounded generation that doesn't fabricate) can't be proven without actually wiring the chat model. Phase 9 extends the system prompt with the full sales persona on top of this same model/env var — it does not introduce a new one. Chat model string confirmed live against `ai.google.dev` during Phase 7 prompt-writing.
 
 ---
 
@@ -218,7 +228,7 @@ All grants and cross-tenant RLS isolation confirmed by user: 2026-08-12 for `pro
 | `prompts/default-privileges-revoke-execute-on-functions.md` | — (schema-wide fix, pre-Phase-8) | implemented, **found incomplete by live verification** — see next row |
 | `prompts/default-privileges-revoke-execute-functions-anon-authenticated.md` | — (corrective fix, pre-Phase-8) | implemented, **also found incomplete by live verification** — see next row |
 | `prompts/default-privileges-revoke-execute-functions-supabase-admin.md` | — (third/final corrective fix, pre-Phase-8) | implemented, **migration failed to apply** (`permission denied to change default privileges`, Postgres `42501`) — accepted as a platform constraint, not retried; see §1 and §8 |
-| `prompts/phase-8-langchain-rag.md` | 8 | draft — awaiting user approval |
+| `prompts/phase-8-langchain-rag.md` | 8 | implemented — pending user manual verification |
 
 Status values: `draft` · `approved` · `implemented` · `superseded`
 
