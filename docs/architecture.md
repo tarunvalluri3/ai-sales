@@ -313,37 +313,49 @@ the same "RLS is never the only tenant filter" pattern as every other
 table in this project. `lib/retrieval.ts`'s `searchKnowledgeChunks()` is
 its only caller so far; no chat/RAG logic consumes it yet (Phase 8).
 
-**Functions default to PUBLIC execute access — unlike tables in this
-project.** Postgres grants `EXECUTE` on every newly created function to
-`PUBLIC` by default. This project's tables default to *zero* grants
-(the Phase 3 `ALTER DEFAULT PRIVILEGES` migration closed that at the
-source — see above), which made it easy to assume the same is true of
-functions. It isn't: `match_knowledge_chunks`'s original migration
-granted `execute` to `authenticated` but never revoked the `PUBLIC`
-default, so the function was reachable by `anon` and by completely
-unauthenticated connections until
+**Functions default to broader execute access than tables in this
+project — a provisioning-time artifact, exactly like the Phase 3 table
+case, not just Postgres's SQL-standard `PUBLIC` default.** This project's
+tables default to *zero* grants (the Phase 3 `ALTER DEFAULT PRIVILEGES`
+migration closed that at the source — see above). Functions did not:
+`match_knowledge_chunks`'s original migration granted `execute` to
+`authenticated` but never revoked the default, so the function was
+reachable by `anon` and by completely unauthenticated connections until
 `20260812163653_revoke_public_execute_on_match_knowledge_chunks.sql`
-fixed it. `security invoker` meant `knowledge_chunks`' RLS policies
-still blocked any actual cross-tenant data access — this was a
+fixed it individually. `security invoker` meant `knowledge_chunks`' RLS
+policies still blocked any actual cross-tenant data access — this was a
 defense-in-depth failure, not a live data leak — but it's exactly the
 kind of gap that's invisible unless checked for explicitly.
-**Closed at the source** (matching the table-level fix's own history):
-`supabase/migrations/20260812191914_default_privileges_revoke_execute_on_functions.sql`
-runs `alter default privileges in schema public revoke execute on
-functions from public;`, so every function created from that migration
-onward starts with zero default `EXECUTE` grant to `PUBLIC` (and
-therefore to every role that inherits from it, including `authenticated`
-and `anon`). **This is not retroactive** — it doesn't affect
-`match_knowledge_chunks` (already fixed individually) or anything
-created before it ran. Each new function's own migration is still
-responsible for its own explicit `grant execute ... to authenticated`
-(or whichever role actually needs it) — the default no longer opens
-access automatically, it just stops auto-opening it to `PUBLIC`; nothing
-auto-grants the access a function actually needs. **Still worth a
-verification check on the first genuinely new function created after
-this migration**, the same "confirm the fix applies going forward, not
-just in theory" discipline the table-level equivalent used with a
-throwaway table.
+
+The first schema-wide attempt at closing this
+(`20260812191914_default_privileges_revoke_execute_on_functions.sql`,
+`revoke execute on functions from public;`) was **itself incomplete** —
+live verification (a throwaway function's `has_function_privilege()`
+still returning `true` for both `anon` and `authenticated`) found that
+this project's default ACL for functions in `public` explicitly grants
+`anon` and `authenticated` alongside `postgres`/`service_role`
+(confirmed via `pg_default_acl`), independent of the `PUBLIC` grant —
+the same class of provisioning-time artifact the Phase 3 table-grants
+gap was, not the SQL-standard default this note originally (incorrectly)
+assumed it was. **Closed correctly** by
+`supabase/migrations/20260812200105_default_privileges_revoke_execute_functions_anon_authenticated.sql`,
+which names `anon` and `authenticated` explicitly — `revoke execute on
+functions from anon, authenticated;` — mirroring the table-level fix's
+own scoping (`revoke all on tables from anon, authenticated;`) rather
+than relying on revoking `PUBLIC` alone. **Lesson for future grant
+fixes in this project: always name the actual roles explicitly in the
+`REVOKE`, verify live with `has_function_privilege()`/
+`pg_default_acl`/`information_schema`, and do not assume a `PUBLIC`-only
+revoke is sufficient just because it was for a different object type.**
+
+Neither migration is retroactive — neither affects
+`match_knowledge_chunks` (already fixed individually, re-verified
+unaffected by this gap) or anything created before they ran. Each new
+function's own migration remains responsible for its own explicit
+`grant execute ... to authenticated` (or whichever role actually needs
+it) — the default no longer opens access automatically to `anon` or
+`authenticated`, it just stops auto-opening it; nothing auto-grants the
+access a function actually needs.
 
 ## Error handling
 
