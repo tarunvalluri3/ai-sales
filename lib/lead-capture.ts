@@ -2,6 +2,7 @@ import "server-only";
 import type { ConversationMessage } from "@/lib/rag";
 import { extractLead } from "@/lib/lead-extraction";
 import { createConversation } from "@/lib/conversations";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createLead } from "@/lib/leads";
 import { listProductsForBusiness } from "@/lib/products";
 import { listServicesForBusiness } from "@/lib/services";
@@ -85,7 +86,7 @@ export async function captureLeadFromConversation(
     );
   }
 
-  const conversation = await createConversation(businessId, source);
+  const conversation = await createConversation(createServerSupabaseClient(), businessId, source);
   const lead = await createLead(businessId, conversation.id, parsed.data);
 
   return { created: true, lead };

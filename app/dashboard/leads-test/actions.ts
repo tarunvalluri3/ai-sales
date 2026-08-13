@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { requireBusinessContext } from "@/lib/business-context";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { askSalesEmployee } from "@/lib/rag";
 import type { ConversationMessage } from "@/lib/rag";
 import { captureLeadFromConversation } from "@/lib/lead-capture";
@@ -38,7 +39,13 @@ export async function askTurnAction(
   }
 
   try {
-    const result = await askSalesEmployee(businessId, businessName, parsedQuestion.data, parsedHistory.data);
+    const result = await askSalesEmployee(
+      createServerSupabaseClient(),
+      businessId,
+      businessName,
+      parsedQuestion.data,
+      parsedHistory.data,
+    );
     return { ok: true, answer: result.answer };
   } catch (error) {
     return { ok: false, error: logAndGetUserMessage(error) };

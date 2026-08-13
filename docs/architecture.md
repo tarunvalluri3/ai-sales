@@ -588,6 +588,111 @@ accumulating a transcript in client-side React state only; no
 stub note above). Ending the test conversation calls
 `captureLeadFromConversation()` directly.
 
+### Public chat widget (Phase 11)
+
+`app/api/chat/route.ts` is the first genuinely public, unauthenticated
+endpoint in this app (resolved decision D4, `STATE.md` §4). It never
+calls `requireAuthContext()`/`auth.protect()`. Instead:
+
+- `lib/widget-auth.ts`'s `resolveBusinessFromWidgetKey(key, origin)`
+  resolves a per-business `widget_key` (a new `businesses` column,
+  `uuid not null default gen_random_uuid() unique` -- a *publishable*
+  identifier, same trust class as a Stripe publishable key, not a
+  secret) to a validated `business_id`, checked against a per-business
+  `widget_allowed_origin` column (also new, nullable -- the widget fails
+  closed until an owner sets it via `/dashboard/widget-settings`). The
+  check happens against the request's `Origin` header, falling back to
+  the origin portion of `Referer`, **before** the key is ever treated as
+  valid. `WidgetAuthError` is deliberately generic -- the route never
+  tells a caller *which* check failed.
+- No code path in this flow accepts a client-supplied `business_id`.
+  There isn't even a `business_id` field in the request schema.
+
+**This is the first phase needing a service-role Supabase client**
+(`lib/supabase/service.ts`'s `createServiceSupabaseClient()`,
+`SUPABASE_SECRET_KEY` -- required as of this phase). Every prior phase
+deferred this deliberately (`docs/security.md` §3: "reserved for narrow,
+deliberate operations"); the widget request path is that narrow,
+deliberate case, since a prospect has no Clerk session for RLS to key
+off of at all. **On this path, RLS is bypassed entirely** -- the
+application-layer `business_id` filter in every query is the *only*
+tenant boundary, not defense-in-depth on top of RLS the way every other
+table in this project works. This client is never imported by any
+dashboard/Clerk-session code.
+
+`lib/conversations.ts`'s `createConversation`/`getConversationForBusiness`,
+the new `lib/messages.ts`'s `createMessage`/`listRecentMessages`, and (as
+a same-day corrective fix, `prompts/fix-widget-retrieval-client-injection.md`)
+`lib/retrieval.ts`'s `searchKnowledgeChunks` and `lib/rag.ts`'s
+`KnowledgeRetriever`/`askSalesEmployee` all take the Supabase client as
+an explicit parameter, rather than constructing one internally, so both
+the Clerk-session dashboard path (`lib/lead-capture.ts`,
+`/dashboard/ai-test`, `/dashboard/leads-test`) and the service-role
+widget path share one query implementation per table/retrieval call
+instead of duplicating it. **The retrieval chain was missed in the
+original Phase 11 implementation**: `searchKnowledgeChunks()` still
+constructed a Clerk-session client internally, so every widget request
+called `match_knowledge_chunks` as `anon` (no session on that path) --
+which correctly has no `EXECUTE` grant on that function (Phase 7's
+deliberate fix, left untouched by this correction) -- and every real
+`/api/chat` request 500'd with `42501` until this was caught in manual
+testing and fixed.
+
+**`public.messages`** is the real persisted chat-turn table this phase
+adds -- both prospect and AI turns (`role` check `user`/`assistant`),
+`business_id`/`conversation_id` fk'd, same RLS-join-through-`businesses`
+shape as every other business-owned table. `authenticated` gets `SELECT`
+only (for a future Phase 13 dashboard conversation view); no
+`INSERT`/`UPDATE`/`DELETE` grant exists for it at all -- only the
+service-role widget path writes messages in v1.
+
+**Conversation/message persistence is now unconditional, on every
+request** -- a deliberate change from Phase 10's lazy, lead-triggered
+`conversations` row creation. The Phase 10 note above ("a decision for
+whenever Phase 11's real conversation/message model lands") is resolved
+here: every widget turn is persisted regardless of whether a lead is
+ever captured. A returning `conversationId` from the client must belong
+to the resolved `business_id`, verified via `getConversationForBusiness`
+-- a mismatch or nonexistent id gets a generic `400`, indistinguishable
+from each other, so no cross-tenant existence information leaks.
+
+**Rate limiting** is a lightweight Postgres fixed-window counter table,
+`public.rate_limit_counters` (`scope`, `identifier`, `window_start`,
+`request_count`, unique on the three), incremented atomically by
+`public.increment_rate_limit_counter(p_scope, p_identifier,
+p_window_seconds)` -- one `INSERT ... ON CONFLICT ... DO UPDATE ...
+RETURNING` statement, avoiding the read-then-write race a naive
+check-then-increment from the client would have. `lib/rate-limit.ts`'s
+`checkAndIncrementRateLimit()` is the only caller, applied to three
+scopes per request: `ip` (30/5min), `key` (120/5min, keyed on the
+widget key), `conversation` (20/5min). This function got the same
+per-function privilege treatment as `match_knowledge_chunks` (Phase 7)
+from the start, not as a follow-up fix: `EXECUTE` explicitly revoked
+from `public`/`anon`/`authenticated`, granted only to `service_role`,
+in the same migration that creates it.
+
+**CORS**: `Access-Control-Allow-Origin: *` is set on every response
+from this route (success and error alike), plus an `OPTIONS` handler
+for the browser preflight. This is a browser-compatibility concern, not
+the security boundary -- the request carries no cookies/Clerk session,
+so there's no credentialed-CORS risk, and the actual authorization
+check is the server-side stored-origin comparison in
+`lib/widget-auth.ts`, which runs regardless of what CORS would have
+allowed.
+
+The public response body is deliberately minimal: `{ conversationId,
+answer, escalate }`. No `sourceChunkIds`, `usedContext`, or
+`escalationReason` -- those remain dashboard-debugging-only fields
+(`/dashboard/ai-test`, `/dashboard/leads-test`).
+
+**Deliberately not built this phase:** lead-capture triggering from the
+widget (`captureLeadFromConversation()` exists from Phase 10 but nothing
+calls it from `/api/chat` -- no trigger point is specified by any phase
+yet), a GET endpoint to resume/redisplay prior messages (Phase 12), key
+rotation/multiple keys per business (deferred by D4 until needed), and
+`rate_limit_counters` row cleanup (rows accumulate indefinitely; no
+cron exists).
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

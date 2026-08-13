@@ -2,6 +2,8 @@ export type Business = {
   id: string;
   clerk_org_id: string;
   name: string;
+  widget_key: string;
+  widget_allowed_origin: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -63,6 +65,17 @@ export type Conversation = {
   id: string;
   business_id: string;
   source: string | null;
+  created_at: string;
+};
+
+export type MessageRole = "user" | "assistant";
+
+export type Message = {
+  id: string;
+  business_id: string;
+  conversation_id: string;
+  role: MessageRole;
+  content: string;
   created_at: string;
 };
 

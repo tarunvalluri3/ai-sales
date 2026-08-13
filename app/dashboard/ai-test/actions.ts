@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { requireBusinessContext } from "@/lib/business-context";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { askSalesEmployee } from "@/lib/rag";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -30,7 +31,7 @@ export async function askKnowledgeAction(
   }
 
   try {
-    const result = await askSalesEmployee(businessId, businessName, parsed.data);
+    const result = await askSalesEmployee(createServerSupabaseClient(), businessId, businessName, parsed.data);
     return {
       question: parsed.data,
       answer: result.answer,

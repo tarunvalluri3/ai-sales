@@ -5,7 +5,10 @@ import { Document } from "@langchain/core/documents";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
+import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+
+type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
 export const FALLBACK_MESSAGE =
   "I don't have that information yet. I can connect you with someone from our team, or you can leave your contact details and we'll follow up.";
@@ -40,17 +43,19 @@ type KnowledgeChunkMetadata = {
 class KnowledgeRetriever extends BaseRetriever<KnowledgeChunkMetadata> {
   lc_namespace = ["ai-sales", "retrievers", "knowledge"];
 
+  private readonly supabase: SupabaseClient;
   private readonly businessId: string;
   private readonly limit: number;
 
-  constructor(fields: { businessId: string; limit?: number }) {
+  constructor(fields: { supabase: SupabaseClient; businessId: string; limit?: number }) {
     super();
+    this.supabase = fields.supabase;
     this.businessId = fields.businessId;
     this.limit = fields.limit ?? 5;
   }
 
   async _getRelevantDocuments(query: string): Promise<Document<KnowledgeChunkMetadata>[]> {
-    const results = await searchKnowledgeChunks(this.businessId, query, this.limit);
+    const results = await searchKnowledgeChunks(this.supabase, this.businessId, query, this.limit);
     return results.map(
       (result) =>
         new Document({
@@ -135,12 +140,13 @@ function toLangchainHistory(history: ConversationMessage[]): ["human" | "ai", st
  * here rather than weakened by the richer persona.
  */
 export async function askSalesEmployee(
+  supabase: SupabaseClient,
   businessId: string,
   businessName: string,
   question: string,
   history: ConversationMessage[] = [],
 ): Promise<SalesEmployeeResponse> {
-  const retriever = new KnowledgeRetriever({ businessId });
+  const retriever = new KnowledgeRetriever({ supabase, businessId });
   const documents = await retriever.invoke(question);
 
   if (documents.length === 0) {
