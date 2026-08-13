@@ -492,6 +492,95 @@ input (`AGENTS.md` §3 rule 5, `docs/security.md` §8): rendered as
 display text/a UI flag only, never used to authorize anything, select a
 tenant, or execute a real-world action.
 
+### Lead extraction (Phase 10)
+
+`PRODUCT.md` §8's resolved field specification (decision D6) is
+implemented across four separated modules, per `AGENTS.md` §9's
+explicit "lead logic" / "AI orchestration" / "database access"
+boundaries: `lib/lead-extraction.ts` (AI-only — calls Gemini via
+`getChatModel().withStructuredOutput()`, the same pattern as
+`lib/rag.ts`, and knows nothing about Postgres), `lib/conversations.ts`
+and `lib/leads.ts` (database-only CRUD, no AI calls), and
+`lib/lead-capture.ts` (the orchestration layer that ties them together
+— resolves interest names to real catalog IDs, normalizes contact
+fields, applies the "at least one of email/phone" gate, and only then
+persists).
+
+**`public.conversations` is a deliberate, minimal stub, not Phase 11's
+real chat/message model.** `leads.conversation_id` is a required FK per
+the approved spec, but `docs/phases.md` places Phase 10 before Phase 11
+(the phase that actually owns conversation creation). Rather than widen
+Phase 10's scope into Phase 11's or weaken the spec's "required," the
+user was asked directly and chose to have Phase 10 create just enough
+of a `conversations` table (`id`, `business_id`, `source`,
+`created_at` — no messages, no chat API, no status) to give leads a
+real FK target; Phase 11 extends this table with the real contract
+rather than replacing it. A conversation row is created lazily, only at
+the moment a lead is actually captured — a test conversation that never
+yields contact info leaves zero trace in the database (no
+`conversations` row, no `leads` row). This is an intentional v1
+tradeoff, not an oversight: conversation-count/engagement telemetry
+isn't a `PRODUCT.md` goal yet. If it's ever wanted, it requires
+persisting a conversation row regardless of outcome — a decision for
+whenever Phase 11's real conversation/message model lands, not assumed
+here.
+
+**AI output never becomes a foreign key directly.** The extraction
+model (`lib/lead-extraction.ts`'s `LeadExtractionSchema`) outputs
+`interestType` and a free-text `interestName` — never a raw ID.
+`lib/lead-capture.ts`'s `resolveInterestId()` is the only thing that
+turns that into a real `interest_id`: a case-insensitive **exact**
+name match against that business's own `products`/`services` (fetched
+tenant-scoped via the existing `listProductsForBusiness()`/
+`listServicesForBusiness()`), never a fuzzy/partial match. No match
+leaves `interest_id` null while still recording `interest_type` if the
+model gave one. This is the same "never trust AI-suggested identifiers
+directly" principle Phase 9 already applied to `escalate`/`usedContext`
+(model self-report, display-only) — applied here to a case where the
+model's output could otherwise have become a real database reference,
+which is a meaningfully higher-stakes trust boundary than a display
+flag (`docs/security.md` §8).
+
+**Contact fields are validated twice, at two different strictness
+levels.** `lib/lead-extraction.ts`'s `LeadExtractionSchema` accepts
+`contactEmail`/`contactPhone` as loose, unvalidated strings — an AI's
+free-text rendering of "an email" isn't guaranteed RFC-valid.
+`lib/schemas/lead.ts`'s `normalizeEmail()`/`normalizePhone()` then
+validate each individually and return `null` on a failed format check,
+rather than rejecting the whole extraction over one malformed field.
+`leadPersistSchema` (also in `lib/schemas/lead.ts`) is the actual
+validation boundary before anything reaches the database
+(`docs/security.md` §7's explicit callout that AI structured outputs
+need the same Zod discipline as any other external input), and
+includes a `.refine()` requiring at least one of the two contact
+fields — one of three layers enforcing that rule (the others being
+`lib/lead-capture.ts`'s early return before persistence is even
+attempted, and the `leads_contact_required` database `CHECK`
+constraint), the same "redundant, not accidental" defense-in-depth
+pattern used everywhere else in this project (RLS + application
+filter, table grants + RLS, etc.).
+
+**`qualification`/`qualification_reason` are untrusted, display-only AI
+output**, same trust category as Phase 9's `escalate`/`usedContext` —
+never used for authorization, tenant scoping, or any decision with
+real-world effect. Set once at lead creation and never recomputed; no
+re-qualification exists in this phase.
+
+`updateLeadStatus()` (`lib/leads.ts`) follows the exact contract
+`lib/products.ts`'s `updateProduct()` established: filtered by both
+`business_id` and `id`, returns `boolean` rather than throwing or
+distinguishing "not found" from "belongs to another tenant" — a
+cross-tenant attempt silently affects zero rows.
+
+The multi-turn manual test surface (`/dashboard/leads-test`) is a
+**separate** throwaway page from `/dashboard/ai-test` (Phase 8/9),
+deliberately not merged into it — it exercises `askSalesEmployee()`'s
+`history` parameter (built in Phase 9, unexercised until now) by
+accumulating a transcript in client-side React state only; no
+`messages` table exists to persist it into (see the `conversations`
+stub note above). Ending the test conversation calls
+`captureLeadFromConversation()` directly.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

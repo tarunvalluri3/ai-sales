@@ -102,7 +102,11 @@ Rules:
 - Set usedContext to true only if the answer above actually used the reference context to answer the question. Set it to false if the reference context was irrelevant, unused, or the question fell into category 4 and was declined rather than answered from context.
 - Set escalate to true, with a short escalationReason, when the prospect explicitly asks to speak with a person, the message is a complaint, or the prospect asks you to commit to something (custom pricing, contractual terms, guarantees) you are not authorized to promise. Otherwise set escalate to false. Always still provide a real answer, even when escalating -- e.g. acknowledge the request and say a team member will follow up.`;
 
-function getChatModel(): ChatGoogleGenerativeAI {
+/**
+ * Shared Gemini chat model construction -- also used by
+ * lib/lead-extraction.ts, rather than duplicating this setup there.
+ */
+export function getChatModel(): ChatGoogleGenerativeAI {
   return new ChatGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY!,
     model: process.env.GEMINI_CHAT_MODEL!,

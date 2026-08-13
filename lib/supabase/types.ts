@@ -58,3 +58,32 @@ export type KnowledgeChunk = {
   embedding: number[] | null;
   created_at: string;
 };
+
+export type Conversation = {
+  id: string;
+  business_id: string;
+  source: string | null;
+  created_at: string;
+};
+
+export type LeadInterestType = "product" | "service" | "general";
+export type LeadQualification = "hot" | "warm" | "cold";
+export type LeadStatus = "new" | "contacted" | "converted" | "lost";
+
+export type Lead = {
+  id: string;
+  business_id: string;
+  conversation_id: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  interest_type: LeadInterestType | null;
+  interest_id: string | null;
+  notes: string | null;
+  qualification: LeadQualification;
+  qualification_reason: string;
+  status: LeadStatus;
+  source: string | null;
+  created_at: string;
+  updated_at: string;
+};
