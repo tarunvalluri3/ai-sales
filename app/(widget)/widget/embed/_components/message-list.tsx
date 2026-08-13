@@ -1,0 +1,56 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import type { ChatMessage } from "../_lib/use-widget-chat";
+import { MessageBubble } from "./message-bubble";
+import { TypingIndicator } from "./typing-indicator";
+
+const NEAR_BOTTOM_THRESHOLD_PX = 80;
+
+export function MessageList({
+  messages,
+  isAwaitingResponse,
+  onRetry,
+}: {
+  messages: ChatMessage[];
+  isAwaitingResponse: boolean;
+  onRetry: (id: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const wasNearBottomRef = useRef(true);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (wasNearBottomRef.current) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages, isAwaitingResponse]);
+
+  function handleScroll() {
+    const container = containerRef.current;
+    if (!container) return;
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    wasNearBottomRef.current = distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      aria-live="polite"
+      className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
+    >
+      {messages.length === 0 ? (
+        <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground">
+          Hi! Ask me anything and I&apos;ll do my best to help.
+        </div>
+      ) : null}
+      {messages.map((message) => (
+        <MessageBubble key={message.id} message={message} onRetry={onRetry} />
+      ))}
+      {isAwaitingResponse ? <TypingIndicator /> : null}
+    </div>
+  );
+}

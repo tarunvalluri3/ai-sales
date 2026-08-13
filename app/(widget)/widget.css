@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  --widget-primary: #4f46e5;
+  --widget-primary-hover: #4338ca;
+  --widget-on-primary: #ffffff;
+  --widget-surface: #ffffff;
+  --widget-assistant-bubble: #f1f1f7;
+  --widget-foreground: #1e293b;
+  --widget-muted: #64748b;
+  --widget-border: #e2e8f0;
+  --widget-success: #10b981;
+  --widget-error: #dc2626;
+}
+
+@theme inline {
+  --color-widget-primary: var(--widget-primary);
+  --color-widget-primary-hover: var(--widget-primary-hover);
+  --color-widget-on-primary: var(--widget-on-primary);
+  --color-widget-surface: var(--widget-surface);
+  --color-widget-assistant-bubble: var(--widget-assistant-bubble);
+  --color-widget-foreground: var(--widget-foreground);
+  --color-widget-muted: var(--widget-muted);
+  --color-widget-border: var(--widget-border);
+  --color-widget-success: var(--widget-success);
+  --color-widget-error: var(--widget-error);
+  --font-widget-sans: var(--widget-font-sans);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  color: var(--widget-foreground);
+  font-family: var(--widget-font-sans), sans-serif;
+}
+
+/*
+ * Typing-indicator dot pulse. Deliberately not Tailwind's `animate-bounce`
+ * (a spring/overshoot easing) -- a smooth exponential ease-out reads as a
+ * calmer, more premium "processing" cue and avoids the dated, tacky feel
+ * bounce/elastic easing gives on real objects.
+ */
+@keyframes widget-typing-dot {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.widget-typing-dot {
+  animation: widget-typing-dot 1.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .widget-typing-dot {
+    animation: none;
+  }
+}

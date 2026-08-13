@@ -693,6 +693,56 @@ rotation/multiple keys per business (deferred by D4 until needed), and
 `rate_limit_counters` row cleanup (rows accumulate indefinitely; no
 cron exists).
 
+### Public chat widget UI (Phase 12)
+
+`public/widget-loader.js` is the entire embed mechanism: a business
+drops `<script src=".../widget-loader.js" data-widget-key="...">`
+into their own site. It creates a fixed-position `<iframe>` pointed at
+`/widget/embed?key=...`, a same-origin Next.js page rendering the
+actual bubble/panel UI. No bundler, no new dependency -- the loader is
+plain, framework-free JS served as a static asset.
+
+**The loader, not the iframe, calls `/api/chat`.** This is the one
+load-bearing correction from this phase's original prompt draft: the
+iframe's document is same-origin with this app, not with whatever site
+embeds the widget, so a `fetch` from inside it would always carry this
+app's own `Origin` header, never the host page's real one --
+`lib/widget-auth.ts`'s per-business origin check could then never pass
+for a genuine cross-domain embed. The loader runs in the host page's
+own JS context, so its `fetch("/api/chat")` carries the host page's
+real `Origin`, which is what the check actually depends on. The iframe
+is a pure rendering surface: it posts `{ type: "widget:send", requestId,
+text }` up to `window.parent`, and the loader posts back `{ type:
+"widget:response", ... }` or `{ type: "widget:error", ..., kind }`
+once its own cross-origin fetch resolves. The loader also owns the
+`conversationId` for the lifetime of the page (not the iframe), since
+it is the thing making every request across the conversation. A
+`{ type: "widget:resize" }` / `{ type: "widget:viewport" }` pair
+handles sizing (collapsed bubble vs. open panel vs. full-screen on
+narrow viewports) the same way, since a cross-origin iframe can't read
+the parent's window dimensions directly. Every `postMessage` listener
+on both sides validates `event.source`/`event.origin` before acting.
+
+**Independent root layout.** `app/` now has two route groups --
+`app/(dashboard)/` (the pre-existing app: `layout.tsx`, `page.tsx`,
+`globals.css`, `dashboard/`, `onboarding/`, `session-tasks/`,
+`sign-in/`, `sign-up/`, all moved here verbatim, same URLs, same
+behavior) and `app/(widget)/` (`layout.tsx`, `widget.css`,
+`widget/embed/`). Per Next.js 16's route-groups convention, any layout
+with no `layout.js` above it is its own root layout, so the widget
+route neither loads `ClerkProvider` nor renders any dashboard chrome --
+a prospect must never see either. `app/api/**` is unaffected (route
+handlers don't participate in the layout tree). `app/widget/embed/page.tsx`
+sets `robots: { index: false, follow: false }` -- it carries live,
+non-secret widget keys in its query string and has no reason to be
+indexed.
+
+No new table, column, env var, or npm dependency. The visual system
+(indigo/neutral palette, Inter, `--widget-*` CSS tokens scoped to
+`app/(widget)/widget.css` only) is documented in
+`prompts/phase-12-chat-ui.md`'s "Visual interpretation" section, not
+duplicated here.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept
