@@ -757,7 +757,7 @@ Authentication above) -- a page never assumes the layout above it already
 resolved a valid context.
 
 Nav items are defined once in
-`app/(dashboard)/dashboard/_components/nav-items.ts` and consumed by both
+`app/(dashboard)/dashboard/_components/nav-items.tsx` and consumed by both
 `sidebar.tsx` (desktop, `usePathname`-driven active state) and
 `mobile-nav.tsx` (off-canvas panel) so the two can't drift.
 
@@ -770,6 +770,56 @@ the widget's full token set, since the dashboard's dense, multi-page layout
 is a different surface than the widget's single chat panel. No shared CSS
 file between the two route groups, consistent with Phase 12's independent
 per-route-group styling.
+
+### Business profile fields and the AI boundary (Phase 13b)
+
+`/dashboard/profile` (`app/(dashboard)/dashboard/profile/`) is the second
+nav item, `org:admin`-only per the same `requireAuthContext({ role:
+"org:admin" })` pattern Phase 4's onboarding admin check established. It
+edits `businesses.name` plus four new nullable columns
+(`description`/`contact_email`/`contact_phone`/`website`, migration
+`20260813140000_add_business_profile_fields.sql`) through
+`lib/business.ts`'s `updateBusinessProfile()`. Writability is gated the
+same way `widget_allowed_origin` was in Phase 11: the existing
+`businesses_update_own_org` RLS policy already permits row-level `UPDATE`
+for an org-matched caller, so a column-level `GRANT` is the only thing
+that changed -- `org:admin`-only is an application-layer check, not
+something Postgres's `GRANT` can express.
+
+**The four new fields are dashboard-display-only.** `lib/rag.ts`'s
+`askSalesEmployee()` still sources business-profile context from `name`
+alone, exactly as Phase 9's Decision 1 left it -- this phase deliberately
+did not touch `lib/rag.ts` or extend what reaches the AI's system prompt.
+Wiring `description`/`contact_email`/`contact_phone`/`website` into the AI
+persona is a distinct, later decision (`prompts/phase-13b-business-profile-and-polish.md`'s
+"Out of scope"), not something to assume from their existence in the
+database.
+
+### Conversations and leads dashboard views (Phase 13c)
+
+`/dashboard/conversations` and `/dashboard/conversations/[id]` are the
+first dashboard reads of `messages`/`conversations` -- `authenticated` has
+had `SELECT` on both since Phase 11, whose own migration comment
+anticipated this exact phase. No migration was needed; this phase only
+adds new read queries against already-live RLS/grants.
+
+`lib/conversations.ts`'s `listConversationsForBusiness()` gets each
+conversation's message count via PostgREST's embedded-relationship count
+(`.select('*, messages(count)')`) rather than a per-row query or a new
+Postgres function -- applicable because `messages.conversation_id` is a
+real FK, unlike this project's several app-enforced polymorphic
+references (`knowledge_documents.source_id`, `leads.interest_id`).
+
+`lib/leads.ts`'s new `getLeadForConversation()` deliberately does **not**
+take a `supabase` client parameter, unlike `lib/conversations.ts`'s and
+`lib/messages.ts`'s functions. This is intentional, not a missed
+Phase-11-style client-injection gap: `lib/leads.ts` has no service-role
+caller today (lead capture isn't wired from the widget path, Phase 11
+Decision 16), so every function in that file -- old and new -- only ever
+runs under a Clerk session, matching the file's existing internal-client
+convention. If lead capture is ever wired to the widget path, this file
+would need the same client-injection retrofit Phase 11 applied to
+`lib/conversations.ts`/`lib/messages.ts`, at that time.
 
 ## Error handling
 

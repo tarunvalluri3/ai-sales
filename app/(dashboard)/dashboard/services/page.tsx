@@ -15,12 +15,14 @@ export default async function ServicesPage() {
 
       <ul className="flex flex-col gap-3">
         {services.length === 0 ? (
-          <li className="text-sm text-zinc-600">No services yet.</li>
+          <li className="rounded-lg border border-dashed border-zinc-300 bg-white px-4 py-6 text-center text-sm text-zinc-600">
+            No services yet.
+          </li>
         ) : null}
         {services.map((service) => (
           <li
             key={service.id}
-            className="flex items-center justify-between gap-4 rounded-md border border-zinc-200 px-4 py-3"
+            className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-dashboard-primary"
           >
             <div>
               <p className="font-medium text-zinc-900">{service.name}</p>
@@ -34,7 +36,7 @@ export default async function ServicesPage() {
             <div className="flex items-center gap-4">
               <Link
                 href={`/dashboard/services/${service.id}/edit`}
-                className="text-sm font-medium text-zinc-900 underline"
+                className="text-sm font-medium text-dashboard-primary hover:text-dashboard-primary-hover"
               >
                 Edit
               </Link>

@@ -31,7 +31,7 @@ export function DeleteButton({
       <button
         type="submit"
         disabled={isPending}
-        className="text-sm font-medium text-red-600 disabled:opacity-60"
+        className="rounded-md px-2 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
       >
         {isPending ? "Deleting…" : label}
       </button>

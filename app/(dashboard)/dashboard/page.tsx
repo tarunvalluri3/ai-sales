@@ -36,12 +36,11 @@ export default async function DashboardOverviewPage() {
           href="/dashboard/knowledge"
         />
         <StatCard label="Leads" count={leads.length} href="/dashboard/leads" />
-        {/*
-         * Conversations has no dedicated page yet (Phase 13c) -- links to
-         * Leads for now as the closest existing related view. Deliberate
-         * temporary link, not a bug; update once 13c ships.
-         */}
-        <StatCard label="Conversations" count={conversationCount} href="/dashboard/leads" />
+        <StatCard
+          label="Conversations"
+          count={conversationCount}
+          href="/dashboard/conversations"
+        />
       </div>
     </div>
   );

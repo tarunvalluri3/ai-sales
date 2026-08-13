@@ -16,6 +16,20 @@ function OverviewIcon(props: IconProps) {
   );
 }
 
+function ProfileIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-6 7v-.5A4.5 4.5 0 0 1 8.5 12h3a4.5 4.5 0 0 1 4.5 4.5v.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ProductsIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
@@ -76,6 +90,20 @@ function KnowledgeIcon(props: IconProps) {
   );
 }
 
+function ConversationsIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M3 5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H10l-3.5 3v-3H4.5A1.5 1.5 0 0 1 3 11.5v-6Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M6.5 7.5h7M6.5 10h4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function LeadsIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
@@ -111,10 +139,12 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: OverviewIcon },
+  { label: "Business Profile", href: "/dashboard/profile", icon: ProfileIcon },
   { label: "Products", href: "/dashboard/products", icon: ProductsIcon },
   { label: "Services", href: "/dashboard/services", icon: ServicesIcon },
   { label: "FAQs", href: "/dashboard/faqs", icon: FaqsIcon },
   { label: "Knowledge", href: "/dashboard/knowledge", icon: KnowledgeIcon },
+  { label: "Conversations", href: "/dashboard/conversations", icon: ConversationsIcon },
   { label: "Leads", href: "/dashboard/leads", icon: LeadsIcon },
   { label: "Widget Settings", href: "/dashboard/widget-settings", icon: WidgetIcon },
 ];

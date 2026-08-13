@@ -2,6 +2,10 @@ export type Business = {
   id: string;
   clerk_org_id: string;
   name: string;
+  description: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  website: string | null;
   widget_key: string;
   widget_allowed_origin: string | null;
   created_at: string;

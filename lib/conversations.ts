@@ -59,6 +59,39 @@ export async function countConversationsForBusiness(
   return count ?? 0;
 }
 
+export type ConversationWithMessageCount = Conversation & { messageCount: number };
+
+/**
+ * Lists all conversations for a business, most recent first, with each
+ * conversation's message count via PostgREST's embedded-relationship
+ * count (messages.conversation_id is a real FK, unlike this project's
+ * several app-enforced polymorphic references). `businessId` must come
+ * from `requireBusinessContext()`.
+ */
+export async function listConversationsForBusiness(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<ConversationWithMessageCount[]> {
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("*, messages(count)")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your conversations. Please try again.",
+      "listConversationsForBusiness failed",
+      error,
+    );
+  }
+
+  return data.map(({ messages, ...conversation }) => ({
+    ...conversation,
+    messageCount: (messages as { count: number }[])[0]?.count ?? 0,
+  }));
+}
+
 /**
  * Looks up a conversation, scoped to the given business. Returns null if
  * the conversation doesn't exist or belongs to a different business --

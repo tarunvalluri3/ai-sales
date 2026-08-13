@@ -14,11 +14,15 @@ export default async function FaqsPage() {
       <h1 className="text-2xl font-semibold text-zinc-900">FAQs</h1>
 
       <ul className="flex flex-col gap-3">
-        {faqs.length === 0 ? <li className="text-sm text-zinc-600">No FAQs yet.</li> : null}
+        {faqs.length === 0 ? (
+          <li className="rounded-lg border border-dashed border-zinc-300 bg-white px-4 py-6 text-center text-sm text-zinc-600">
+            No FAQs yet.
+          </li>
+        ) : null}
         {faqs.map((faq) => (
           <li
             key={faq.id}
-            className="flex items-center justify-between gap-4 rounded-md border border-zinc-200 px-4 py-3"
+            className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-dashboard-primary"
           >
             <div>
               <p className="font-medium text-zinc-900">{faq.question}</p>
@@ -27,7 +31,7 @@ export default async function FaqsPage() {
             <div className="flex items-center gap-4">
               <Link
                 href={`/dashboard/faqs/${faq.id}/edit`}
-                className="text-sm font-medium text-zinc-900 underline"
+                className="text-sm font-medium text-dashboard-primary hover:text-dashboard-primary-hover"
               >
                 Edit
               </Link>

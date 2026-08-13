@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Business } from "@/lib/supabase/types";
+import type { BusinessProfileInput } from "@/lib/schemas/business";
 import { AppError } from "@/lib/errors";
 
 /** Postgres unique-violation error code. */
@@ -64,6 +65,43 @@ export async function createBusinessForOrg(
     throw new AppError(
       "Something went wrong creating your business. Please try again.",
       "createBusinessForOrg failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Updates the business profile for a given Clerk org. `orgId` must come
+ * from a validated session, never from client input. Authorization
+ * (org:admin-only) is enforced by the caller via
+ * `requireAuthContext({ role: "org:admin" })`, not by this function --
+ * this filter is tenant scoping only, matching every other function in
+ * this file.
+ */
+export async function updateBusinessProfile(
+  orgId: string,
+  input: BusinessProfileInput,
+): Promise<Business> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("businesses")
+    .update({
+      name: input.name,
+      description: input.description,
+      contact_email: input.contactEmail,
+      contact_phone: input.contactPhone,
+      website: input.website,
+    })
+    .eq("clerk_org_id", orgId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong updating your business profile. Please try again.",
+      "updateBusinessProfile failed",
       error,
     );
   }

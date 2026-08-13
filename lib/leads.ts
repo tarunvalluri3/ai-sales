@@ -61,6 +61,38 @@ export async function listLeadsForBusiness(businessId: string): Promise<Lead[]> 
 }
 
 /**
+ * Looks up the lead associated with a conversation, scoped to the given
+ * business. `null` if the conversation has no lead (the common case --
+ * most conversations don't produce one, per Phase 10's "no contact info
+ * -> no lead row" rule). Constructs its own client internally, matching
+ * this file's existing convention -- not lib/conversations.ts's/
+ * lib/messages.ts's client-injection pattern, since lead capture has no
+ * service-role caller today (Phase 11 Decision 16).
+ */
+export async function getLeadForConversation(
+  businessId: string,
+  conversationId: string,
+): Promise<Lead | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("leads")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("conversation_id", conversationId)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading this conversation's lead. Please try again.",
+      "getLeadForConversation failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/**
  * Updates a lead's status, scoped to the given business. `id`s belonging
  * to another business (or nonexistent) affect zero rows -- returns
  * `false` rather than throwing, so the caller can show a safe "not

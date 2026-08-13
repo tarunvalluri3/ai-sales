@@ -71,3 +71,35 @@ export async function listRecentMessages(
     content: row.content,
   }));
 }
+
+/**
+ * Returns the full, ordered transcript for a conversation, for the
+ * dashboard's conversation detail view (app/(dashboard)/dashboard/conversations/[id]).
+ * Unlike listRecentMessages(), this returns full rows (id/created_at
+ * included) in chronological (oldest-first) order, not the narrowed,
+ * reversed-for-LLM-context shape. Capped at 500 rows as a defensive
+ * bound, not a real limit at current usage.
+ */
+export async function listMessagesForConversation(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(500);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading this conversation's messages. Please try again.",
+      "listMessagesForConversation failed",
+      error,
+    );
+  }
+
+  return data;
+}
