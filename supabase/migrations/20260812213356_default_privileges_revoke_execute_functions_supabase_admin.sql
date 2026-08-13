@@ -19,6 +19,15 @@
 -- Not retroactive: does not affect match_knowledge_chunks (already
 -- fixed individually via its own direct revoke) or any function created
 -- before this migration runs. service_role untouched.
-
-alter default privileges for role supabase_admin in schema public
-revoke execute on functions from anon, authenticated;
+--
+-- NEUTRALIZED: the statement this file used to contain permanently
+-- fails with "permission denied to change default privileges"
+-- (Postgres 42501) on every `db push` attempt against this managed
+-- Supabase project -- altering another role's (supabase_admin's)
+-- default privileges requires membership in that role, which the
+-- migration connection never has, and there is no normal-connection
+-- workaround. This file is intentionally a no-op from here on, so it
+-- no longer blocks later migrations from applying. See STATE.md §1/§8
+-- for the full investigation and the standing per-function mitigation
+-- (explicit `revoke execute ... from anon` on every new function's own
+-- migration) adopted instead.

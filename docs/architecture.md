@@ -361,6 +361,13 @@ a row.
    `pg_default_acl` — but **failed to apply**: `npx supabase db push`
    returned `permission denied to change default privileges` (Postgres
    error `42501`). Nothing changed; the statement never took effect.
+   Because this failure is permanent (see below) and was blocking every
+   subsequent `db push` from getting past it, the file has since been
+   **neutralized in place**: its `alter default privileges` statement
+   was removed, leaving only its investigation comments plus a note
+   explaining the removal. It is now an intentional no-op — this is a
+   change to the migration file, not a retroactive change to what was
+   ever applied to the live database.
 
 **Final, corrected conclusion (not a retry candidate): a schema-wide
 `ALTER DEFAULT PRIVILEGES ... FOR ROLE supabase_admin` fix is not
