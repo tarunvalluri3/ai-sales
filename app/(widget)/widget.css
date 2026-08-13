@@ -37,10 +37,10 @@ body {
 }
 
 /*
- * Typing-indicator dot pulse. Deliberately not Tailwind's `animate-bounce`
- * (a spring/overshoot easing) -- a smooth exponential ease-out reads as a
- * calmer, more premium "processing" cue and avoids the dated, tacky feel
- * bounce/elastic easing gives on real objects.
+ * Typing-indicator dot pulse. Deliberately avoids a spring/overshoot
+ * easing -- a smooth exponential ease-out reads as a calmer, more premium
+ * "processing" cue and avoids the dated, tacky feel that kind of easing
+ * gives on real objects.
  */
 @keyframes widget-typing-dot {
   0%,
