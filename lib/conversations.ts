@@ -36,6 +36,30 @@ export async function createConversation(
 }
 
 /**
+ * Returns the number of conversations for a business, without fetching row
+ * data. `businessId` must come from `requireBusinessContext()`.
+ */
+export async function countConversationsForBusiness(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("conversations")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your conversations. Please try again.",
+      "countConversationsForBusiness failed",
+      error,
+    );
+  }
+
+  return count ?? 0;
+}
+
+/**
  * Looks up a conversation, scoped to the given business. Returns null if
  * the conversation doesn't exist or belongs to a different business --
  * the caller must not distinguish those two cases in its own response

@@ -743,6 +743,34 @@ No new table, column, env var, or npm dependency. The visual system
 `prompts/phase-12-chat-ui.md`'s "Visual interpretation" section, not
 duplicated here.
 
+## Dashboard shell and navigation (Phase 13a)
+
+`app/(dashboard)/dashboard/layout.tsx` is a **nested** layout under the
+existing `app/(dashboard)/layout.tsx` root layout, so dashboard chrome
+(sidebar nav on desktop, off-canvas nav on mobile) wraps only `/dashboard/*`
+pages -- `/onboarding`, `/sign-in`, `/sign-up`, and
+`/session-tasks/choose-organization` stay outside it, unchanged. It calls
+`requireBusinessContext()` once for nav-level data (business name); every
+page under it still independently calls `requireBusinessContext()` too, per
+this project's existing "defense in depth, not one layer" convention (see
+Authentication above) -- a page never assumes the layout above it already
+resolved a valid context.
+
+Nav items are defined once in
+`app/(dashboard)/dashboard/_components/nav-items.ts` and consumed by both
+`sidebar.tsx` (desktop, `usePathname`-driven active state) and
+`mobile-nav.tsx` (off-canvas panel) so the two can't drift.
+
+Visual identity: the dashboard borrows the widget's indigo primary color
+(`#4f46e5`/`#4338ca`, matching `app/(widget)/widget.css` exactly) into its
+own token block in `app/(dashboard)/globals.css` (`--dashboard-primary`
+etc.) for one visible brand across both surfaces -- but keeps its own
+Geist typography and plain Tailwind `zinc-*` neutrals rather than adopting
+the widget's full token set, since the dashboard's dense, multi-page layout
+is a different surface than the widget's single chat panel. No shared CSS
+file between the two route groups, consistent with Phase 12's independent
+per-route-group styling.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

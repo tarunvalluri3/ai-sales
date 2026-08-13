@@ -3,11 +3,24 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /*
+   * Shared brand primary, matching app/(widget)/widget.css's indigo exactly
+   * -- one visible brand color across the public widget and the internal
+   * dashboard (Phase 13a). Everything else (grays, borders) stays plain
+   * Tailwind zinc utilities, already used throughout every dashboard page.
+   */
+  --dashboard-primary: #4f46e5;
+  --dashboard-primary-hover: #4338ca;
+  --dashboard-on-primary: #ffffff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-dashboard-primary: var(--dashboard-primary);
+  --color-dashboard-primary-hover: var(--dashboard-primary-hover);
+  --color-dashboard-on-primary: var(--dashboard-on-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
