@@ -13,6 +13,7 @@ import {
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
+import { logEvent } from "@/lib/logger";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -68,6 +69,7 @@ export async function POST(request: NextRequest) {
 
   const ipAllowed = await checkAndIncrementRateLimit("ip", ip, IP_LIMIT, RATE_LIMIT_WINDOW_SECONDS);
   if (!ipAllowed) {
+    logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }, "error");
     return withCors(jsonError("Too many requests.", 429));
   }
 
@@ -84,6 +86,7 @@ export async function POST(request: NextRequest) {
 
   const keyAllowed = await checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS);
   if (!keyAllowed) {
+    logEvent("rate_limit_exceeded", business.businessId, { scope: "key" }, "error");
     return withCors(jsonError("Too many requests.", 429));
   }
 
@@ -109,6 +112,7 @@ export async function POST(request: NextRequest) {
       RATE_LIMIT_WINDOW_SECONDS,
     );
     if (!conversationAllowed) {
+      logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }, "error");
       return withCors(jsonError("Too many requests.", 429));
     }
 
@@ -169,6 +173,7 @@ export async function POST(request: NextRequest) {
       // "Decisions and assumptions" #1 for why escalation alone must not
       // silence the AI before a human is actually watching.
       await flagConversationNeedsAttention(supabase, business.businessId, conversation.id);
+      logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
     }
 
     return withCors(

@@ -1102,3 +1102,19 @@ internal detail server-side, returns only the safe message). Route
 handlers and server actions should catch, log, and convert errors through
 this convention rather than surfacing raw messages, stack traces, or
 provider errors to the client. See `docs/security.md` §10.
+
+## Structured event logging (Phase 18)
+
+`lib/logger.ts`'s `logEvent(event, businessId, metadata?, level?)` is the
+convention for discrete business events going forward -- escalations,
+rate-limit rejections, tool invocations, and anything similar added
+later. It is distinct from `lib/errors.ts`'s `logAndGetUserMessage()`,
+which stays the general error-logging convention and is not replaced by
+this.
+
+`metadata`'s type (`Record<string, string | number | boolean | null>`)
+is deliberately closed to identifiers, counts, and short enum strings
+only -- never pass free text through it: no prospect message content, no
+contact info, no raw tool-call input argument, no IP address. `logEvent`
+never throws, so a logging call can never break the caller's own control
+flow.

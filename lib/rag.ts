@@ -12,6 +12,7 @@ import { AppError } from "@/lib/errors";
 import { checkProductDetailsTool, executeCheckProductDetails } from "@/lib/tools/check-product-details";
 import { checkFaqTopicTool, executeCheckFaqTopic } from "@/lib/tools/check-faq-topic";
 import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request-callback";
+import { logEvent } from "@/lib/logger";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -211,7 +212,7 @@ export async function askSalesEmployee(
         } else if (toolCall.name === "request_callback") {
           toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
         } else {
-          console.error("askSalesEmployee: unrecognized tool call", businessId, toolCall.name);
+          logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
           toolResult = { found: false, reason: "invalid_input" };
         }
         messages.push(

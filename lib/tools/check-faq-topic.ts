@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
+import { logEvent } from "@/lib/logger";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -47,7 +48,7 @@ export async function executeCheckFaqTopic(
 ): Promise<CheckFaqTopicResult> {
   const parsed = CheckFaqTopicInputSchema.safeParse(rawArgs);
   if (!parsed.success) {
-    console.error("check_faq_topic: invalid tool-call args", businessId, parsed.error.message);
+    logEvent("tool_invoked", businessId, { tool: "check_faq_topic", result: "invalid_input" }, "error");
     return { found: false, reason: "invalid_input" };
   }
 
@@ -62,16 +63,16 @@ export async function executeCheckFaqTopic(
     .limit(1);
 
   if (error) {
-    console.error("check_faq_topic: faqs lookup failed", businessId, error);
+    logEvent("tool_invoked", businessId, { tool: "check_faq_topic", result: "lookup_failed" }, "error");
     return { found: false, reason: "lookup_failed" };
   }
 
   const faq = data[0];
   if (!faq) {
-    console.log("check_faq_topic", businessId, topic, "not_found");
+    logEvent("tool_invoked", businessId, { tool: "check_faq_topic", result: "not_found" });
     return { found: false, reason: "not_found" };
   }
 
-  console.log("check_faq_topic", businessId, topic, "found");
+  logEvent("tool_invoked", businessId, { tool: "check_faq_topic", result: "found" });
   return { found: true, question: faq.question, answer: faq.answer };
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { normalizeEmail, normalizePhone } from "@/lib/schemas/lead";
+import { logEvent } from "@/lib/logger";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -68,20 +69,25 @@ export async function executeRequestCallback(
 ): Promise<RequestCallbackResult> {
   const parsed = RequestCallbackInputSchema.safeParse(rawArgs);
   if (!parsed.success) {
-    console.error("request_callback: invalid tool-call args", businessId, conversationId, parsed.error.message);
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "invalid_input" }, "error");
     return { success: false, reason: "invalid_input" };
   }
 
   const contactEmail = normalizeEmail(parsed.data.contactEmail);
   const contactPhone = normalizePhone(parsed.data.contactPhone);
   if (contactEmail === null && contactPhone === null) {
-    console.log("request_callback", businessId, conversationId, "missing_contact_info");
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "missing_contact_info" });
     return { success: false, reason: "missing_contact_info" };
   }
 
   const conversation = await getConversationForBusiness(supabase, businessId, conversationId);
   if (!conversation) {
-    console.error("request_callback: conversation does not belong to business", businessId, conversationId);
+    logEvent(
+      "tool_invoked",
+      businessId,
+      { tool: "request_callback", conversationId, result: "conversation_not_found" },
+      "error",
+    );
     return { success: false, reason: "lookup_failed" };
   }
 
@@ -93,7 +99,7 @@ export async function executeRequestCallback(
     .maybeSingle();
 
   if (lookupError) {
-    console.error("request_callback: existing-lead lookup failed", businessId, conversationId, lookupError);
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "lookup_failed" }, "error");
     return { success: false, reason: "lookup_failed" };
   }
 
@@ -113,11 +119,11 @@ export async function executeRequestCallback(
       .eq("id", existing.id);
 
     if (updateError) {
-      console.error("request_callback: update failed", businessId, conversationId, updateError);
+      logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "update_failed" }, "error");
       return { success: false, reason: "lookup_failed" };
     }
 
-    console.log("request_callback", businessId, conversationId, "updated");
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "updated" });
     return { success: true, leadId: existing.id, created: false };
   }
 
@@ -141,10 +147,10 @@ export async function executeRequestCallback(
     .single();
 
   if (insertError) {
-    console.error("request_callback: insert failed", businessId, conversationId, insertError);
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "insert_failed" }, "error");
     return { success: false, reason: "lookup_failed" };
   }
 
-  console.log("request_callback", businessId, conversationId, "created");
+  logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "created" });
   return { success: true, leadId: inserted.id, created: true };
 }

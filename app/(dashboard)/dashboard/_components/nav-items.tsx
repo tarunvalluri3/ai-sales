@@ -118,6 +118,20 @@ function LeadsIcon(props: IconProps) {
   );
 }
 
+function AnalyticsIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M3.5 16.5h13M6 16.5V10m4 6.5V6m4 10.5v-4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function WidgetIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
@@ -146,6 +160,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Knowledge", href: "/dashboard/knowledge", icon: KnowledgeIcon },
   { label: "Conversations", href: "/dashboard/conversations", icon: ConversationsIcon },
   { label: "Leads", href: "/dashboard/leads", icon: LeadsIcon },
+  { label: "Analytics", href: "/dashboard/analytics", icon: AnalyticsIcon },
   { label: "Widget Settings", href: "/dashboard/widget-settings", icon: WidgetIcon },
 ];
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
+import { logEvent } from "@/lib/logger";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -49,7 +50,7 @@ export async function executeCheckProductDetails(
 ): Promise<CheckProductDetailsResult> {
   const parsed = CheckProductDetailsInputSchema.safeParse(rawArgs);
   if (!parsed.success) {
-    console.error("check_product_details: invalid tool-call args", businessId, parsed.error.message);
+    logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "invalid_input" }, "error");
     return { found: false, reason: "invalid_input" };
   }
 
@@ -63,12 +64,12 @@ export async function executeCheckProductDetails(
     .maybeSingle();
 
   if (productError) {
-    console.error("check_product_details: products lookup failed", businessId, productError);
+    logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "lookup_failed" }, "error");
     return { found: false, reason: "lookup_failed" };
   }
 
   if (product) {
-    console.log("check_product_details", businessId, query, "found:product");
+    logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "found_product" });
     return { found: true, type: "product", name: product.name, description: product.description, price: product.price };
   }
 
@@ -80,15 +81,15 @@ export async function executeCheckProductDetails(
     .maybeSingle();
 
   if (serviceError) {
-    console.error("check_product_details: services lookup failed", businessId, serviceError);
+    logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "lookup_failed" }, "error");
     return { found: false, reason: "lookup_failed" };
   }
 
   if (service) {
-    console.log("check_product_details", businessId, query, "found:service");
+    logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "found_service" });
     return { found: true, type: "service", name: service.name, description: service.description, price: service.price };
   }
 
-  console.log("check_product_details", businessId, query, "not_found");
+  logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "not_found" });
   return { found: false, reason: "not_found" };
 }
