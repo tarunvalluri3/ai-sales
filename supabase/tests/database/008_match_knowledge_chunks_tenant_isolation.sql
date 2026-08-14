@@ -1,7 +1,9 @@
 -- Tenant-isolation test for public.match_knowledge_chunks (AGENTS.md §7 /
--- Phase 7 exit criterion). Not run in this implementation environment (no
--- Docker / local Supabase instance available) -- written and reviewed
--- only. Run with: supabase test db
+-- Phase 7 exit criterion).
+--
+-- Run against the live, linked project via `npm test`
+-- (scripts/run-pgtap-tests.mjs) -- see 001_businesses_tenant_isolation.sql's
+-- header for why this is wrapped in a temporary results table.
 --
 -- Uses small hand-built 3-dimension-pattern vectors padded to 1536 so the
 -- test is readable without embedding a real model output. Only the first
@@ -10,6 +12,8 @@
 
 begin;
 select plan(3);
+create temporary table _tap_results (line text);
+grant insert on _tap_results to authenticated;
 
 insert into public.businesses (id, clerk_org_id, name)
 values
@@ -59,7 +63,7 @@ select set_config(
   true
 );
 
-select results_eq(
+insert into _tap_results select results_eq(
   $$
     select content from public.match_knowledge_chunks(
       '00000000-0000-0000-0000-00000000000a'::uuid,
@@ -71,7 +75,7 @@ select results_eq(
   'match_knowledge_chunks scoped to org_a returns only org_a''s chunk, never org_b''s identically-embedded chunk'
 );
 
-select is(
+insert into _tap_results select is(
   (
     select count(*) from public.match_knowledge_chunks(
       '00000000-0000-0000-0000-00000000000b'::uuid,
@@ -99,7 +103,7 @@ select set_config(
   true
 );
 
-select is(
+insert into _tap_results select is(
   (
     select count(*) from public.match_knowledge_chunks(
       '00000000-0000-0000-0000-00000000000c'::uuid,
@@ -113,5 +117,6 @@ select is(
 
 reset role;
 
-select * from finish();
+insert into _tap_results select * from finish();
+select line from _tap_results;
 rollback;

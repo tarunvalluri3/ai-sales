@@ -1,12 +1,16 @@
 -- Tenant-isolation test for public.products (AGENTS.md §7 / Phase 5 exit
--- criterion). Not run in this implementation environment (no Docker /
--- local Supabase instance available) — written and reviewed only. Run
--- with: supabase test db
+-- criterion).
+--
+-- Run against the live, linked project via `npm test`
+-- (scripts/run-pgtap-tests.mjs) -- see 001_businesses_tenant_isolation.sql's
+-- header for why this is wrapped in a temporary results table.
 --
 -- Same session-simulation technique as 001_businesses_tenant_isolation.sql.
 
 begin;
 select plan(4);
+create temporary table _tap_results (line text);
+grant insert on _tap_results to authenticated;
 
 -- Fixture setup as postgres (bypasses RLS — this is seeding, not the
 -- thing under test).
@@ -32,26 +36,44 @@ select set_config(
   true
 );
 
-select results_eq(
+insert into _tap_results select results_eq(
   $$ select name from public.products order by name $$,
   $$ values ('Product A') $$,
   'org_a session sees only its own business''s products, never org_b''s'
 );
 
-select lives_ok(
+insert into _tap_results select lives_ok(
   $$ update public.products set name = 'Product A updated' where id = '10000000-0000-0000-0000-00000000000a' $$,
   'org_a session can update its own product'
 );
 
 update public.products set name = 'Forged update' where id = '10000000-0000-0000-0000-00000000000b';
 
-select is(
+-- Checked via reset role (the unrestricted connecting role), not the
+-- org_a-scoped session that just attempted the forged update -- that
+-- session's own SELECT policy can never see org_b's row at all, so a
+-- count(*) run under it would read 0 regardless of whether the update
+-- actually succeeded, proving nothing (Phase 19b,
+-- docs/phase-19-audit-findings.md's follow-up test-correctness fix).
+reset role;
+insert into _tap_results select is(
   (select count(*) from public.products where id = '10000000-0000-0000-0000-00000000000b' and name = 'Forged update'),
   0::bigint,
   'org_a session cannot mutate org_b''s product (no rows affected, not an error)'
 );
 
-select throws_ok(
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', 'user_test_a',
+    'role', 'authenticated',
+    'o', json_build_object('id', 'org_a')
+  )::text,
+  true
+);
+
+insert into _tap_results select throws_ok(
   $$ insert into public.products (business_id, name) values ('00000000-0000-0000-0000-00000000000b', 'Forged product') $$,
   '42501',
   null,
@@ -60,5 +82,6 @@ select throws_ok(
 
 reset role;
 
-select * from finish();
+insert into _tap_results select * from finish();
+select line from _tap_results;
 rollback;

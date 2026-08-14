@@ -584,7 +584,20 @@ The tool's log line is businessId + conversationId + outcome only — never
 the prospect's actual contact info, unlike the read tools' query-string
 logging, since this one touches real PII.
 
-### Lead extraction (Phase 10)
+### Lead extraction (Phase 10) — superseded, modules removed in Phase 19b
+
+**`lib/lead-extraction.ts` and `lib/lead-capture.ts` (including
+`captureLeadFromConversation()`, referenced throughout this section) were
+deleted as dead code during Phase 19b's remediation** (`docs/phase-19-audit-findings.md`,
+`STATE.md`). The transcript-based extraction flow they implemented was
+fully superseded by Phase 14c's `request_callback` tool (see "AI tools"
+above) without ever being wired into `/api/chat` or removed — confirmed
+by grep to have zero call sites anywhere in `app/`/`lib/` at the time of
+removal. The throwaway `/dashboard/leads-test` and `/dashboard/ai-test`
+pages this section also describes no longer exist either (removed in a
+later dashboard phase). The rest of this section is preserved unedited as
+the historical record of Phase 10's design and reasoning — read it as
+"what Phase 10 built," not as a description of current code.
 
 `PRODUCT.md` §8's resolved field specification (decision D6) is
 implemented across four separated modules, per `AGENTS.md` §9's
@@ -1118,3 +1131,90 @@ only -- never pass free text through it: no prospect message content, no
 contact info, no raw tool-call input argument, no IP address. `logEvent`
 never throws, so a logging call can never break the caller's own control
 flow.
+
+## Startup environment validation (Phase 19b)
+
+`lib/env.ts` validates every currently-required environment variable
+(the set in `STATE.md` §5 / `docs/security.md` §5) with a Zod schema at
+module load time -- modeled on the pre-existing `lib/embeddings.ts`
+`EMBEDDING_DIMENSION` pattern, generalized to the full required set and
+triggered at server startup rather than at whichever request path
+happens to import a given module first. `instrumentation.ts` (repo root)
+calls it via its `register()` export, which Next.js runs once per new
+server instance before accepting any request (stable since Next.js 15).
+Guarded to the Node runtime only (`process.env.NEXT_RUNTIME === "edge"`
+short-circuits) -- the Edge runtime (`proxy.ts`'s `clerkMiddleware()`)
+never touches these server secrets. A missing or invalid required
+variable throws immediately, naming every failing variable, never its
+value -- confirmed live: removing a variable and running `npm run dev`
+fails fast at boot with a clear message, not on first request.
+
+## Security headers (Phase 19b)
+
+`next.config.ts`'s `headers()` applies three framing-neutral headers
+(`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`)
+everywhere, including `/widget/embed` and `/api/*` -- none of the three
+affect iframe embedding or JSON responses. `X-Frame-Options: DENY` is
+applied only to an explicit allowlist of non-widget sources (`/`,
+`/dashboard/:path*`, `/onboarding/:path*`, `/session-tasks/:path*`,
+`/sign-in/:path*`, `/sign-up/:path*`), never to `/widget/embed`.
+
+**This exclusion is load-bearing, not incidental**: `/widget/embed` is
+deliberately loaded cross-origin inside an `<iframe>` by design
+(`public/widget-loader.js`'s entire mechanism depends on it,
+`docs/security.md` §4). Next.js's `headers()` `source` matching has no
+built-in "everything except X" syntax, so any future change to this
+allowlist must be additive (add another non-widget source) rather than
+switched to a blanket `/:path*` rule with an attempted exclusion --
+confirmed live that `/dashboard` carries `X-Frame-Options: DENY` and
+`/widget/embed` does not.
+
+## Testing: pgTAP against the live project (Phase 19b)
+
+`npm test` runs `scripts/run-pgtap-tests.mjs`, which executes every file
+under `supabase/tests/database/` against the **live, linked** Supabase
+project via `supabase db query --linked --file <path>` -- not
+`supabase test db` against a local Docker-backed stack, which this
+project's implementing environment and the user's own machine both lack
+(no Docker/Podman available in either, confirmed directly). This was a
+deliberate, explicit choice, not a fallback: pgTAP's extension
+(`supabase/migrations/20260814160000_enable_pgtap_extension.sql`) is
+installed on the live project itself.
+
+Each test file wraps its assertions in `begin;`/`rollback;` (verified
+live, before this mechanism was built further, that fixture rows do not
+persist afterward -- `supabase db query --file` really does run a whole
+file as one connection/session, so the transaction boundary holds) and
+additionally funnels every assertion's result line into a temporary
+table, selecting it all as the file's own final statement. This second
+part is required because `supabase db query --file` returns only the
+**last** statement's result set, not every statement's -- confirmed
+live; without the temp-table funnel, an early assertion's failure would
+be silently dropped from the runner's output.
+
+**A "cannot mutate/delete another business's row" assertion must verify
+the outcome via `reset role` (the unrestricted connecting role), not the
+RLS-scoped `authenticated` session that just attempted the forged
+mutation.** That session's own `SELECT` policy can never see the other
+business's row at all, so a `count(*)` check run under it reads the same
+result (invisible) whether the forged mutation was correctly blocked or
+silently succeeded -- proving nothing either way. This was caught live
+during Phase 19b: `007_knowledge_chunks_tenant_isolation.sql`'s original
+delete-isolation assertion failed unconditionally (it expected the row
+to still be visible, which an RLS-scoped session can never show,
+regardless of whether the delete was blocked), while five other files'
+otherwise-identical "no rows affected" `UPDATE` assertions were passing
+for the same wrong reason -- they'd have shown the same false "ok" even
+had `UPDATE` RLS been completely broken, since a forged update's target
+row is equally invisible either way. Directly reproduced live via
+`update ... returning id`/`delete ... returning id` counted inside the
+same transaction, independent of RLS-scoped visibility, confirming the
+app itself was never at fault -- only these assertions' design. All six
+affected files (003, 004, 005, 006, 007, 010) now `reset role` before
+checking post-mutation state.
+
+Requires the `supabase` CLI already authenticated (`supabase login`) and
+linked (`supabase link`) to the target project. Not currently
+CI-portable without also setting up a `SUPABASE_ACCESS_TOKEN`-based
+non-interactive auth path -- no CI exists yet for this project, so this
+is a documented limitation, not something worked around.

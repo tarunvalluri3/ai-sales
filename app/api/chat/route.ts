@@ -23,6 +23,15 @@ import { logEvent } from "@/lib/logger";
  * resolveBusinessFromWidgetKey().
  */
 
+/**
+ * A single request can make up to ~3-4 sequential Gemini calls (the
+ * bounded tool-calling loop in askSalesEmployee(), MAX_TOOL_ITERATIONS
+ * iterations, plus the final structured-output call) -- comfortably
+ * within this limit but well above a default serverless function
+ * timeout (Phase 19b, docs/phase-19-audit-findings.md §10).
+ */
+export const maxDuration = 60;
+
 const RATE_LIMIT_WINDOW_SECONDS = 300;
 const IP_LIMIT = 30;
 const KEY_LIMIT = 120;

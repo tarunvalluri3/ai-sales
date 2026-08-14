@@ -1,8 +1,12 @@
 -- Tenant-isolation test for public.businesses (AGENTS.md §7 requirement).
 --
--- Not run in this implementation environment (no Docker / local Supabase
--- instance available) — written and reviewed only. Run with:
---   supabase test db
+-- Run against the live, linked project via `npm test`
+-- (scripts/run-pgtap-tests.mjs), not a local Docker stack -- see Phase
+-- 19b's "pgTAP live wiring" (docs/phase-19-audit-findings.md §9,
+-- prompts/phase-19b-production-hardening-remediation.md). Wrapped in a
+-- temporary results table because `supabase db query --file` only
+-- returns the *last* statement's result set, not every statement's --
+-- without this, an early assertion's failure would be silently dropped.
 --
 -- Simulates two different Clerk organizations' sessions via
 -- set_config('request.jwt.claims', ...) + `set local role authenticated`,
@@ -16,6 +20,8 @@
 
 begin;
 select plan(2);
+create temporary table _tap_results (line text);
+grant insert on _tap_results to authenticated;
 
 -- Fixture setup as postgres (bypasses RLS — this is seeding, not the
 -- thing under test).
@@ -36,7 +42,7 @@ select set_config(
   true
 );
 
-select results_eq(
+insert into _tap_results select results_eq(
   $$ select clerk_org_id from public.businesses order by clerk_org_id $$,
   $$ values ('org_a') $$,
   'org_a session sees only its own business row, never org_b''s'
@@ -56,7 +62,7 @@ select set_config(
   true
 );
 
-select results_eq(
+insert into _tap_results select results_eq(
   $$ select clerk_org_id from public.businesses order by clerk_org_id $$,
   $$ values ('org_b') $$,
   'org_b session sees only its own business row, never org_a''s'
@@ -64,5 +70,6 @@ select results_eq(
 
 reset role;
 
-select * from finish();
+insert into _tap_results select * from finish();
+select line from _tap_results;
 rollback;

@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
+import { logEvent } from "@/lib/logger";
 
 export type RateLimitScope = "ip" | "key" | "conversation" | "poll_ip" | "poll_conversation";
 
@@ -26,8 +27,12 @@ export async function checkAndIncrementRateLimit(
 
   if (error) {
     // Fail closed: an infra error here should not silently disable rate
-    // limiting.
-    console.error("checkAndIncrementRateLimit failed", error);
+    // limiting. businessId is not yet known at this layer, and the raw
+    // identifier (ip/widgetKey/conversationId) is deliberately never
+    // logged here -- same "never log a raw IP" precedent as
+    // app/api/chat/route.ts's ip-scope 429 logging (Phase 19b,
+    // docs/phase-19-audit-findings.md §6/§12).
+    logEvent("rate_limit_check_failed", "unknown", { scope }, "error");
     return false;
   }
 

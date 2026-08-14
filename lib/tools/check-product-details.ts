@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
+import { escapeLikePattern } from "@/lib/sql-escape";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -60,7 +61,7 @@ export async function executeCheckProductDetails(
     .from("products")
     .select("name, description, price")
     .eq("business_id", businessId)
-    .ilike("name", query)
+    .ilike("name", escapeLikePattern(query))
     .maybeSingle();
 
   if (productError) {
@@ -77,7 +78,7 @@ export async function executeCheckProductDetails(
     .from("services")
     .select("name, description, price")
     .eq("business_id", businessId)
-    .ilike("name", query)
+    .ilike("name", escapeLikePattern(query))
     .maybeSingle();
 
   if (serviceError) {

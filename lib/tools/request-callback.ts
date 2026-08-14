@@ -107,7 +107,7 @@ export async function executeRequestCallback(
   const notes = parsed.data.notes?.trim() || null;
 
   if (existing) {
-    const { error: updateError } = await supabase
+    const { data: updated, error: updateError } = await supabase
       .from("leads")
       .update({
         requested_callback: true,
@@ -116,10 +116,22 @@ export async function executeRequestCallback(
         contact_phone: existing.contact_phone ?? contactPhone,
         notes: appendNotes(existing.notes, notes),
       })
-      .eq("id", existing.id);
+      .eq("id", existing.id)
+      .eq("business_id", businessId)
+      .select("id");
 
     if (updateError) {
       logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "update_failed" }, "error");
+      return { success: false, reason: "lookup_failed" };
+    }
+
+    if (!updated || updated.length === 0) {
+      logEvent(
+        "tool_invoked",
+        businessId,
+        { tool: "request_callback", conversationId, result: "update_affected_zero_rows" },
+        "error",
+      );
       return { success: false, reason: "lookup_failed" };
     }
 

@@ -8,10 +8,10 @@ type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 /**
  * Creates a conversation row. Takes the Supabase client as a parameter
  * (rather than constructing one internally) so both the Clerk-authenticated
- * dashboard path (lib/lead-capture.ts) and the service-role widget path
- * (app/api/chat/route.ts) can share this one implementation.
- * `businessId` must come from `requireBusinessContext()` or
- * `resolveBusinessFromWidgetKey()`, never client input.
+ * dashboard path and the service-role widget path (app/api/chat/route.ts)
+ * can share this one implementation. `businessId` must come from
+ * `requireBusinessContext()` or `resolveBusinessFromWidgetKey()`, never
+ * client input.
  */
 export async function createConversation(
   supabase: SupabaseClient,

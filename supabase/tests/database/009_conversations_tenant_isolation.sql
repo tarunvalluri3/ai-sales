@@ -1,12 +1,16 @@
 -- Tenant-isolation test for public.conversations (AGENTS.md §7 / Phase 10
--- exit criterion). Not run in this implementation environment (no Docker /
--- local Supabase instance available) -- written and reviewed only. Run
--- with: supabase test db
+-- exit criterion).
+--
+-- Run against the live, linked project via `npm test`
+-- (scripts/run-pgtap-tests.mjs) -- see 001_businesses_tenant_isolation.sql's
+-- header for why this is wrapped in a temporary results table.
 --
 -- Same session-simulation technique as 001_businesses_tenant_isolation.sql.
 
 begin;
 select plan(3);
+create temporary table _tap_results (line text);
+grant insert on _tap_results to authenticated;
 
 -- Fixture setup as postgres (bypasses RLS -- this is seeding, not the
 -- thing under test).
@@ -32,18 +36,18 @@ select set_config(
   true
 );
 
-select results_eq(
+insert into _tap_results select results_eq(
   $$ select id from public.conversations order by id $$,
   $$ values ('20000000-0000-0000-0000-00000000000a'::uuid) $$,
   'org_a session sees only its own business''s conversations, never org_b''s'
 );
 
-select lives_ok(
+insert into _tap_results select lives_ok(
   $$ insert into public.conversations (business_id, source) values ('00000000-0000-0000-0000-00000000000a', 'test') $$,
   'org_a session can insert a conversation for its own business'
 );
 
-select throws_ok(
+insert into _tap_results select throws_ok(
   $$ insert into public.conversations (business_id, source) values ('00000000-0000-0000-0000-00000000000b', 'forged') $$,
   '42501',
   null,
@@ -52,5 +56,6 @@ select throws_ok(
 
 reset role;
 
-select * from finish();
+insert into _tap_results select * from finish();
+select line from _tap_results;
 rollback;

@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
+import { escapeLikePattern } from "@/lib/sql-escape";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -58,7 +59,7 @@ export async function executeCheckFaqTopic(
     .from("faqs")
     .select("question, answer")
     .eq("business_id", businessId)
-    .ilike("question", `%${topic}%`)
+    .ilike("question", `%${escapeLikePattern(topic)}%`)
     .order("created_at", { ascending: true })
     .limit(1);
 
