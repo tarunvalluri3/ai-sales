@@ -120,9 +120,10 @@ Resolved decision D6 (`STATE.md`). This is the approved lead field specification
 | `qualification` | AI-generated | hot / warm / cold, plus a short AI-written reason — always shown as an AI signal, never hidden from or substituted for the human's own judgment; the human can always see the raw conversation and override this |
 | `status` | required, defaults `new` | new → contacted → converted / lost |
 | `source` | optional | free text, where the conversation started (e.g. "chat widget", "pricing page") |
+| `requested_callback` | required, defaults `false` | set `true` by the `request_callback` AI tool (Phase 14c) once the prospect has clearly agreed to a callback and given contact info |
 | `created_at` / `updated_at` | automatic | timestamps |
 
-**Rule:** a lead is only created once at least one of `contact_email`/`contact_phone` is present — a conversation with no contact info given doesn't produce a lead row at all (avoids junk/empty leads).
+**Rule:** a lead is only created once at least one of `contact_email`/`contact_phone` is present — a conversation with no contact info given doesn't produce a lead row at all (avoids junk/empty leads). The `request_callback` tool enforces this same rule as part of its own input contract, not just at the database layer.
 
 **`qualification` (hot/warm/cold + reason) is AI-generated, untrusted, UI/display-only** — the same trust category as Phase 9's `escalate`/`usedContext` fields (`docs/security.md` §8). It must never be the sole gate for whether a human reviews a lead, and the human must always be able to see the full conversation and override it.
 

@@ -508,6 +508,20 @@ tenant-scoped lookup of one product or service by name directly from the
 specific and precise price/description matters more than retrieval's
 fuzzy chunk-matching can guarantee.
 
+**A second tool, `check_faq_topic` (`lib/tools/check-faq-topic.ts`,
+Phase 14b), joined the same `bindTools([...])` array and the same bounded
+loop — no second loop, no second `MAX_TOOL_ITERATIONS`.** Each `tool_calls`
+entry is dispatched to its executor by `toolCall.name`. Its matching
+strategy deliberately differs from `check_product_details`'s exact match:
+FAQ `question` values are full sentences a prospect will rarely phrase
+verbatim, so the tool matches by case-insensitive **substring** (`ilike
+'%topic%'`) against `question` only, taking the first match ordered by
+`created_at` rather than erroring when a common keyword matches more than
+one FAQ. It still returns the literal stored `answer` verbatim, never a
+paraphrase — the same "exact record, not retrieval's fuzzy chunk-match"
+guarantee as `check_product_details`, just with a more forgiving lookup
+step to get there.
+
 **Two stages, not one — a provider-level constraint, not a stylistic
 choice.** Inspecting the installed `@langchain/google-genai`'s
 `withStructuredOutput` implementation showed it uses Gemini's native
@@ -537,10 +551,38 @@ enforcement) and returns a structured `{ found, ... }` / `{ found: false,
 reason }` result rather than throwing, so a tool failure can't take down
 the whole answer.
 
-Future tools (`check_faq_topic`, `request_callback`) live alongside this
-one in `lib/tools/`, following the same shape: narrow Zod input schema,
-`businessId` injected by the caller, structured success/failure result,
-server-side logging.
+**`request_callback` (`lib/tools/request-callback.ts`, Phase 14c) is the
+first write action any tool in this codebase can take**, and it needed more
+than the read tools' mechanics. `askSalesEmployee()`'s signature gained a
+required `conversationId` parameter (threaded from `app/api/chat/route.ts`,
+which already resolves it before calling), positioned alongside `businessId`
+as a second trusted, server-injected value the model's schema structurally
+excludes — the tool creates or updates a `leads` row for that conversation,
+never reads `conversationId` from `rawArgs`. Two existing lead-creation
+paths were inspected and rejected: `captureLeadFromConversation()` re-runs a
+whole-transcript extraction and always mints a new `conversations` row (the
+wrong shape for a tool call that already has explicit args and an existing
+conversation), and `lib/leads.ts`'s `createLead()`/`getLeadForConversation()`
+both construct a Clerk-session client internally, which has no valid session
+on the widget's service-role path (the same bug class the
+fix-widget-retrieval-client-injection entry already fixed once for
+retrieval). The executor instead does its own tenant-scoped `leads` queries
+with the passed-in client, reusing `lib/conversations.ts`'s
+`getConversationForBusiness()` (already client-injected) as the
+tenant-ownership guard before any write — a `conversationId` that doesn't
+belong to `businessId` fails closed with no write, the tool's real
+forged-tenant proof. A second call for the same conversation updates the
+existing row (fill-blank contact fields, appended notes, `leads`'s new
+`unique (conversation_id)` constraint backstopping "never a duplicate") 
+rather than inserting a second one. Consent is enforced by instruction, not
+a schema field: the system prompt states explicitly that offering a
+callback is conversational only, and the tool may only be called once the
+prospect has clearly agreed **and** given contact info — there is
+deliberately no `prospectConfirmed`-style boolean in the tool's schema,
+since the model could set that `true` regardless of what actually happened.
+The tool's log line is businessId + conversationId + outcome only — never
+the prospect's actual contact info, unlike the read tools' query-string
+logging, since this one touches real PII.
 
 ### Lead extraction (Phase 10)
 

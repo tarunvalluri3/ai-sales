@@ -136,7 +136,14 @@ export async function POST(request: NextRequest) {
 
     let response;
     try {
-      response = await askSalesEmployee(supabase, business.businessId, business.businessName, message, history);
+      response = await askSalesEmployee(
+        supabase,
+        business.businessId,
+        conversation.id,
+        business.businessName,
+        message,
+        history,
+      );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);
       return withCors(jsonError(userMessage, 500));

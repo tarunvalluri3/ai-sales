@@ -101,6 +101,7 @@ export type Lead = {
   qualification_reason: string;
   status: LeadStatus;
   source: string | null;
+  requested_callback: boolean;
   created_at: string;
   updated_at: string;
 };

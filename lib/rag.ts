@@ -10,6 +10,8 @@ import { searchKnowledgeChunks } from "@/lib/retrieval";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import { checkProductDetailsTool, executeCheckProductDetails } from "@/lib/tools/check-product-details";
+import { checkFaqTopicTool, executeCheckFaqTopic } from "@/lib/tools/check-faq-topic";
+import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request-callback";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -115,6 +117,8 @@ Rules:
 - Answer only using the reference context above and this conversation's own messages.
 - If the answer falls into category 4 (unknown), say plainly that you don't have that information -- do not guess, do not answer from general knowledge, and do not generalize from other businesses. Offer to connect the prospect with a human or collect their contact details for follow-up.
 - When a prospect asks about a specific named product or service and you need its exact, current price or description, use the check_product_details tool rather than relying only on the reference context above -- it queries the business's live catalog directly.
+- When a prospect's question matches a specific FAQ topic and you need the business's exact approved wording, use the check_faq_topic tool rather than relying only on the reference context above.
+- A prospect may want a callback in two ways: they ask for one directly, or you proactively offer one (for example, as part of deciding to escalate). Offering a callback is always just conversation -- it never calls a tool by itself. Only call the request_callback tool after the prospect has clearly agreed to a callback, in response to either their own request or your offer, AND you already have their email or phone number from this conversation. Never call this tool based only on your own guess that they might want one -- wait for their explicit agreement first, and if you don't have contact info yet, ask for it before calling the tool.
 - Never invent facts about {businessName}.
 - Never discuss competitors or any other business.
 - Never answer general-knowledge questions unrelated to {businessName}'s business.
@@ -158,6 +162,7 @@ function toLangchainHistory(history: ConversationMessage[]): ["human" | "ai", st
 export async function askSalesEmployee(
   supabase: SupabaseClient,
   businessId: string,
+  conversationId: string,
   businessName: string,
   question: string,
   history: ConversationMessage[] = [],
@@ -189,7 +194,7 @@ export async function askSalesEmployee(
     });
     const messages: BaseMessage[] = prompt.toChatMessages();
 
-    const toolModel = getChatModel().bindTools([checkProductDetailsTool]);
+    const toolModel = getChatModel().bindTools([checkProductDetailsTool, checkFaqTopicTool, requestCallbackTool]);
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const aiMessage = await toolModel.invoke(messages);
       if (!aiMessage.tool_calls || aiMessage.tool_calls.length === 0) {
@@ -198,7 +203,17 @@ export async function askSalesEmployee(
 
       messages.push(aiMessage);
       for (const toolCall of aiMessage.tool_calls) {
-        const toolResult = await executeCheckProductDetails(supabase, businessId, toolCall.args);
+        let toolResult: unknown;
+        if (toolCall.name === "check_product_details") {
+          toolResult = await executeCheckProductDetails(supabase, businessId, toolCall.args);
+        } else if (toolCall.name === "check_faq_topic") {
+          toolResult = await executeCheckFaqTopic(supabase, businessId, toolCall.args);
+        } else if (toolCall.name === "request_callback") {
+          toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
+        } else {
+          console.error("askSalesEmployee: unrecognized tool call", businessId, toolCall.name);
+          toolResult = { found: false, reason: "invalid_input" };
+        }
         messages.push(
           new ToolMessage({
             content: JSON.stringify(toolResult),
