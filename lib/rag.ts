@@ -4,9 +4,24 @@ import { BaseRetriever } from "@langchain/core/retrievers";
 import { Document } from "@langchain/core/documents";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import type { BaseMessage } from "@langchain/core/messages";
+import { ToolMessage } from "@langchain/core/messages";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { checkProductDetailsTool, executeCheckProductDetails } from "@/lib/tools/check-product-details";
+
+/**
+ * Caps the tool-calling loop in askSalesEmployee(). Tools and
+ * withStructuredOutput's responseSchema are mutually exclusive on a single
+ * Gemini call in this LangChain integration (see docs/architecture.md's
+ * "AI tool-calling" section), so tool use happens in its own bounded loop
+ * before a separate, tools-unbound structured-output call produces the
+ * final answer. Hitting the cap is not an error -- the loop just stops
+ * issuing further tool calls and proceeds to the final answer with
+ * whatever context has been gathered so far.
+ */
+const MAX_TOOL_ITERATIONS = 2;
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -99,6 +114,7 @@ You have four kinds of information available to you:
 Rules:
 - Answer only using the reference context above and this conversation's own messages.
 - If the answer falls into category 4 (unknown), say plainly that you don't have that information -- do not guess, do not answer from general knowledge, and do not generalize from other businesses. Offer to connect the prospect with a human or collect their contact details for follow-up.
+- When a prospect asks about a specific named product or service and you need its exact, current price or description, use the check_product_details tool rather than relying only on the reference context above -- it queries the business's live catalog directly.
 - Never invent facts about {businessName}.
 - Never discuss competitors or any other business.
 - Never answer general-knowledge questions unrelated to {businessName}'s business.
@@ -171,10 +187,32 @@ export async function askSalesEmployee(
       question,
       history: toLangchainHistory(history),
     });
+    const messages: BaseMessage[] = prompt.toChatMessages();
+
+    const toolModel = getChatModel().bindTools([checkProductDetailsTool]);
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      const aiMessage = await toolModel.invoke(messages);
+      if (!aiMessage.tool_calls || aiMessage.tool_calls.length === 0) {
+        break;
+      }
+
+      messages.push(aiMessage);
+      for (const toolCall of aiMessage.tool_calls) {
+        const toolResult = await executeCheckProductDetails(supabase, businessId, toolCall.args);
+        messages.push(
+          new ToolMessage({
+            content: JSON.stringify(toolResult),
+            tool_call_id: toolCall.id!,
+            name: toolCall.name,
+          }),
+        );
+      }
+    }
+
     const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, {
       name: "SalesEmployeeResponse",
     });
-    const result = await model.invoke(prompt);
+    const result = await model.invoke(messages);
 
     return {
       answer: result.answer,

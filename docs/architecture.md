@@ -499,6 +499,49 @@ input (`AGENTS.md` §3 rule 5, `docs/security.md` §8): rendered as
 display text/a UI flag only, never used to authorize anything, select a
 tenant, or execute a real-world action.
 
+### AI tool-calling (Phase 14a)
+
+`askSalesEmployee()` can now call tools mid-answer, starting with
+`check_product_details` (`lib/tools/check-product-details.ts`) — an exact,
+tenant-scoped lookup of one product or service by name directly from the
+`products`/`services` tables, for when a prospect asks about something
+specific and precise price/description matters more than retrieval's
+fuzzy chunk-matching can guarantee.
+
+**Two stages, not one — a provider-level constraint, not a stylistic
+choice.** Inspecting the installed `@langchain/google-genai`'s
+`withStructuredOutput` implementation showed it uses Gemini's native
+`responseSchema` JSON-mode generation config, not forced function-calling
+— and a single Gemini call cannot carry both a `tools` list and a
+`responseSchema`. So tool use and the final structured
+`SalesEmployeeResponse` can never happen in the same model call. The flow
+is: (1) a tools-bound call (`getChatModel().bindTools([...])`) that may
+come back with `tool_calls`; each is executed and fed back as a
+`ToolMessage` (keyed by `tool_call_id`), looped up to `MAX_TOOL_ITERATIONS`
+(currently 2) to bound cost/latency — hitting the cap is not an error, the
+loop just stops issuing tool calls; then (2) a separate, tools-unbound
+`withStructuredOutput` call over the full accumulated message list
+produces the final answer, exactly as before this phase. This costs at
+least one extra model call whenever documents are retrieved (up from one
+call to two-or-more), accepted as the necessary shape of tool-calling on
+this provider via this integration.
+
+**Tenant scope is injected, never model-supplied**, same principle
+`KnowledgeRetriever` already established for retrieval: a tool's
+executor takes `businessId` as a function parameter from
+`askSalesEmployee`'s own already-trusted parameter, never as a field on
+the tool's model-facing Zod input schema. `check_product_details`'s tool
+schema has only a `query` field; `executeCheckProductDetails()` re-validates
+`rawArgs` itself (defense in depth beyond `bindTools`' own schema
+enforcement) and returns a structured `{ found, ... }` / `{ found: false,
+reason }` result rather than throwing, so a tool failure can't take down
+the whole answer.
+
+Future tools (`check_faq_topic`, `request_callback`) live alongside this
+one in `lib/tools/`, following the same shape: narrow Zod input schema,
+`businessId` injected by the caller, structured success/failure result,
+server-side logging.
+
 ### Lead extraction (Phase 10)
 
 `PRODUCT.md` §8's resolved field specification (decision D6) is
