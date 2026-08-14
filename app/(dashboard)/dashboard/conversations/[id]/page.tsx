@@ -5,6 +5,7 @@ import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversation } from "@/lib/messages";
 import { getLeadForConversation } from "@/lib/leads";
 import { MessageBubble } from "../_components/message-bubble";
+import { ControlToggle } from "../_components/control-toggle";
 
 export default async function ConversationDetailPage({
   params,
@@ -32,6 +33,10 @@ export default async function ConversationDetailPage({
         <p className="text-sm text-zinc-600">
           {new Date(conversation.created_at).toLocaleString()} · {conversation.source ?? "—"}
         </p>
+      </div>
+
+      <div className="max-w-2xl">
+        <ControlToggle conversationId={conversation.id} control={conversation.control} />
       </div>
 
       <div className="flex max-w-2xl flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-4">

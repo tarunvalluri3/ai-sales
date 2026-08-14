@@ -1,7 +1,7 @@
 import "server-only";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Conversation } from "@/lib/supabase/types";
-import { AppError } from "@/lib/errors";
+import type { Conversation, ConversationControl } from "@/lib/supabase/types";
+import { AppError, logAndGetUserMessage } from "@/lib/errors";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -119,4 +119,71 @@ export async function getConversationForBusiness(
   }
 
   return data;
+}
+
+/**
+ * Sets a conversation's control state ('ai' | 'human'), scoped to the
+ * given business. Only a Clerk-authenticated dashboard caller should use
+ * this (grants restrict `authenticated` to the `control` column only --
+ * `needs_attention` is never writable from this path, see
+ * flagConversationNeedsAttention()). `businessId` must come from
+ * `requireBusinessContext()`. Same no-existence-leak, boolean-return
+ * contract as lib/leads.ts's updateLeadStatus() -- a cross-tenant or
+ * nonexistent id affects zero rows rather than throwing or leaking which
+ * case occurred.
+ */
+export async function setConversationControl(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+  control: ConversationControl,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({ control })
+    .eq("business_id", businessId)
+    .eq("id", conversationId)
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong updating this conversation. Please try again.",
+      "setConversationControl failed",
+      error,
+    );
+  }
+
+  return data.length > 0;
+}
+
+/**
+ * Flags a conversation as needing human attention. Called only from
+ * app/api/chat/route.ts with the service-role client, after the AI sets
+ * escalate: true on a turn -- never from a dashboard caller (no
+ * `authenticated` grant exists on this column, by design). Escalation
+ * deliberately does not change `control` -- see
+ * prompts/phase-15a-handoff-state-and-ai-pause.md's "Decisions and
+ * assumptions" #1. A failure here must not fail the prospect's request,
+ * so this logs rather than throws.
+ */
+export async function flagConversationNeedsAttention(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ needs_attention: true })
+    .eq("business_id", businessId)
+    .eq("id", conversationId);
+
+  if (error) {
+    logAndGetUserMessage(
+      new AppError(
+        "Something went wrong flagging this conversation for attention.",
+        "flagConversationNeedsAttention failed",
+        error,
+      ),
+    );
+  }
 }

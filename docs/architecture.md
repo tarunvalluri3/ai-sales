@@ -906,6 +906,61 @@ convention. If lead capture is ever wired to the widget path, this file
 would need the same client-injection retrofit Phase 11 applied to
 `lib/conversations.ts`/`lib/messages.ts`, at that time.
 
+### Human handoff: control state and the AI-pause guard (Phase 15a)
+
+`conversations` gained two columns: `control` (`'ai' | 'human'`, default
+`'ai'`) and `needs_attention` (`boolean`, default `false`). `control` is
+the explicit state distinguishing AI-handled from human-controlled
+conversations that `docs/phases.md`'s Phase 15 entry calls for. It is
+never set from AI output -- the only writer is
+`lib/conversations.ts`'s `setConversationControl()`, called from a new
+Clerk-authenticated Server Action
+(`app/(dashboard)/dashboard/conversations/actions.ts`,
+`setConversationControlAction`) driven by a "Take over this
+conversation" / "Hand back to AI" toggle on the conversation detail
+page. The `authenticated` role's grant is column-scoped to `control`
+only -- there is no grant on `needs_attention` for that role at all.
+
+`app/api/chat/route.ts`'s guard: the prospect's message is always
+persisted first (so a human reviewing the conversation sees every
+message, even while it's human-controlled), then, if
+`conversation.control === "human"`, the request returns a static,
+server-authored acknowledgment (`HUMAN_CONTROL_MESSAGE`) **without ever
+calling `askSalesEmployee()` and without persisting that acknowledgment
+as a message row**. This is the mechanism that makes it structurally
+impossible for the AI and a human to both answer the same prospect
+message -- not a convention the model is asked to follow, an app-layer
+branch that never reaches the model at all when control is human. Not
+persisting the canned acknowledgment is deliberate: it keeps this stage
+from having to decide how a real staff reply is represented in
+`messages` (a new role distinct from `user`/`assistant`) before that
+representation is actually needed -- that decision belongs to the next
+stage, which builds staff-reply delivery.
+
+When the AI's own `escalate` signal is `true` on a turn, the route flags
+the conversation via `flagConversationNeedsAttention()` (service-role
+write, since only that path can touch `needs_attention`) -- but this
+**does not** change `control`. Escalation raises a flag for a human to
+claim; it does not silently switch the prospect from a working AI
+answer to "someone will reply shortly" before any staff member is
+actually watching, since the in-app alert UI that would make a human
+aware of the flag doesn't exist until a later Phase 15 stage. This is a
+confirmed, deliberate reinterpretation of `docs/phases.md`'s literal
+Phase 15 exit-criterion wording ("an escalation trigger reliably moves a
+live conversation to human control") -- see
+`prompts/phase-15a-handoff-state-and-ai-pause.md`'s "Decisions and
+assumptions" #1, and `STATE.md` §4's decision log for the formally
+recorded version. The literal phrase is satisfied at the level of the
+full Phase 15 flow (trigger → attention flag → a human's deliberate
+take-over action → control genuinely moves to human), not by the
+trigger alone.
+
+Still explicitly out of scope as of this stage: any live/polling
+delivery of a staff reply to the prospect, a dashboard UI for actually
+sending a reply, any new `messages` role, and the visual
+badge/sound alert for `needs_attention` -- all later Phase 15 stages,
+not built yet.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

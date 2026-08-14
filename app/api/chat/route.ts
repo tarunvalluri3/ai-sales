@@ -5,7 +5,11 @@ import { logAndGetUserMessage, AppError } from "@/lib/errors";
 import { resolveBusinessFromWidgetKey, WidgetAuthError } from "@/lib/widget-auth";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
-import { createConversation, getConversationForBusiness } from "@/lib/conversations";
+import {
+  createConversation,
+  flagConversationNeedsAttention,
+  getConversationForBusiness,
+} from "@/lib/conversations";
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 
@@ -23,6 +27,16 @@ const KEY_LIMIT = 120;
 const CONVERSATION_LIMIT = 20;
 const HISTORY_LIMIT = 20;
 const MESSAGE_MAX_LENGTH = 2000;
+
+/**
+ * Returned when a conversation is human-controlled (Phase 15a) instead of
+ * calling askSalesEmployee(). A static, server-authored string, never
+ * model output -- this is not persisted as a message row (see the
+ * control check below), so it costs nothing to keep unchanged if a human
+ * reply arrives moments later.
+ */
+const HUMAN_CONTROL_MESSAGE =
+  "Thanks for your message — a member of our team has this conversation and will reply here shortly.";
 
 const bodySchema = z.object({
   widgetKey: z.string().uuid(),
@@ -130,9 +144,27 @@ export async function POST(request: NextRequest) {
       return withCors(jsonError("Too many requests.", 429));
     }
 
-    const history = await listRecentMessages(supabase, business.businessId, conversation.id, HISTORY_LIMIT);
-
+    // Persisted unconditionally, regardless of control state, so a human
+    // reviewing the conversation sees every prospect message even while
+    // it's human-controlled and the AI is not being called.
     await createMessage(supabase, business.businessId, conversation.id, "user", message);
+
+    // Phase 15a's AI-pause guard: once a human has taken over (a
+    // deliberate dashboard action, never set by AI output -- see
+    // lib/conversations.ts's setConversationControl()), askSalesEmployee()
+    // must never be called for this conversation. Without this check, the
+    // AI and a human could both reply to the same prospect message.
+    if (conversation.control === "human") {
+      return withCors(
+        jsonSuccess({
+          conversationId: conversation.id,
+          answer: HUMAN_CONTROL_MESSAGE,
+          escalate: false,
+        }),
+      );
+    }
+
+    const history = await listRecentMessages(supabase, business.businessId, conversation.id, HISTORY_LIMIT);
 
     let response;
     try {
@@ -150,6 +182,14 @@ export async function POST(request: NextRequest) {
     }
 
     await createMessage(supabase, business.businessId, conversation.id, "assistant", response.answer);
+
+    if (response.escalate) {
+      // Flags the conversation for dashboard attention -- deliberately
+      // does not change `control`. See prompts/phase-15a-handoff-state-and-ai-pause.md's
+      // "Decisions and assumptions" #1 for why escalation alone must not
+      // silence the AI before a human is actually watching.
+      await flagConversationNeedsAttention(supabase, business.businessId, conversation.id);
+    }
 
     return withCors(
       jsonSuccess({

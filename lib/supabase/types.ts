@@ -65,10 +65,14 @@ export type KnowledgeChunk = {
   created_at: string;
 };
 
+export type ConversationControl = "ai" | "human";
+
 export type Conversation = {
   id: string;
   business_id: string;
   source: string | null;
+  control: ConversationControl;
+  needs_attention: boolean;
   created_at: string;
 };
 
