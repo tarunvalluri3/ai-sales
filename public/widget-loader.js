@@ -284,6 +284,13 @@
       isPanelOpen = data.open;
       if (isPanelOpen && !wasOpen && hasHandoffSignal) {
         pollNow();
+      } else if (!isPanelOpen && pollTimeoutId) {
+        // schedulePoll()'s own guard only prevents double-scheduling --
+        // it never cancels an already-armed timer, so closing the panel
+        // must actively clear it here (same shape as the
+        // visibilitychange-hidden branch above).
+        clearTimeout(pollTimeoutId);
+        pollTimeoutId = null;
       } else {
         schedulePoll();
       }

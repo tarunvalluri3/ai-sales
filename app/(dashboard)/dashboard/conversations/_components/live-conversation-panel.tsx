@@ -5,6 +5,7 @@ import { pollConversationAction } from "../actions";
 import { ControlToggle } from "./control-toggle";
 import { ReplyComposer } from "./reply-composer";
 import { MessageBubble } from "./message-bubble";
+import { DismissAttentionButton } from "../../_components/dismiss-attention-button";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
 
 const POLL_INTERVAL_MS = 3000;
@@ -21,15 +22,18 @@ const POLL_INTERVAL_MS = 3000;
 export function LiveConversationPanel({
   conversationId,
   initialControl,
+  initialNeedsAttention,
   initialMessages,
   initialAsOf,
 }: {
   conversationId: string;
   initialControl: ConversationControl;
+  initialNeedsAttention: boolean;
   initialMessages: Message[];
   initialAsOf: string;
 }) {
   const [control, setControl] = useState(initialControl);
+  const [needsAttention, setNeedsAttention] = useState(initialNeedsAttention);
   const [messages, setMessages] = useState(initialMessages);
   const asOfRef = useRef(initialAsOf);
   const knownIdsRef = useRef(new Set(initialMessages.map((message) => message.id)));
@@ -58,6 +62,7 @@ export function LiveConversationPanel({
       mergeMessages(result.messages);
       asOfRef.current = result.asOf;
       setControl(result.control);
+      setNeedsAttention(result.needsAttention);
     } catch {
       // A poll failure is invisible to the user -- keep the last-known
       // state and try again on the next tick.
@@ -105,8 +110,14 @@ export function LiveConversationPanel({
 
   return (
     <>
-      <div className="max-w-2xl">
+      <div className="flex max-w-2xl flex-wrap items-center gap-3">
         <ControlToggle conversationId={conversationId} control={control} onChanged={poll} />
+        {needsAttention ? (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2">
+            <span className="text-sm font-medium text-amber-800">Needs attention</span>
+            <DismissAttentionButton conversationId={conversationId} onDismissed={poll} />
+          </div>
+        ) : null}
       </div>
 
       {control === "human" ? (

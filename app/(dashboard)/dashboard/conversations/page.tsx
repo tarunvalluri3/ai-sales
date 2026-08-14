@@ -40,11 +40,18 @@ export default async function ConversationsPage() {
                   {conversation.messageCount === 1 ? "" : "s"}
                 </p>
               </div>
-              {conversationIdsWithLead.has(conversation.id) ? (
-                <span className="rounded-full bg-dashboard-primary/10 px-2.5 py-1 text-xs font-medium text-dashboard-primary">
-                  Lead
-                </span>
-              ) : null}
+              <div className="flex items-center gap-2">
+                {conversation.needs_attention ? (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+                    Needs attention
+                  </span>
+                ) : null}
+                {conversationIdsWithLead.has(conversation.id) ? (
+                  <span className="rounded-full bg-dashboard-primary/10 px-2.5 py-1 text-xs font-medium text-dashboard-primary">
+                    Lead
+                  </span>
+                ) : null}
+              </div>
             </Link>
           </li>
         ))}

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS, isNavItemActive } from "./nav-items";
+import { NAV_ITEMS, isNavItemActive, formatAttentionBadge } from "./nav-items";
+import { useAttentionCount } from "./attention-provider";
 
 export function Sidebar({ businessName }: { businessName: string }) {
   const pathname = usePathname();
+  const attentionCount = useAttentionCount();
 
   return (
     <nav
@@ -17,6 +19,7 @@ export function Sidebar({ businessName }: { businessName: string }) {
       </p>
       {NAV_ITEMS.map((item) => {
         const active = isNavItemActive(pathname, item.href);
+        const showBadge = item.href === "/dashboard/conversations" && attentionCount > 0;
         return (
           <Link
             key={item.href}
@@ -29,7 +32,15 @@ export function Sidebar({ businessName }: { businessName: string }) {
             }`}
           >
             <item.icon className="size-4 shrink-0" />
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {showBadge ? (
+              <span
+                aria-label={`${attentionCount} conversation${attentionCount === 1 ? "" : "s"} need attention`}
+                className="rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-semibold text-white"
+              >
+                {formatAttentionBadge(attentionCount)}
+              </span>
+            ) : null}
           </Link>
         );
       })}

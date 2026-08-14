@@ -4,7 +4,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getConversationForBusiness, setConversationControl } from "@/lib/conversations";
+import {
+  dismissConversationAttention,
+  getConversationForBusiness,
+  setConversationControl,
+} from "@/lib/conversations";
 import { createMessage, listMessagesForConversationAfter } from "@/lib/messages";
 import { logAndGetUserMessage } from "@/lib/errors";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
@@ -109,6 +113,50 @@ export async function sendHumanReplyAction(
   return { success: true, message };
 }
 
+const dismissAttentionSchema = z.object({
+  conversationId: z.string().uuid(),
+});
+
+export type DismissAttentionState = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
+ * Clears `needs_attention` without changing `control` -- for a
+ * conversation staff has reviewed and decided the AI is handling fine,
+ * no takeover needed (Phase 15c).
+ */
+export async function dismissAttentionAction(
+  _prevState: DismissAttentionState,
+  formData: FormData,
+): Promise<DismissAttentionState> {
+  const { businessId } = await requireBusinessContext();
+
+  const parsed = dismissAttentionSchema.safeParse({
+    conversationId: formData.get("conversationId"),
+  });
+  if (!parsed.success) {
+    return { error: "Invalid request." };
+  }
+
+  const supabase = createServerSupabaseClient();
+
+  let updated: boolean;
+  try {
+    updated = await dismissConversationAttention(supabase, businessId, parsed.data.conversationId);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!updated) {
+    return { error: "This conversation no longer exists." };
+  }
+
+  revalidatePath(`/dashboard/conversations/${parsed.data.conversationId}`);
+  return { success: true };
+}
+
 const pollSchema = z.object({
   conversationId: z.string().uuid(),
   after: z.iso.datetime({ offset: true }),
@@ -117,6 +165,7 @@ const pollSchema = z.object({
 export type PollConversationResult = {
   messages: Message[];
   control: ConversationControl;
+  needsAttention: boolean;
   asOf: string;
 };
 
@@ -148,14 +197,14 @@ export async function pollConversationAction(
 
   const parsed = pollSchema.safeParse({ conversationId, after });
   if (!parsed.success) {
-    return { messages: [], control: "ai", asOf: after };
+    return { messages: [], control: "ai", needsAttention: false, asOf: after };
   }
 
   const supabase = createServerSupabaseClient();
 
   const conversation = await getConversationForBusiness(supabase, businessId, parsed.data.conversationId);
   if (!conversation) {
-    return { messages: [], control: "ai", asOf: after };
+    return { messages: [], control: "ai", needsAttention: false, asOf: after };
   }
 
   const messages = await listMessagesForConversationAfter(
@@ -168,5 +217,5 @@ export async function pollConversationAction(
 
   const asOf = messages.length > 0 ? messages[messages.length - 1].created_at : after;
 
-  return { messages, control: conversation.control, asOf };
+  return { messages, control: conversation.control, needsAttention: conversation.needs_attention, asOf };
 }

@@ -37,6 +37,7 @@ export default async function ConversationDetailPage({
       <LiveConversationPanel
         conversationId={conversation.id}
         initialControl={conversation.control}
+        initialNeedsAttention={conversation.needs_attention}
         initialMessages={messages}
         initialAsOf={messages.length > 0 ? messages[messages.length - 1].created_at : conversation.created_at}
       />

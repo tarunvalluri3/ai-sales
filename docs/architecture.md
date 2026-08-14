@@ -1041,6 +1041,59 @@ cursor as defense in depth, not a substitute for it.
 `app/api/chat/poll/route.ts` -- a small, directly-justified refactor
 (two real call sites), not scope creep.
 
+### Phase 15c -- in-app attention alerts (badge + sound)
+
+`needs_attention`, set only by the service role (Phase 15a), previously
+had no path back to `false` -- a badge counting it would only ever grow.
+This stage adds exactly two ways to clear it, both a deliberate human
+action: **taking over a conversation** (`setConversationControl()`, when
+transitioning to `"human"`, now also clears `needs_attention` in the same
+update -- taking over is already the human's explicit acknowledgment, so
+this avoids a second click for the common "see an alert, take it over"
+path) and a new, separate **Dismiss action**
+(`dismissConversationAttention()`, a new `authenticated` column-scoped
+grant on `needs_attention` alongside the existing `control` grant, same
+`conversations_update_own_business` RLS policy, unchanged) for when
+staff reviews an escalated conversation and decides the AI is handling
+it fine after all. Hand-back-to-AI does not touch `needs_attention`. No
+grant exists for `authenticated` to ever set `needs_attention` back to
+`true` -- only the service role can raise the flag; the dashboard can
+only lower it.
+
+**One shared poller, not one per nav surface.** `Sidebar` and
+`MobileNav` are both always mounted (CSS-hidden by breakpoint), so a
+single client component, `AttentionProvider`, is mounted once in
+`dashboard/layout.tsx` and owns the poll
+(`pollAttentionCountAction()`, 3-second self-rescheduling `setTimeout`,
+same pause-on-hidden/resume-with-immediate-poll shape as
+`LiveConversationPanel`). It exposes the count via a small React
+Context (`useAttentionCount()`), consumed by both nav components to
+render a numeric badge next to the "Conversations" item only -- zero
+count renders no badge, and the count caps display at "9+" past 9.
+
+**The chime is a synthesized Web Audio tone (`AudioContext` +
+`OscillatorNode`), not an audio file** -- avoids a binary asset and any
+new dependency. Browsers only allow `AudioContext` to produce sound
+after a user gesture, so `AttentionProvider` creates it lazily on the
+dashboard's first `click`/`keydown` (a one-time listener), not eagerly
+on mount. The chime fires only when the polled count is strictly
+greater than the previously known count in that tab, and never on the
+very first poll after mount -- otherwise every login with an existing
+backlog would alarm immediately. Any `AudioContext`/playback failure is
+caught and swallowed; a missing sound must never break the badge.
+
+The conversations list page's per-row "Needs attention" pill is
+static, server-rendered from the same query that already renders the
+list -- not live-polled itself, since only the nav-level badge/sound
+was in the phase's original scope. The conversation detail page's own
+indicator and Dismiss button *are* live, riding the existing
+`pollConversationAction()` poll (`PollConversationResult` gained a
+`needsAttention` field, sourced from the same `getConversationForBusiness()`
+call already made on every tick -- no new query).
+
+This closes the gap Phase 15a's own entry flagged as open, and
+completes all three planned Phase 15 stages.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept

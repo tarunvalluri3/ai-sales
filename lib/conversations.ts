@@ -124,9 +124,11 @@ export async function getConversationForBusiness(
 /**
  * Sets a conversation's control state ('ai' | 'human'), scoped to the
  * given business. Only a Clerk-authenticated dashboard caller should use
- * this (grants restrict `authenticated` to the `control` column only --
- * `needs_attention` is never writable from this path, see
- * flagConversationNeedsAttention()). `businessId` must come from
+ * this. Taking over (control === "human") also clears `needs_attention`
+ * -- taking over is already the human's explicit acknowledgment of the
+ * alert, so this avoids requiring a second click for the common "see an
+ * alert, take it over" path (Phase 15c). Hand-back-to-AI (control ===
+ * "ai") does not touch `needs_attention`. `businessId` must come from
  * `requireBusinessContext()`. Same no-existence-leak, boolean-return
  * contract as lib/leads.ts's updateLeadStatus() -- a cross-tenant or
  * nonexistent id affects zero rows rather than throwing or leaking which
@@ -138,9 +140,11 @@ export async function setConversationControl(
   conversationId: string,
   control: ConversationControl,
 ): Promise<boolean> {
+  const update = control === "human" ? { control, needs_attention: false } : { control };
+
   const { data, error } = await supabase
     .from("conversations")
-    .update({ control })
+    .update(update)
     .eq("business_id", businessId)
     .eq("id", conversationId)
     .select("id");
@@ -154,6 +158,63 @@ export async function setConversationControl(
   }
 
   return data.length > 0;
+}
+
+/**
+ * Clears `needs_attention` without changing `control` -- for the case
+ * where staff reviews an escalated conversation and decides the AI is
+ * handling it fine after all, no takeover needed (Phase 15c). Same
+ * no-existence-leak, boolean-return contract as setConversationControl().
+ */
+export async function dismissConversationAttention(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({ needs_attention: false })
+    .eq("business_id", businessId)
+    .eq("id", conversationId)
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong updating this conversation. Please try again.",
+      "dismissConversationAttention failed",
+      error,
+    );
+  }
+
+  return data.length > 0;
+}
+
+/**
+ * Returns the number of conversations for a business with
+ * `needs_attention = true` -- the count backing the dashboard's live nav
+ * badge (Phase 15c). `businessId` must come from `requireBusinessContext()`.
+ * The existing `conversations_business_needs_attention_idx` partial index
+ * (Phase 15a) covers exactly this query shape.
+ */
+export async function countConversationsNeedingAttention(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("conversations")
+    .select("id", { count: "exact", head: true })
+    .eq("business_id", businessId)
+    .eq("needs_attention", true);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your conversations. Please try again.",
+      "countConversationsNeedingAttention failed",
+      error,
+    );
+  }
+
+  return count ?? 0;
 }
 
 /**

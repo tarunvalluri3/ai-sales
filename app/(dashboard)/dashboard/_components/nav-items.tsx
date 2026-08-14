@@ -160,3 +160,10 @@ export function isNavItemActive(pathname: string, href: string): boolean {
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+
+const ATTENTION_BADGE_CEILING = 9;
+
+/** Formats the attention count for the nav badge, capping at "9+". */
+export function formatAttentionBadge(count: number): string {
+  return count > ATTENTION_BADGE_CEILING ? `${ATTENTION_BADGE_CEILING}+` : String(count);
+}
