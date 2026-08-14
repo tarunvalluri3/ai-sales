@@ -5,6 +5,9 @@ import type { KnowledgeFormState } from "./actions";
 
 const initialState: KnowledgeFormState = {};
 
+const inputClasses =
+  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+
 export function KnowledgeForm({
   action,
   id,
@@ -30,10 +33,10 @@ export function KnowledgeForm({
   }, [state.success, id]);
 
   return (
-    <form ref={formRef} action={formAction} className="flex w-full max-w-lg flex-col gap-3">
+    <form ref={formRef} action={formAction} className="flex w-full flex-col gap-3">
       {id ? <input type="hidden" name="id" value={id} /> : null}
       <div className="flex flex-col gap-1">
-        <label htmlFor="title" className="text-sm font-medium text-zinc-900">
+        <label htmlFor="title" className="text-sm font-medium text-ds-text-secondary">
           Title
         </label>
         <input
@@ -45,11 +48,11 @@ export function KnowledgeForm({
           maxLength={200}
           defaultValue={initialTitle}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="content" className="text-sm font-medium text-zinc-900">
+        <label htmlFor="content" className="text-sm font-medium text-ds-text-secondary">
           Content
         </label>
         <textarea
@@ -61,18 +64,18 @@ export function KnowledgeForm({
           maxLength={20000}
           defaultValue={initialContent}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       {state.error ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-ds-danger">
           {state.error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md bg-dashboard-primary px-3 py-2 text-sm font-medium text-dashboard-on-primary hover:bg-dashboard-primary-hover disabled:opacity-60"
+        className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? pendingLabel : submitLabel}
       </button>

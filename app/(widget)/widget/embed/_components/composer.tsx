@@ -57,14 +57,14 @@ export function Composer({
           rows={1}
           aria-label="Message input"
           placeholder="Type a message…"
-          className="max-h-[120px] flex-1 resize-none rounded-xl border border-widget-border bg-widget-surface px-3 py-2 text-[15px] text-widget-foreground outline-none placeholder:text-widget-muted focus-visible:ring-2 focus-visible:ring-widget-primary disabled:opacity-60"
+          className="max-h-[120px] flex-1 resize-none rounded-xl border border-widget-border bg-widget-surface-elevated px-3 py-2 text-[15px] text-widget-foreground outline-none placeholder:text-widget-muted focus-visible:border-widget-border-strong focus-visible:ring-2 focus-visible:ring-widget-primary disabled:opacity-60"
         />
         <button
           type="button"
           aria-label="Send message"
           onClick={handleSend}
           disabled={disabled || !value.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-colors hover:bg-widget-primary-hover disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path

@@ -68,6 +68,13 @@
   iframe.style.colorScheme = "light";
   iframe.setAttribute("allowtransparency", "true");
 
+  // Purely visual: a short size transition so the launcher <-> panel swap
+  // reads as one smooth surface instead of a hard cut. Does not touch
+  // scheduling/polling/postMessage logic below.
+  var prefersReducedMotion =
+    window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  iframe.style.transition = prefersReducedMotion ? "none" : "width 200ms ease, height 200ms ease";
+
   document.body.appendChild(iframe);
 
   // Owned by this loader, not the iframe -- it persists across the whole

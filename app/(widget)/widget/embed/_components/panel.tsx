@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import type { ChatMessage } from "../_lib/use-widget-chat";
 import { PanelHeader } from "./panel-header";
 import { MessageList } from "./message-list";
@@ -24,6 +25,7 @@ export function Panel({
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -34,11 +36,14 @@ export function Panel({
   }, [onClose]);
 
   return (
-    <div
+    <motion.div
       ref={panelRef}
       role="dialog"
       aria-label="Chat"
-      className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-widget-border bg-widget-surface shadow-xl sm:rounded-2xl"
+      initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-widget-border-strong bg-widget-surface shadow-2xl shadow-black/20 sm:rounded-2xl"
     >
       <PanelHeader onClose={onClose} />
       {panelError ? (
@@ -55,6 +60,6 @@ export function Panel({
           />
         </>
       )}
-    </div>
+    </motion.div>
   );
 }

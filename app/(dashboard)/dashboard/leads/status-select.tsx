@@ -20,16 +20,16 @@ export function StatusSelect({ id, status }: { id: string; status: LeadStatus })
         defaultValue={status}
         disabled={isPending}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
-        className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 disabled:opacity-60"
+        className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1.5 text-sm text-ds-text-primary capitalize transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {STATUSES.map((value) => (
-          <option key={value} value={value}>
+          <option key={value} value={value} className="bg-ds-surface-elevated text-ds-text-primary capitalize">
             {value}
           </option>
         ))}
       </select>
       {state.error ? (
-        <span role="alert" className="text-xs text-red-600">
+        <span role="alert" className="text-xs text-ds-danger">
           {state.error}
         </span>
       ) : null}

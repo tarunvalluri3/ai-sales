@@ -1,27 +1,75 @@
 @import "tailwindcss";
 
 :root {
-  --widget-primary: #4f46e5;
-  --widget-primary-hover: #4338ca;
-  --widget-on-primary: #ffffff;
-  --widget-surface: #ffffff;
-  --widget-assistant-bubble: #f1f1f7;
-  --widget-foreground: #1e293b;
-  --widget-muted: #64748b;
-  --widget-border: #e2e8f0;
-  --widget-success: #10b981;
-  --widget-error: #dc2626;
+  /*
+   * Premium widget palette -- mirrors app/(dashboard)/globals.css's design
+   * tokens (deep warm charcoal + warm ivory + electric lime), hardcoded
+   * here since this route group doesn't share a Tailwind config with the
+   * dashboard. Values are duplicated intentionally, not aliased, to keep
+   * this file self-contained for a standalone cross-origin iframe.
+   *
+   * Layout: charcoal header + launcher (--widget-header-bg #100f0c,
+   * matches --ds-bg), warm ivory panel body (--widget-surface #f3ede0,
+   * matches --ds-ivory) so message text stays highly legible in a small
+   * floating panel, electric lime accent (#d7f24e, matches --ds-accent)
+   * used selectively for the launcher, send action, and focus rings.
+   */
+  --widget-header-bg: #100f0c;
+  --widget-header-fg: #f3ede0;
+  --widget-header-fg-muted: rgba(243, 237, 224, 0.6);
+
+  --widget-primary: #d7f24e;
+  --widget-primary-hover: #e8ff5e;
+  --widget-on-primary: #14130c;
+
+  --widget-surface: #f3ede0;
+  --widget-surface-elevated: #ffffff;
+  --widget-assistant-bubble: #e7ddc8;
+  --widget-user-bubble: #1c1912;
+  --widget-user-bubble-fg: #f3ede0;
+
+  /* Staff (human_agent) reply -- a calm, distinct tint, not an alarm. */
+  --widget-human-bubble-bg: rgba(154, 171, 92, 0.16);
+  --widget-human-bubble-border: rgba(154, 171, 92, 0.4);
+  --widget-human-bubble-fg: #1c1912;
+  --widget-human-accent: #6f7f45;
+
+  --widget-foreground: #1c1912;
+  --widget-muted: #746e5f;
+  --widget-border: rgba(28, 25, 18, 0.1);
+  --widget-border-strong: rgba(28, 25, 18, 0.18);
+
+  /* Tuned darker than the dashboard's dark-bg success/error tokens --
+     these sit on the widget's light ivory surface and need their own
+     contrast ratio. */
+  --widget-success: #5f8a2e;
+  --widget-error: #b23e2b;
 }
 
 @theme inline {
+  --color-widget-header-bg: var(--widget-header-bg);
+  --color-widget-header-fg: var(--widget-header-fg);
+  --color-widget-header-fg-muted: var(--widget-header-fg-muted);
+
   --color-widget-primary: var(--widget-primary);
   --color-widget-primary-hover: var(--widget-primary-hover);
   --color-widget-on-primary: var(--widget-on-primary);
+
   --color-widget-surface: var(--widget-surface);
+  --color-widget-surface-elevated: var(--widget-surface-elevated);
   --color-widget-assistant-bubble: var(--widget-assistant-bubble);
+  --color-widget-user-bubble: var(--widget-user-bubble);
+  --color-widget-user-bubble-fg: var(--widget-user-bubble-fg);
+
+  --color-widget-human-bubble-bg: var(--widget-human-bubble-bg);
+  --color-widget-human-bubble-border: var(--widget-human-bubble-border);
+  --color-widget-human-bubble-fg: var(--widget-human-bubble-fg);
+  --color-widget-human-accent: var(--widget-human-accent);
+
   --color-widget-foreground: var(--widget-foreground);
   --color-widget-muted: var(--widget-muted);
   --color-widget-border: var(--widget-border);
+  --color-widget-border-strong: var(--widget-border-strong);
   --color-widget-success: var(--widget-success);
   --color-widget-error: var(--widget-error);
   --font-widget-sans: var(--widget-font-sans);
@@ -59,8 +107,24 @@ body {
   animation: widget-typing-dot 1.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
+/* Launcher "online" status dot -- a slow, subtle breathing pulse. */
+@keyframes widget-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.widget-status-dot {
+  animation: widget-status-pulse 2.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .widget-typing-dot {
+  .widget-typing-dot,
+  .widget-status-dot {
     animation: none;
   }
 }

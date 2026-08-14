@@ -18,17 +18,19 @@ export default async function EditServicePage({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Edit service</h1>
-      <ServiceForm
-        action={updateServiceAction}
-        id={service.id}
-        initialName={service.name}
-        initialDescription={service.description ?? ""}
-        initialPrice={service.price ?? ""}
-        submitLabel="Save changes"
-        pendingLabel="Saving…"
-      />
+    <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
+      <h1 className="text-2xl font-semibold text-ds-text-primary">Edit service</h1>
+      <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <ServiceForm
+          action={updateServiceAction}
+          id={service.id}
+          initialName={service.name}
+          initialDescription={service.description ?? ""}
+          initialPrice={service.price ?? ""}
+          submitLabel="Save changes"
+          pendingLabel="Saving…"
+        />
+      </section>
     </div>
   );
 }

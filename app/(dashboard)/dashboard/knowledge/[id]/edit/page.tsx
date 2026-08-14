@@ -20,28 +20,30 @@ export default async function EditKnowledgeDocumentPage({
   const chunks = await listChunksForDocument(businessId, document.id);
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Edit knowledge document</h1>
-      <KnowledgeForm
-        action={updateKnowledgeDocumentAction}
-        id={document.id}
-        initialTitle={document.title}
-        initialContent={document.content}
-        submitLabel="Save changes"
-        pendingLabel="Saving…"
-      />
+    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
+      <h1 className="text-2xl font-semibold text-ds-text-primary">Edit knowledge document</h1>
+      <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <KnowledgeForm
+          action={updateKnowledgeDocumentAction}
+          id={document.id}
+          initialTitle={document.title}
+          initialContent={document.content}
+          submitLabel="Save changes"
+          pendingLabel="Saving…"
+        />
+      </section>
 
       <div className="flex max-w-lg flex-col gap-3">
-        <h2 className="text-lg font-semibold text-zinc-900">
+        <h2 className="text-sm font-medium text-ds-text-primary">
           {chunks.length} chunk{chunks.length === 1 ? "" : "s"} generated
         </h2>
         <ul className="flex flex-col gap-2">
           {chunks.map((chunk) => (
             <li
               key={chunk.id}
-              className="max-h-40 overflow-y-auto rounded-md border border-zinc-200 px-3 py-2 text-sm text-zinc-700"
+              className="max-h-40 overflow-y-auto rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary"
             >
-              <p className="mb-1 text-xs font-medium text-zinc-500">
+              <p className="mb-1 text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
                 Chunk {chunk.chunk_index + 1} · {chunk.char_count} characters
               </p>
               <p className="whitespace-pre-wrap">{chunk.content}</p>

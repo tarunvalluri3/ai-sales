@@ -2,8 +2,10 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { countConversationsNeedingAttention } from "@/lib/conversations";
 import { getConversationVolumeStats, getLeadStats, getMessageVolumeStats } from "@/lib/analytics";
-import { StatCard } from "../_components/stat-card";
-import { StatBreakdown } from "../_components/stat-breakdown";
+import { KpiTile } from "../_components/kpi-tile";
+import { BreakdownBarChart } from "../_components/charts/breakdown-bar-chart";
+import { QualificationDonut } from "../_components/charts/qualification-donut";
+import { chartColors } from "../_components/charts/chart-colors";
 
 export default async function AnalyticsPage() {
   const { businessId } = await requireBusinessContext();
@@ -20,43 +22,53 @@ export default async function AnalyticsPage() {
     conversationStats.total === 0 ? 0 : Math.round((leadStats.total / conversationStats.total) * 100);
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Analytics</h1>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard label="Total conversations" count={conversationStats.total} href="/dashboard/conversations" />
-        <StatCard label="Conversations, last 7 days" count={conversationStats.last7Days} href="/dashboard/conversations" />
-        <StatCard label="Conversations, last 30 days" count={conversationStats.last30Days} href="/dashboard/conversations" />
-        <StatCard label="Needs attention now" count={needsAttentionCount} href="/dashboard/conversations" />
-        <StatCard label="Conversion rate" count={conversionRate} suffix="%" href="/dashboard/leads" />
+    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold text-ds-text-primary">Analytics</h1>
+        <p className="text-sm text-ds-text-secondary">
+          How your AI sales employee is performing, from real conversation and lead data.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatBreakdown
-          label="Leads by qualification"
-          items={[
-            { label: "Hot", count: leadStats.byQualification.hot },
-            { label: "Warm", count: leadStats.byQualification.warm },
-            { label: "Cold", count: leadStats.byQualification.cold },
-          ]}
-        />
-        <StatBreakdown
-          label="Leads by status"
-          items={[
-            { label: "New", count: leadStats.byStatus.new },
-            { label: "Contacted", count: leadStats.byStatus.contacted },
-            { label: "Converted", count: leadStats.byStatus.converted },
-            { label: "Lost", count: leadStats.byStatus.lost },
-          ]}
-        />
-        <StatBreakdown
-          label="Messages by role"
-          items={[
-            { label: "Prospect", count: messageStats.user },
-            { label: "AI", count: messageStats.assistant },
-            { label: "Staff reply", count: messageStats.humanAgent },
-          ]}
-        />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <KpiTile label="Total conversations" value={conversationStats.total} href="/dashboard/conversations" />
+        <KpiTile label="Last 7 days" value={conversationStats.last7Days} href="/dashboard/conversations" />
+        <KpiTile label="Last 30 days" value={conversationStats.last30Days} href="/dashboard/conversations" />
+        <KpiTile label="Needs attention now" value={needsAttentionCount} href="/dashboard/conversations" />
+        <KpiTile label="Conversion rate" value={conversionRate} suffix="%" hint="Leads / conversations" href="/dashboard/leads" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <h2 className="text-sm font-medium text-ds-text-primary">Leads by qualification</h2>
+          <p className="text-2xs text-ds-text-muted">AI-assigned signal, not verified human truth.</p>
+          <QualificationDonut byQualification={leadStats.byQualification} />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <h2 className="text-sm font-medium text-ds-text-primary">Leads by status</h2>
+          <BreakdownBarChart
+            items={[
+              { label: "New", count: leadStats.byStatus.new },
+              { label: "Contacted", count: leadStats.byStatus.contacted },
+              { label: "Converted", count: leadStats.byStatus.converted },
+              { label: "Lost", count: leadStats.byStatus.lost },
+            ]}
+            colors={[chartColors.accent, chartColors.accentMuted, chartColors.success, chartColors.textMuted]}
+          />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <h2 className="text-sm font-medium text-ds-text-primary">Messages by role</h2>
+          <BreakdownBarChart
+            items={[
+              { label: "Prospect", count: messageStats.user },
+              { label: "AI", count: messageStats.assistant },
+              { label: "Staff reply", count: messageStats.humanAgent },
+            ]}
+            colors={[chartColors.accentMuted, chartColors.accent, chartColors.warning]}
+          />
+        </section>
       </div>
     </div>
   );

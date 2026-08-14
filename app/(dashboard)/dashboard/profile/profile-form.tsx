@@ -1,10 +1,14 @@
 "use client";
 
 import { useActionState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ProfileFormState } from "./actions";
 import { updateBusinessProfileAction } from "./actions";
 
 const initialState: ProfileFormState = {};
+
+const inputClasses =
+  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
 
 export function ProfileForm({
   initialName,
@@ -23,11 +27,12 @@ export function ProfileForm({
     updateBusinessProfileAction,
     initialState,
   );
+  const reduceMotion = useReducedMotion();
 
   return (
-    <form action={formAction} className="flex w-full max-w-lg flex-col gap-4">
+    <form action={formAction} className="flex w-full flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label htmlFor="name" className="text-sm font-medium text-zinc-900">
+        <label htmlFor="name" className="text-sm font-medium text-ds-text-secondary">
           Business name
         </label>
         <input
@@ -39,12 +44,12 @@ export function ProfileForm({
           maxLength={120}
           defaultValue={initialName}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="description" className="text-sm font-medium text-zinc-900">
-          Description (optional)
+        <label htmlFor="description" className="text-sm font-medium text-ds-text-secondary">
+          Description <span className="text-ds-text-muted">(optional)</span>
         </label>
         <textarea
           id="description"
@@ -53,12 +58,12 @@ export function ProfileForm({
           maxLength={500}
           defaultValue={initialDescription}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="contactEmail" className="text-sm font-medium text-zinc-900">
-          Contact email (optional)
+        <label htmlFor="contactEmail" className="text-sm font-medium text-ds-text-secondary">
+          Contact email <span className="text-ds-text-muted">(optional)</span>
         </label>
         <input
           id="contactEmail"
@@ -67,12 +72,12 @@ export function ProfileForm({
           placeholder="hello@example.com"
           defaultValue={initialContactEmail}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="contactPhone" className="text-sm font-medium text-zinc-900">
-          Contact phone (optional)
+        <label htmlFor="contactPhone" className="text-sm font-medium text-ds-text-secondary">
+          Contact phone <span className="text-ds-text-muted">(optional)</span>
         </label>
         <input
           id="contactPhone"
@@ -81,12 +86,12 @@ export function ProfileForm({
           placeholder="+1 555 123 4567"
           defaultValue={initialContactPhone}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="website" className="text-sm font-medium text-zinc-900">
-          Website (optional)
+        <label htmlFor="website" className="text-sm font-medium text-ds-text-secondary">
+          Website <span className="text-ds-text-muted">(optional)</span>
         </label>
         <input
           id="website"
@@ -95,21 +100,40 @@ export function ProfileForm({
           placeholder="https://example.com"
           defaultValue={initialWebsite}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
-      {state.error ? (
-        <p role="alert" className="text-sm text-red-600">
-          {state.error}
-        </p>
-      ) : null}
-      {state.success ? (
-        <p className="text-sm text-green-700">Profile updated.</p>
-      ) : null}
+      <AnimatePresence mode="wait">
+        {state.error ? (
+          <motion.p
+            key="error"
+            role="alert"
+            className="text-sm text-ds-danger"
+            initial={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {state.error}
+          </motion.p>
+        ) : null}
+        {state.success ? (
+          <motion.p
+            key="success"
+            className="text-sm text-ds-success"
+            initial={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? undefined : { opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            Profile updated.
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md bg-dashboard-primary px-3 py-2 text-sm font-medium text-dashboard-on-primary hover:bg-dashboard-primary-hover disabled:opacity-60"
+        className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? "Saving…" : "Save changes"}
       </button>

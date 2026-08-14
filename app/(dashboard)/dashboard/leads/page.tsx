@@ -2,53 +2,78 @@ import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
 import { listLeadsForBusiness } from "@/lib/leads";
 import { StatusSelect } from "./status-select";
+import type { LeadQualification } from "@/lib/supabase/types";
+
+const QUALIFICATION_STYLE: Record<LeadQualification, string> = {
+  hot: "bg-ds-accent-soft-bg text-ds-accent-muted",
+  warm: "bg-ds-success-bg text-ds-success",
+  cold: "bg-ds-surface-soft text-ds-text-muted",
+};
 
 export default async function LeadsPage() {
   const { businessId } = await requireBusinessContext();
   const leads = await listLeadsForBusiness(businessId);
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Leads</h1>
+    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold text-ds-text-primary">Leads</h1>
+        <p className="text-sm text-ds-text-secondary">
+          {leads.length} lead{leads.length === 1 ? "" : "s"} total · qualification is an AI-generated
+          signal, not verified truth -- always confirm from the conversation itself
+        </p>
+      </div>
 
-      <ul className="flex flex-col gap-3">
-        {leads.length === 0 ? (
-          <li className="rounded-lg border border-dashed border-zinc-300 bg-white px-4 py-6 text-center text-sm text-zinc-600">
-            No leads yet.
-          </li>
-        ) : null}
-        {leads.map((lead) => (
-          <li
-            key={lead.id}
-            className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-dashboard-primary"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <p className="font-medium text-zinc-900">{lead.contact_name ?? "Unnamed prospect"}</p>
-              <StatusSelect id={lead.id} status={lead.status} />
-            </div>
-            <p className="text-sm text-zinc-600">
-              {lead.contact_email ?? "—"} · {lead.contact_phone ?? "—"}
-            </p>
-            <p className="text-sm text-zinc-600">
-              Interest: {lead.interest_type ?? "—"}
-              {lead.interest_id ? ` (matched: ${lead.interest_id})` : ""}
-            </p>
-            <p className="text-sm text-zinc-600">
-              Qualification: {lead.qualification} — {lead.qualification_reason}
-            </p>
-            {lead.notes ? <p className="text-sm text-zinc-600">Notes: {lead.notes}</p> : null}
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs text-zinc-500">Source: {lead.source ?? "—"}</p>
-              <Link
-                href={`/dashboard/conversations/${lead.conversation_id}`}
-                className="text-sm font-medium text-dashboard-primary hover:text-dashboard-primary-hover"
-              >
-                View conversation
-              </Link>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {leads.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-ds-lg border border-dashed border-ds-border px-4 py-14 text-center">
+          <p className="text-sm font-medium text-ds-text-primary">No leads yet</p>
+          <p className="max-w-sm text-xs text-ds-text-muted">
+            When a prospect shares contact details, the AI captures them here for follow-up.
+          </p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {leads.map((lead) => (
+            <li
+              key={lead.id}
+              className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4 transition-colors hover:border-ds-border-strong"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium text-ds-text-primary">
+                    {lead.contact_name ?? "Unnamed prospect"}
+                  </p>
+                  <span
+                    title="AI-assessed signal -- not verified"
+                    className={`rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase ${QUALIFICATION_STYLE[lead.qualification]}`}
+                  >
+                    {lead.qualification}
+                  </span>
+                </div>
+                <StatusSelect id={lead.id} status={lead.status} />
+              </div>
+              <p className="text-sm text-ds-text-secondary">
+                {lead.contact_email ?? "—"} · {lead.contact_phone ?? "—"}
+              </p>
+              <p className="text-sm text-ds-text-secondary">
+                Interest: {lead.interest_type ?? "—"}
+                {lead.interest_id ? ` (matched: ${lead.interest_id})` : ""}
+              </p>
+              <p className="text-sm text-ds-text-muted">{lead.qualification_reason}</p>
+              {lead.notes ? <p className="text-sm text-ds-text-secondary">Notes: {lead.notes}</p> : null}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ds-border pt-3">
+                <p className="text-xs text-ds-text-muted">Source: {lead.source ?? "—"}</p>
+                <Link
+                  href={`/dashboard/conversations/${lead.conversation_id}`}
+                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                >
+                  View conversation
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

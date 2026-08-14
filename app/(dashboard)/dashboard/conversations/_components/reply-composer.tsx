@@ -31,10 +31,13 @@ export function ReplyComposer({
     <form
       ref={formRef}
       action={formAction}
-      className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-4"
+      className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4"
     >
       <input type="hidden" name="conversationId" value={conversationId} />
-      <label htmlFor="reply-content" className="text-sm font-medium text-zinc-900">
+      <label
+        htmlFor="reply-content"
+        className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase"
+      >
         Reply as a team member
       </label>
       <textarea
@@ -44,19 +47,19 @@ export function ReplyComposer({
         required
         maxLength={2000}
         disabled={isPending}
-        className="resize-none rounded-md border border-zinc-300 px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+        className="resize-none rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         placeholder="Type your reply to the prospect..."
       />
       <div className="flex items-center justify-between gap-3">
         <button
           type="submit"
           disabled={isPending}
-          className="rounded-md bg-dashboard-primary px-3 py-1.5 text-sm font-medium text-dashboard-on-primary hover:bg-dashboard-primary-hover disabled:opacity-60"
+          className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
-          Send reply
+          {isPending ? "Sending…" : "Send reply"}
         </button>
         {state.error ? (
-          <span role="alert" className="text-xs text-red-600">
+          <span role="alert" className="text-xs text-ds-danger">
             {state.error}
           </span>
         ) : null}

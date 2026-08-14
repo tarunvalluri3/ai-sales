@@ -18,17 +18,19 @@ export default async function EditProductPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Edit product</h1>
-      <ProductForm
-        action={updateProductAction}
-        id={product.id}
-        initialName={product.name}
-        initialDescription={product.description ?? ""}
-        initialPrice={product.price ?? ""}
-        submitLabel="Save changes"
-        pendingLabel="Saving…"
-      />
+    <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
+      <h1 className="text-2xl font-semibold text-ds-text-primary">Edit product</h1>
+      <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <ProductForm
+          action={updateProductAction}
+          id={product.id}
+          initialName={product.name}
+          initialDescription={product.description ?? ""}
+          initialPrice={product.price ?? ""}
+          submitLabel="Save changes"
+          pendingLabel="Saving…"
+        />
+      </section>
     </div>
   );
 }

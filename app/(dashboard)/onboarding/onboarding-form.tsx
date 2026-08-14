@@ -13,7 +13,7 @@ export function OnboardingForm() {
 
   return (
     <form action={formAction} className="flex w-full max-w-sm flex-col gap-3">
-      <label htmlFor="name" className="text-sm font-medium text-zinc-900">
+      <label htmlFor="name" className="text-sm font-medium text-ds-text-secondary">
         Business name
       </label>
       <input
@@ -27,17 +27,17 @@ export function OnboardingForm() {
         disabled={isPending}
         aria-invalid={state.error ? true : undefined}
         aria-describedby={state.error ? "name-error" : undefined}
-        className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+        className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary transition-colors focus:border-ds-accent-muted focus:outline-none disabled:opacity-60"
       />
       {state.error ? (
-        <p id="name-error" role="alert" className="text-sm text-red-600">
+        <p id="name-error" role="alert" className="text-sm text-ds-danger">
           {state.error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+        className="rounded-ds-sm bg-ds-accent px-3 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60"
       >
         {isPending ? "Creating…" : "Create business"}
       </button>

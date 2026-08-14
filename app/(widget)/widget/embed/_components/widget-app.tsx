@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { useWidgetChat } from "../_lib/use-widget-chat";
 import { parseFromParentMessage, postToParent } from "../_lib/post-message";
 import { LauncherButton } from "./launcher-button";
@@ -66,25 +67,25 @@ export function WidgetApp() {
     setIsOpen(false);
   }, []);
 
-  if (!isOpen) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <LauncherButton ref={launcherButtonRef} isOpen={false} onToggle={() => setIsOpen(true)} />
-      </div>
-    );
-  }
-
   return (
-    <div className="h-full w-full p-0 sm:p-0">
-      <Panel
-        messages={chat.messages}
-        isAwaitingResponse={chat.isAwaitingResponse}
-        isCoolingDown={chat.isCoolingDown}
-        panelError={chat.panelError}
-        onSend={chat.sendMessage}
-        onRetry={chat.retryMessage}
-        onClose={handleClose}
-      />
-    </div>
+    <AnimatePresence initial={false} mode="wait">
+      {isOpen ? (
+        <div key="panel" className="h-full w-full p-0 sm:p-0">
+          <Panel
+            messages={chat.messages}
+            isAwaitingResponse={chat.isAwaitingResponse}
+            isCoolingDown={chat.isCoolingDown}
+            panelError={chat.panelError}
+            onSend={chat.sendMessage}
+            onRetry={chat.retryMessage}
+            onClose={handleClose}
+          />
+        </div>
+      ) : (
+        <div key="launcher" className="flex h-full w-full items-center justify-center">
+          <LauncherButton ref={launcherButtonRef} isOpen={false} onToggle={() => setIsOpen(true)} />
+        </div>
+      )}
+    </AnimatePresence>
   );
 }

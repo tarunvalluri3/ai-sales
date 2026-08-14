@@ -5,6 +5,9 @@ import type { ServiceFormState } from "./actions";
 
 const initialState: ServiceFormState = {};
 
+const inputClasses =
+  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+
 export function ServiceForm({
   action,
   id,
@@ -32,10 +35,10 @@ export function ServiceForm({
   }, [state.success, id]);
 
   return (
-    <form ref={formRef} action={formAction} className="flex w-full max-w-sm flex-col gap-3">
+    <form ref={formRef} action={formAction} className="flex w-full flex-col gap-3">
       {id ? <input type="hidden" name="id" value={id} /> : null}
       <div className="flex flex-col gap-1">
-        <label htmlFor="name" className="text-sm font-medium text-zinc-900">
+        <label htmlFor="name" className="text-sm font-medium text-ds-text-secondary">
           Name
         </label>
         <input
@@ -47,11 +50,11 @@ export function ServiceForm({
           maxLength={120}
           defaultValue={initialName}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="description" className="text-sm font-medium text-zinc-900">
+        <label htmlFor="description" className="text-sm font-medium text-ds-text-secondary">
           Description
         </label>
         <textarea
@@ -60,12 +63,12 @@ export function ServiceForm({
           rows={3}
           defaultValue={initialDescription}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       <div className="flex flex-col gap-1">
-        <label htmlFor="price" className="text-sm font-medium text-zinc-900">
-          Price (optional)
+        <label htmlFor="price" className="text-sm font-medium text-ds-text-secondary">
+          Price <span className="text-ds-text-muted">(optional)</span>
         </label>
         <input
           id="price"
@@ -75,18 +78,18 @@ export function ServiceForm({
           placeholder="19.99"
           defaultValue={initialPrice}
           disabled={isPending}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+          className={inputClasses}
         />
       </div>
       {state.error ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-ds-danger">
           {state.error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md bg-dashboard-primary px-3 py-2 text-sm font-medium text-dashboard-on-primary hover:bg-dashboard-primary-hover disabled:opacity-60"
+        className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? pendingLabel : submitLabel}
       </button>

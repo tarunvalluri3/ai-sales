@@ -30,12 +30,12 @@ export function DismissAttentionButton({
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-60"
+        className="rounded-ds-sm border border-ds-border-strong px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
-        Dismiss
+        {isPending ? "Dismissing…" : "Dismiss"}
       </button>
       {state.error ? (
-        <span role="alert" className="text-xs text-red-600">
+        <span role="alert" className="text-xs text-ds-danger">
           {state.error}
         </span>
       ) : null}

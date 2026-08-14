@@ -16,46 +16,62 @@ export default async function ConversationsPage() {
   const conversationIdsWithLead = new Set(leads.map((lead) => lead.conversation_id));
 
   return (
-    <div className="flex flex-1 flex-col gap-8 p-6">
-      <h1 className="text-2xl font-semibold text-zinc-900">Conversations</h1>
+    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold text-ds-text-primary">Conversations</h1>
+        <p className="text-sm text-ds-text-secondary">
+          {conversations.length} conversation{conversations.length === 1 ? "" : "s"} total
+        </p>
+      </div>
 
-      <ul className="flex flex-col gap-3">
-        {conversations.length === 0 ? (
-          <li className="rounded-lg border border-dashed border-zinc-300 bg-white px-4 py-6 text-center text-sm text-zinc-600">
-            No conversations yet.
-          </li>
-        ) : null}
-        {conversations.map((conversation) => (
-          <li key={conversation.id}>
-            <Link
-              href={`/dashboard/conversations/${conversation.id}`}
-              className="flex items-center justify-between gap-4 rounded-lg border border-zinc-200 bg-white px-4 py-3 transition-colors hover:border-dashboard-primary"
-            >
-              <div>
-                <p className="font-medium text-zinc-900">
-                  {new Date(conversation.created_at).toLocaleString()}
-                </p>
-                <p className="text-sm text-zinc-600">
-                  {conversation.source ?? "—"} · {conversation.messageCount} message
-                  {conversation.messageCount === 1 ? "" : "s"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {conversation.needs_attention ? (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
-                    Needs attention
-                  </span>
-                ) : null}
-                {conversationIdsWithLead.has(conversation.id) ? (
-                  <span className="rounded-full bg-dashboard-primary/10 px-2.5 py-1 text-xs font-medium text-dashboard-primary">
-                    Lead
-                  </span>
-                ) : null}
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {conversations.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 rounded-ds-lg border border-dashed border-ds-border px-4 py-14 text-center">
+          <p className="text-sm font-medium text-ds-text-primary">No conversations yet</p>
+          <p className="max-w-sm text-xs text-ds-text-muted">
+            Conversations started from your chat widget will appear here, with prospect and AI messages
+            in real time.
+          </p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {conversations.map((conversation) => (
+            <li key={conversation.id}>
+              <Link
+                href={`/dashboard/conversations/${conversation.id}`}
+                className="group flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface px-4 py-3.5 transition-colors hover:border-ds-border-strong hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+              >
+                <div className="flex min-w-0 flex-col gap-1">
+                  <p className="truncate text-sm font-medium text-ds-text-primary">
+                    {conversation.source ?? "Chat widget"}
+                  </p>
+                  <p className="text-xs text-ds-text-muted">
+                    {new Date(conversation.created_at).toLocaleString()} · {conversation.messageCount}{" "}
+                    message
+                    {conversation.messageCount === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {conversation.needs_attention ? (
+                    <span className="rounded-ds-sm bg-ds-warning-bg px-2.5 py-1 text-2xs font-semibold tracking-wide-ds text-ds-warning uppercase">
+                      Needs attention
+                    </span>
+                  ) : null}
+                  {conversation.control === "human" ? (
+                    <span className="rounded-ds-sm bg-ds-surface-soft px-2.5 py-1 text-2xs font-semibold tracking-wide-ds text-ds-text-secondary uppercase">
+                      Human-controlled
+                    </span>
+                  ) : null}
+                  {conversationIdsWithLead.has(conversation.id) ? (
+                    <span className="rounded-ds-sm bg-ds-accent-soft-bg px-2.5 py-1 text-2xs font-semibold tracking-wide-ds text-ds-accent-muted uppercase">
+                      Lead
+                    </span>
+                  ) : null}
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

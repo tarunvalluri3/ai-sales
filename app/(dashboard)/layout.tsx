@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import {
-  ClerkProvider,
-  OrganizationSwitcher,
-  Show,
-  UserButton,
-} from "@clerk/nextjs";
-import Link from "next/link";
+import { ClerkProvider } from "@clerk/nextjs";
+import { SiteHeader } from "./_components/site-header";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,22 +28,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       >
-        <body className="min-h-full flex flex-col">
-          <header className="flex items-center justify-end gap-4 border-b border-zinc-200 bg-zinc-50 p-4">
-            <Show when="signed-out">
-              <Link href="/sign-in" className="text-sm">
-                Sign in
-              </Link>
-            </Show>
-            <Show when="signed-in">
-              <OrganizationSwitcher
-                hidePersonal
-                afterSelectOrganizationUrl="/dashboard"
-                afterCreateOrganizationUrl="/dashboard"
-              />
-              <UserButton />
-            </Show>
-          </header>
+        <body className="flex min-h-full flex-col bg-ds-bg">
+          <SiteHeader />
           {children}
         </body>
       </html>

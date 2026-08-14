@@ -31,12 +31,12 @@ export function DeleteButton({
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-md px-2 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+        className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? "Deleting…" : label}
       </button>
       {state.error ? (
-        <span role="alert" className="text-xs text-red-600">
+        <span role="alert" className="text-xs text-ds-danger">
           {state.error}
         </span>
       ) : null}

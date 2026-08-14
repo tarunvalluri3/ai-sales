@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { pollConversationAction } from "../actions";
 import { ControlToggle } from "./control-toggle";
 import { ReplyComposer } from "./reply-composer";
@@ -42,6 +43,7 @@ export function LiveConversationPanel({
   // Holds the latest `poll` so its own self-rescheduling setTimeout call
   // never has to reference the `poll` binding before it's assigned.
   const pollRef = useRef<() => Promise<void>>(async () => {});
+  const shouldReduceMotion = useReducedMotion();
 
   const mergeMessages = useCallback((incoming: Message[]) => {
     const fresh = incoming.filter((message) => !knownIdsRef.current.has(message.id));
@@ -110,11 +112,11 @@ export function LiveConversationPanel({
 
   return (
     <>
-      <div className="flex max-w-2xl flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <ControlToggle conversationId={conversationId} control={control} onChanged={poll} />
         {needsAttention ? (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2">
-            <span className="text-sm font-medium text-amber-800">Needs attention</span>
+          <div className="flex items-center gap-3 rounded-ds-lg border border-ds-border bg-ds-warning-bg px-4 py-2.5">
+            <span className="text-sm font-medium text-ds-warning">Needs attention</span>
             <DismissAttentionButton conversationId={conversationId} onDismissed={poll} />
           </div>
         ) : null}
@@ -126,11 +128,23 @@ export function LiveConversationPanel({
         </div>
       ) : null}
 
-      <div className="flex max-w-2xl flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-4">
+      <div className="flex max-w-2xl flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4 sm:p-5">
         {messages.length === 0 ? (
-          <p className="text-sm text-zinc-600">No messages yet.</p>
+          <p className="text-sm text-ds-text-muted">No messages yet.</p>
         ) : (
-          messages.map((message) => <MessageBubble key={message.id} message={message} />)
+          <AnimatePresence initial={false}>
+            {messages.map((message) => (
+              <motion.div
+                key={message.id}
+                layout={!shouldReduceMotion}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+              >
+                <MessageBubble message={message} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
     </>

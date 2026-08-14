@@ -5,14 +5,60 @@
   --foreground: #171717;
 
   /*
-   * Shared brand primary, matching app/(widget)/widget.css's indigo exactly
-   * -- one visible brand color across the public widget and the internal
-   * dashboard (Phase 13a). Everything else (grays, borders) stays plain
-   * Tailwind zinc utilities, already used throughout every dashboard page.
+   * Premium design system: deep warm charcoal + warm ivory + electric lime,
+   * modeled on the Zajno "Smart Energy Dashboard" reference. Body background
+   * stays light for now -- flipping it globally would make every not-yet-
+   * restyled page (later-stage CRUD pages, sign-in/up) use hardcoded
+   * light-mode text on a dark body and go illegible. Only components that
+   * opt into these tokens explicitly go dark until each surface's own stage
+   * lands.
    */
-  --dashboard-primary: #4f46e5;
-  --dashboard-primary-hover: #4338ca;
-  --dashboard-on-primary: #ffffff;
+  --ds-bg: #100f0c;
+  --ds-surface: #17150f;
+  --ds-surface-elevated: #1e1b13;
+  --ds-surface-soft: #262218;
+  --ds-ivory: #f3ede0;
+  --ds-ivory-muted: #e7ddc8;
+  --ds-on-ivory: #1c1912;
+
+  /* Electric lime/chartreuse -- the one strong accent. Used selectively, never as a background wash. */
+  --ds-accent: #d7f24e;
+  --ds-accent-strong: #e8ff5e;
+  --ds-accent-muted: #9aab5c;
+  --ds-accent-soft-bg: rgba(215, 242, 78, 0.14);
+  --ds-accent-on: #14130c;
+
+  --ds-text-primary: #f2ede1;
+  --ds-text-secondary: #a8a190;
+  --ds-text-muted: #746e5f;
+  --ds-border: rgba(242, 237, 225, 0.1);
+  --ds-border-strong: rgba(242, 237, 225, 0.18);
+
+  --ds-success: #9ecb4f;
+  --ds-success-bg: rgba(158, 203, 79, 0.14);
+  --ds-warning: #d9a94f;
+  --ds-warning-bg: rgba(217, 169, 79, 0.14);
+  --ds-danger: #e0664f;
+  --ds-danger-bg: rgba(224, 102, 79, 0.14);
+
+  /* Compact editorial type scale -- restrained, a few sizes beyond Tailwind's defaults. */
+  --ds-text-2xs: 0.6875rem;
+  --ds-tracking-wide: 0.04em;
+
+  /* Radii -- subtle, not the default Tailwind "rounded-2xl" pill look. */
+  --ds-radius-sm: 0.375rem;
+  --ds-radius-md: 0.625rem;
+  --ds-radius-lg: 0.875rem;
+
+  /*
+   * Shared brand primary -- the dashboard's electric lime accent. The
+   * public widget keeps its own separate indigo token until its own
+   * redesign stage lands -- an intentional, temporary mismatch between the
+   * two surfaces until that stage lands.
+   */
+  --dashboard-primary: var(--ds-accent);
+  --dashboard-primary-hover: var(--ds-accent-strong);
+  --dashboard-on-primary: var(--ds-accent-on);
 }
 
 @theme inline {
@@ -21,6 +67,38 @@
   --color-dashboard-primary: var(--dashboard-primary);
   --color-dashboard-primary-hover: var(--dashboard-primary-hover);
   --color-dashboard-on-primary: var(--dashboard-on-primary);
+
+  --color-ds-bg: var(--ds-bg);
+  --color-ds-surface: var(--ds-surface);
+  --color-ds-surface-elevated: var(--ds-surface-elevated);
+  --color-ds-surface-soft: var(--ds-surface-soft);
+  --color-ds-ivory: var(--ds-ivory);
+  --color-ds-ivory-muted: var(--ds-ivory-muted);
+  --color-ds-on-ivory: var(--ds-on-ivory);
+  --color-ds-accent: var(--ds-accent);
+  --color-ds-accent-strong: var(--ds-accent-strong);
+  --color-ds-accent-muted: var(--ds-accent-muted);
+  --color-ds-accent-soft-bg: var(--ds-accent-soft-bg);
+  --color-ds-accent-on: var(--ds-accent-on);
+  --color-ds-text-primary: var(--ds-text-primary);
+  --color-ds-text-secondary: var(--ds-text-secondary);
+  --color-ds-text-muted: var(--ds-text-muted);
+  --color-ds-border: var(--ds-border);
+  --color-ds-border-strong: var(--ds-border-strong);
+  --color-ds-success: var(--ds-success);
+  --color-ds-success-bg: var(--ds-success-bg);
+  --color-ds-warning: var(--ds-warning);
+  --color-ds-warning-bg: var(--ds-warning-bg);
+  --color-ds-danger: var(--ds-danger);
+  --color-ds-danger-bg: var(--ds-danger-bg);
+
+  --text-2xs: var(--ds-text-2xs);
+  --tracking-wide-ds: var(--ds-tracking-wide);
+
+  --radius-ds-sm: var(--ds-radius-sm);
+  --radius-ds-md: var(--ds-radius-md);
+  --radius-ds-lg: var(--ds-radius-lg);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -28,5 +106,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
