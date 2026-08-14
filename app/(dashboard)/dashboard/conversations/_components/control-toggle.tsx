@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import type { SetControlState } from "../actions";
 import { setConversationControlAction } from "../actions";
 import type { ConversationControl } from "@/lib/supabase/types";
@@ -10,12 +10,23 @@ const initialState: SetControlState = {};
 export function ControlToggle({
   conversationId,
   control,
+  onChanged,
 }: {
   conversationId: string;
   control: ConversationControl;
+  onChanged?: () => void;
 }) {
   const [state, formAction, isPending] = useActionState(setConversationControlAction, initialState);
   const nextControl: ConversationControl = control === "human" ? "ai" : "human";
+
+  useEffect(() => {
+    if (state.success) {
+      onChanged?.();
+    }
+    // onChanged is expected to be a stable callback from the parent;
+    // only re-run when the action actually produces a new success result.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-white p-4">

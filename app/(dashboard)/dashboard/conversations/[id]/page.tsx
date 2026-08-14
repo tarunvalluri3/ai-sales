@@ -4,8 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversation } from "@/lib/messages";
 import { getLeadForConversation } from "@/lib/leads";
-import { MessageBubble } from "../_components/message-bubble";
-import { ControlToggle } from "../_components/control-toggle";
+import { LiveConversationPanel } from "../_components/live-conversation-panel";
 
 export default async function ConversationDetailPage({
   params,
@@ -35,17 +34,12 @@ export default async function ConversationDetailPage({
         </p>
       </div>
 
-      <div className="max-w-2xl">
-        <ControlToggle conversationId={conversation.id} control={conversation.control} />
-      </div>
-
-      <div className="flex max-w-2xl flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-4">
-        {messages.length === 0 ? (
-          <p className="text-sm text-zinc-600">No messages yet.</p>
-        ) : (
-          messages.map((message) => <MessageBubble key={message.id} message={message} />)
-        )}
-      </div>
+      <LiveConversationPanel
+        conversationId={conversation.id}
+        initialControl={conversation.control}
+        initialMessages={messages}
+        initialAsOf={messages.length > 0 ? messages[messages.length - 1].created_at : conversation.created_at}
+      />
 
       {lead ? (
         <div className="flex max-w-2xl flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4">

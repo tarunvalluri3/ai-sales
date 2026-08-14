@@ -12,6 +12,7 @@ import {
 } from "@/lib/conversations";
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
+import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -43,39 +44,6 @@ const bodySchema = z.object({
   conversationId: z.string().uuid().optional(),
   message: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
 });
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-function withCors(response: Response): Response {
-  for (const [key, value] of Object.entries(CORS_HEADERS)) {
-    response.headers.set(key, value);
-  }
-  return response;
-}
-
-function extractOrigin(request: NextRequest): string | null {
-  const origin = request.headers.get("origin");
-  if (origin) return origin;
-
-  const referer = request.headers.get("referer");
-  if (!referer) return null;
-
-  try {
-    return new URL(referer).origin;
-  } catch {
-    return null;
-  }
-}
-
-function extractIp(request: NextRequest): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const first = forwardedFor?.split(",")[0]?.trim();
-  return first || "unknown";
-}
 
 export async function OPTIONS() {
   return withCors(new Response(null, { status: 204 }));
@@ -147,7 +115,7 @@ export async function POST(request: NextRequest) {
     // Persisted unconditionally, regardless of control state, so a human
     // reviewing the conversation sees every prospect message even while
     // it's human-controlled and the AI is not being called.
-    await createMessage(supabase, business.businessId, conversation.id, "user", message);
+    const userMessageRow = await createMessage(supabase, business.businessId, conversation.id, "user", message);
 
     // Phase 15a's AI-pause guard: once a human has taken over (a
     // deliberate dashboard action, never set by AI output -- see
@@ -155,11 +123,17 @@ export async function POST(request: NextRequest) {
     // must never be called for this conversation. Without this check, the
     // AI and a human could both reply to the same prospect message.
     if (conversation.control === "human") {
+      // `asOf` is the widget-loader's initial polling cursor (Phase
+      // 15b) -- everything up to and including this response is
+      // already known to the client, so it's safe to poll for anything
+      // strictly after it.
       return withCors(
         jsonSuccess({
           conversationId: conversation.id,
           answer: HUMAN_CONTROL_MESSAGE,
           escalate: false,
+          control: conversation.control,
+          asOf: userMessageRow.created_at,
         }),
       );
     }
@@ -181,7 +155,13 @@ export async function POST(request: NextRequest) {
       return withCors(jsonError(userMessage, 500));
     }
 
-    await createMessage(supabase, business.businessId, conversation.id, "assistant", response.answer);
+    const assistantMessageRow = await createMessage(
+      supabase,
+      business.businessId,
+      conversation.id,
+      "assistant",
+      response.answer,
+    );
 
     if (response.escalate) {
       // Flags the conversation for dashboard attention -- deliberately
@@ -196,6 +176,8 @@ export async function POST(request: NextRequest) {
         conversationId: conversation.id,
         answer: response.answer,
         escalate: response.escalate,
+        control: conversation.control,
+        asOf: assistantMessageRow.created_at,
       }),
     );
   } catch (error) {

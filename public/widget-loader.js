@@ -74,6 +74,107 @@
   // conversation because this loader is what makes every /api/chat call.
   var conversationId = null;
 
+  // Phase 15b polling state -- all owned by this loader, since it's the
+  // only script that can make an authorized (real-Origin-header) request.
+  // Polling is a one-way latch, not gated on control alone: it starts the
+  // first time a response shows escalate:true OR control:"human" (see
+  // prompts/phase-15b-staff-reply-and-live-polling.md's Decision 2), and
+  // then stays on for the rest of this session rather than toggling on
+  // and off with control changes.
+  var hasHandoffSignal = false;
+  var isPanelOpen = false;
+  var isSendInFlight = false;
+  var lastKnownMessageAt = null;
+  var knownMessageIds = {};
+  var pollTimeoutId = null;
+  var POLL_INTERVAL_MS = 6000;
+
+  function schedulePoll() {
+    if (pollTimeoutId) return;
+    if (
+      !hasHandoffSignal ||
+      !isPanelOpen ||
+      isSendInFlight ||
+      !conversationId ||
+      document.visibilityState !== "visible"
+    ) {
+      return;
+    }
+    pollTimeoutId = setTimeout(doPoll, POLL_INTERVAL_MS);
+  }
+
+  function doPoll() {
+    pollTimeoutId = null;
+
+    // Defensive: pollNow() (an immediate poll, bypassing the normal
+    // schedule) can be triggered by an event (tab refocus, panel
+    // reopen) that races a send already in flight -- re-check here
+    // rather than trusting every caller to have checked already.
+    if (isSendInFlight || !conversationId) {
+      schedulePoll();
+      return;
+    }
+
+    fetch(appOrigin + "/api/chat/poll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        widgetKey: widgetKey,
+        conversationId: conversationId,
+        after: lastKnownMessageAt,
+      }),
+    })
+      .then(function (response) {
+        return response.json().catch(function () {
+          return null;
+        });
+      })
+      .then(function (body) {
+        if (body && body.ok) {
+          var fresh = [];
+          for (var i = 0; i < body.data.messages.length; i++) {
+            var m = body.data.messages[i];
+            if (!knownMessageIds[m.id]) {
+              knownMessageIds[m.id] = true;
+              fresh.push(m);
+            }
+          }
+          lastKnownMessageAt = body.data.asOf;
+          if (fresh.length > 0) {
+            iframe.contentWindow.postMessage(
+              { type: "widget:poll_result", messages: fresh },
+              appOrigin,
+            );
+          }
+        }
+        // A poll failure is invisible to the prospect -- no cursor
+        // update, just try again on the next scheduled tick.
+      })
+      .catch(function () {
+        // Same as above: silent, retried on the next tick.
+      })
+      .then(function () {
+        schedulePoll();
+      });
+  }
+
+  function pollNow() {
+    if (pollTimeoutId) {
+      clearTimeout(pollTimeoutId);
+      pollTimeoutId = null;
+    }
+    doPoll();
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible") {
+      if (hasHandoffSignal && isPanelOpen) pollNow();
+    } else if (pollTimeoutId) {
+      clearTimeout(pollTimeoutId);
+      pollTimeoutId = null;
+    }
+  });
+
   function applyResize(width, height) {
     iframe.style.width = width + "px";
     iframe.style.height = height + "px";
@@ -113,6 +214,9 @@
   });
 
   async function handleSend(requestId, text) {
+    // The synchronous chat response is more current than any poll could
+    // be, and this avoids two competing requests updating state at once.
+    isSendInFlight = true;
     try {
       var response = await fetch(appOrigin + "/api/chat", {
         method: "POST",
@@ -130,6 +234,10 @@
 
       if (response.ok && body && body.ok) {
         conversationId = body.data.conversationId;
+        if (body.data.asOf) lastKnownMessageAt = body.data.asOf;
+        if (body.data.escalate || body.data.control === "human") {
+          hasHandoffSignal = true;
+        }
         iframe.contentWindow.postMessage(
           {
             type: "widget:response",
@@ -156,6 +264,9 @@
         { type: "widget:error", requestId: requestId, kind: "failure" },
         appOrigin,
       );
+    } finally {
+      isSendInFlight = false;
+      schedulePoll();
     }
   }
 
@@ -168,6 +279,14 @@
       applyResize(data.width, data.height);
     } else if (data.type === "widget:send" && typeof data.requestId === "string" && typeof data.text === "string") {
       handleSend(data.requestId, data.text);
+    } else if (data.type === "widget:panel_open" && typeof data.open === "boolean") {
+      var wasOpen = isPanelOpen;
+      isPanelOpen = data.open;
+      if (isPanelOpen && !wasOpen && hasHandoffSignal) {
+        pollNow();
+      } else {
+        schedulePoll();
+      }
     }
   });
 })();

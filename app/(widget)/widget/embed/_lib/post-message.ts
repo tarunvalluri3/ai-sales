@@ -45,8 +45,34 @@ export type WidgetErrorMessage = {
   kind: WidgetErrorKind;
 };
 
-export type FromParentMessage = WidgetViewportMessage | WidgetResponseMessage | WidgetErrorMessage;
-export type ToParentMessage = WidgetResizeMessage | WidgetSendMessage;
+/**
+ * Sent by this iframe to the loader on every panel open/close change
+ * (Phase 15b), including the initial `false` on mount -- the loader
+ * uses this to decide whether it's worth polling for a staff reply at
+ * all (see public/widget-loader.js's schedulePoll()).
+ */
+export type WidgetPanelOpenMessage = {
+  type: "widget:panel_open";
+  open: boolean;
+};
+
+/**
+ * Sent by the loader to this iframe whenever a poll (public/widget-loader.js)
+ * finds new non-prospect messages (Phase 15b) -- only 'assistant'/
+ * 'human_agent' roles ever appear here; the widget never needs the
+ * server to tell it about its own prospect-authored messages.
+ */
+export type WidgetPollResultMessage = {
+  type: "widget:poll_result";
+  messages: { id: string; role: "assistant" | "human_agent"; content: string }[];
+};
+
+export type FromParentMessage =
+  | WidgetViewportMessage
+  | WidgetResponseMessage
+  | WidgetErrorMessage
+  | WidgetPollResultMessage;
+export type ToParentMessage = WidgetResizeMessage | WidgetSendMessage | WidgetPanelOpenMessage;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -83,6 +109,18 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
         (data.kind === "unauthorized" || data.kind === "rate_limited" || data.kind === "failure")
       ) {
         return { type: "widget:error", requestId: data.requestId, kind: data.kind };
+      }
+      return null;
+    case "widget:poll_result":
+      if (Array.isArray(data.messages)) {
+        const messages = data.messages.filter(
+          (message): message is WidgetPollResultMessage["messages"][number] =>
+            isPlainObject(message) &&
+            typeof message.id === "string" &&
+            (message.role === "assistant" || message.role === "human_agent") &&
+            typeof message.content === "string",
+        );
+        return { type: "widget:poll_result", messages };
       }
       return null;
     default:

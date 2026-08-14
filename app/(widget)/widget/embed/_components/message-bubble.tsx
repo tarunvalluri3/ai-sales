@@ -17,6 +17,7 @@ export function MessageBubble({
   onRetry: (id: string) => void;
 }) {
   const isUser = message.role === "user";
+  const isHumanAgent = message.role === "human_agent";
 
   if (message.role === "assistant" && message.content === "") {
     return null;
@@ -24,6 +25,9 @@ export function MessageBubble({
 
   return (
     <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+      {isHumanAgent ? (
+        <span className="mb-1 text-xs text-widget-muted">A team member replied</span>
+      ) : null}
       <div
         className={
           isUser

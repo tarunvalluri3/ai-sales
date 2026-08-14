@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 
-export type RateLimitScope = "ip" | "key" | "conversation";
+export type RateLimitScope = "ip" | "key" | "conversation" | "poll_ip" | "poll_conversation";
 
 /**
  * Atomically increments the fixed-window counter for (scope, identifier)

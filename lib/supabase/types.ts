@@ -76,7 +76,7 @@ export type Conversation = {
   created_at: string;
 };
 
-export type MessageRole = "user" | "assistant";
+export type MessageRole = "user" | "assistant" | "human_agent";
 
 export type Message = {
   id: string;

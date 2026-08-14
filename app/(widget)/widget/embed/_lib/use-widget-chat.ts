@@ -5,7 +5,7 @@ import { parseFromParentMessage, postToParent, type WidgetErrorKind } from "./po
 
 export type ChatMessage = {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "human_agent";
   content: string;
   status?: "sending" | "error";
   errorKind?: WidgetErrorKind;
@@ -76,6 +76,18 @@ export function useWidgetChat() {
               m.id === pending.userMessageId ? { ...m, status: "error", errorKind: message.kind } : m,
             ),
         );
+      } else if (message.type === "widget:poll_result") {
+        if (message.messages.length === 0) return;
+        setMessages((prev) => {
+          // De-dup by id (defense in depth alongside the loader's own
+          // cursor -- prompts/phase-15b-staff-reply-and-live-polling.md's
+          // Decision 7): a poll result can never overwrite/duplicate a
+          // message this widget already knows about.
+          const knownIds = new Set(prev.map((m) => m.id));
+          const fresh = message.messages.filter((m) => !knownIds.has(m.id));
+          if (fresh.length === 0) return prev;
+          return [...prev, ...fresh.map((m) => ({ id: m.id, role: m.role, content: m.content }))];
+        });
       }
     }
 

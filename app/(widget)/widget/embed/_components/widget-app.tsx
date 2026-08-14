@@ -39,6 +39,13 @@ export function WidgetApp() {
   }, []);
 
   useEffect(() => {
+    // Lets the loader (which owns polling, Phase 15b) know whether the
+    // panel is currently open -- it never polls while closed. Sent on
+    // every isOpen change, including the initial `false` on mount.
+    postToParent({ type: "widget:panel_open", open: isOpen });
+  }, [isOpen]);
+
+  useEffect(() => {
     const isNarrow = viewport.width < NARROW_BREAKPOINT_PX;
 
     if (!isOpen) {

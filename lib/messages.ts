@@ -1,7 +1,7 @@
 import "server-only";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { ConversationMessage } from "@/lib/rag";
-import type { Message } from "@/lib/supabase/types";
+import type { Message, MessageRole } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
@@ -10,13 +10,16 @@ type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
  * Persists one conversation turn. Widget requests use the service-role
  * client (app/api/chat/route.ts) -- there is no Clerk session on that
  * path. `businessId`/`conversationId` must already be resolved and
- * validated by the caller (never client input).
+ * validated by the caller (never client input). `role` includes
+ * 'human_agent' (Phase 15b) alongside 'user'/'assistant' -- an
+ * authenticated dashboard caller inserting 'human_agent' is gated by
+ * RLS (messages_insert_human_agent_reply), not by this function.
  */
 export async function createMessage(
   supabase: SupabaseClient,
   businessId: string,
   conversationId: string,
-  role: "user" | "assistant",
+  role: MessageRole,
   content: string,
 ): Promise<Message> {
   const { data, error } = await supabase
@@ -97,6 +100,49 @@ export async function listMessagesForConversation(
     throw new AppError(
       "Something went wrong loading this conversation's messages. Please try again.",
       "listMessagesForConversation failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Returns messages created strictly after `after` (an ISO timestamp),
+ * chronological (oldest-first), for polling (Phase 15b). Used by both
+ * app/api/chat/poll/route.ts (widget-side, `excludeRoles: ["user"]` --
+ * the widget already knows its own prospect-authored messages from
+ * local state) and the dashboard's live-updating transcript (no
+ * excludeRoles -- staff need to see new prospect messages too).
+ * `limit` is a defensive bound, not a real limit at current usage, same
+ * convention as listMessagesForConversation()'s 500-row cap.
+ */
+export async function listMessagesForConversationAfter(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+  after: string,
+  options?: { excludeRoles?: MessageRole[]; limit?: number },
+): Promise<Message[]> {
+  let query = supabase
+    .from("messages")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("conversation_id", conversationId)
+    .gt("created_at", after);
+
+  if (options?.excludeRoles && options.excludeRoles.length > 0) {
+    query = query.not("role", "in", `(${options.excludeRoles.join(",")})`);
+  }
+
+  const { data, error } = await query
+    .order("created_at", { ascending: true })
+    .limit(options?.limit ?? 200);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading new messages. Please try again.",
+      "listMessagesForConversationAfter failed",
       error,
     );
   }

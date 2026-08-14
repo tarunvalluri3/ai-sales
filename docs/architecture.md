@@ -961,6 +961,86 @@ sending a reply, any new `messages` role, and the visual
 badge/sound alert for `needs_attention` -- all later Phase 15 stages,
 not built yet.
 
+### Phase 15b -- staff reply persistence and live polling
+
+`messages.role` gained a third value, `human_agent`, distinct from
+`assistant` (AI-authored) and `user` (prospect-authored). It is the
+**first `authenticated`-role write into `messages` ever** -- every
+prior write came from the service role. The write is gated by defense
+in depth: a column-scoped `INSERT` grant (`business_id`,
+`conversation_id`, `role`, `content` only) plus an RLS policy requiring
+`role = 'human_agent'`, a business match, and the target conversation's
+`control = 'human'` -- the same "no reply while AI-controlled"
+invariant `app/api/chat/route.ts` already enforces for reads, now also
+enforced at the DB layer for this new write path. The dashboard's
+`sendHumanReplyAction` re-checks `control === "human"` at the
+application layer before attempting the insert, independently of RLS.
+
+**Polling is a one-way latch, not a toggle.** Both the widget and the
+dashboard poll for updates, but neither gates *starting* to poll
+strictly on `control === "human"`. The widget starts polling the first
+time a response shows either `escalate: true` or `control === "human"`,
+then keeps polling for the rest of that browser session even after a
+hand-back to AI -- gating strictly on `control` learned only from the
+prospect's own outgoing messages would miss a proactive staff take-over
+that happens before the prospect sends anything else. The dashboard's
+live conversation view polls unconditionally once mounted (it already
+knows it's looking at a specific conversation someone chose to open).
+
+**The widget's poll endpoint (`app/api/chat/poll/route.ts`) reuses
+`lib/widget-auth.ts`'s `resolveBusinessFromWidgetKey()` unchanged** --
+not a new auth mechanism. `public/widget-loader.js`, not the iframe, is
+the only thing that calls it, for the same genuine-`Origin`-header
+reason `handleSend` already lives there. It excludes `role: 'user'`
+from its results (the widget already knows its own prospect-authored
+messages from local state); the dashboard's `pollConversationAction`
+returns every role, since staff need to see the prospect's next message
+live. Both share one query function, `lib/messages.ts`'s
+`listMessagesForConversationAfter()`.
+
+`/api/chat`'s response gained two fields, `control` and `asOf`
+(the `created_at` of whichever message was persisted last in that
+request), on every success path. `asOf` is the polling cursor --
+`control`/`asOf` are consumed entirely inside `public/widget-loader.js`
+and never cross the postMessage boundary into the iframe; the iframe
+only ever receives rendered message content via the new
+`widget:poll_result` message type. `public/widget-loader.js`'s
+hand-kept-in-sync duplication of `app/(widget)/widget/embed/_lib/post-message.ts`'s
+type shapes (documented since Phase 12) now also covers
+`widget:panel_open` (iframe → loader, sent on every panel open/close
+change) and `widget:poll_result` (loader → iframe).
+
+**Rate limiting for poll traffic is intentionally separate from Phase
+11's message-send scopes.** Two new `rate_limit_counters` scopes,
+`poll_ip` (300/5min) and `poll_conversation` (100/5min), sized around
+the widget's actual 6-second poll interval -- reusing the existing
+generic scope/identifier/window mechanism (D4's precedent), not a new
+rate-limiting system. The dashboard's polling Server Action gets no new
+rate limit at all: it is Clerk-authenticated and tenant-scoped via
+`requireBusinessContext()`, and this codebase has never rate-limited a
+Server Action -- Phase 11's limits exist specifically because that
+endpoint is public and unauthenticated.
+
+**Poll intervals differ by side, reasoned separately, not identical by
+default:** the widget polls every 6 seconds (mid-band of a 5-8s target,
+balancing responsiveness against genuinely unbounded anonymous
+traffic); the dashboard polls every 3 seconds (a single authenticated
+staff session actively waiting on the next prospect message, bounded
+traffic). Both use a self-rescheduling `setTimeout`, not `setInterval`,
+so a slow poll can never overlap with the next one. Both pause on
+`document.visibilitychange` (tab hidden); the widget additionally
+pauses while its panel is closed (`widget:panel_open`) and while a
+message send is in flight, and both fire one immediate poll on
+resume/reopen rather than waiting out a full interval. De-duplication
+is by message `id` on both sides, layered on top of the `after`/`asOf`
+cursor as defense in depth, not a substitute for it.
+
+`lib/http/widget-cors.ts` extracts the CORS/origin/IP helpers
+(`extractOrigin`, `extractIp`, `withCors`, `CORS_HEADERS`) that
+`app/api/chat/route.ts` used to define locally, now shared with
+`app/api/chat/poll/route.ts` -- a small, directly-justified refactor
+(two real call sites), not scope creep.
+
 ## Error handling
 
 `lib/errors.ts` defines `AppError` (a safe, user-facing message kept
