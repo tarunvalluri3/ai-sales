@@ -70,11 +70,17 @@ function runFile(filePath) {
     return { passed: false, lines: [], error: `could not parse CLI output as JSON: ${stdout.slice(0, 500)}` };
   }
 
-  if (!parsed.rows) {
-    return { passed: false, lines: [], error: `unexpected response shape (no "rows"): ${stdout.slice(0, 500)}` };
+  // Confirmed live: the CLI's -o json response shape differs by
+  // environment/version -- a bare array of row objects in one
+  // (observed in CI), an { rows: [...] } envelope in another (observed
+  // locally). Accept either rather than assuming one.
+  const rows = Array.isArray(parsed) ? parsed : parsed.rows;
+
+  if (!rows) {
+    return { passed: false, lines: [], error: `unexpected response shape (no rows array): ${stdout.slice(0, 500)}` };
   }
 
-  const lines = parsed.rows.map((row) => row.line ?? JSON.stringify(row));
+  const lines = rows.map((row) => row.line ?? JSON.stringify(row));
   const hasFailure = lines.some((line) => typeof line === "string" && line.includes("not ok"));
 
   return { passed: !hasFailure, lines, error: null };
