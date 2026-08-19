@@ -50,7 +50,10 @@ function runFile(filePath) {
     // spaces, breaking the CLI's own argument parsing. execSync with one
     // manually-quoted command string is the combination that actually
     // works on both Windows and POSIX.
-    const command = `npx supabase db query --linked --file "${filePath}"`;
+    // -o json is explicit, not relied on as a default: confirmed live that
+    // a clean CI environment (no prior local CLI config) defaults to a
+    // pretty-printed table instead of JSON, which broke parsing here.
+    const command = `npx supabase db query --linked --file "${filePath}" -o json`;
     stdout = execSync(command, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   } catch (error) {
     return {
