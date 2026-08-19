@@ -28,6 +28,16 @@ Last updated: 2026-08-15 (cross-cutting UI/UX premium redesign — implemented a
 
 ---
 
+## 0a. Roadmap decision — no-compromise production launch, Phases 20–25 — 2026-08-20
+
+User requested a full production/market-readiness audit (delegated to the implementing session's own analysis, not a subagent), which was cross-checked against this file rather than accepted at face value — several claimed gaps (rate limiting, structured logging, env validation, security headers, HNSW re-check) were already closed by Phase 18/19 and corrected before planning. The genuinely open gaps were grouped into dependency-ordered stages and published as an interactive checklist artifact (`Launch Readiness Spec`, 55 items, Must/Should/Later tags) for the user to track against. The user then approved building **everything on that list except Razorpay (Phase 17) and WhatsApp (Phase 16)** — both remain explicitly deferred, not cancelled, exactly as decided 2026-08-14 (§4 Resolved decisions).
+
+That approval was formalized into `docs/phases.md` as five new phases, appended after Phase 19 in build order: **Phase 20 (ship safety & release process — CI, staging DB, backups, rollback)**, **Phase 21 (observability — error tracking, uptime, alerting)**, **Phase 22 (legal/trust/AI safety — consent, retention, eval suite, spend limits)**, **Phase 23 (reliability & scale — background ingestion queue, load testing)**, **Phase 24 (commercial readiness minus billing — roles, integrations, knowledge versioning)**, **Phase 25 (UI/UX production polish — widget refresh bug, accessibility, funnel analytics)**. Full item-level detail for each phase lives in `docs/phases.md`; do not re-derive scope from this entry alone.
+
+**Next phase to start: Phase 20.** Per `docs/phases.md`'s own rationale for Phase 20, nothing in 21–25 should be built ahead of it — every later phase assumes CI and a staging database exist. No implementation has started yet; this is a planning/scope entry only, no code or migration touched.
+
+---
+
 ## 1. Current phase
 
 **Phase 16 (WhatsApp) and Phase 17 (Razorpay) — explicitly deferred by user decision, 2026-08-14.** Not started, not silently dropped, not cancelled — they remain available to schedule later, consistent with `PRODUCT.md` §10's existing "out of scope until explicitly scheduled" framing for both (`docs/phases.md`'s Phase 16/17 entries and phase ordering are unedited and still correctly describe them). This is a phase-order reorder only, made under `AGENTS.md` §4's allowance for a user-directed reorder; it changes no security rule in `AGENTS.md` §3, which still applies unconditionally to Phase 18 and everything after it. Full detail in the Resolved decisions table, §4.

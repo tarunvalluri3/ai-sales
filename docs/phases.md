@@ -163,3 +163,47 @@ Production observability after the core product works. Approved tools only. Trac
 Security review · tenant-isolation review · auth review · server/client secret review · validation review · error handling · rate limiting and abuse · database indexes · vector query performance · build checks · deployment configuration · environment validation · logging · responsive UI checks · accessibility checks · production smoke tests.
 
 A working dev server is not production readiness.
+
+## Phase 20 — Ship safety & release process
+
+CI pipeline (lint, typecheck, build, test on every PR and every push to main), an isolated staging Supabase project fully separate from production, the pgTAP suite running in CI against staging via a service token instead of a locally-linked CLI session, a documented migration promotion path from staging to production with an explicit rollback step per migration, automated backups with a restore actually tested, documented environment separation between dev/staging/production secrets, a reviewed production Vercel configuration, a live-verified rollback drill, and a one-page disaster-recovery runbook.
+
+Nothing in Phases 21–25 is safe to build on top of until changes can reach production without a human eyeballing every diff.
+
+**Exit:** a change goes from PR to production through the full pipeline with no manual step skipped, and a deliberately-broken deploy is rolled back live, not merely described.
+
+## Phase 21 — Observability
+
+Error tracking wired on server and client with prospect/PII fields scrubbed before capture, uptime monitoring on the homepage/chat API/widget embed endpoint, per-request AI latency and cost metrics, alerting on chat failures/rate-limit spikes/failed embeddings/handoff backlog, one operational dashboard combining platform built-ins with the custom AI metrics, and an enforced log retention policy.
+
+**Exit:** a deliberately-triggered failure (forced error, rate-limit burst) surfaces in the error tracker and fires the correct alert, verified live, not by inspection.
+
+## Phase 22 — Legal, trust & AI safety
+
+A consent notice before the widget captures a prospect's email or phone; a written data retention/deletion policy enforced by a scheduled job; tenant data export and cascade-delete, tested end to end; real privacy policy and terms of service pages; a documented GDPR/DPDP request workflow (manual process is acceptable if explicit); an audit trail for sensitive actions (conversation takeover, attention dismissal, knowledge deletion); a curated AI eval set per vertical covering hallucination, prompt-injection resistance, escalation correctness, and lead-capture accuracy, required to pass before any prompt or model change ships; and a per-tenant Gemini usage quota/spend limit with a defined graceful-degrade behavior when it's hit.
+
+Resolve where consent state and eval results are persisted before writing any migration.
+
+**Exit:** a tenant can export and fully delete its own data with no residual row anywhere, and the eval suite fails a deliberately-broken prompt before it can ship.
+
+## Phase 23 — Reliability & scale
+
+Knowledge embedding/re-embedding moved off the request path onto a background queue, retries with backoff and dead-letter handling for failed embedding jobs, idempotent ingestion, an ingestion status UI (processing/failed/complete per knowledge item), scheduled cleanup for expired `rate_limit_counters` rows and other operational tables, load testing under realistic concurrent-conversation volume, safe response caching for low-variance questions, a monitored re-check of the HNSW index decision against live `knowledge_chunks` row counts, and a move from handoff polling to realtime/SSE/WebSockets once usage justifies it.
+
+Design this phase's targets from Phase 21's real measured numbers, not assumptions.
+
+**Exit:** re-running ingestion on the same source never duplicates chunks, a forced embedding failure lands in the dead-letter path and is visible in the ingestion status UI, and the chat/widget path holds under a defined concurrent-load test.
+
+## Phase 24 — Commercial readiness
+
+Multiple allowed widget origins per business, widget key rotation and safe revocation without downtime, role-based access beyond one tier (owner/admin/sales agent/analyst-viewer), an audit log for admin-level actions, an outbound webhook fired on new qualified lead, business-hours rules with team assignment and SLA-based escalation routing, knowledge ingestion from file upload and website/URL import with source refresh, knowledge versioning with a draft/publish approval step, answer citations so an operator can see which knowledge chunk backed an answer, and AI responses that actually draw on the business profile's description/email/phone/website.
+
+Billing (Phase 17 — Razorpay) and WhatsApp (Phase 16) stay explicitly out of this phase's scope — excluded by user decision, not forgotten.
+
+**Exit:** each area is tenant-scoped and verified against a second test business, matching Phase 13's existing standard.
+
+## Phase 25 — UI/UX production polish
+
+Widget conversation restored from the database on page refresh instead of resetting; widget branding (accent color, logo, welcome text, CTA copy, placement, office-hours-aware greeting); language/localization support; funnel analytics (lead rate, qualified-lead rate, handoff response time, answer-failure rate, top unanswered questions, source/page attribution, CSV export); a full accessibility pass across dashboard and widget in both themes (keyboard nav, screen-reader labels, contrast); a responsive audit of the dashboard itself, not only the widget; slow-network/timeout UX with honest failure messaging; a consistent empty/error/loading pattern across every dashboard page; onboarding polish including a "test your AI before publishing" workspace; and handoff/lead notifications that reach the team outside the browser tab (email digest at minimum).
+
+**Exit:** a keyboard-only pass, a screen-reader pass, and a throttled-network pass each complete without a broken or silent state, on every page touched by this phase.

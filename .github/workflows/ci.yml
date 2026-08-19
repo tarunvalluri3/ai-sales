@@ -1,0 +1,76 @@
+name: CI
+
+# Phase 20 (STATE.md / docs/phases.md): gates every PR and every push to
+# main on lint + typecheck + build + the pgTAP tenant-isolation suite,
+# the last of which now runs against the isolated ai-sales-staging
+# Supabase project (never production) via a service-account access
+# token, closing the gap flagged in Phase 19's audit (npm test used to
+# require a human's locally-linked CLI session and always targeted
+# whichever project that session happened to be linked to).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  # One global lane, not per-ref: every run touches the same shared
+  # ai-sales-staging database (see the "known limitation" note below),
+  # so two runs must never execute the migration-push step at once.
+  group: ci-shared-staging-db
+  cancel-in-progress: false
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
+      GEMINI_EMBEDDING_MODEL: ${{ secrets.GEMINI_EMBEDDING_MODEL }}
+      GEMINI_EMBEDDING_DIMENSION: ${{ secrets.GEMINI_EMBEDDING_DIMENSION }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.STAGING_SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Sync staging database schema
+        # Keeps ai-sales-staging's schema current with this branch's
+        # migrations before the pgTAP suite runs against it, and also
+        # verifies every migration file applies cleanly from scratch on
+        # a real (non-local, non-Docker) Postgres instance.
+        #
+        # Known limitation: ai-sales-staging is one shared database, not
+        # a fresh instance per PR (Supabase's per-PR preview-branching
+        # feature needs a paid project tier, deliberately not adopted --
+        # see STATE.md's Phase 20 backups/tier decision). Two PRs with
+        # migrations open at once can race against this same database.
+        # Acceptable for a single-developer project today; revisit
+        # (branching, or serializing this job) before a second
+        # contributor lands concurrent migration PRs.
+        run: npx supabase link --project-ref ${{ secrets.STAGING_SUPABASE_PROJECT_REF }} --password ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+             && npx supabase db push --linked --yes
+
+      - name: Tenant-isolation tests (pgTAP, against staging)
+        run: npm test
