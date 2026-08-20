@@ -14,6 +14,7 @@ import { checkFaqTopicTool, executeCheckFaqTopic } from "@/lib/tools/check-faq-t
 import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request-callback";
 import { logEvent } from "@/lib/logger";
 import { isWithinUsageQuota } from "@/lib/usage-limit";
+import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -163,6 +164,11 @@ function toLangchainHistory(history: ConversationMessage[]): ["human" | "ai", st
   return history.map((message) => [message.role === "user" ? "human" : "ai", message.content]);
 }
 
+/** `history` always includes the current turn's own just-persisted user message as its last element -- see the callers' doc comments. A genuinely first conversational turn has length 1, not 0. */
+function isFirstTurn(history: ConversationMessage[]): boolean {
+  return history.length <= 1;
+}
+
 /**
  * Retrieves the given business's own knowledge chunks for `question` and
  * generates a persona-grounded sales-employee answer, per `PRODUCT.md`
@@ -206,6 +212,29 @@ export async function askSalesEmployee(
     };
   }
 
+  // Phase 23: only a first-turn question is ever cache-eligible (see
+  // shouldCacheResponse) so a multi-turn conversation never bothers with
+  // the lookup. A hit skips retrieval and every Gemini call this turn
+  // would otherwise make -- the point of "safe response caching for
+  // low-variance questions" (docs/phases.md Phase 23). `history` always
+  // includes the current turn's own just-persisted user message as its
+  // last element (app/api/chat/route.ts inserts it before fetching
+  // history), so a genuinely first-turn conversation has length 1, not 0.
+  if (isFirstTurn(history)) {
+    const cached = await getCachedResponse(supabase, businessId, question);
+    if (cached) {
+      logEvent("ai_response_cache_hit", businessId, { conversationId });
+      return {
+        answer: cached.answer,
+        grounded: true,
+        usedContext: cached.usedContext,
+        sourceChunkIds: cached.sourceChunkIds,
+        escalate: false,
+        escalationReason: null,
+      };
+    }
+  }
+
   const retriever = new KnowledgeRetriever({ supabase, businessId });
   const documents = await retriever.invoke(question);
 
@@ -228,6 +257,12 @@ export async function askSalesEmployee(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let toolCallCount = 0;
+  // Phase 23 cache eligibility cares specifically about side effects, not
+  // tool use in general -- check_product_details/check_faq_topic are
+  // read-only lookups (exactly the kind of low-variance question this
+  // cache targets), so only request_callback (the one tool that writes a
+  // lead) should ever disqualify a turn from being cached.
+  let calledSideEffectingTool = false;
 
   try {
     const prompt = await buildPrompt().invoke({
@@ -256,6 +291,7 @@ export async function askSalesEmployee(
         } else if (toolCall.name === "check_faq_topic") {
           toolResult = await executeCheckFaqTopic(supabase, businessId, toolCall.args);
         } else if (toolCall.name === "request_callback") {
+          calledSideEffectingTool = true;
           toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
         } else {
           logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
@@ -308,7 +344,7 @@ export async function askSalesEmployee(
       logEvent("ai_response_metrics_write_failed", businessId, { conversationId }, "error");
     }
 
-    return {
+    const response: SalesEmployeeResponse = {
       answer: result.answer,
       grounded: documents.length > 0 && result.usedContext,
       usedContext: result.usedContext,
@@ -316,6 +352,12 @@ export async function askSalesEmployee(
       escalate: result.escalate,
       escalationReason: result.escalationReason,
     };
+
+    if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
+      await setCachedResponse(supabase, businessId, question, response);
+    }
+
+    return response;
   } catch (error) {
     throw new AppError(
       "Something went wrong generating a response. Please try again.",
