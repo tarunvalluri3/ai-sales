@@ -6,6 +6,8 @@ import { useWidgetChat } from "../_lib/use-widget-chat";
 import { parseFromParentMessage, postToParent } from "../_lib/post-message";
 import { LauncherButton } from "./launcher-button";
 import { Panel } from "./panel";
+import type { WidgetStrings } from "@/lib/widget-i18n";
+import type { WidgetLanguage } from "@/lib/supabase/types";
 
 const NARROW_BREAKPOINT_PX = 480;
 const COLLAPSED_SIZE_PX = 84;
@@ -13,12 +15,32 @@ const PANEL_WIDTH_PX = 380;
 const PANEL_HEIGHT_PX = 600;
 const VIEWPORT_MARGIN_PX = 24;
 
-export function WidgetApp() {
+export function WidgetApp({
+  businessName,
+  language,
+  strings,
+  greeting,
+  accentColor,
+  logoUrl,
+  ctaText,
+}: {
+  businessName: string;
+  language: WidgetLanguage;
+  strings: WidgetStrings;
+  greeting: string;
+  accentColor: string | null;
+  logoUrl: string | null;
+  ctaText: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewport, setViewport] = useState({ width: 1280, height: 800 });
   const launcherButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
-  const chat = useWidgetChat();
+  const chat = useWidgetChat(strings);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   useEffect(() => {
     if (wasOpenRef.current && !isOpen) {
@@ -68,26 +90,40 @@ export function WidgetApp() {
   }, []);
 
   return (
-    <AnimatePresence initial={false} mode="wait">
-      {isOpen ? (
-        <div key="panel" className="h-full w-full p-0 sm:p-0">
-          <Panel
-            messages={chat.messages}
-            isAwaitingResponse={chat.isAwaitingResponse}
-            isCoolingDown={chat.isCoolingDown}
-            panelError={chat.panelError}
-            consentGiven={chat.consentGiven}
-            onConsentChange={chat.setConsentGiven}
-            onSend={chat.sendMessage}
-            onRetry={chat.retryMessage}
-            onClose={handleClose}
-          />
-        </div>
-      ) : (
-        <div key="launcher" className="flex h-full w-full items-center justify-center">
-          <LauncherButton ref={launcherButtonRef} isOpen={false} onToggle={() => setIsOpen(true)} />
-        </div>
-      )}
-    </AnimatePresence>
+    <div
+      className="h-full w-full"
+      style={accentColor ? ({ "--widget-primary": accentColor } as React.CSSProperties) : undefined}
+    >
+      <AnimatePresence initial={false} mode="wait">
+        {isOpen ? (
+          <div key="panel" className="h-full w-full p-0 sm:p-0">
+            <Panel
+              businessName={businessName}
+              strings={strings}
+              greeting={greeting}
+              logoUrl={logoUrl}
+              messages={chat.messages}
+              isAwaitingResponse={chat.isAwaitingResponse}
+              isCoolingDown={chat.isCoolingDown}
+              panelError={chat.panelError}
+              consentGiven={chat.consentGiven}
+              onConsentChange={chat.setConsentGiven}
+              onSend={chat.sendMessage}
+              onRetry={chat.retryMessage}
+              onClose={handleClose}
+            />
+          </div>
+        ) : (
+          <div key="launcher" className="flex h-full w-full items-center justify-center">
+            <LauncherButton
+              ref={launcherButtonRef}
+              isOpen={false}
+              label={ctaText || strings.openChatLabel}
+              onToggle={() => setIsOpen(true)}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

@@ -48,21 +48,23 @@ function normalizeQuestion(question: string): string {
   return question.trim().toLowerCase().replace(/\s+/g, " ").replace(/[?.!]+$/g, "");
 }
 
-function hashQuestion(businessId: string, question: string): string {
-  return createHash("sha256").update(`${businessId}:${normalizeQuestion(question)}`).digest("hex");
+/** `language` is folded into the hash (Phase 25a) so a business that changes/varies its widget_language never gets a cached answer written in a different language served back. */
+function hashQuestion(businessId: string, question: string, language: string): string {
+  return createHash("sha256").update(`${businessId}:${language}:${normalizeQuestion(question)}`).digest("hex");
 }
 
-/** Looks up a live (not-yet-expired) cached answer for this business/question. Returns `null` on a miss or any lookup error -- a cache-read failure must never break a real chat response, it just skips the cache. */
+/** Looks up a live (not-yet-expired) cached answer for this business/question/language. Returns `null` on a miss or any lookup error -- a cache-read failure must never break a real chat response, it just skips the cache. */
 export async function getCachedResponse(
   supabase: SupabaseClient,
   businessId: string,
   question: string,
+  language: string,
 ): Promise<CachedResponse | null> {
   const { data, error } = await supabase
     .from("ai_response_cache")
     .select("answer, used_context, source_chunk_ids")
     .eq("business_id", businessId)
-    .eq("question_hash", hashQuestion(businessId, question))
+    .eq("question_hash", hashQuestion(businessId, question, language))
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
 
@@ -83,13 +85,14 @@ export async function setCachedResponse(
   supabase: SupabaseClient,
   businessId: string,
   question: string,
+  language: string,
   response: CachedResponse,
 ): Promise<void> {
   try {
     const { error } = await supabase.from("ai_response_cache").upsert(
       {
         business_id: businessId,
-        question_hash: hashQuestion(businessId, question),
+        question_hash: hashQuestion(businessId, question, language),
         answer: response.answer,
         used_context: response.usedContext,
         source_chunk_ids: response.sourceChunkIds,

@@ -6,6 +6,7 @@ import { getBusinessForOrg } from "@/lib/business";
 export type BusinessContext = {
   userId: string;
   orgId: string;
+  orgRole: string | undefined;
   businessId: string;
   businessName: string;
 };
@@ -33,6 +34,7 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
   return {
     userId: context.userId,
     orgId: context.orgId,
+    orgRole: context.orgRole,
     businessId: business.id,
     businessName: business.name,
   };

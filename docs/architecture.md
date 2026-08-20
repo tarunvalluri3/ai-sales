@@ -884,14 +884,13 @@ for an org-matched caller, so a column-level `GRANT` is the only thing
 that changed -- `org:admin`-only is an application-layer check, not
 something Postgres's `GRANT` can express.
 
-**The four new fields are dashboard-display-only.** `lib/rag.ts`'s
-`askSalesEmployee()` still sources business-profile context from `name`
-alone, exactly as Phase 9's Decision 1 left it -- this phase deliberately
-did not touch `lib/rag.ts` or extend what reaches the AI's system prompt.
-Wiring `description`/`contact_email`/`contact_phone`/`website` into the AI
-persona is a distinct, later decision (`prompts/phase-13b-business-profile-and-polish.md`'s
-"Out of scope"), not something to assume from their existence in the
-database.
+**Superseded by Phase 24:** the four new fields were dashboard-display-only
+at the time this phase shipped -- `lib/rag.ts`'s `askSalesEmployee()`
+sourced business-profile context from `name` alone, exactly as Phase 9's
+Decision 1 left it. Phase 24 wired `description`/`contact_email`/
+`contact_phone`/`website` into the AI's system prompt (`SYSTEM_TEMPLATE`'s
+`{businessProfileContext}` placeholder, `formatBusinessProfileContext()`)
+-- see STATE.md's Phase 24 entry for the current shape.
 
 ### Conversations and leads dashboard views (Phase 13c)
 

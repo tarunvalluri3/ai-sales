@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 
-export function EscalationBanner() {
+export function EscalationBanner({ text }: { text: string }) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
@@ -28,10 +28,7 @@ export function EscalationBanner() {
           strokeLinecap="round"
         />
       </svg>
-      <span>
-        Want to talk to a person? Leave your best contact info in the chat and our team will
-        follow up.
-      </span>
+      <span>{text}</span>
     </motion.div>
   );
 }

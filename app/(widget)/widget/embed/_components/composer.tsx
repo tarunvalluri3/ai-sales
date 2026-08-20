@@ -1,17 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { WidgetStrings } from "@/lib/widget-i18n";
 
 const MAX_MESSAGE_LENGTH = 2000;
 const COUNTER_THRESHOLD = MAX_MESSAGE_LENGTH - 200;
 
 export function Composer({
+  strings,
   onSend,
   disabled,
   autoFocus,
   consentGiven,
   onConsentChange,
 }: {
+  strings: WidgetStrings;
   onSend: (text: string) => void;
   disabled: boolean;
   autoFocus: boolean;
@@ -53,9 +56,9 @@ export function Composer({
           className="mt-0.5 size-3.5 shrink-0 accent-widget-primary"
         />
         <span>
-          I agree that contact details I share here may be stored to follow up with me.{" "}
+          {strings.consentText}{" "}
           <a href="/privacy" target="_blank" rel="noreferrer" className="underline hover:text-widget-foreground">
-            Privacy Policy
+            {strings.consentLinkLabel}
           </a>
         </span>
       </label>
@@ -73,13 +76,13 @@ export function Composer({
           disabled={disabled}
           autoFocus={autoFocus}
           rows={1}
-          aria-label="Message input"
-          placeholder="Type a message…"
+          aria-label={strings.inputPlaceholder}
+          placeholder={strings.inputPlaceholder}
           className="max-h-[120px] flex-1 resize-none rounded-xl border border-widget-border bg-widget-surface-elevated px-3 py-2 text-[15px] text-widget-foreground outline-none placeholder:text-widget-muted focus-visible:border-widget-border-strong focus-visible:ring-2 focus-visible:ring-widget-primary disabled:opacity-60"
         />
         <button
           type="button"
-          aria-label="Send message"
+          aria-label={strings.sendLabel}
           onClick={handleSend}
           disabled={disabled || !value.trim()}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"

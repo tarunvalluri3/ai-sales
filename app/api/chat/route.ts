@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { logAndGetUserMessage, AppError } from "@/lib/errors";
-import { resolveBusinessFromWidgetKey, WidgetAuthError } from "@/lib/widget-auth";
+import { resolveBusinessFromWidgetKey, WidgetAuthError, type WidgetBusinessContext } from "@/lib/widget-auth";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import {
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Too many requests.", 429));
   }
 
-  let business: { businessId: string; businessName: string };
+  let business: WidgetBusinessContext;
   try {
     business = await resolveBusinessFromWidgetKey(widgetKey, origin);
   } catch (error) {
@@ -170,8 +170,10 @@ export async function POST(request: NextRequest) {
         business.businessId,
         conversation.id,
         business.businessName,
+        business.businessProfile,
         message,
         history,
+        business.language,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);
@@ -184,6 +186,7 @@ export async function POST(request: NextRequest) {
       conversation.id,
       "assistant",
       response.answer,
+      response.sourceChunkIds,
     );
 
     if (response.escalate) {
@@ -191,7 +194,7 @@ export async function POST(request: NextRequest) {
       // does not change `control`. See prompts/phase-15a-handoff-state-and-ai-pause.md's
       // "Decisions and assumptions" #1 for why escalation alone must not
       // silence the AI before a human is actually watching.
-      await flagConversationNeedsAttention(supabase, business.businessId, conversation.id);
+      await flagConversationNeedsAttention(supabase, business.businessId, conversation.id, business.clerkOrgId);
       logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
     }
 

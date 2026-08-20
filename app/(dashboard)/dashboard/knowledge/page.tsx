@@ -5,11 +5,26 @@ import { DeleteButton } from "../_components/delete-button";
 import { KnowledgeForm } from "./knowledge-form";
 import { IngestionStatusPill } from "./_components/ingestion-status-pill";
 import { RetryIngestionButton } from "./_components/retry-ingestion-button";
+import { PublishToggleButton } from "./_components/publish-toggle-button";
+import { FileUploadForm } from "./_components/file-upload-form";
+import { UrlImportForm } from "./_components/url-import-form";
+import { RefreshUrlButton } from "./_components/refresh-url-button";
 import {
   createKnowledgeDocumentAction,
   deleteKnowledgeDocumentAction,
   retryIngestionAction,
+  publishKnowledgeDocumentAction,
+  unpublishKnowledgeDocumentAction,
 } from "./actions";
+
+const SOURCE_LABEL: Record<string, string> = {
+  manual: "Manual",
+  file: "File",
+  url: "URL",
+  product: "Product",
+  service: "Service",
+  faq: "FAQ",
+};
 
 export default async function KnowledgePage() {
   const { businessId } = await requireBusinessContext();
@@ -20,7 +35,8 @@ export default async function KnowledgePage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-ds-text-primary">Knowledge</h1>
         <p className="text-sm text-ds-text-secondary">
-          This is what your AI sales employee is allowed to know.
+          This is what your AI sales employee is allowed to know. New documents start as drafts —
+          publish one to make it part of your AI&rsquo;s live reference context.
         </p>
       </div>
 
@@ -43,13 +59,49 @@ export default async function KnowledgePage() {
                 <div className="flex items-center gap-2">
                   <p className="truncate font-medium text-ds-text-primary">{document.title}</p>
                   <IngestionStatusPill status={document.ingestion_status} lastError={document.ingestion_last_error} />
+                  <span
+                    className={`rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase ${
+                      document.status === "published"
+                        ? "bg-ds-success-bg text-ds-success"
+                        : "bg-ds-surface-soft text-ds-text-muted"
+                    }`}
+                  >
+                    {document.status}
+                  </span>
+                  <span className="rounded-ds-sm bg-ds-surface-soft px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase text-ds-text-muted">
+                    {SOURCE_LABEL[document.source_type] ?? document.source_type}
+                  </span>
                 </div>
                 <p className="line-clamp-2 text-sm text-ds-text-secondary">{document.content}</p>
+                {document.source_type === "url" && document.source_url ? (
+                  <p className="truncate text-xs text-ds-text-muted">
+                    {document.source_url}
+                    {document.refresh_interval_hours
+                      ? ` · Auto-refreshes every ${document.refresh_interval_hours}h`
+                      : ""}
+                  </p>
+                ) : null}
               </div>
               <div className="flex shrink-0 items-center gap-4">
                 {document.ingestion_status === "failed" ? (
                   <RetryIngestionButton action={retryIngestionAction} id={document.id} />
                 ) : null}
+                {document.source_type === "url" ? <RefreshUrlButton id={document.id} /> : null}
+                {document.status === "draft" ? (
+                  <PublishToggleButton
+                    action={publishKnowledgeDocumentAction}
+                    id={document.id}
+                    label="Publish"
+                    pendingLabel="Publishing…"
+                  />
+                ) : (
+                  <PublishToggleButton
+                    action={unpublishKnowledgeDocumentAction}
+                    id={document.id}
+                    label="Unpublish"
+                    pendingLabel="Unpublishing…"
+                  />
+                )}
                 <Link
                   href={`/dashboard/knowledge/${document.id}/edit`}
                   className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
@@ -63,14 +115,26 @@ export default async function KnowledgePage() {
         </ul>
       )}
 
-      <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-medium text-ds-text-primary">Add knowledge</h2>
-        <KnowledgeForm
-          action={createKnowledgeDocumentAction}
-          submitLabel="Add knowledge"
-          pendingLabel="Adding…"
-        />
-      </section>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <h2 className="text-sm font-medium text-ds-text-primary">Add knowledge manually</h2>
+          <KnowledgeForm
+            action={createKnowledgeDocumentAction}
+            submitLabel="Add knowledge"
+            pendingLabel="Adding…"
+          />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <h2 className="text-sm font-medium text-ds-text-primary">Upload a file</h2>
+          <FileUploadForm />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <h2 className="text-sm font-medium text-ds-text-primary">Import from a URL</h2>
+          <UrlImportForm />
+        </section>
+      </div>
     </div>
   );
 }

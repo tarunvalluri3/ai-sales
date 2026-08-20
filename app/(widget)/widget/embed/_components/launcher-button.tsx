@@ -4,13 +4,14 @@ import { forwardRef } from "react";
 
 export const LauncherButton = forwardRef<
   HTMLButtonElement,
-  { isOpen: boolean; onToggle: () => void }
->(function LauncherButton({ isOpen, onToggle }, ref) {
+  { isOpen: boolean; label: string; onToggle: () => void }
+>(function LauncherButton({ isOpen, label, onToggle }, ref) {
   return (
     <button
       ref={ref}
       type="button"
-      aria-label={isOpen ? "Close chat" : "Open chat"}
+      aria-label={label}
+      title={label}
       onClick={onToggle}
       className="relative flex h-14 w-14 items-center justify-center rounded-full bg-widget-header-bg text-widget-primary shadow-lg shadow-black/25 transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
     >

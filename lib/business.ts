@@ -1,7 +1,7 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Business } from "@/lib/supabase/types";
-import type { BusinessProfileInput } from "@/lib/schemas/business";
+import type { BusinessProfileInput, WidgetBrandingInput } from "@/lib/schemas/business";
 import { AppError } from "@/lib/errors";
 
 /** Postgres unique-violation error code. */
@@ -102,6 +102,39 @@ export async function updateBusinessProfile(
     throw new AppError(
       "Something went wrong updating your business profile. Please try again.",
       "updateBusinessProfile failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Updates a business's widget branding/language settings (Phase 25a).
+ * `orgId` must come from a validated session; authorization (org:admin-only)
+ * is enforced by the caller, same convention as `updateBusinessProfile`.
+ */
+export async function updateWidgetBranding(orgId: string, input: WidgetBrandingInput): Promise<Business> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("businesses")
+    .update({
+      widget_accent_color: input.accentColor,
+      widget_logo_url: input.logoUrl,
+      widget_welcome_text: input.welcomeText,
+      widget_welcome_text_closed: input.welcomeTextClosed,
+      widget_cta_text: input.ctaText,
+      widget_position: input.position,
+      widget_language: input.language,
+    })
+    .eq("clerk_org_id", orgId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong updating your widget settings. Please try again.",
+      "updateWidgetBranding failed",
       error,
     );
   }

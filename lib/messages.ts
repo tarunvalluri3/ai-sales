@@ -21,10 +21,17 @@ export async function createMessage(
   conversationId: string,
   role: MessageRole,
   content: string,
+  sourceChunkIds: string[] = [],
 ): Promise<Message> {
   const { data, error } = await supabase
     .from("messages")
-    .insert({ business_id: businessId, conversation_id: conversationId, role, content })
+    .insert({
+      business_id: businessId,
+      conversation_id: conversationId,
+      role,
+      content,
+      source_chunk_ids: sourceChunkIds,
+    })
     .select()
     .single();
 

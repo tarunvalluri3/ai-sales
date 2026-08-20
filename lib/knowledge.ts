@@ -23,7 +23,7 @@ export async function getKnowledgeDocument(
     .select("*")
     .eq("business_id", businessId)
     .eq("id", id)
-    .eq("source_type", "manual")
+    .in("source_type", ["manual", "file", "url"])
     .maybeSingle();
 
   if (error) {
@@ -46,7 +46,7 @@ export async function listKnowledgeDocumentsForBusiness(
     .from("knowledge_documents")
     .select("*")
     .eq("business_id", businessId)
-    .eq("source_type", "manual")
+    .in("source_type", ["manual", "file", "url"])
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -68,7 +68,7 @@ export async function createKnowledgeDocument(
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("knowledge_documents")
-    .insert({ business_id: businessId, source_type: "manual", source_id: null, ...input })
+    .insert({ business_id: businessId, source_type: "manual", source_id: null, status: "draft", ...input })
     .select()
     .single();
 
@@ -103,7 +103,7 @@ export async function updateKnowledgeDocument(
     .update(input)
     .eq("business_id", businessId)
     .eq("id", id)
-    .eq("source_type", "manual")
+    .in("source_type", ["manual", "file", "url"])
     .select("id");
 
   if (error) {
@@ -131,7 +131,7 @@ export async function deleteKnowledgeDocument(businessId: string, id: string): P
     .delete()
     .eq("business_id", businessId)
     .eq("id", id)
-    .eq("source_type", "manual")
+    .in("source_type", ["manual", "file", "url"])
     .select("id");
 
   if (error) {
@@ -273,6 +273,145 @@ export async function enqueueIngestion(
   }
 
   return data.length > 0;
+}
+
+/**
+ * Publishes a draft (or republishes a previously unpublished) manual
+ * knowledge document -- the approval step gating whether its chunks are
+ * ever eligible for retrieval (match_knowledge_chunks joins knowledge_documents
+ * and filters status = 'published'). Snapshots the current title/content
+ * into knowledge_document_versions as an immutable history row before
+ * flipping status, and bumps `version`. `actorUserId` must come from
+ * `requireBusinessContext()`. Returns `false` for a cross-tenant,
+ * nonexistent, or non-manual id, same not-found contract as every other
+ * mutation in this file.
+ */
+export async function publishKnowledgeDocument(
+  businessId: string,
+  id: string,
+  actorUserId: string,
+): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+
+  const { data: document, error: fetchError } = await supabase
+    .from("knowledge_documents")
+    .select("id, title, content, version")
+    .eq("business_id", businessId)
+    .eq("id", id)
+    .in("source_type", ["manual", "file", "url"])
+    .maybeSingle();
+
+  if (fetchError || !document) {
+    return false;
+  }
+
+  const nextVersion = document.version + 1;
+  const now = new Date().toISOString();
+
+  const { error: versionError } = await supabase.from("knowledge_document_versions").insert({
+    document_id: document.id,
+    business_id: businessId,
+    version: nextVersion,
+    title: document.title,
+    content: document.content,
+    published_by: actorUserId,
+    published_at: now,
+  });
+
+  if (versionError) {
+    throw new AppError(
+      "Something went wrong publishing this knowledge document. Please try again.",
+      "publishKnowledgeDocument version insert failed",
+      versionError,
+    );
+  }
+
+  const { error: updateError } = await supabase
+    .from("knowledge_documents")
+    .update({ status: "published", version: nextVersion, published_at: now })
+    .eq("business_id", businessId)
+    .eq("id", id);
+
+  if (updateError) {
+    throw new AppError(
+      "Something went wrong publishing this knowledge document. Please try again.",
+      "publishKnowledgeDocument status update failed",
+      updateError,
+    );
+  }
+
+  return true;
+}
+
+/** Takes a published manual document back to draft -- its chunks immediately stop being retrieval-eligible, without deleting them (a re-publish needs no re-ingestion). See `publishKnowledgeDocument` for the not-found contract. */
+export async function unpublishKnowledgeDocument(businessId: string, id: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("knowledge_documents")
+    .update({ status: "draft" })
+    .eq("business_id", businessId)
+    .eq("id", id)
+    .in("source_type", ["manual", "file", "url"])
+    .eq("status", "published")
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong unpublishing this knowledge document. Please try again.",
+      "unpublishKnowledgeDocument failed",
+      error,
+    );
+  }
+
+  return data.length > 0;
+}
+
+export type CitedChunk = {
+  id: string;
+  content: string;
+  documentTitle: string;
+};
+
+/**
+ * Resolves citation details (chunk content + parent document title) for
+ * the chunk IDs an assistant message cited (Phase 24, `messages.source_chunk_ids`).
+ * Deliberately business-scoped like every other lookup here -- a chunk ID
+ * from another business's data would simply return nothing, never leak
+ * cross-tenant content. Silently drops any ID that no longer resolves
+ * (the source document/chunk was edited or deleted since the message was
+ * sent -- regenerateChunksForDocument is delete-and-reinsert by design)
+ * rather than erroring, since a stale citation is expected, not a bug.
+ */
+export async function getCitationDetails(businessId: string, chunkIds: string[]): Promise<CitedChunk[]> {
+  if (chunkIds.length === 0) {
+    return [];
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data: chunks, error: chunksError } = await supabase
+    .from("knowledge_chunks")
+    .select("id, document_id, content")
+    .eq("business_id", businessId)
+    .in("id", chunkIds);
+
+  if (chunksError || !chunks || chunks.length === 0) {
+    return [];
+  }
+
+  const documentIds = [...new Set(chunks.map((chunk) => chunk.document_id))];
+  const { data: documents } = await supabase
+    .from("knowledge_documents")
+    .select("id, title")
+    .eq("business_id", businessId)
+    .in("id", documentIds);
+
+  const titleByDocumentId = new Map((documents ?? []).map((document) => [document.id, document.title]));
+
+  return chunks.map((chunk) => ({
+    id: chunk.id,
+    content: chunk.content,
+    documentTitle: titleByDocumentId.get(chunk.document_id) ?? "Untitled",
+  }));
 }
 
 export type { KnowledgeSourceType };

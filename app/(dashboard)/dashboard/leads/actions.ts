@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
+import { requireMinRole } from "@/lib/auth";
 import { updateLeadStatus } from "@/lib/leads";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -20,7 +21,11 @@ export async function updateLeadStatusAction(
   _prevState: UpdateStatusState,
   formData: FormData,
 ): Promise<UpdateStatusState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:sales_agent");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = updateStatusSchema.safeParse({
     id: formData.get("id"),

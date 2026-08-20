@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseFromParentMessage, postToParent, type WidgetErrorKind } from "./post-message";
+import type { WidgetStrings } from "@/lib/widget-i18n";
 
 export type ChatMessage = {
   id: string;
@@ -21,7 +22,7 @@ function newId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function useWidgetChat() {
+export function useWidgetChat(strings: WidgetStrings) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAwaitingResponse, setIsAwaitingResponse] = useState(false);
   const [isCoolingDown, setIsCoolingDown] = useState(false);
@@ -66,7 +67,7 @@ export function useWidgetChat() {
 
         if (message.kind === "unauthorized" && !hasSucceededRef.current) {
           setMessages((prev) => prev.filter((m) => m.id !== pending.assistantPlaceholderId));
-          setPanelError("This chat isn't available right now.");
+          setPanelError(strings.panelUnavailable);
           return;
         }
 
@@ -94,12 +95,22 @@ export function useWidgetChat() {
           if (fresh.length === 0) return prev;
           return [...prev, ...fresh.map((m) => ({ id: m.id, role: m.role, content: m.content }))];
         });
+      } else if (message.type === "widget:restore") {
+        // Sent once, right after the loader fetches /api/chat/restore
+        // for a conversationId it found in localStorage (Phase 25a).
+        // Only applied while this widget instance has no messages of
+        // its own yet -- if the prospect has already sent something in
+        // this session (a race between mount and the fetch resolving),
+        // restoring here would clobber real in-flight state.
+        if (message.messages.length === 0) return;
+        setMessages((prev) => (prev.length > 0 ? prev : message.messages.map((m) => ({ id: m.id, role: m.role, content: m.content }))));
+        hasSucceededRef.current = true;
       }
     }
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [strings]);
 
   const dispatchSend = useCallback((text: string, userMessageId: string) => {
     const requestId = newId();
