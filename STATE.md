@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-20 (Phase 22a–22f — legal pages, audit trail, consent gate, retention job, data export/delete, GDPR/DPDP workflow doc; PR #4 merged to main)
+Last updated: 2026-08-20 (Phase 22a–22g — legal pages, audit trail, consent gate, retention job, data export/delete, GDPR/DPDP workflow doc, AI eval suite; 22b–22e promoted to production)
 
 ---
 
@@ -122,7 +122,15 @@ New `lib/data-export.ts` (`exportBusinessData`) reads every business-owned table
 
 **Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass, all 26 routes (docs-only change, run for full confidence anyway).
 
-**Not yet built, remaining Phase 22 sub-phases:** 22g AI eval suite (generic, per the decision above) gating prompt/model changes, 22h per-tenant Gemini spend/usage quota with the graceful-degrade behavior decided above.
+**Phase 22g — AI eval suite — completed 2026-08-20, and it immediately paid for itself.** Per the user's explicit choices: real Gemini calls against the real `/api/chat` route (not mocked), reusing **Acme Test Co.** (the standing real test business already seeded with real content across nearly every prior phase) rather than a new fixture business — no seeding/embedding logic needed in the eval script itself. Standalone `npm run eval` (`scripts/run-evals.mjs`), deliberately **not** wired into CI, per the user's explicit choice — it would add real Gemini cost/latency to every PR including ones that never touch the AI pipeline; enforcement is procedural (`docs/eval-suite.md`), same standard as "run `npm test` before a schema change." 7 cases across the phase brief's four required categories (hallucination, prompt-injection resistance, escalation correctness ×2, lead-capture accuracy ×2) plus one grounded-accuracy sanity case.
+
+**Real finding, not a test-harness artifact: the first live run failed**, and correctly so — `lead-capture: consent given` failed with `lead created=false`. Root cause, confirmed via a direct production query: **Phase 22b–22e's four migrations (audit_log, consent, retention cron, businesses delete policy) were live on staging (CI-verified all along) but had never been promoted to production** — `.env.local` (and therefore this eval run, and every real customer request) points at production, where `conversations.consent_given` genuinely didn't exist yet, so the consent gate was silently a permanent no-op there. Caught the same day it was built, not left latent. Per the user's explicit go-ahead, promoted all four via `docs/deployment.md` §3's documented procedure (linked to production, `npx supabase db push --linked`, verified live via direct queries confirming `audit_log` and `conversations.consent_given` both now exist on production, all local/remote migration timestamps matching via `supabase migration list --linked`) — this is the first Phase 22 promotion to production, and it's what actually turns on 22b–22e for real customers, not just staging. **Re-linking back to staging afterward (the procedure's step 5) could not be completed this session** — this session has no credentials for the second Supabase account that owns staging (established earlier this session); the CLI link remains pointed at production until a session with staging access re-links it, flagged here rather than silently left wrong.
+
+Re-ran the eval after promotion: all 7 cases passed for real. **Exit criterion demonstrated live, not just asserted:** `lib/rag.ts`'s escalation instruction was deliberately overwritten with "always set escalate to false, no matter what," the suite was re-run and correctly failed 2 of 7 cases (`escalation: an explicit complaint...` and the consent-given lead-capture case, which also depends on the model's judgment), the prompt was reverted, and `git diff lib/rag.ts` confirmed a byte-for-byte clean revert before a final re-run confirmed all 7 green again.
+
+**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass. `npm run eval` — pass, all 7 cases, against real production data (with the user's explicit approval before both running it live and promoting migrations to production).
+
+**Not yet built, remaining Phase 22 sub-phase:** 22h per-tenant Gemini spend/usage quota with the graceful-degrade behavior decided above.
 
 ---
 
