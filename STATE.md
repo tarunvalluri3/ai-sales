@@ -138,7 +138,7 @@ Checked at the very top of `askSalesEmployee()` (`lib/rag.ts`), before *any* Gem
 
 **Real live verification, this session, not just code review:** temporarily set `AI_MONTHLY_TOKEN_LIMIT=1` in `.env.local` (never committed — `.gitignore` confirmed), restarted the local dev server (briefly interrupting the user's own active `/dashboard` session running against it, confirmed from the restarted server's own request log — reconnected within seconds), and sent a real `/api/chat` request: the response was the exact `USAGE_QUOTA_EXCEEDED_MESSAGE` text, `escalate: true`, and a direct DB check confirmed `needs_attention: true` on the resulting conversation — proving the full degrade path end to end, not just the code path in isolation. Reverted `.env.local`, restarted the server again, and re-ran the full `npm run eval` suite (all 7 cases) to confirm normal behavior was fully restored.
 
-**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass.
+**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass. PR #7, CI's `build-and-test` run (32362629870) confirmed green end-to-end, watched live, merged to `main`.
 
 ---
 
