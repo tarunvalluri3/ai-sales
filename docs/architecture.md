@@ -1132,6 +1132,51 @@ contact info, no raw tool-call input argument, no IP address. `logEvent`
 never throws, so a logging call can never break the caller's own control
 flow.
 
+## Error tracking and alerting (Phase 21)
+
+`@sentry/nextjs` is wired at three layers: `instrumentation.ts`/
+`instrumentation-client.ts` load `sentry.server.config.ts`/
+`sentry.edge.config.ts`/the client init respectively; `app/global-error.tsx`
+catches root-layout-level React errors; and `next.config.ts`'s
+`withSentryConfig` uploads source maps at build time using the
+org-scoped, `org:ci`-only `SENTRY_AUTH_TOKEN`. `lib/sentry-scrub.ts`'s
+`beforeSend` strips cookies and auth-adjacent headers from every event
+before it leaves the process; `sendDefaultPii: false` and no session-replay
+integration are both deliberate, since this app's dashboard and widget
+both render real tenant data and real prospect conversations.
+`tracesSampleRate: 0` everywhere -- performance tracing is intentionally
+off; AI latency/cost is measured separately (below), not through
+Sentry's own transaction quota.
+
+Two existing conventions now double as alerting hooks, not just logs:
+`lib/errors.ts`'s `logAndGetUserMessage()` calls `Sentry.captureException`
+for every error that reaches it (its ~14 existing call sites across the
+app needed no individual changes); `lib/logger.ts`'s `logEvent()` calls
+`Sentry.captureMessage` for every `level: "error"` event (rate-limit
+rejections, failed tool invocations, failed embeddings via the
+`AppError` path above, and `app/(dashboard)/dashboard/actions.ts`'s
+handoff-backlog threshold check). Sentry groups repeated identical
+messages into one issue, so a condition that stays elevated across many
+requests/poll ticks produces one alertable issue, not one per
+occurrence. Configure Sentry's own issue alert rules (email, per the
+current setup) in the Sentry project settings -- this is dashboard
+configuration, not application code, and is not re-described here.
+
+`lib/rag.ts`'s `askSalesEmployee()` emits a real, non-estimated
+`ai_response_generated` event (wall-clock latency across every Gemini
+call that turn, real token counts from each call's own
+`usage_metadata`) and best-effort writes one row to
+`public.ai_response_metrics` (tenant-scoped, RLS `select`-only for
+`authenticated`, written exclusively by the service-role client -- see
+the migration's own header). `lib/analytics.ts`'s
+`getAiResponseMetricsStats()` aggregates the last 7 days' rows
+client-side over a bounded fetch (`AI_METRICS_ROW_LIMIT`), not a
+database-side aggregate -- adequate at this project's current data
+volume, revisit with a real Postgres aggregate if that changes. Surfaced
+on `/dashboard/analytics` alongside links out to Sentry and Vercel for
+everything that table doesn't cover (uptime, error rates, full request
+traces).
+
 ## Startup environment validation (Phase 19b)
 
 `lib/env.ts` validates every currently-required environment variable

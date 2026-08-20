@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 /**
  * Framing-sensitive: /widget/embed is deliberately loaded cross-origin
@@ -39,4 +40,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * SENTRY_AUTH_TOKEN is deliberately the org:ci-scoped token (docs/deployment.md),
+ * never the broader user token used one-time to create the project --
+ * this only needs release/source-map upload access, and only at build
+ * time. silent:!CI keeps local `npm run build` quiet while still
+ * logging in CI for visibility. Absent locally/without the token, the
+ * plugin no-ops the upload rather than failing the build.
+ */
+export default withSentryConfig(nextConfig, {
+  org: "waves-web-studio",
+  project: "ai-sales",
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+});
