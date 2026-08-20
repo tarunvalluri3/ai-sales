@@ -145,6 +145,20 @@ function WidgetIcon(props: IconProps) {
   );
 }
 
+function AuditLogIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M5.5 3h6l3 3v9.5a1.5 1.5 0 0 1-1.5 1.5h-7.5A1.5 1.5 0 0 1 4 15.5v-11A1.5 1.5 0 0 1 5.5 3Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path d="M7 9.5h6M7 12.5h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export type NavItem = {
   label: string;
   href: string;
@@ -162,6 +176,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Leads", href: "/dashboard/leads", icon: LeadsIcon },
   { label: "Analytics", href: "/dashboard/analytics", icon: AnalyticsIcon },
   { label: "Widget Settings", href: "/dashboard/widget-settings", icon: WidgetIcon },
+  { label: "Audit Log", href: "/dashboard/audit-log", icon: AuditLogIcon },
 ];
 
 /**

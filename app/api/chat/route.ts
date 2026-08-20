@@ -9,6 +9,7 @@ import {
   createConversation,
   flagConversationNeedsAttention,
   getConversationForBusiness,
+  recordConversationConsent,
 } from "@/lib/conversations";
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
@@ -53,6 +54,7 @@ const bodySchema = z.object({
   widgetKey: z.string().uuid(),
   conversationId: z.string().uuid().optional(),
   message: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
+  consentGiven: z.boolean().optional(),
 });
 
 export async function OPTIONS() {
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId, message } = parsed.data;
+  const { widgetKey, conversationId, message, consentGiven } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
 
@@ -123,6 +125,14 @@ export async function POST(request: NextRequest) {
     if (!conversationAllowed) {
       logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }, "error");
       return withCors(jsonError("Too many requests.", 429));
+    }
+
+    // Phase 22c: the widget's own consent checkbox is the only thing
+    // that can set this -- never inferred from the AI or the prospect's
+    // free-text reply. Recorded before the message is processed so a
+    // tool call triggered by this very message already sees it.
+    if (consentGiven) {
+      await recordConversationConsent(supabase, business.businessId, conversation.id);
     }
 
     // Persisted unconditionally, regardless of control state, so a human

@@ -27,6 +27,7 @@ export type WidgetSendMessage = {
   type: "widget:send";
   requestId: string;
   text: string;
+  consentGiven: boolean;
 };
 
 export type WidgetResponseMessage = {

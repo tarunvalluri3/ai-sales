@@ -11,6 +11,7 @@ import {
 } from "@/lib/conversations";
 import { createMessage, listMessagesForConversationAfter } from "@/lib/messages";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { recordAuditLogEntry } from "@/lib/audit-log";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
 
 const setControlSchema = z.object({
@@ -34,7 +35,7 @@ export async function setConversationControlAction(
   _prevState: SetControlState,
   formData: FormData,
 ): Promise<SetControlState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, userId } = await requireBusinessContext();
 
   const parsed = setControlSchema.safeParse({
     id: formData.get("id"),
@@ -56,6 +57,10 @@ export async function setConversationControlAction(
   if (!updated) {
     return { error: "This conversation no longer exists." };
   }
+
+  await recordAuditLogEntry(businessId, userId, "conversation.control_changed", "conversation", parsed.data.id, {
+    control: parsed.data.control,
+  });
 
   revalidatePath(`/dashboard/conversations/${parsed.data.id}`);
   return { success: true };
@@ -131,7 +136,7 @@ export async function dismissAttentionAction(
   _prevState: DismissAttentionState,
   formData: FormData,
 ): Promise<DismissAttentionState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, userId } = await requireBusinessContext();
 
   const parsed = dismissAttentionSchema.safeParse({
     conversationId: formData.get("conversationId"),
@@ -152,6 +157,14 @@ export async function dismissAttentionAction(
   if (!updated) {
     return { error: "This conversation no longer exists." };
   }
+
+  await recordAuditLogEntry(
+    businessId,
+    userId,
+    "conversation.attention_dismissed",
+    "conversation",
+    parsed.data.conversationId,
+  );
 
   revalidatePath(`/dashboard/conversations/${parsed.data.conversationId}`);
   return { success: true };

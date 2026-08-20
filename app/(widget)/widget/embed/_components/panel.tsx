@@ -12,6 +12,8 @@ export function Panel({
   isAwaitingResponse,
   isCoolingDown,
   panelError,
+  consentGiven,
+  onConsentChange,
   onSend,
   onRetry,
   onClose,
@@ -20,6 +22,8 @@ export function Panel({
   isAwaitingResponse: boolean;
   isCoolingDown: boolean;
   panelError: string | null;
+  consentGiven: boolean;
+  onConsentChange: (value: boolean) => void;
   onSend: (text: string) => void;
   onRetry: (id: string) => void;
   onClose: () => void;
@@ -57,6 +61,8 @@ export function Panel({
             onSend={onSend}
             disabled={isAwaitingResponse || isCoolingDown}
             autoFocus
+            consentGiven={consentGiven}
+            onConsentChange={onConsentChange}
           />
         </>
       )}

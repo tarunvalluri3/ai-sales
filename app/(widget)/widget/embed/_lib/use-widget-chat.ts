@@ -26,8 +26,14 @@ export function useWidgetChat() {
   const [isAwaitingResponse, setIsAwaitingResponse] = useState(false);
   const [isCoolingDown, setIsCoolingDown] = useState(false);
   const [panelError, setPanelError] = useState<string | null>(null);
+  // Phase 22c: set by the widget's own consent checkbox, never inferred
+  // from chat text. Sent with every message once true -- the server
+  // records it idempotently, so re-sending it on later messages is
+  // harmless.
+  const [consentGiven, setConsentGiven] = useState(false);
   const conversationIdRef = useRef<string | null>(null);
   const hasSucceededRef = useRef(false);
+  const consentGivenRef = useRef(false);
   const pendingRef = useRef(
     new Map<string, { userMessageId: string; assistantPlaceholderId: string; text: string }>(),
   );
@@ -102,7 +108,7 @@ export function useWidgetChat() {
 
     setMessages((prev) => [...prev, { id: assistantPlaceholderId, role: "assistant", content: "" }]);
     setIsAwaitingResponse(true);
-    postToParent({ type: "widget:send", requestId, text });
+    postToParent({ type: "widget:send", requestId, text, consentGiven: consentGivenRef.current });
 
     setTimeout(() => {
       if (!pendingRef.current.has(requestId)) return;
@@ -141,11 +147,18 @@ export function useWidgetChat() {
     [messages, isAwaitingResponse, isCoolingDown, dispatchSend],
   );
 
+  const setConsent = useCallback((value: boolean) => {
+    consentGivenRef.current = value;
+    setConsentGiven(value);
+  }, []);
+
   return {
     messages,
     isAwaitingResponse,
     isCoolingDown,
     panelError,
+    consentGiven,
+    setConsentGiven: setConsent,
     sendMessage,
     retryMessage,
   };

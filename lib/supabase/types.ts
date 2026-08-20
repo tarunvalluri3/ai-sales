@@ -73,6 +73,8 @@ export type Conversation = {
   source: string | null;
   control: ConversationControl;
   needs_attention: boolean;
+  consent_given: boolean;
+  consent_given_at: string | null;
   created_at: string;
 };
 
@@ -108,4 +110,22 @@ export type Lead = {
   requested_callback: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type AuditLogAction =
+  | "conversation.control_changed"
+  | "conversation.attention_dismissed"
+  | "knowledge.deleted";
+
+export type AuditLogMetadata = Record<string, string | number | boolean | null>;
+
+export type AuditLogEntry = {
+  id: string;
+  business_id: string;
+  actor_user_id: string;
+  action: AuditLogAction;
+  target_type: string;
+  target_id: string;
+  metadata: AuditLogMetadata | null;
+  created_at: string;
 };
