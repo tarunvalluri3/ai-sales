@@ -218,6 +218,39 @@ export async function countConversationsNeedingAttention(
 }
 
 /**
+ * Records that the prospect on this conversation has explicitly agreed
+ * (via the widget's own consent checkbox, never inferred from chat text)
+ * to have contact info they share stored to follow up with them (Phase
+ * 22c). Idempotent -- a conversation that already has consent recorded is
+ * left with its original `consent_given_at`. Called only from
+ * app/api/chat/route.ts with the service-role client; a failure here must
+ * not fail the prospect's message, so this logs rather than throws,
+ * matching flagConversationNeedsAttention()'s contract.
+ */
+export async function recordConversationConsent(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ consent_given: true, consent_given_at: new Date().toISOString() })
+    .eq("business_id", businessId)
+    .eq("id", conversationId)
+    .eq("consent_given", false);
+
+  if (error) {
+    logAndGetUserMessage(
+      new AppError(
+        "Something went wrong recording consent for this conversation.",
+        "recordConversationConsent failed",
+        error,
+      ),
+    );
+  }
+}
+
+/**
  * Flags a conversation as needing human attention. Called only from
  * app/api/chat/route.ts with the service-role client, after the AI sets
  * escalate: true on a turn -- never from a dashboard caller (no

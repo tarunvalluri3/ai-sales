@@ -76,6 +76,8 @@ export function WidgetApp() {
             isAwaitingResponse={chat.isAwaitingResponse}
             isCoolingDown={chat.isCoolingDown}
             panelError={chat.panelError}
+            consentGiven={chat.consentGiven}
+            onConsentChange={chat.setConsentGiven}
             onSend={chat.sendMessage}
             onRetry={chat.retryMessage}
             onClose={handleClose}

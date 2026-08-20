@@ -24,13 +24,13 @@ export const RequestCallbackInputSchema = z.object({
 export const requestCallbackTool = {
   name: "request_callback",
   description:
-    "Creates or updates a callback request for the current conversation. Only call this after the prospect has clearly agreed to a callback (in response to either their own request or your offer) AND you already have their email or phone number from this conversation. If the result comes back with reason 'missing_contact_info', ask the prospect for their email or phone number before calling this tool again -- do not call it again without contact info.",
+    "Creates or updates a callback request for the current conversation. Only call this after the prospect has clearly agreed to a callback (in response to either their own request or your offer) AND you already have their email or phone number from this conversation. If the result comes back with reason 'missing_contact_info', ask the prospect for their email or phone number before calling this tool again -- do not call it again without contact info. If the result comes back with reason 'consent_required', tell the prospect you need their consent to store their details and ask them to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent.",
   schema: RequestCallbackInputSchema,
 };
 
 export type RequestCallbackResult =
   | { success: true; leadId: string; created: boolean }
-  | { success: false; reason: "missing_contact_info" | "invalid_input" | "lookup_failed" };
+  | { success: false; reason: "missing_contact_info" | "consent_required" | "invalid_input" | "lookup_failed" };
 
 function appendNotes(existing: string | null, addition: string | null): string | null {
   if (!addition) return existing;
@@ -89,6 +89,11 @@ export async function executeRequestCallback(
       "error",
     );
     return { success: false, reason: "lookup_failed" };
+  }
+
+  if (!conversation.consent_given) {
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "consent_required" });
+    return { success: false, reason: "consent_required" };
   }
 
   const { data: existing, error: lookupError } = await supabase

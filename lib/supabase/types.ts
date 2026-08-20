@@ -73,6 +73,8 @@ export type Conversation = {
   source: string | null;
   control: ConversationControl;
   needs_attention: boolean;
+  consent_given: boolean;
+  consent_given_at: string | null;
   created_at: string;
 };
 

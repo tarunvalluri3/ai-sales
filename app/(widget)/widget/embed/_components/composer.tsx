@@ -9,10 +9,14 @@ export function Composer({
   onSend,
   disabled,
   autoFocus,
+  consentGiven,
+  onConsentChange,
 }: {
   onSend: (text: string) => void;
   disabled: boolean;
   autoFocus: boolean;
+  consentGiven: boolean;
+  onConsentChange: (value: boolean) => void;
 }) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -41,6 +45,20 @@ export function Composer({
 
   return (
     <div className="border-t border-widget-border bg-widget-surface px-3 py-3">
+      <label className="mb-2 flex items-start gap-2 text-xs leading-snug text-widget-muted">
+        <input
+          type="checkbox"
+          checked={consentGiven}
+          onChange={(event) => onConsentChange(event.target.checked)}
+          className="mt-0.5 size-3.5 shrink-0 accent-widget-primary"
+        />
+        <span>
+          I agree that contact details I share here may be stored to follow up with me.{" "}
+          <a href="/privacy" target="_blank" rel="noreferrer" className="underline hover:text-widget-foreground">
+            Privacy Policy
+          </a>
+        </span>
+      </label>
       {value.length >= COUNTER_THRESHOLD ? (
         <p className="mb-1 text-right text-xs text-widget-muted">
           {value.length}/{MAX_MESSAGE_LENGTH}

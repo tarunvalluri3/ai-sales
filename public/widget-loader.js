@@ -220,7 +220,7 @@
     }, 150);
   });
 
-  async function handleSend(requestId, text) {
+  async function handleSend(requestId, text, consentGiven) {
     // The synchronous chat response is more current than any poll could
     // be, and this avoids two competing requests updating state at once.
     isSendInFlight = true;
@@ -232,6 +232,7 @@
           widgetKey: widgetKey,
           conversationId: conversationId || undefined,
           message: text,
+          consentGiven: !!consentGiven,
         }),
       });
 
@@ -285,7 +286,7 @@
     if (data.type === "widget:resize" && typeof data.width === "number" && typeof data.height === "number") {
       applyResize(data.width, data.height);
     } else if (data.type === "widget:send" && typeof data.requestId === "string" && typeof data.text === "string") {
-      handleSend(data.requestId, data.text);
+      handleSend(data.requestId, data.text, data.consentGiven);
     } else if (data.type === "widget:panel_open" && typeof data.open === "boolean") {
       var wasOpen = isPanelOpen;
       isPanelOpen = data.open;
