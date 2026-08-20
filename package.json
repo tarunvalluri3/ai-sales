@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node scripts/run-pgtap-tests.mjs"
+    "test": "node scripts/run-pgtap-tests.mjs",
+    "eval": "node --env-file=.env.local scripts/run-evals.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.3",
@@ -37,6 +38,7 @@
     "typescript": "^5"
   },
   "allowScripts": {
-    "@sentry/cli@2.58.6": true
+    "@sentry/cli@2.58.6": true,
+    "esbuild@0.28.2": true
   }
 }
