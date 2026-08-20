@@ -168,6 +168,14 @@ export default function HomePage() {
             AI Sales
           </div>
           <p className="text-2xs text-ds-text-muted">An AI sales employee, grounded in your own business.</p>
+          <div className="flex items-center gap-4 text-2xs text-ds-text-muted">
+            <Link href="/privacy" className="transition-colors hover:text-ds-text-primary">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="transition-colors hover:text-ds-text-primary">
+              Terms of Service
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

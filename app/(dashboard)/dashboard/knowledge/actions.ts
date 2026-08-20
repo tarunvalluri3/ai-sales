@@ -11,6 +11,7 @@ import {
 } from "@/lib/knowledge";
 import { knowledgeTitleSchema, knowledgeContentSchema } from "@/lib/schemas/knowledge";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { recordAuditLogEntry } from "@/lib/audit-log";
 
 const knowledgeFieldsSchema = z.object({
   title: knowledgeTitleSchema,
@@ -86,7 +87,7 @@ export async function deleteKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, userId } = await requireBusinessContext();
 
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
   if (!parsed.success) {
@@ -103,6 +104,8 @@ export async function deleteKnowledgeDocumentAction(
   if (!deleted) {
     return { error: "This knowledge document no longer exists." };
   }
+
+  await recordAuditLogEntry(businessId, userId, "knowledge.deleted", "knowledge_document", parsed.data.id);
 
   revalidatePath("/dashboard/knowledge");
   return { success: true };
