@@ -142,3 +142,53 @@ export async function getLeadStats(
     requestedCallback: requestedCallback.count ?? 0,
   };
 }
+
+const AI_METRICS_ROW_LIMIT = 500;
+
+/**
+ * AI response latency/cost stats for a business over the last 7 days
+ * (Phase 21). Averages/sums are computed here over a bounded row fetch
+ * (most-recent `AI_METRICS_ROW_LIMIT` rows within the window), not a
+ * database-side aggregate -- adequate at this project's current data
+ * volume (Phase 19b's own HNSW-index check found single-digit row
+ * counts project-wide); revisit with a real Postgres aggregate/RPC
+ * (matching match_knowledge_chunks's pattern) if that stops being true.
+ * `businessId` must come from `requireBusinessContext()`.
+ */
+export async function getAiResponseMetricsStats(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<{
+  responseCount: number;
+  avgLatencyMs: number;
+  totalTokens: number;
+  avgTokensPerResponse: number;
+}> {
+  const { data, error } = await supabase
+    .from("ai_response_metrics")
+    .select("latency_ms, input_tokens, output_tokens")
+    .eq("business_id", businessId)
+    .gte("created_at", cutoffIso(7))
+    .order("created_at", { ascending: false })
+    .limit(AI_METRICS_ROW_LIMIT);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your analytics. Please try again.",
+      "getAiResponseMetricsStats failed",
+      error,
+    );
+  }
+
+  const rows = data ?? [];
+  const responseCount = rows.length;
+  const totalLatencyMs = rows.reduce((sum, row) => sum + row.latency_ms, 0);
+  const totalTokens = rows.reduce((sum, row) => sum + row.input_tokens + row.output_tokens, 0);
+
+  return {
+    responseCount,
+    avgLatencyMs: responseCount > 0 ? Math.round(totalLatencyMs / responseCount) : 0,
+    totalTokens,
+    avgTokensPerResponse: responseCount > 0 ? Math.round(totalTokens / responseCount) : 0,
+  };
+}

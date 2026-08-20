@@ -4,7 +4,7 @@ import { BaseRetriever } from "@langchain/core/retrievers";
 import { Document } from "@langchain/core/documents";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import type { BaseMessage } from "@langchain/core/messages";
+import type { AIMessage, BaseMessage } from "@langchain/core/messages";
 import { ToolMessage } from "@langchain/core/messages";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -159,6 +159,14 @@ function toLangchainHistory(history: ConversationMessage[]): ["human" | "ai", st
  * Gemini when the business has no matching knowledge at all -- this is
  * the guarantee behind Phase 8's exit criterion, preserved unchanged
  * here rather than weakened by the richer persona.
+ *
+ * Emits an "ai_response_generated" event on a successful run (Phase 21,
+ * STATE.md / docs/phases.md's per-request AI latency/cost metrics) --
+ * wall-clock latency across every Gemini call this turn made, plus real
+ * token counts read from each call's own usage_metadata (never
+ * estimated). The early-return fallback path above intentionally emits
+ * nothing: no Gemini call was made, so there is no latency/cost to
+ * report.
  */
 export async function askSalesEmployee(
   supabase: SupabaseClient,
@@ -186,6 +194,11 @@ export async function askSalesEmployee(
     .map((document, index) => `[${index + 1}] ${document.pageContent}`)
     .join("\n\n");
 
+  const startedAt = Date.now();
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let toolCallCount = 0;
+
   try {
     const prompt = await buildPrompt().invoke({
       context,
@@ -198,11 +211,14 @@ export async function askSalesEmployee(
     const toolModel = getChatModel().bindTools([checkProductDetailsTool, checkFaqTopicTool, requestCallbackTool]);
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const aiMessage = await toolModel.invoke(messages);
+      totalInputTokens += aiMessage.usage_metadata?.input_tokens ?? 0;
+      totalOutputTokens += aiMessage.usage_metadata?.output_tokens ?? 0;
       if (!aiMessage.tool_calls || aiMessage.tool_calls.length === 0) {
         break;
       }
 
       messages.push(aiMessage);
+      toolCallCount += aiMessage.tool_calls.length;
       for (const toolCall of aiMessage.tool_calls) {
         let toolResult: unknown;
         if (toolCall.name === "check_product_details") {
@@ -227,8 +243,40 @@ export async function askSalesEmployee(
 
     const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, {
       name: "SalesEmployeeResponse",
+      includeRaw: true,
     });
-    const result = await model.invoke(messages);
+    const { raw, parsed: result } = await model.invoke(messages);
+    // includeRaw types `raw` as the generic BaseMessage, but a chat
+    // model's raw output is always an AIMessage with usage_metadata at
+    // runtime -- confirmed against @langchain/core's own AIMessage type.
+    const rawUsage = (raw as AIMessage).usage_metadata;
+    totalInputTokens += rawUsage?.input_tokens ?? 0;
+    totalOutputTokens += rawUsage?.output_tokens ?? 0;
+
+    const latencyMs = Date.now() - startedAt;
+    logEvent("ai_response_generated", businessId, {
+      conversationId,
+      latencyMs,
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      totalTokens: totalInputTokens + totalOutputTokens,
+      toolCallCount,
+    });
+
+    // Best-effort: a metrics-write failure must never break a real
+    // chat response. Errors are still visible via lib/errors.ts's own
+    // Sentry wiring, just not re-thrown here.
+    const { error: metricsError } = await supabase.from("ai_response_metrics").insert({
+      business_id: businessId,
+      conversation_id: conversationId,
+      latency_ms: latencyMs,
+      input_tokens: totalInputTokens,
+      output_tokens: totalOutputTokens,
+      tool_call_count: toolCallCount,
+    });
+    if (metricsError) {
+      logEvent("ai_response_metrics_write_failed", businessId, { conversationId }, "error");
+    }
 
     return {
       answer: result.answer,

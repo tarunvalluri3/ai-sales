@@ -110,6 +110,16 @@ What exists today:
 
 ---
 
+## 5a. Error tracking, alerting, and uptime (Phase 21)
+
+**Error tracking:** Sentry project `waves-web-studio/ai-sales` (DE region). Full wiring detail in `docs/architecture.md`'s "Error tracking and alerting (Phase 21)" section — SDK layers, PII scrubbing, and how the existing `lib/errors.ts`/`lib/logger.ts` conventions double as alert triggers. Sentry's default "notify on high-priority issue" rule emails the account owner; view issues at `https://waves-web-studio.sentry.io/projects/ai-sales/`.
+
+**AI latency/cost metrics:** `public.ai_response_metrics`, surfaced on `/dashboard/analytics`. See `docs/architecture.md` for the full write/read path.
+
+**Uptime monitoring:** UptimeRobot, account `tarunvalluri3@gmail.com`. **Known limitation, not silently solved:** the free plan allows exactly one monitor — it now watches `/api/health` (chosen over the homepage as a more meaningful liveness check; a static page can serve from Vercel's edge cache even if the app server itself is unhealthy, `/api/health` cannot). `/widget/embed` and the homepage itself are **not** independently monitored. Revisit if the free-plan limit changes or the account is upgraded.
+
+**Log retention:** Vercel's own request/function logs (accessible via the Vercel dashboard) are the only structured-log retention this project has — subject to Vercel's plan-level retention window (short on the Hobby tier this project is currently on), not a separately configured policy. Sentry retains captured errors/messages per its own plan (90 days on the free tier at time of writing). No log is exported or retained anywhere longer than each platform's own default — an explicit choice, not an oversight: this project has no compliance requirement yet that would justify a longer, separately-managed retention pipeline (see the Launch Readiness checklist's Stage C for where that requirement would be tracked if it arises).
+
 ## 6. Production deployment (Vercel)
 
 Production is deployed via Vercel's GitHub integration, linked to `tarunvalluri3/ai-sales`. Production env vars are set directly in the Vercel project (Project Settings → Environment Variables → Production), sourced from `.env.local`'s real production values — never committed to the repo.

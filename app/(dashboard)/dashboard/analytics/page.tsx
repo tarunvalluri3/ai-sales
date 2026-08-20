@@ -1,7 +1,12 @@
 import { requireBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { countConversationsNeedingAttention } from "@/lib/conversations";
-import { getConversationVolumeStats, getLeadStats, getMessageVolumeStats } from "@/lib/analytics";
+import {
+  getAiResponseMetricsStats,
+  getConversationVolumeStats,
+  getLeadStats,
+  getMessageVolumeStats,
+} from "@/lib/analytics";
 import { KpiTile } from "../_components/kpi-tile";
 import { BreakdownBarChart } from "../_components/charts/breakdown-bar-chart";
 import { QualificationDonut } from "../_components/charts/qualification-donut";
@@ -11,11 +16,12 @@ export default async function AnalyticsPage() {
   const { businessId } = await requireBusinessContext();
   const supabase = createServerSupabaseClient();
 
-  const [conversationStats, messageStats, leadStats, needsAttentionCount] = await Promise.all([
+  const [conversationStats, messageStats, leadStats, needsAttentionCount, aiMetricsStats] = await Promise.all([
     getConversationVolumeStats(supabase, businessId),
     getMessageVolumeStats(supabase, businessId),
     getLeadStats(supabase, businessId),
     countConversationsNeedingAttention(supabase, businessId),
+    getAiResponseMetricsStats(supabase, businessId),
   ]);
 
   const conversionRate =
@@ -69,6 +75,39 @@ export default async function AnalyticsPage() {
             colors={[chartColors.accentMuted, chartColors.accent, chartColors.warning]}
           />
         </section>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-medium text-ds-text-primary">AI performance (last 7 days)</h2>
+          <p className="text-2xs text-ds-text-muted">
+            Real Gemini latency and token usage, measured per response. Uptime, error rates, and full
+            request traces live in{" "}
+            <a
+              href="https://waves-web-studio.sentry.io/projects/ai-sales/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-ds-text-primary"
+            >
+              Sentry
+            </a>{" "}
+            and the{" "}
+            <a
+              href="https://vercel.com/taruns-projects-fe9a950f/ai-sales"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2 hover:text-ds-text-primary"
+            >
+              Vercel dashboard
+            </a>
+            .
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <KpiTile label="AI responses" value={aiMetricsStats.responseCount} />
+          <KpiTile label="Avg. response time" value={aiMetricsStats.avgLatencyMs} suffix="ms" />
+          <KpiTile label="Avg. tokens / response" value={aiMetricsStats.avgTokensPerResponse} />
+        </div>
       </div>
     </div>
   );
