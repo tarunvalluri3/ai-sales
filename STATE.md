@@ -128,7 +128,7 @@ New `lib/data-export.ts` (`exportBusinessData`) reads every business-owned table
 
 Re-ran the eval after promotion: all 7 cases passed for real. **Exit criterion demonstrated live, not just asserted:** `lib/rag.ts`'s escalation instruction was deliberately overwritten with "always set escalate to false, no matter what," the suite was re-run and correctly failed 2 of 7 cases (`escalation: an explicit complaint...` and the consent-given lead-capture case, which also depends on the model's judgment), the prompt was reverted, and `git diff lib/rag.ts` confirmed a byte-for-byte clean revert before a final re-run confirmed all 7 green again.
 
-**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass. `npm run eval` — pass, all 7 cases, against real production data (with the user's explicit approval before both running it live and promoting migrations to production).
+**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass. `npm run eval` — pass, all 7 cases, against real production data (with the user's explicit approval before both running it live and promoting migrations to production). PR #6, CI's `build-and-test` run (32361328101) confirmed green end-to-end, watched live, merged to `main`.
 
 **Not yet built, remaining Phase 22 sub-phase:** 22h per-tenant Gemini spend/usage quota with the graceful-degrade behavior decided above.
 
