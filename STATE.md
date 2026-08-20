@@ -72,6 +72,8 @@ That approval was formalized into `docs/phases.md` as five new phases, appended 
 
 **Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass, all 24 routes, real Sentry release created each time. `npm test` — pass, all 12 pgTAP files (staging). All live-verified end-to-end against real production data (Acme Test Co., existing test business reused from every prior phase) with the user's explicit approval before querying production.
 
+**Post-merge finding, fixed same day:** the merge to `main` triggered Vercel's automatic preview-deployment build for the (now-merged) PR branch, which failed outright — `GEMINI_EMBEDDING_DIMENSION must be a positive integer, got: undefined` — because only the Production Vercel environment had ever been configured (Phase 20); Preview had no env vars at all. Fixed by setting the full env var set on Vercel's Preview environment too, deliberately pointed at **staging** Supabase/Clerk/Gemini rather than duplicating production values, so an arbitrary in-progress branch can never touch real tenant data. Documented in `docs/deployment.md` §6. Production itself was unaffected throughout (its own deployment built and went `Ready` normally).
+
 **Next phase: Phase 22 — Legal, trust & AI safety.** Not started.
 
 ---
