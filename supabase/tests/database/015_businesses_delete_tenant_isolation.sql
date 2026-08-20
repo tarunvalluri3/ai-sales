@@ -39,7 +39,7 @@ insert into _tap_results select diag(
     'jwt org=%s current_user=%s policies=%s',
     (select auth.jwt() -> 'o' ->> 'id'),
     current_user,
-    (select string_agg(polname || ':' || polcmd, ',') from pg_policy pol join pg_class c on c.oid = pol.polrelid where c.relname = 'businesses')
+    (select string_agg(polname || ':' || polcmd::text, ',') from pg_policy pol join pg_class c on c.oid = pol.polrelid where c.relname = 'businesses')
   )
 );
 
