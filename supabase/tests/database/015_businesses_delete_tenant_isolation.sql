@@ -8,7 +8,7 @@
 -- header for why this is wrapped in a temporary results table.
 
 begin;
-select plan(3);
+select plan(2);
 create temporary table _tap_results (line text);
 grant insert on _tap_results to authenticated;
 
@@ -32,14 +32,15 @@ select set_config(
   true
 );
 
-insert into _tap_results select is_empty(
-  $$ delete from public.businesses where id = '00000000-0000-0000-0000-00000000000b' returning id $$,
-  'org_a session''s delete of org_b''s business row affects zero rows (RLS-filtered, not an error)'
-);
+-- Plain top-level DELETE, not wrapped in any pgTAP helper -- RLS's
+-- `using` clause makes org_b's row invisible to this DELETE, so it
+-- affects zero rows without erroring (unlike the INSERT case, which
+-- throws on a with-check violation).
+delete from public.businesses where id = '00000000-0000-0000-0000-00000000000b';
 
 insert into _tap_results select ok(
   exists (select 1 from public.businesses where id = '00000000-0000-0000-0000-00000000000b'),
-  'org_b''s business row is untouched after org_a''s attempted delete'
+  'org_a session cannot delete org_b''s business row -- it still exists afterward'
 );
 
 delete from public.businesses where id = '00000000-0000-0000-0000-00000000000a';
