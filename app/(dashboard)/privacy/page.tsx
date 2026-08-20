@@ -89,11 +89,14 @@ export default function PrivacyPolicyPage() {
 
         <Section title="Retention and deletion">
           <p>
-            We retain business and conversation data for as long as the customer&apos;s account is
-            active, plus a reasonable period after account closure to allow recovery from accidental
+            A visitor&apos;s conversation (its messages and any contact details captured from it) is
+            automatically and permanently deleted after <strong>24 months of inactivity</strong> — a
+            scheduled process, not a manual one. Business account data (business profile, products,
+            services, FAQs, knowledge documents) is retained for as long as the customer&apos;s account
+            is active, plus a reasonable period after account closure to allow recovery from accidental
             deletion, unless a shorter period is required by law or a longer period is requested in
-            writing. A customer or visitor may request access to, export of, or deletion of their data
-            at any time — see &quot;Your rights&quot; below.
+            writing. A customer or visitor may request access to, export of, or earlier deletion of
+            their data at any time — see &quot;Your rights&quot; below.
           </p>
         </Section>
 
