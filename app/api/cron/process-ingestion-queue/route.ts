@@ -4,6 +4,7 @@ import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 import { refreshDueUrlKnowledgeSources } from "@/lib/url-ingestion";
 import { runSlaEscalationSweep } from "@/lib/sla-routing";
+import { sendDailyDigestEmails } from "@/lib/notifications";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -16,7 +17,10 @@ import { logAndGetUserMessage } from "@/lib/errors";
  * request-triggered). This route only exists to sweep up anything an
  * immediate trigger missed (a crashed function, a retry still in
  * backoff) -- one shared daily route, not one cron job per queue, since
- * Vercel's Hobby plan caps cron jobs and each one to once a day.
+ * Vercel's Hobby plan caps cron jobs and each one to once a day. The
+ * handoff/lead email digest (lib/notifications.ts, Phase 25b) has no
+ * immediate trigger at all -- it's inherently a once-a-day summary, so
+ * this route IS its primary trigger, not just a backstop.
  *
  * Vercel signs cron-triggered requests with `Authorization: Bearer
  * $CRON_SECRET` when that env var is set (Vercel's own documented
@@ -34,13 +38,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [ingestion, webhooks, urlRefresh, slaRouting] = await Promise.all([
+    const [ingestion, webhooks, urlRefresh, slaRouting, notificationDigest] = await Promise.all([
       processIngestionQueue(),
       processWebhookDeliveries(),
       refreshDueUrlKnowledgeSources(),
       runSlaEscalationSweep(),
+      sendDailyDigestEmails(),
     ]);
-    return jsonSuccess({ ingestion, webhooks, urlRefresh, slaRouting });
+    return jsonSuccess({ ingestion, webhooks, urlRefresh, slaRouting, notificationDigest });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);
   }

@@ -129,6 +129,7 @@ export type Conversation = {
   id: string;
   business_id: string;
   source: string | null;
+  source_url: string | null;
   control: ConversationControl;
   needs_attention: boolean;
   consent_given: boolean;
@@ -147,6 +148,15 @@ export type Message = {
   role: MessageRole;
   content: string;
   source_chunk_ids: string[];
+  grounded: boolean | null;
+  created_at: string;
+};
+
+export type UnansweredQuestion = {
+  id: string;
+  business_id: string;
+  conversation_id: string;
+  question: string;
   created_at: string;
 };
 

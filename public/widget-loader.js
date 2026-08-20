@@ -46,6 +46,14 @@
 
   var appOrigin = new URL(ownScript.src, window.location.href).origin;
 
+  // Phase 25b "source/page attribution": origin + pathname only, no
+  // query string or fragment (which can carry tracking tokens this app
+  // has no reason to store) -- the server re-derives/caps this anyway
+  // (app/api/chat/route.ts's sanitizeSourceUrl()), this is just not
+  // sending more than necessary in the first place. Only used by the
+  // server the first time it creates a conversation for this send.
+  var pageUrl = window.location.origin + window.location.pathname;
+
   var COLLAPSED_SIZE = 84;
   var MARGIN = 20;
 
@@ -336,6 +344,7 @@
           conversationId: conversationId || undefined,
           message: text,
           consentGiven: !!consentGiven,
+          pageUrl: pageUrl,
         }),
       });
 

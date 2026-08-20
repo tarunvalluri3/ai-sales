@@ -4,24 +4,43 @@ import { countConversationsNeedingAttention } from "@/lib/conversations";
 import {
   getAiResponseMetricsStats,
   getConversationVolumeStats,
+  getFunnelRateStats,
+  getHandoffResponseTimeStats,
   getLeadStats,
   getMessageVolumeStats,
+  getTopSourcePages,
+  getTopUnansweredQuestions,
 } from "@/lib/analytics";
 import { KpiTile } from "../_components/kpi-tile";
 import { BreakdownBarChart } from "../_components/charts/breakdown-bar-chart";
 import { QualificationDonut } from "../_components/charts/qualification-donut";
 import { chartColors } from "../_components/charts/chart-colors";
+import { ExportLeadsCsvButton } from "./export-leads-csv-button";
 
 export default async function AnalyticsPage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, businessName } = await requireBusinessContext();
   const supabase = createServerSupabaseClient();
 
-  const [conversationStats, messageStats, leadStats, needsAttentionCount, aiMetricsStats] = await Promise.all([
+  const [
+    conversationStats,
+    messageStats,
+    leadStats,
+    needsAttentionCount,
+    aiMetricsStats,
+    funnelRateStats,
+    handoffResponseTimeStats,
+    topUnansweredQuestions,
+    topSourcePages,
+  ] = await Promise.all([
     getConversationVolumeStats(supabase, businessId),
     getMessageVolumeStats(supabase, businessId),
     getLeadStats(supabase, businessId),
     countConversationsNeedingAttention(supabase, businessId),
     getAiResponseMetricsStats(supabase, businessId),
+    getFunnelRateStats(supabase, businessId),
+    getHandoffResponseTimeStats(supabase, businessId),
+    getTopUnansweredQuestions(supabase, businessId),
+    getTopSourcePages(supabase, businessId),
   ]);
 
   const conversionRate =
@@ -29,11 +48,14 @@ export default async function AnalyticsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Analytics</h1>
-        <p className="text-sm text-ds-text-secondary">
-          How your AI sales employee is performing, from real conversation and lead data.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold text-ds-text-primary">Analytics</h1>
+          <p className="text-sm text-ds-text-secondary">
+            How your AI sales employee is performing, from real conversation and lead data.
+          </p>
+        </div>
+        <ExportLeadsCsvButton businessName={businessName} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -42,6 +64,39 @@ export default async function AnalyticsPage() {
         <KpiTile label="Last 30 days" value={conversationStats.last30Days} href="/dashboard/conversations" />
         <KpiTile label="Needs attention now" value={needsAttentionCount} href="/dashboard/conversations" />
         <KpiTile label="Conversion rate" value={conversionRate} suffix="%" hint="Leads / conversations" href="/dashboard/leads" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiTile
+          label="Qualified-lead rate"
+          value={funnelRateStats.qualifiedLeadRate}
+          suffix="%"
+          hint="Hot + warm leads / conversations"
+          href="/dashboard/leads"
+        />
+        <KpiTile
+          label="Answer-failure rate"
+          value={funnelRateStats.answerFailureRate}
+          suffix="%"
+          hint="AI replies with no grounded answer"
+        />
+        <KpiTile
+          label="Handoff response time"
+          value={handoffResponseTimeStats.sampleSize === 0 ? "—" : handoffResponseTimeStats.avgMinutes}
+          suffix={handoffResponseTimeStats.sampleSize === 0 ? "" : "min"}
+          hint={
+            handoffResponseTimeStats.sampleSize === 0
+              ? "No handoffs with a staff reply yet"
+              : `Avg. over last ${handoffResponseTimeStats.sampleSize} handoff(s)`
+          }
+          href="/dashboard/conversations"
+        />
+        <KpiTile
+          label="Requested callback"
+          value={leadStats.requestedCallback}
+          hint="Leads that asked for a callback"
+          href="/dashboard/leads"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -74,6 +129,59 @@ export default async function AnalyticsPage() {
             ]}
             colors={[chartColors.accentMuted, chartColors.accent, chartColors.warning]}
           />
+        </section>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-medium text-ds-text-primary">Top unanswered questions</h2>
+            <p className="text-2xs text-ds-text-muted">
+              Questions the AI could not answer from your knowledge base — the biggest opportunity to
+              close gaps in Products, Services, FAQs, or Knowledge.
+            </p>
+          </div>
+          {topUnansweredQuestions.length === 0 ? (
+            <p className="text-sm text-ds-text-muted">No unanswered questions yet.</p>
+          ) : (
+            <ol className="flex flex-col gap-2">
+              {topUnansweredQuestions.map((item, index) => (
+                <li key={item.question} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-ds-text-secondary">
+                    <span className="text-ds-text-muted">{index + 1}.</span> {item.question}
+                  </span>
+                  <span className="shrink-0 rounded-ds-sm bg-ds-surface-soft px-2 py-0.5 text-2xs font-medium text-ds-text-muted">
+                    {item.count}×
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-medium text-ds-text-primary">Top source pages</h2>
+            <p className="text-2xs text-ds-text-muted">
+              The pages prospects most often started a chat from.
+            </p>
+          </div>
+          {topSourcePages.length === 0 ? (
+            <p className="text-sm text-ds-text-muted">No page attribution recorded yet.</p>
+          ) : (
+            <ol className="flex flex-col gap-2">
+              {topSourcePages.map((item, index) => (
+                <li key={item.sourceUrl} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="truncate text-ds-text-secondary">
+                    <span className="text-ds-text-muted">{index + 1}.</span> {item.sourceUrl}
+                  </span>
+                  <span className="shrink-0 rounded-ds-sm bg-ds-surface-soft px-2 py-0.5 text-2xs font-medium text-ds-text-muted">
+                    {item.count}×
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
       </div>
 

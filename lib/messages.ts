@@ -22,6 +22,7 @@ export async function createMessage(
   role: MessageRole,
   content: string,
   sourceChunkIds: string[] = [],
+  grounded: boolean | null = null,
 ): Promise<Message> {
   const { data, error } = await supabase
     .from("messages")
@@ -31,6 +32,7 @@ export async function createMessage(
       role,
       content,
       source_chunk_ids: sourceChunkIds,
+      grounded,
     })
     .select()
     .single();

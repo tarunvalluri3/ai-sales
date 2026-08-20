@@ -14,7 +14,7 @@ export function KpiTile({
   href,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   suffix?: string;
   hint?: string;
   href?: string;

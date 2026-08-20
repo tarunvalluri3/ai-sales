@@ -18,10 +18,11 @@ export async function createConversation(
   supabase: SupabaseClient,
   businessId: string,
   source: string | null,
+  sourceUrl: string | null = null,
 ): Promise<Conversation> {
   const { data, error } = await supabase
     .from("conversations")
-    .insert({ business_id: businessId, source })
+    .insert({ business_id: businessId, source, source_url: sourceUrl })
     .select()
     .single();
 
