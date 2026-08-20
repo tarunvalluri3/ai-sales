@@ -108,3 +108,34 @@ export async function updateBusinessProfile(
 
   return data;
 }
+
+/**
+ * Permanently deletes the business row for a given Clerk org, cascading
+ * to every business-owned table (Phase 22e) -- no residual row anywhere.
+ * Does NOT touch the Clerk organization itself, by explicit user choice
+ * (STATE.md): the org and its members are untouched, and would simply
+ * re-onboard (create a fresh business) if anyone signs back in. `orgId`
+ * must come from a validated session; authorization (org:admin-only,
+ * plus the caller's own type-to-confirm check) is enforced by the
+ * caller, same convention as `updateBusinessProfile`. Returns `false`
+ * without throwing if no business existed for this org (nothing to
+ * delete, not an error).
+ */
+export async function deleteBusinessForOrg(orgId: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("businesses")
+    .delete()
+    .eq("clerk_org_id", orgId)
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong deleting your business. Please try again.",
+      "deleteBusinessForOrg failed",
+      error,
+    );
+  }
+
+  return data.length > 0;
+}

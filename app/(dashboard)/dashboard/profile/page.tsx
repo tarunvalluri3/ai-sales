@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
 import { ProfileForm } from "./profile-form";
+import { DangerZone } from "./danger-zone";
 
 export default async function ProfilePage() {
   const context = await requireAuthContext();
@@ -27,15 +28,18 @@ export default async function ProfilePage() {
       </div>
 
       {isAdmin ? (
-        <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-          <ProfileForm
-            initialName={business.name}
-            initialDescription={business.description ?? ""}
-            initialContactEmail={business.contact_email ?? ""}
-            initialContactPhone={business.contact_phone ?? ""}
-            initialWebsite={business.website ?? ""}
-          />
-        </section>
+        <>
+          <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+            <ProfileForm
+              initialName={business.name}
+              initialDescription={business.description ?? ""}
+              initialContactEmail={business.contact_email ?? ""}
+              initialContactPhone={business.contact_phone ?? ""}
+              initialWebsite={business.website ?? ""}
+            />
+          </section>
+          <DangerZone businessName={business.name} />
+        </>
       ) : (
         <div className="flex w-full max-w-lg flex-col gap-3">
           <dl className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
