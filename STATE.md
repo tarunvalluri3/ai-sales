@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-20 (Phase 22a/22b/22c — legal pages, sensitive-action audit trail, widget consent gate)
+Last updated: 2026-08-20 (Phase 22a–22f — legal pages, audit trail, consent gate, retention job, data export/delete, GDPR/DPDP workflow doc; PR #4 merged to main)
 
 ---
 
@@ -116,7 +116,13 @@ New `lib/data-export.ts` (`exportBusinessData`) reads every business-owned table
 
 **Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass, all 26 routes. **CI's `build-and-test` run (32357753105) confirmed green end-to-end, watched live, after the two fixes above** — all 15 pgTAP files pass against staging. **Known limitation, not glossed over: no full live click-through was performed this session** (create a throwaway test business → export it → delete it → confirm zero residual rows in a real browser) — deliberately avoided running a real delete against this project's long-standing shared test data (Acme/Ghost Test Co., reused across many prior phases' verification) without the user first confirming that's acceptable. RLS enforcement is CI-verified via the new pgTAP file; the export/delete UI flow itself is unverified beyond build-time compilation. Flagged as the natural first manual test for the user (or a future session, with explicit throwaway-business approval) to run.
 
-**Not yet built, remaining Phase 22 sub-phases:** 22f GDPR/DPDP request workflow documentation, 22g AI eval suite (generic, per the decision above) gating prompt/model changes, 22h per-tenant Gemini spend/usage quota with the graceful-degrade behavior decided above.
+**PR #4 (22a–22e) merged to `main`, at the user's explicit request** — confirmed via `gh pr view 4` showing `state: MERGED` with a real merge commit SHA, not assumed. (The first merge attempt's local sync step failed with a `cannot pull with rebase: you have unstaged changes` error — caused by the pre-existing, unrelated uncommitted `message-bubble.tsx` change that predates this session — which switched the local checkout back to `main` mid-command; the merge itself had already succeeded on GitHub by that point, confirmed via the API, and a plain `git fetch && git merge origin/main`, not a rebase, brought the local checkout current without touching that unrelated file. No work was lost.) Local and remote feature branches deleted; `main` is current.
+
+**Phase 22f — GDPR/DPDP request workflow — completed 2026-08-20.** Docs-only, per the phase brief's explicit "manual process is acceptable" allowance — no new tooling built. New `docs/gdpr-dpdp-request-workflow.md` distinguishes customer requests (business members — point them at the Phase 22e self-service export/delete tools first) from visitor requests (AI Sales is the processor, not the controller, for prospect data — redirect to the business the visitor actually spoke to, or act only on the controller-business's own explicit instruction), documents a 30-day response target, and adds a record-keeping requirement distinct from the in-app `audit_log` table (which only covers specific in-app actions, not manual Supabase-side interventions). Explicitly states what it does *not* cover yet (no intake form, no SLA tracking, no identity verification tooling) rather than implying more rigor than actually exists.
+
+**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass, all 26 routes (docs-only change, run for full confidence anyway).
+
+**Not yet built, remaining Phase 22 sub-phases:** 22g AI eval suite (generic, per the decision above) gating prompt/model changes, 22h per-tenant Gemini spend/usage quota with the graceful-degrade behavior decided above.
 
 ---
 
