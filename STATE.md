@@ -104,7 +104,7 @@ New migration `20260820200000_schedule_conversation_retention_cleanup.sql`: enab
 
 New pgTAP file `014_delete_expired_conversations_function.sql` (14th file) — a functional test, not a tenant-isolation test (this function's whole point is to act across every business), confirming: a conversation whose last message is 25 months old is deleted, its lead row goes with it (cascade, no residual row), and a conversation whose last message is 1 month old is untouched.
 
-**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass, all 26 routes. Pushed as an additional commit onto the still-open PR #4. CI's real result is recorded once watched (see below — do not assume pass without checking this line was actually updated after a real run).
+**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass, all 26 routes. Pushed as an additional commit onto the still-open PR #4. **CI's `build-and-test` run (32354431818) confirmed green end-to-end, watched live**: `pg_cron` extension enabled, `delete_expired_conversations()` created, and all 14 pgTAP files (including the new functional test) passed against staging.
 
 **Not yet built, remaining Phase 22 sub-phases:** 22e tenant data export + cascade-delete (tested end to end), 22f GDPR/DPDP request workflow documentation, 22g AI eval suite (generic, per the decision above) gating prompt/model changes, 22h per-tenant Gemini spend/usage quota with the graceful-degrade behavior decided above.
 
