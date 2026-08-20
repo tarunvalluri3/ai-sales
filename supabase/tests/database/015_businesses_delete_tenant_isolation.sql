@@ -32,6 +32,17 @@ select set_config(
   true
 );
 
+-- DIAGNOSTIC (temporary): confirm what this session actually resolves
+-- before trusting the delete's outcome.
+insert into _tap_results select diag(
+  format(
+    'jwt org=%s current_user=%s policies=%s',
+    (select auth.jwt() -> 'o' ->> 'id'),
+    current_user,
+    (select string_agg(polname || ':' || polcmd, ',') from pg_policy pol join pg_class c on c.oid = pol.polrelid where c.relname = 'businesses')
+  )
+);
+
 -- Plain top-level DELETE, not wrapped in any pgTAP helper -- RLS's
 -- `using` clause makes org_b's row invisible to this DELETE, so it
 -- affects zero rows without erroring (unlike the INSERT case, which
