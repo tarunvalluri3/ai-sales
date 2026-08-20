@@ -13,6 +13,7 @@ import { checkProductDetailsTool, executeCheckProductDetails } from "@/lib/tools
 import { checkFaqTopicTool, executeCheckFaqTopic } from "@/lib/tools/check-faq-topic";
 import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request-callback";
 import { logEvent } from "@/lib/logger";
+import { isWithinUsageQuota } from "@/lib/usage-limit";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -30,6 +31,16 @@ type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
 export const FALLBACK_MESSAGE =
   "I don't have that information yet. I can connect you with someone from our team, or you can leave your contact details and we'll follow up.";
+
+/**
+ * Phase 22h's graceful-degrade message, shown once a business is over
+ * its monthly usage quota -- deliberately distinct from FALLBACK_MESSAGE
+ * (which means "I don't know this specific answer") since this means
+ * "the AI is unavailable right now," a different situation for the
+ * prospect to understand. Never a fabricated answer either way.
+ */
+export const USAGE_QUOTA_EXCEEDED_MESSAGE =
+  "We're experiencing high demand right now, so I'm not able to respond in real time. A member of our team will follow up with you directly — thanks for your patience.";
 
 export type ConversationMessage = {
   role: "user" | "assistant";
@@ -176,6 +187,25 @@ export async function askSalesEmployee(
   question: string,
   history: ConversationMessage[] = [],
 ): Promise<SalesEmployeeResponse> {
+  // Phase 22h: checked before any Gemini call this turn would make,
+  // including the embedding call retrieval itself makes -- a business
+  // over quota must not spend another token, not just stop short of a
+  // full response. escalate: true so app/api/chat/route.ts's existing
+  // escalation handling (flagConversationNeedsAttention + logEvent)
+  // picks this up with no new call site needed there.
+  const withinQuota = await isWithinUsageQuota(supabase, businessId);
+  if (!withinQuota) {
+    logEvent("ai_usage_quota_exceeded", businessId, { conversationId }, "error");
+    return {
+      answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
+      grounded: false,
+      usedContext: false,
+      sourceChunkIds: [],
+      escalate: true,
+      escalationReason: "usage_quota_exceeded",
+    };
+  }
+
   const retriever = new KnowledgeRetriever({ supabase, businessId });
   const documents = await retriever.invoke(question);
 

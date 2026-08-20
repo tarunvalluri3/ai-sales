@@ -98,10 +98,13 @@ Core set:
 | `SENTRY_DSN` | yes (not a secret in the traditional sense, but not marked `NEXT_PUBLIC_*`) |
 | `NEXT_PUBLIC_SENTRY_DSN` | yes |
 | `SENTRY_AUTH_TOKEN` | **no — build-time only, org:ci scope** |
+| `AI_MONTHLY_TOKEN_LIMIT` | config |
 
 Add a variable only when a feature actually requires it. Razorpay and WhatsApp variables are deferred to their phases. Keep the live list in `STATE.md` §5 in sync.
 
 `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` are deliberately not in `lib/env.ts`'s required schema (Phase 21) — a missing DSN degrades observability (Sentry silently no-ops), not the app's ability to serve requests, so it does not belong in the fail-fast startup check the way a missing Clerk/Supabase/Gemini variable does.
+
+`AI_MONTHLY_TOKEN_LIMIT` (Phase 22h) is optional in `lib/env.ts`'s schema (present, but `.optional()`) — a missing value falls back to a built-in default in `lib/usage-limit.ts` rather than failing startup, since this is a tunable operational knob, not a variable whose absence should ever break the app.
 
 Supabase key names above reflect the current `publishable`/`secret` key system (Phase 3), not the legacy `anon`/`service_role` naming, which Supabase is deprecating by end of 2026.
 

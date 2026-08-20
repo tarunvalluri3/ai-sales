@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-20 (Phase 22a–22g — legal pages, audit trail, consent gate, retention job, data export/delete, GDPR/DPDP workflow doc, AI eval suite; 22b–22e promoted to production)
+Last updated: 2026-08-20 (Phase 22 complete, 22a–22h — legal pages, audit trail, consent gate, retention job, data export/delete, GDPR/DPDP workflow doc, AI eval suite, usage quota; 22b–22e promoted to production)
 
 ---
 
@@ -130,7 +130,21 @@ Re-ran the eval after promotion: all 7 cases passed for real. **Exit criterion d
 
 **Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass. `npm run eval` — pass, all 7 cases, against real production data (with the user's explicit approval before both running it live and promoting migrations to production). PR #6, CI's `build-and-test` run (32361328101) confirmed green end-to-end, watched live, merged to `main`.
 
-**Not yet built, remaining Phase 22 sub-phase:** 22h per-tenant Gemini spend/usage quota with the graceful-degrade behavior decided above.
+**Phase 22h — Per-tenant AI usage quota with graceful degrade — completed 2026-08-20. Phase 22 is now fully complete.** Implements the graceful-degrade behavior decided earlier this session (AI stops responding once quota is hit, widget shows a fixed message, conversation auto-flagged `needs_attention`, never a fabricated answer, never a silent failure).
+
+**Deliberately a token quota, not a tracked dollar figure** — the phase brief's own wording ("usage quota/spend limit") explicitly allows either framing, and hardcoding Gemini's per-token pricing (which varies by model and changes over time) would go stale and mislead; `lib/rag.ts` already measures tokens exactly, never estimated, via Phase 21's `ai_response_metrics`. New `lib/usage-limit.ts`'s `isWithinUsageQuota()` sums `input_tokens + output_tokens` from `ai_response_metrics` for the current UTC calendar month, compared against `AI_MONTHLY_TOKEN_LIMIT` (new optional env var, `lib/env.ts`/`.env.example`/`docs/security.md`, falling back to a built-in default of 2,000,000 tokens/business/month when unset — an operational tuning knob, not a variable whose absence should ever fail startup). Fails open (treats a metrics-read error as "within quota") — a metrics-read failure must never itself take down the chat widget.
+
+Checked at the very top of `askSalesEmployee()` (`lib/rag.ts`), before *any* Gemini call the turn would make — including the embedding call retrieval itself makes — not just before the final answer. Over-quota returns a new `USAGE_QUOTA_EXCEEDED_MESSAGE` constant with `escalate: true` and `escalationReason: "usage_quota_exceeded"`; `app/api/chat/route.ts`'s existing escalation handling (`flagConversationNeedsAttention` + `logEvent("chat_escalation_triggered", ...)`) picks this up with **zero new call sites** there. A new `ai_usage_quota_exceeded` log event (error level, so Sentry-forwarded per Phase 21's existing convention) fires at the check itself. No migration needed — reads an existing table via existing grants, no new schema surface.
+
+**Real live verification, this session, not just code review:** temporarily set `AI_MONTHLY_TOKEN_LIMIT=1` in `.env.local` (never committed — `.gitignore` confirmed), restarted the local dev server (briefly interrupting the user's own active `/dashboard` session running against it, confirmed from the restarted server's own request log — reconnected within seconds), and sent a real `/api/chat` request: the response was the exact `USAGE_QUOTA_EXCEEDED_MESSAGE` text, `escalate: true`, and a direct DB check confirmed `needs_attention: true` on the resulting conversation — proving the full degrade path end to end, not just the code path in isolation. Reverted `.env.local`, restarted the server again, and re-ran the full `npm run eval` suite (all 7 cases) to confirm normal behavior was fully restored.
+
+**Checks:** `npm run lint` — pass. `npm run typecheck` — pass. `npm run build` — pass.
+
+---
+
+## Phase 22 — complete (2026-08-20)
+
+All 8 sub-phases (22a–22h) built, checked, and CI/live-verified: legal pages, sensitive-action audit trail, widget consent gate, 24-month data retention job, tenant data export/cascade-delete, GDPR/DPDP request workflow doc, a real-Gemini AI eval suite (which caught and led to fixing a real staging→production promotion gap), and a per-tenant usage quota with graceful degrade. PRs #4–#6 merged to `main`; migrations for 22b–22e promoted to production and verified live. **Next phase: Phase 23 — Reliability & scale.** Not started.
 
 ---
 
