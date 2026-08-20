@@ -3,7 +3,13 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { listKnowledgeDocumentsForBusiness } from "@/lib/knowledge";
 import { DeleteButton } from "../_components/delete-button";
 import { KnowledgeForm } from "./knowledge-form";
-import { createKnowledgeDocumentAction, deleteKnowledgeDocumentAction } from "./actions";
+import { IngestionStatusPill } from "./_components/ingestion-status-pill";
+import { RetryIngestionButton } from "./_components/retry-ingestion-button";
+import {
+  createKnowledgeDocumentAction,
+  deleteKnowledgeDocumentAction,
+  retryIngestionAction,
+} from "./actions";
 
 export default async function KnowledgePage() {
   const { businessId } = await requireBusinessContext();
@@ -33,11 +39,17 @@ export default async function KnowledgePage() {
               key={document.id}
               className="group flex items-center justify-between gap-4 rounded-ds-lg border border-ds-border bg-ds-surface px-4 py-3 transition-colors hover:border-ds-border-strong hover:bg-ds-surface-elevated focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ds-accent"
             >
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <p className="truncate font-medium text-ds-text-primary">{document.title}</p>
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate font-medium text-ds-text-primary">{document.title}</p>
+                  <IngestionStatusPill status={document.ingestion_status} lastError={document.ingestion_last_error} />
+                </div>
                 <p className="line-clamp-2 text-sm text-ds-text-secondary">{document.content}</p>
               </div>
               <div className="flex shrink-0 items-center gap-4">
+                {document.ingestion_status === "failed" ? (
+                  <RetryIngestionButton action={retryIngestionAction} id={document.id} />
+                ) : null}
                 <Link
                   href={`/dashboard/knowledge/${document.id}/edit`}
                   className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"

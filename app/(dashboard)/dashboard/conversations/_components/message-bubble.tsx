@@ -26,7 +26,7 @@ export function MessageBubble({ message }: { message: Message }) {
     <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
       <div className={bubbleClassName}>{message.content}</div>
       <span className={`mt-1 text-2xs ${CAPTION_STYLE[message.role]}`}>
-        {CAPTION[message.role]} · {new Date(message.created_at).toLocaleString()}
+        {CAPTION[message.role]} · {new Date(message.created_at).toLocaleString("en-US")}
       </span>
     </div>
   );

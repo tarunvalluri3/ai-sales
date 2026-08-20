@@ -43,6 +43,8 @@ export type Faq = {
 
 export type KnowledgeSourceType = "manual" | "product" | "service" | "faq";
 
+export type IngestionStatus = "pending" | "processing" | "complete" | "failed";
+
 export type KnowledgeDocument = {
   id: string;
   business_id: string;
@@ -50,6 +52,11 @@ export type KnowledgeDocument = {
   source_id: string | null;
   title: string;
   content: string;
+  ingestion_status: IngestionStatus;
+  ingestion_attempts: number;
+  ingestion_last_error: string | null;
+  ingestion_next_attempt_at: string;
+  ingestion_updated_at: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -2,7 +2,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { KnowledgeSourceType } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
-import { regenerateChunksForDocument } from "@/lib/knowledge";
+import { enqueueIngestion } from "@/lib/knowledge";
 
 /**
  * Keeps a generated knowledge document (and its chunks) in sync with one
@@ -36,7 +36,7 @@ export async function syncGeneratedDocument(
     );
   }
 
-  await regenerateChunksForDocument(businessId, data.id, content);
+  await enqueueIngestion(supabase, businessId, data.id);
 }
 
 /**

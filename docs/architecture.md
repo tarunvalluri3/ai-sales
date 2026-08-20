@@ -1263,3 +1263,160 @@ linked (`supabase link`) to the target project. Not currently
 CI-portable without also setting up a `SUPABASE_ACCESS_TOKEN`-based
 non-interactive auth path -- no CI exists yet for this project, so this
 is a documented limitation, not something worked around.
+
+## Background knowledge ingestion queue (Phase 23)
+
+Knowledge embedding moved off the request path. `lib/knowledge.ts` /
+`lib/knowledge-sync.ts` still write a document's own row (title/content)
+synchronously -- fast, no external API call -- but chunking + the Gemini
+embedding call now happen in a background job, tracked entirely on
+`knowledge_documents` itself (`ingestion_status`/`ingestion_attempts`/
+`ingestion_last_error`/`ingestion_next_attempt_at`/`ingestion_updated_at`,
+migration `20260820220000`). No separate jobs table -- one document is
+one job, and its own row is the queue entry.
+
+**Claiming** is the one piece that must be atomic across possibly-concurrent
+callers: `public.claim_knowledge_ingestion_jobs(p_limit)` is a
+`security definer` function using `FOR UPDATE SKIP LOCKED` to atomically
+grab up to `p_limit` due (`status = 'pending'`, `next_attempt_at <= now()`)
+rows and flip them to `'processing'` in one statement -- `execute` is
+revoked from `anon`/`authenticated` (this project's standing
+per-function-grant discipline, STATE.md §8), only `service_role` can call
+it. **Processing** (`lib/ingestion-queue.ts`'s `processIngestionQueue`)
+then runs `regenerateChunksForDocument` (delete-then-reinsert, which is
+what makes re-running ingestion on the same document idempotent -- a
+second run produces the same chunk set, never duplicates) against each
+claimed row using the service-role client -- the queue has no Clerk
+session to key an authenticated client off of, and must be able to touch
+any business's document, not just one tenant's. This is a second
+legitimate use of `createServiceSupabaseClient()` alongside the public
+widget path (see that file's own doc comment).
+
+A failure schedules an exponential-backoff retry (1m/2m/4m/8m/16m,
+capped at 1h) and re-marks the row `'pending'` with a future
+`next_attempt_at`; past 5 attempts it's dead-lettered (`'failed'`,
+terminal) with the error message (text only, truncated, never a raw
+error object) recorded. The Knowledge page (`app/(dashboard)/dashboard/knowledge/page.tsx`)
+shows a status pill per document (Pending/Processing/Ready/Failed) and a
+Retry action on a dead-lettered document that re-enqueues it.
+
+**Two triggers, no dedicated worker process** (this app has none --
+Vercel serverless functions + Supabase only): every create/update Server
+Action calls `after(() => processIngestionQueue())` (`next/server`,
+Next 16) right after responding, so the common case processes within
+seconds without making the user's own request wait on a Gemini call.
+`app/api/cron/process-ingestion-queue/route.ts`, scheduled daily via
+`vercel.json`, is only the backstop for whatever the immediate trigger
+missed -- Vercel's Hobby plan (this project's tier) caps Cron Jobs at
+once a day, so the cron is deliberately not the primary path. The cron
+route checks `Authorization: Bearer $CRON_SECRET` against the
+`CRON_SECRET` env var (Vercel's own documented convention for signing
+cron-triggered requests) and fails closed (404) if the var is unset --
+so local dev, which has no cron, never accidentally exposes an open
+endpoint.
+
+**Verified live, not just reviewed:** a forced failure (temporarily
+invalid `GEMINI_API_KEY`) run against a document already at 4 prior
+attempts dead-lettered on the next attempt exactly as designed
+(`status: 'failed'`, `attempts: 5`, a real error message), was visible
+on the Knowledge page in a real authenticated browser session (Clerk
+sign-in-token flow, Playwright), and clicking Retry there took it back
+through `pending` and (once the real key was restored) to `'complete'`
+with a real chunk row. Re-running ingestion on the same document a
+second time produced the same single chunk, not two -- idempotency
+confirmed by direct count, not by inspection.
+
+## Safe response caching for low-variance questions (Phase 23)
+
+`lib/response-cache.ts` / `public.ai_response_cache` (migration
+`20260820220500`, service-role only, same zero-grant pattern as
+`ai_response_metrics`/`rate_limit_counters`) caches a real, previously
+-generated answer keyed by `(business_id, sha256(businessId + normalized
+question))`, 1-hour TTL, purged daily alongside the rate-limit-counter
+sweep (`20260820221000`).
+
+Eligibility is deliberately narrow (`shouldCacheResponse`) -- a turn is
+only ever cached, and only ever served from cache, when **all** of:
+first conversational turn, grounded (real retrieved knowledge was used),
+not escalating, and no *side-effecting* tool call this turn. A read-only
+tool call (`check_product_details`/`check_faq_topic`) does not disqualify
+caching -- excluding those would defeat the feature's own point, since
+FAQ-style lookups are exactly the low-variance case it targets. Only
+`request_callback` (the one tool that writes a `leads` row) disqualifies
+a turn, tracked via `askSalesEmployee()`'s own `calledSideEffectingTool`
+flag, not a blanket tool-call count. A cache hit skips retrieval and
+every Gemini call the turn would otherwise make entirely.
+
+**Important pre-existing behavior this depended on getting right, found
+during Phase 23's own live testing, not assumed:** `askSalesEmployee()`'s
+`history` parameter always includes the *current* turn's own
+just-persisted user message as its last element --
+`app/api/chat/route.ts` inserts the incoming message before fetching
+history, by design (so a human reviewing later sees every prospect
+message regardless of AI/human control state). A genuinely first
+conversational turn therefore has `history.length === 1`, not `0` --
+`lib/rag.ts`'s `isFirstTurn()` helper encodes this explicitly rather
+than repeating the off-by-one at each call site. (Note, out of this
+phase's scope: this same duplication means the current question is sent
+to Gemini twice per turn -- once as `history`'s last message, once via
+the prompt template's own `{question}` slot -- a pre-existing
+inefficiency this phase did not touch.)
+
+**Verified live:** two identical first-turn questions in separate
+conversations produced byte-identical answers, the second in ~2s versus
+~17s for the first (real Gemini call) -- confirmed via the
+`ai_response_cache_hit` log event and a direct row in
+`ai_response_cache`. The same question asked of a second business
+(Ghost Test Co.) did not receive Acme's cached answer (cross-tenant
+isolation holds, same `business_id`-scoped key as every other tenant
+-scoped read). A follow-up message in an existing multi-turn
+conversation, same question text, correctly bypassed the cache (~20s,
+real Gemini call, no cache-hit log line) -- proving the first-turn gate
+actually gates, not just that a hit is possible.
+
+## Operational-table cleanup and the HNSW re-check (Phase 23)
+
+`rate_limit_counters` (every window <=5 minutes) and `ai_response_cache`
+(TTL-bounded) both accumulate rows that are permanently worthless once
+stale -- `delete_expired_rate_limit_counters()`/
+`delete_expired_ai_response_cache()`, scheduled daily at 03:30/03:35 UTC
+(migration `20260820221000`), alongside the existing 03:00 conversation-
+retention sweep (Phase 22d). Both are functional pgTAP-tested
+(`017_operational_cleanup_functions.sql`), not just reviewed.
+
+`knowledge_chunks`' HNSW index question (deferred since Phase 7, last
+re-checked Phase 19b at 5 rows) was re-checked live again this phase:
+still exactly 5 rows across 1 business. No migration added -- nowhere
+near a volume where an index is justified. Re-check this again once real
+customer usage exists, not on a fixed schedule.
+
+## Concurrent-load testing (Phase 23)
+
+`scripts/run-load-test.mjs` (no new dependency, hand-rolled `fetch`,
+matching `run-evals.mjs`/`run-pgtap-tests.mjs`'s existing convention)
+fires N concurrent, independent conversations (distinct
+`conversationId`s, so this exercises real concurrent DB writes and real
+concurrent Gemini calls, not just concurrent HTTP connections) against a
+real widget key and reports success/error counts and latency
+percentiles. Deliberately stays under the IP-scope rate limit (30
+requests/5 minutes) by default -- its purpose is proving the widget path
+holds up *within* its designed limits, not re-proving the rate limiter
+itself (already covered live by Phase 18/21's burst tests).
+
+**Run this phase against local dev, real Gemini, real Supabase:** 8
+concurrent conversations, 8/8 succeeded, 0 failed. (p95 latency was high
+in this run -- expected on a single local dev Node process serializing
+work across 8 simultaneous Gemini calls; Vercel production runs each
+request as its own isolated serverless function, so this number is not
+representative of production concurrency behavior, only of correctness
+under it.)
+
+## Deferred: moving handoff polling to realtime/SSE/WebSockets (Phase 23)
+
+`docs/phases.md`'s Phase 23 scope explicitly conditions this on "once
+usage justifies it." Real usage remains test-business-only (this
+project has no paying customers yet) -- polling (Phase 15b, 3s
+dashboard / 6s widget) continues to be simple, already-load-tested (see
+above), and cheap at this volume. Revisit once real concurrent-handoff
+volume exists to justify the added complexity of a persistent-connection
+transport; not built this phase.
