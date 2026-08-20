@@ -18,8 +18,16 @@
   --widget-header-fg: #f3ede0;
   --widget-header-fg-muted: rgba(243, 237, 224, 0.6);
 
+  /*
+   * --widget-primary can be overridden per-business (Phase 25a widget
+   * branding, app/(widget)/widget/embed/_components/widget-app.tsx sets
+   * it as an inline style on its root wrapper from `businesses.widget_accent_color`).
+   * --widget-primary-hover derives from it via color-mix() rather than a
+   * second hardcoded hex, so a custom accent color gets a correct hover
+   * shade automatically instead of silently keeping the default lime's.
+   */
   --widget-primary: #d7f24e;
-  --widget-primary-hover: #e8ff5e;
+  --widget-primary-hover: color-mix(in srgb, var(--widget-primary) 88%, white);
   --widget-on-primary: #14130c;
 
   --widget-surface: #f3ede0;

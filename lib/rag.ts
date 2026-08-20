@@ -15,6 +15,8 @@ import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request
 import { logEvent } from "@/lib/logger";
 import { isWithinUsageQuota } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
+import type { WidgetLanguage } from "@/lib/supabase/types";
+import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -47,6 +49,37 @@ export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
 };
+
+/**
+ * Phase 24: the business profile fields an owner fills in on
+ * `/dashboard/profile` (Phase 13b), wired into the AI persona for the
+ * first time -- previously dashboard-display-only (see the Phase 13b
+ * migration comment this supersedes). Each field is optional; only the
+ * ones a business has actually filled in are interpolated into the
+ * prompt, never a blank/placeholder value.
+ */
+export type BusinessProfileContext = {
+  description: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  website: string | null;
+};
+
+/** Phase 25a: instructs the model to reply in the business's configured widget language. English is the default and needs no special instruction (the model already replies in the prospect's own language by default; being explicit for `en` would be redundant, not incorrect, but is skipped to keep the prompt minimal for the common case). */
+function formatLanguageInstruction(language: WidgetLanguage): string {
+  if (language === "en") return "";
+  return `\nAlways reply in ${WIDGET_LANGUAGE_NAMES_FOR_PROMPT[language]}, regardless of the language the prospect writes in.\n`;
+}
+
+/** Renders the optional business-profile fields as prompt lines, omitting anything the business hasn't filled in -- never a blank "Description: " line. */
+function formatBusinessProfileContext(profile: BusinessProfileContext): string {
+  const lines: string[] = [];
+  if (profile.description) lines.push(`Description: ${profile.description}`);
+  if (profile.website) lines.push(`Website: ${profile.website}`);
+  if (profile.contactEmail) lines.push(`Contact email: ${profile.contactEmail}`);
+  if (profile.contactPhone) lines.push(`Contact phone: ${profile.contactPhone}`);
+  return lines.length > 0 ? `\nBusiness profile:\n${lines.join("\n")}\n` : "";
+}
 
 export type SalesEmployeeResponse = {
   answer: string;
@@ -116,12 +149,13 @@ const SalesEmployeeResponseSchema = z.object({
 });
 
 const SYSTEM_TEMPLATE = `You are a sales employee of {businessName}. You represent only {businessName} to this prospect -- never any other business.
-
+{languageInstruction}
+{businessProfileContext}
 Reference context (retrieved business knowledge, relevant to the current question):
 {context}
 
 You have four kinds of information available to you:
-1. Business profile information: you work for {businessName}. This is always true.
+1. Business profile information: you work for {businessName}, and the business profile above (when shown) is real, business-provided information you may use.
 2. Retrieved business knowledge: the reference context above, pulled for this specific question.
 3. Conversation information: what the prospect has said earlier in this conversation, if shown to you.
 4. Unknown: anything not covered by 1-3.
@@ -190,8 +224,10 @@ export async function askSalesEmployee(
   businessId: string,
   conversationId: string,
   businessName: string,
+  businessProfile: BusinessProfileContext,
   question: string,
   history: ConversationMessage[] = [],
+  language: WidgetLanguage = "en",
 ): Promise<SalesEmployeeResponse> {
   // Phase 22h: checked before any Gemini call this turn would make,
   // including the embedding call retrieval itself makes -- a business
@@ -221,7 +257,7 @@ export async function askSalesEmployee(
   // last element (app/api/chat/route.ts inserts it before fetching
   // history), so a genuinely first-turn conversation has length 1, not 0.
   if (isFirstTurn(history)) {
-    const cached = await getCachedResponse(supabase, businessId, question);
+    const cached = await getCachedResponse(supabase, businessId, question, language);
     if (cached) {
       logEvent("ai_response_cache_hit", businessId, { conversationId });
       return {
@@ -268,6 +304,8 @@ export async function askSalesEmployee(
     const prompt = await buildPrompt().invoke({
       context,
       businessName,
+      languageInstruction: formatLanguageInstruction(language),
+      businessProfileContext: formatBusinessProfileContext(businessProfile),
       question,
       history: toLangchainHistory(history),
     });
@@ -354,7 +392,7 @@ export async function askSalesEmployee(
     };
 
     if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
-      await setCachedResponse(supabase, businessId, question, response);
+      await setCachedResponse(supabase, businessId, question, language, response);
     }
 
     return response;

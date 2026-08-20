@@ -2,19 +2,22 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import type { ChatMessage } from "../_lib/use-widget-chat";
+import type { WidgetStrings } from "@/lib/widget-i18n";
 import { EscalationBanner } from "./escalation-banner";
 
-const ERROR_COPY: Record<NonNullable<ChatMessage["errorKind"]>, string> = {
-  unauthorized: "This chat isn't available right now.",
-  rate_limited: "Too many messages — please wait a moment and try again.",
-  failure: "Something went wrong. Check your connection and try again.",
-};
+function errorCopy(strings: WidgetStrings, kind: NonNullable<ChatMessage["errorKind"]>): string {
+  if (kind === "unauthorized") return strings.errorUnauthorized;
+  if (kind === "rate_limited") return strings.errorRateLimited;
+  return strings.errorFailure;
+}
 
 export function MessageBubble({
   message,
+  strings,
   onRetry,
 }: {
   message: ChatMessage;
+  strings: WidgetStrings;
   onRetry: (id: string) => void;
 }) {
   const isUser = message.role === "user";
@@ -49,23 +52,25 @@ export function MessageBubble({
               strokeLinecap="round"
             />
           </svg>
-          Team member
+          {strings.teamMemberLabel}
         </span>
       ) : null}
       <div className={bubbleClass}>{message.content}</div>
       {message.status === "error" && message.errorKind ? (
         <div className="mt-1.5 flex items-center gap-2">
-          <span className="text-xs text-widget-error">{ERROR_COPY[message.errorKind]}</span>
+          <span className="text-xs text-widget-error">{errorCopy(strings, message.errorKind)}</span>
           <button
             type="button"
             onClick={() => onRetry(message.id)}
             className="text-xs font-medium text-widget-human-accent underline underline-offset-2 hover:text-widget-foreground"
           >
-            Retry
+            {strings.retryLabel}
           </button>
         </div>
       ) : null}
-      {message.role === "assistant" && message.escalate ? <EscalationBanner /> : null}
+      {message.role === "assistant" && message.escalate ? (
+        <EscalationBanner text={strings.escalationBannerText} />
+      ) : null}
     </motion.div>
   );
 }

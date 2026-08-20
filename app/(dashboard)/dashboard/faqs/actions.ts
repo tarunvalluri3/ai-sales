@@ -4,6 +4,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
+import { requireMinRole } from "@/lib/auth";
 import { createFaq, updateFaq, deleteFaq } from "@/lib/faqs";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -25,7 +26,11 @@ export async function createFaqAction(
   _prevState: FaqFormState,
   formData: FormData,
 ): Promise<FaqFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = faqFieldsSchema.safeParse({
     question: formData.get("question"),
@@ -49,7 +54,11 @@ export async function updateFaqAction(
   _prevState: FaqFormState,
   formData: FormData,
 ): Promise<FaqFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = updateFaqSchema.safeParse({
     id: formData.get("id"),
@@ -81,7 +90,11 @@ export async function deleteFaqAction(
   _prevState: FaqFormState,
   formData: FormData,
 ): Promise<FaqFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
   if (!parsed.success) {

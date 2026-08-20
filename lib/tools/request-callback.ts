@@ -1,9 +1,12 @@
 import "server-only";
 import { z } from "zod";
+import { after } from "next/server";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { normalizeEmail, normalizePhone } from "@/lib/schemas/lead";
 import { logEvent } from "@/lib/logger";
+import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
+import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -169,5 +172,22 @@ export async function executeRequestCallback(
   }
 
   logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "created" });
+
+  // Phase 24: outbound webhook on a new qualified lead -- every lead
+  // created via this tool starts 'warm' (QUALIFICATION_REASON above),
+  // so a fresh creation is always a qualifying event. Never fired on the
+  // update branch above (an existing lead getting a repeat callback
+  // request is not a *new* qualified lead).
+  await enqueueLeadQualifiedWebhooks(supabase, businessId, {
+    event: "lead.qualified",
+    leadId: inserted.id,
+    conversationId,
+    qualification: "warm",
+    contactEmail,
+    contactPhone,
+    createdAt: new Date().toISOString(),
+  });
+  after(() => processWebhookDeliveries());
+
   return { success: true, leadId: inserted.id, created: true };
 }

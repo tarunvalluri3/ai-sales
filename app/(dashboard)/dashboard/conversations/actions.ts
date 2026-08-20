@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
+import { requireMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   dismissConversationAttention,
@@ -10,6 +11,7 @@ import {
   setConversationControl,
 } from "@/lib/conversations";
 import { createMessage, listMessagesForConversationAfter } from "@/lib/messages";
+import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
@@ -35,7 +37,11 @@ export async function setConversationControlAction(
   _prevState: SetControlState,
   formData: FormData,
 ): Promise<SetControlState> {
-  const { businessId, userId } = await requireBusinessContext();
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:sales_agent");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = setControlSchema.safeParse({
     id: formData.get("id"),
@@ -90,7 +96,11 @@ export async function sendHumanReplyAction(
   _prevState: SendReplyState,
   formData: FormData,
 ): Promise<SendReplyState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:sales_agent");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = sendReplySchema.safeParse({
     conversationId: formData.get("conversationId"),
@@ -136,7 +146,11 @@ export async function dismissAttentionAction(
   _prevState: DismissAttentionState,
   formData: FormData,
 ): Promise<DismissAttentionState> {
-  const { businessId, userId } = await requireBusinessContext();
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:sales_agent");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = dismissAttentionSchema.safeParse({
     conversationId: formData.get("conversationId"),
@@ -231,4 +245,25 @@ export async function pollConversationAction(
   const asOf = messages.length > 0 ? messages[messages.length - 1].created_at : after;
 
   return { messages, control: conversation.control, needsAttention: conversation.needs_attention, asOf };
+}
+
+const chunkIdSchema = z.string().uuid();
+
+/**
+ * Loads citation details (chunk content + parent document title) for the
+ * "Sources" expander on an assistant message (Phase 24). Called on
+ * demand from the client, not preloaded for every message in the
+ * transcript -- most messages are never expanded. `businessId` scoping
+ * happens inside getCitationDetails(); an ID belonging to another
+ * business simply resolves to nothing.
+ */
+export async function getCitationDetailsAction(chunkIds: string[]): Promise<CitedChunk[]> {
+  const { businessId } = await requireBusinessContext();
+
+  const parsed = z.array(chunkIdSchema).max(10).safeParse(chunkIds);
+  if (!parsed.success) {
+    return [];
+  }
+
+  return getCitationDetails(businessId, parsed.data);
 }

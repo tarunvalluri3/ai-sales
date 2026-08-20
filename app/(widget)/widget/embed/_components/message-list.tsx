@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { AnimatePresence } from "motion/react";
 import type { ChatMessage } from "../_lib/use-widget-chat";
+import type { WidgetStrings } from "@/lib/widget-i18n";
 import { MessageBubble } from "./message-bubble";
 import { TypingIndicator } from "./typing-indicator";
 
@@ -10,10 +11,14 @@ const NEAR_BOTTOM_THRESHOLD_PX = 80;
 
 export function MessageList({
   messages,
+  greeting,
+  strings,
   isAwaitingResponse,
   onRetry,
 }: {
   messages: ChatMessage[];
+  greeting: string;
+  strings: WidgetStrings;
   isAwaitingResponse: boolean;
   onRetry: (id: string) => void;
 }) {
@@ -45,11 +50,11 @@ export function MessageList({
     >
       {messages.length === 0 ? (
         <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground">
-          Hi! Ask me anything and I&apos;ll do my best to help.
+          {greeting}
         </div>
       ) : null}
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} onRetry={onRetry} />
+        <MessageBubble key={message.id} message={message} strings={strings} onRetry={onRetry} />
       ))}
       <AnimatePresence>{isAwaitingResponse ? <TypingIndicator /> : null}</AnimatePresence>
     </div>

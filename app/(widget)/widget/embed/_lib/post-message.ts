@@ -68,11 +68,24 @@ export type WidgetPollResultMessage = {
   messages: { id: string; role: "assistant" | "human_agent"; content: string }[];
 };
 
+/**
+ * Sent by the loader to this iframe once, right after it fetches
+ * /api/chat/restore for a conversationId found in localStorage (Phase
+ * 25a) -- unlike widget:poll_result, this carries the full transcript
+ * including the prospect's own prior 'user' messages, since there is no
+ * existing local state to diff against yet.
+ */
+export type WidgetRestoreMessage = {
+  type: "widget:restore";
+  messages: { id: string; role: "user" | "assistant" | "human_agent"; content: string }[];
+};
+
 export type FromParentMessage =
   | WidgetViewportMessage
   | WidgetResponseMessage
   | WidgetErrorMessage
-  | WidgetPollResultMessage;
+  | WidgetPollResultMessage
+  | WidgetRestoreMessage;
 export type ToParentMessage = WidgetResizeMessage | WidgetSendMessage | WidgetPanelOpenMessage;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -122,6 +135,18 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
             typeof message.content === "string",
         );
         return { type: "widget:poll_result", messages };
+      }
+      return null;
+    case "widget:restore":
+      if (Array.isArray(data.messages)) {
+        const messages = data.messages.filter(
+          (message): message is WidgetRestoreMessage["messages"][number] =>
+            isPlainObject(message) &&
+            typeof message.id === "string" &&
+            (message.role === "user" || message.role === "assistant" || message.role === "human_agent") &&
+            typeof message.content === "string",
+        );
+        return { type: "widget:restore", messages };
       }
       return null;
     default:

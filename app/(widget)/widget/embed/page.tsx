@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import { createServiceSupabaseClient } from "@/lib/supabase/service";
+import { resolveBusinessBrandingFromWidgetKey } from "@/lib/widget-auth";
+import { isWithinBusinessHours } from "@/lib/business-hours";
+import { getWidgetStrings } from "@/lib/widget-i18n";
 import { WidgetApp } from "./_components/widget-app";
 
 /**
@@ -21,5 +25,27 @@ export default async function WidgetEmbedPage({
     return null;
   }
 
-  return <WidgetApp />;
+  const branding = await resolveBusinessBrandingFromWidgetKey(key);
+  if (!branding) {
+    return null;
+  }
+
+  const strings = getWidgetStrings(branding.language);
+  const supabase = createServiceSupabaseClient();
+  const isOpenNow = await isWithinBusinessHours(supabase, branding.businessId);
+  const greeting = isOpenNow
+    ? branding.welcomeText ?? strings.defaultGreetingOpen
+    : branding.welcomeTextClosed ?? strings.defaultGreetingClosed;
+
+  return (
+    <WidgetApp
+      businessName={branding.businessName}
+      language={branding.language}
+      strings={strings}
+      greeting={greeting}
+      accentColor={branding.accentColor}
+      logoUrl={branding.logoUrl}
+      ctaText={branding.ctaText ?? strings.defaultCta}
+    />
+  );
 }

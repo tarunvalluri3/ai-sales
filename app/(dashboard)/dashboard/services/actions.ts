@@ -4,6 +4,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
+import { requireMinRole } from "@/lib/auth";
 import { createService, updateService, deleteService } from "@/lib/services";
 import {
   catalogNameSchema,
@@ -31,7 +32,11 @@ export async function createServiceAction(
   _prevState: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = serviceFieldsSchema.safeParse({
     name: formData.get("name"),
@@ -56,7 +61,11 @@ export async function updateServiceAction(
   _prevState: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = updateServiceSchema.safeParse({
     id: formData.get("id"),
@@ -89,7 +98,11 @@ export async function deleteServiceAction(
   _prevState: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
   if (!parsed.success) {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORTED_WIDGET_LANGUAGES } from "@/lib/widget-i18n";
 
 /**
  * Shared Zod fields for the business profile (Phase 13b). `name` is
@@ -50,3 +51,59 @@ export const businessProfileSchema = z.object({
 });
 
 export type BusinessProfileInput = z.infer<typeof businessProfileSchema>;
+
+/**
+ * Widget branding (Phase 25a) -- all optional/nullable, matching the
+ * business-profile fields' "blank means unset, falls back to a default"
+ * convention. `accentColor` must be a 6-digit hex or blank (the widget
+ * embed page applies it as a raw CSS custom property -- see
+ * app/(widget)/widget.css -- so it must never contain anything but a
+ * validated color literal).
+ */
+const optionalTrimmedNullable = z
+  .string()
+  .optional()
+  .transform((value) => value?.trim() ?? "")
+  .transform((value) => (value === "" ? null : value));
+
+export const widgetAccentColorSchema = optionalTrimmedNullable.pipe(
+  z
+    .string()
+    .nullable()
+    .refine((value) => value === null || /^#[0-9a-fA-F]{6}$/.test(value), {
+      message: "Enter a 6-digit hex color, e.g. #d7f24e.",
+    }),
+);
+
+export const widgetLogoUrlSchema = optionalTrimmedNullable.pipe(
+  z
+    .string()
+    .nullable()
+    .refine((value) => value === null || z.string().url().safeParse(value).success, {
+      message: "Enter a valid logo image URL.",
+    }),
+);
+
+export const widgetWelcomeTextSchema = optionalTrimmedNullable.pipe(
+  z.string().max(280, "Welcome text must be 280 characters or fewer.").nullable(),
+);
+
+export const widgetCtaTextSchema = optionalTrimmedNullable.pipe(
+  z.string().max(60, "CTA text must be 60 characters or fewer.").nullable(),
+);
+
+export const widgetPositionSchema = z.enum(["bottom-right", "bottom-left"]);
+
+export const widgetLanguageSchema = z.enum(SUPPORTED_WIDGET_LANGUAGES);
+
+export const widgetBrandingSchema = z.object({
+  accentColor: widgetAccentColorSchema,
+  logoUrl: widgetLogoUrlSchema,
+  welcomeText: widgetWelcomeTextSchema,
+  welcomeTextClosed: widgetWelcomeTextSchema,
+  ctaText: widgetCtaTextSchema,
+  position: widgetPositionSchema,
+  language: widgetLanguageSchema,
+});
+
+export type WidgetBrandingInput = z.infer<typeof widgetBrandingSchema>;

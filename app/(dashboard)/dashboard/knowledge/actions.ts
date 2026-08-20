@@ -5,17 +5,22 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireBusinessContext } from "@/lib/business-context";
+import { requireMinRole } from "@/lib/auth";
 import {
   createKnowledgeDocument,
   updateKnowledgeDocument,
   deleteKnowledgeDocument,
   enqueueIngestion,
+  publishKnowledgeDocument,
+  unpublishKnowledgeDocument,
 } from "@/lib/knowledge";
 import { knowledgeTitleSchema, knowledgeContentSchema } from "@/lib/schemas/knowledge";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createFileKnowledgeDocument } from "@/lib/file-ingestion";
+import { createUrlKnowledgeDocument, refreshUrlKnowledgeDocument } from "@/lib/url-ingestion";
 
 /**
  * Kicks the background ingestion queue right after this request finishes
@@ -47,7 +52,11 @@ export async function createKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = knowledgeFieldsSchema.safeParse({
     title: formData.get("title"),
@@ -72,7 +81,11 @@ export async function updateKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = updateKnowledgeSchema.safeParse({
     id: formData.get("id"),
@@ -105,7 +118,11 @@ export async function deleteKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
-  const { businessId, userId } = await requireBusinessContext();
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
   if (!parsed.success) {
@@ -129,6 +146,169 @@ export async function deleteKnowledgeDocumentAction(
   return { success: true };
 }
 
+export async function createFileKnowledgeDocumentAction(
+  _prevState: KnowledgeFormState,
+  formData: FormData,
+): Promise<KnowledgeFormState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: "Choose a file to upload." };
+  }
+
+  try {
+    await createFileKnowledgeDocument(businessId, file);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  triggerIngestionProcessing();
+  revalidatePath("/dashboard/knowledge");
+  return { success: true };
+}
+
+const urlFieldsSchema = z.object({
+  url: z.string().trim().url("Enter a valid URL, e.g. https://example.com/page"),
+  title: knowledgeTitleSchema,
+  refreshIntervalHours: z.coerce.number().int().min(1).max(24 * 30).nullable(),
+});
+
+export async function createUrlKnowledgeDocumentAction(
+  _prevState: KnowledgeFormState,
+  formData: FormData,
+): Promise<KnowledgeFormState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const rawInterval = formData.get("refreshIntervalHours");
+  const parsed = urlFieldsSchema.safeParse({
+    url: formData.get("url"),
+    title: formData.get("title"),
+    refreshIntervalHours: rawInterval && rawInterval !== "" ? rawInterval : null,
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Enter a valid URL and title." };
+  }
+
+  try {
+    await createUrlKnowledgeDocument(businessId, parsed.data.url, parsed.data.title, parsed.data.refreshIntervalHours);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  triggerIngestionProcessing();
+  revalidatePath("/dashboard/knowledge");
+  return { success: true };
+}
+
+export async function refreshUrlKnowledgeDocumentAction(
+  _prevState: KnowledgeFormState,
+  formData: FormData,
+): Promise<KnowledgeFormState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid knowledge document." };
+  }
+
+  let refreshed: boolean;
+  try {
+    refreshed = await refreshUrlKnowledgeDocument(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!refreshed) {
+    return { error: "This knowledge document no longer exists." };
+  }
+
+  triggerIngestionProcessing();
+  revalidatePath("/dashboard/knowledge");
+  return { success: true };
+}
+
+export type PublishState = {
+  error?: string;
+  success?: boolean;
+};
+
+export async function publishKnowledgeDocumentAction(
+  _prevState: PublishState,
+  formData: FormData,
+): Promise<PublishState> {
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid knowledge document." };
+  }
+
+  let published: boolean;
+  try {
+    published = await publishKnowledgeDocument(businessId, parsed.data.id, userId);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!published) {
+    return { error: "This knowledge document no longer exists." };
+  }
+
+  await recordAuditLogEntry(businessId, userId, "knowledge.published", "knowledge_document", parsed.data.id);
+
+  revalidatePath("/dashboard/knowledge");
+  return { success: true };
+}
+
+export async function unpublishKnowledgeDocumentAction(
+  _prevState: PublishState,
+  formData: FormData,
+): Promise<PublishState> {
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid knowledge document." };
+  }
+
+  let unpublished: boolean;
+  try {
+    unpublished = await unpublishKnowledgeDocument(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!unpublished) {
+    return { error: "This knowledge document is not currently published." };
+  }
+
+  await recordAuditLogEntry(businessId, userId, "knowledge.unpublished", "knowledge_document", parsed.data.id);
+
+  revalidatePath("/dashboard/knowledge");
+  return { success: true };
+}
+
 export type RetryIngestionState = {
   error?: string;
   success?: boolean;
@@ -146,7 +326,11 @@ export async function retryIngestionAction(
   _prevState: RetryIngestionState,
   formData: FormData,
 ): Promise<RetryIngestionState> {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
 
   const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
   if (!parsed.success) {

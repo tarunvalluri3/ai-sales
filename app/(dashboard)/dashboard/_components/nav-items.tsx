@@ -159,6 +159,29 @@ function AuditLogIcon(props: IconProps) {
   );
 }
 
+function WebhooksIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M7 13.5a3.5 3.5 0 1 1 2.9-5.5M13 6.5a3.5 3.5 0 1 1-2.9 5.5M10 4v2m0 8v2m5.2-9.2-1.4 1.4M6.2 13.8l-1.4 1.4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BusinessHoursIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 6v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export type NavItem = {
   label: string;
   href: string;
@@ -176,6 +199,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Leads", href: "/dashboard/leads", icon: LeadsIcon },
   { label: "Analytics", href: "/dashboard/analytics", icon: AnalyticsIcon },
   { label: "Widget Settings", href: "/dashboard/widget-settings", icon: WidgetIcon },
+  { label: "Webhooks", href: "/dashboard/webhooks", icon: WebhooksIcon },
+  { label: "Business Hours", href: "/dashboard/business-hours", icon: BusinessHoursIcon },
   { label: "Audit Log", href: "/dashboard/audit-log", icon: AuditLogIcon },
 ];
 

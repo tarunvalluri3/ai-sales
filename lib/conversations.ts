@@ -2,6 +2,7 @@ import "server-only";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Conversation, ConversationControl } from "@/lib/supabase/types";
 import { AppError, logAndGetUserMessage } from "@/lib/errors";
+import { assignNextTeamMember } from "@/lib/team-assignment";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -259,15 +260,40 @@ export async function recordConversationConsent(
  * prompts/phase-15a-handoff-state-and-ai-pause.md's "Decisions and
  * assumptions" #1. A failure here must not fail the prospect's request,
  * so this logs rather than throws.
+ *
+ * Phase 24: also stamps `attention_flagged_at` (the SLA clock's start,
+ * only ever set once -- a conversation that flags again while already
+ * flagged keeps its original timestamp) and round-robin assigns a team
+ * member if none is assigned yet (`clerkOrgId` needed only for this;
+ * `getConversationForBusiness` doesn't otherwise need Clerk at all).
+ * Assignment is a "who's notified first" pointer, not exclusive --
+ * fetches the conversation first since Postgres has no
+ * "set to now() only if null" via a plain update.
  */
 export async function flagConversationNeedsAttention(
   supabase: SupabaseClient,
   businessId: string,
   conversationId: string,
+  clerkOrgId: string,
 ): Promise<void> {
+  const { data: existing } = await supabase
+    .from("conversations")
+    .select("attention_flagged_at, assigned_to_user_id")
+    .eq("business_id", businessId)
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  const update: Record<string, unknown> = { needs_attention: true };
+  if (!existing?.attention_flagged_at) {
+    update.attention_flagged_at = new Date().toISOString();
+  }
+  if (!existing?.assigned_to_user_id) {
+    update.assigned_to_user_id = await assignNextTeamMember(businessId, clerkOrgId);
+  }
+
   const { error } = await supabase
     .from("conversations")
-    .update({ needs_attention: true })
+    .update(update)
     .eq("business_id", businessId)
     .eq("id", conversationId);
 

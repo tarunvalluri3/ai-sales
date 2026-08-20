@@ -77,9 +77,44 @@
 
   document.body.appendChild(iframe);
 
+  // Phase 25a: "widget conversation restored from the database on page
+  // refresh instead of resetting." localStorage is scoped to this
+  // widget key, on the HOST page's own origin (this loader, unlike the
+  // iframe, runs there) -- a returning visitor on the same device/browser
+  // resumes their conversation; a different device/browser starts fresh,
+  // same as any other localStorage-backed session.
+  var STORAGE_KEY = "ai_sales_widget_conversation:" + widgetKey;
+
+  function readStoredConversationId() {
+    try {
+      return window.localStorage.getItem(STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function storeConversationId(id) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      // Storage unavailable (private browsing, disabled storage, etc.) --
+      // the conversation just won't survive a refresh this session.
+    }
+  }
+
+  function clearStoredConversationId() {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Nothing to clean up if storage was never reachable.
+    }
+  }
+
   // Owned by this loader, not the iframe -- it persists across the whole
   // conversation because this loader is what makes every /api/chat call.
-  var conversationId = null;
+  // Seeded from localStorage so a page refresh can resume the same
+  // conversation instead of silently starting a new one.
+  var conversationId = readStoredConversationId();
 
   // Phase 15b polling state -- all owned by this loader, since it's the
   // only script that can make an authorized (real-Origin-header) request.
@@ -209,7 +244,75 @@
     );
   }
 
-  iframe.addEventListener("load", postViewport);
+  // Restore coordination: the /api/chat/restore fetch below and the
+  // iframe's own "load" event race independently -- either can finish
+  // first. The restore message is only postable once the iframe has
+  // actually loaded (its React tree needs to be mounted to receive it),
+  // so whichever finishes second is what actually sends it.
+  var iframeLoaded = false;
+  var pendingRestoreMessages = null;
+
+  function tryPostRestore() {
+    if (!iframeLoaded || !pendingRestoreMessages) return;
+    iframe.contentWindow.postMessage(
+      { type: "widget:restore", messages: pendingRestoreMessages },
+      appOrigin,
+    );
+    pendingRestoreMessages = null;
+  }
+
+  iframe.addEventListener("load", function () {
+    iframeLoaded = true;
+    postViewport();
+    tryPostRestore();
+  });
+
+  if (conversationId) {
+    fetch(appOrigin + "/api/chat/restore", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ widgetKey: widgetKey, conversationId: conversationId }),
+    })
+      .then(function (response) {
+        return response.json().then(
+          function (body) {
+            return { ok: response.ok, body: body };
+          },
+          function () {
+            return { ok: response.ok, body: null };
+          },
+        );
+      })
+      .then(function (result) {
+        if (!result.ok || !result.body || !result.body.ok) {
+          // The stored conversation no longer resolves (deleted,
+          // expired, cross-tenant after a key rotation, etc.) -- clear
+          // it so the next page load starts a genuinely fresh
+          // conversation instead of retrying the same dead id forever.
+          conversationId = null;
+          clearStoredConversationId();
+          return;
+        }
+
+        var data = result.body.data;
+        if (data.asOf) lastKnownMessageAt = data.asOf;
+        if (data.control === "human") hasHandoffSignal = true;
+        for (var i = 0; i < data.messages.length; i++) {
+          if (data.messages[i].role !== "user") {
+            knownMessageIds[data.messages[i].id] = true;
+          }
+        }
+        if (data.messages.length > 0) {
+          pendingRestoreMessages = data.messages;
+          tryPostRestore();
+        }
+      })
+      .catch(function () {
+        // A network failure here is invisible to the prospect -- the
+        // stored conversationId is left in place, so the next page load
+        // (or the first real send, which still carries it) tries again.
+      });
+  }
 
   var viewportThrottle = null;
   window.addEventListener("resize", function () {
@@ -242,6 +345,7 @@
 
       if (response.ok && body && body.ok) {
         conversationId = body.data.conversationId;
+        storeConversationId(conversationId);
         if (body.data.asOf) lastKnownMessageAt = body.data.asOf;
         if (body.data.escalate || body.data.control === "human") {
           hasHandoffSignal = true;

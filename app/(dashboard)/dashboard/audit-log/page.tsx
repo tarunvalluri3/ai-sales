@@ -7,6 +7,15 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "conversation.control_changed": "Conversation control changed",
   "conversation.attention_dismissed": "Attention dismissed",
   "knowledge.deleted": "Knowledge document deleted",
+  "knowledge.published": "Knowledge document published",
+  "knowledge.unpublished": "Knowledge document unpublished",
+  "widget_key.created": "Widget key created",
+  "widget_key.origins_updated": "Widget key origins updated",
+  "widget_key.revoked": "Widget key revoked",
+  "webhook_endpoint.created": "Webhook endpoint created",
+  "webhook_endpoint.deleted": "Webhook endpoint deleted",
+  "business_hours.updated": "Business hours updated",
+  "widget_branding.updated": "Widget branding updated",
 };
 
 export default async function AuditLogPage() {
@@ -18,8 +27,8 @@ export default async function AuditLogPage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-ds-text-primary">Audit Log</h1>
         <p className="text-sm text-ds-text-secondary">
-          A record of sensitive actions taken by your team -- conversation takeovers, attention
-          dismissals, and knowledge deletions. Most recent {entries.length} shown.
+          A record of sensitive actions taken by your team -- conversation takeovers, knowledge
+          and widget key changes, and more. Most recent {entries.length} shown.
         </p>
       </div>
 

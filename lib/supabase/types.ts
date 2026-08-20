@@ -6,10 +6,41 @@ export type Business = {
   contact_email: string | null;
   contact_phone: string | null;
   website: string | null;
-  widget_key: string;
-  widget_allowed_origin: string | null;
+  timezone: string;
+  sla_minutes: number | null;
+  next_assignment_cursor: number;
+  widget_accent_color: string | null;
+  widget_logo_url: string | null;
+  widget_welcome_text: string | null;
+  widget_welcome_text_closed: string | null;
+  widget_cta_text: string | null;
+  widget_position: WidgetPosition;
+  widget_language: WidgetLanguage;
   created_at: string;
   updated_at: string;
+};
+
+export type WidgetPosition = "bottom-right" | "bottom-left";
+export type WidgetLanguage = "en" | "es" | "fr" | "de" | "pt" | "hi";
+
+export type BusinessHours = {
+  business_id: string;
+  day_of_week: number;
+  is_open: boolean;
+  start_time: string | null;
+  end_time: string | null;
+};
+
+export type WidgetKeyStatus = "active" | "revoked";
+
+export type WidgetKey = {
+  id: string;
+  business_id: string;
+  key: string;
+  allowed_origins: string[];
+  status: WidgetKeyStatus;
+  created_at: string;
+  revoked_at: string | null;
 };
 
 export type Product = {
@@ -41,9 +72,11 @@ export type Faq = {
   updated_at: string;
 };
 
-export type KnowledgeSourceType = "manual" | "product" | "service" | "faq";
+export type KnowledgeSourceType = "manual" | "product" | "service" | "faq" | "file" | "url";
 
 export type IngestionStatus = "pending" | "processing" | "complete" | "failed";
+
+export type KnowledgeDocumentStatus = "draft" | "published";
 
 export type KnowledgeDocument = {
   id: string;
@@ -57,8 +90,26 @@ export type KnowledgeDocument = {
   ingestion_last_error: string | null;
   ingestion_next_attempt_at: string;
   ingestion_updated_at: string | null;
+  status: KnowledgeDocumentStatus;
+  version: number;
+  published_at: string | null;
+  source_url: string | null;
+  storage_path: string | null;
+  refresh_interval_hours: number | null;
+  last_refreshed_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type KnowledgeDocumentVersion = {
+  id: string;
+  document_id: string;
+  business_id: string;
+  version: number;
+  title: string;
+  content: string;
+  published_by: string;
+  published_at: string;
 };
 
 export type KnowledgeChunk = {
@@ -82,6 +133,8 @@ export type Conversation = {
   needs_attention: boolean;
   consent_given: boolean;
   consent_given_at: string | null;
+  assigned_to_user_id: string | null;
+  attention_flagged_at: string | null;
   created_at: string;
 };
 
@@ -93,6 +146,7 @@ export type Message = {
   conversation_id: string;
   role: MessageRole;
   content: string;
+  source_chunk_ids: string[];
   created_at: string;
 };
 
@@ -119,10 +173,30 @@ export type Lead = {
   updated_at: string;
 };
 
+export type WebhookEndpointStatus = "active" | "disabled";
+
+export type WebhookEndpoint = {
+  id: string;
+  business_id: string;
+  url: string;
+  secret: string;
+  status: WebhookEndpointStatus;
+  created_at: string;
+};
+
 export type AuditLogAction =
   | "conversation.control_changed"
   | "conversation.attention_dismissed"
-  | "knowledge.deleted";
+  | "knowledge.deleted"
+  | "knowledge.published"
+  | "knowledge.unpublished"
+  | "widget_key.created"
+  | "widget_key.origins_updated"
+  | "widget_key.revoked"
+  | "webhook_endpoint.created"
+  | "webhook_endpoint.deleted"
+  | "business_hours.updated"
+  | "widget_branding.updated";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 
