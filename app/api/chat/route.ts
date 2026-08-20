@@ -55,7 +55,27 @@ const bodySchema = z.object({
   conversationId: z.string().uuid().optional(),
   message: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
   consentGiven: z.boolean().optional(),
+  pageUrl: z.string().max(2048).optional(),
 });
+
+/**
+ * Phase 25b "source/page attribution": reduces an arbitrary client-supplied
+ * URL to origin + pathname only, dropping the query string and fragment
+ * (which can carry tracking tokens or other data this app has no reason
+ * to store) and capping length -- defense in depth even though
+ * public/widget-loader.js already sends a pre-stripped value. Returns
+ * `null` for anything that doesn't parse as a URL, never throws.
+ */
+function sanitizeSourceUrl(rawUrl: string | undefined): string | null {
+  if (!rawUrl) return null;
+  try {
+    const url = new URL(rawUrl);
+    const stripped = `${url.origin}${url.pathname}`;
+    return stripped.slice(0, 500);
+  } catch {
+    return null;
+  }
+}
 
 export async function OPTIONS() {
   return withCors(new Response(null, { status: 204 }));
@@ -74,7 +94,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId, message, consentGiven } = parsed.data;
+  const { widgetKey, conversationId, message, consentGiven, pageUrl } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
 
@@ -113,7 +133,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!conversation) {
-      conversation = await createConversation(supabase, business.businessId, "chat_widget");
+      conversation = await createConversation(supabase, business.businessId, "chat_widget", sanitizeSourceUrl(pageUrl));
     }
 
     const conversationAllowed = await checkAndIncrementRateLimit(
@@ -187,7 +207,22 @@ export async function POST(request: NextRequest) {
       "assistant",
       response.answer,
       response.sourceChunkIds,
+      response.grounded,
     );
+
+    // Phase 25b "top unanswered questions": only a genuine knowledge gap
+    // (ungrounded, and not already escalated -- an escalated turn is
+    // already flagged for staff attention, so logging it here too would
+    // just double-count the same gap under a different metric). A
+    // failure here must never fail the prospect's real response.
+    if (!response.grounded && !response.escalate) {
+      const { error: unansweredError } = await supabase
+        .from("unanswered_questions")
+        .insert({ business_id: business.businessId, conversation_id: conversation.id, question: message });
+      if (unansweredError) {
+        logEvent("unanswered_question_log_failed", business.businessId, { conversationId: conversation.id }, "error");
+      }
+    }
 
     if (response.escalate) {
       // Flags the conversation for dashboard attention -- deliberately

@@ -100,6 +100,8 @@ Core set:
 | `SENTRY_AUTH_TOKEN` | **no — build-time only, org:ci scope** |
 | `AI_MONTHLY_TOKEN_LIMIT` | config |
 | `CRON_SECRET` | **no** |
+| `RESEND_API_KEY` | **no** |
+| `NOTIFICATION_EMAIL_FROM` | config |
 
 Add a variable only when a feature actually requires it. Razorpay and WhatsApp variables are deferred to their phases. Keep the live list in `STATE.md` §5 in sync.
 
@@ -108,6 +110,8 @@ Add a variable only when a feature actually requires it. Razorpay and WhatsApp v
 `AI_MONTHLY_TOKEN_LIMIT` (Phase 22h) is optional in `lib/env.ts`'s schema (present, but `.optional()`) — a missing value falls back to a built-in default in `lib/usage-limit.ts` rather than failing startup, since this is a tunable operational knob, not a variable whose absence should ever break the app.
 
 `CRON_SECRET` (Phase 23) is also optional in `lib/env.ts`'s schema, but for the opposite reason: its absence should degrade safely (the cron route refuses every request, 404, rather than either failing startup or accepting unauthenticated calls) since local dev has no Vercel Cron and ingestion still works there via the immediate `after()` trigger.
+
+`RESEND_API_KEY`/`NOTIFICATION_EMAIL_FROM` (Phase 25b) are optional -- `lib/notifications.ts`'s daily digest silently no-ops (one log line) rather than failing startup or the cron route when unset, since email delivery is a nice-to-have on top of the in-app "needs attention" badge/audit trail, not a path anything else depends on.
 
 Supabase key names above reflect the current `publishable`/`secret` key system (Phase 3), not the legacy `anon`/`service_role` naming, which Supabase is deprecating by end of 2026.
 
