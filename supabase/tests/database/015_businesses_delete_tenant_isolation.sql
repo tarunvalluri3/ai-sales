@@ -32,11 +32,8 @@ select set_config(
   true
 );
 
-insert into _tap_results select is(
-  (with deleted as (
-    delete from public.businesses where id = '00000000-0000-0000-0000-00000000000b' returning id
-  ) select count(*)::int from deleted),
-  0,
+insert into _tap_results select is_empty(
+  $$ delete from public.businesses where id = '00000000-0000-0000-0000-00000000000b' returning id $$,
   'org_a session''s delete of org_b''s business row affects zero rows (RLS-filtered, not an error)'
 );
 
