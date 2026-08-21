@@ -42,35 +42,41 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKey }) {
           Origins at time of revocation: {widgetKey.allowed_origins.join(", ") || "none"}
         </p>
       ) : (
-        <form action={updateAction} className="flex flex-col gap-2">
-          <input type="hidden" name="id" value={widgetKey.id} />
-          <label
-            htmlFor={`origins-${widgetKey.id}`}
-            className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds"
-          >
-            Allowed origins (one per line)
-          </label>
-          <textarea
-            id={`origins-${widgetKey.id}`}
-            name="origins"
-            rows={2}
-            value={origins}
-            onChange={(event) => setOrigins(event.target.value)}
-            disabled={updatePending}
-            placeholder="https://example.com"
-            className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
-          />
-          {updateState.error ? (
-            <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
-              {updateState.error}
-            </p>
-          ) : null}
-          {updateState.success ? (
-            <p className="rounded-ds-sm bg-ds-success-bg px-3 py-2 text-xs text-ds-success">Saved.</p>
-          ) : null}
+        <div className="flex flex-col gap-2">
+          <form id={`update-origins-${widgetKey.id}`} action={updateAction} className="flex flex-col gap-2">
+            <input type="hidden" name="id" value={widgetKey.id} />
+            <label
+              htmlFor={`origins-${widgetKey.id}`}
+              className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds"
+            >
+              Allowed origins (one per line)
+            </label>
+            <textarea
+              id={`origins-${widgetKey.id}`}
+              name="origins"
+              rows={2}
+              value={origins}
+              onChange={(event) => setOrigins(event.target.value)}
+              disabled={updatePending}
+              placeholder="https://example.com"
+              className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+            />
+            {updateState.error ? (
+              <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+                {updateState.error}
+              </p>
+            ) : null}
+            {updateState.success ? (
+              <p className="rounded-ds-sm bg-ds-success-bg px-3 py-2 text-xs text-ds-success">Saved.</p>
+            ) : null}
+          </form>
+          {/* Two sibling <form>s, not nested (HTML forbids a <form> inside a
+             <form>) -- the save button uses the HTML5 `form` attribute to
+             submit the origins form above it despite living outside it. */}
           <div className="flex items-center gap-3">
             <button
               type="submit"
+              form={`update-origins-${widgetKey.id}`}
               disabled={updatePending}
               className="self-start rounded-ds-md bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
             >
@@ -93,7 +99,7 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKey }) {
               {revokeState.error}
             </p>
           ) : null}
-        </form>
+        </div>
       )}
     </div>
   );
