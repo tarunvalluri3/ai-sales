@@ -48,5 +48,5 @@ export async function createBusiness(
     return { error: errorMessage };
   }
 
-  redirect("/dashboard");
+  redirect("/onboarding/test");
 }

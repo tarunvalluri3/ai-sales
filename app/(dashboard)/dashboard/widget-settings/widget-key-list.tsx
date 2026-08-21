@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import type { WidgetKey } from "@/lib/supabase/types";
 import { updateWidgetKeyOriginsAction, revokeWidgetKeyAction, type WidgetKeyActionState } from "./actions";
 import { CopyKeyButton } from "./copy-key-button";
+import { EmptyState } from "../_components/state-views";
 
 const initialState: WidgetKeyActionState = {};
 
@@ -100,7 +101,7 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKey }) {
 
 export function WidgetKeyList({ widgetKeys }: { widgetKeys: WidgetKey[] }) {
   if (widgetKeys.length === 0) {
-    return <p className="text-sm text-ds-text-muted">No widget keys yet. Create one above to get started.</p>;
+    return <EmptyState title="No widget keys yet" description="Create one above to get started." />;
   }
 
   return (

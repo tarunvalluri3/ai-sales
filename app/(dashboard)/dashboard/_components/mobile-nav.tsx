@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS, isNavItemActive, formatAttentionBadge } from "./nav-items";
 import { useAttentionCount } from "./attention-provider";
+import { useFocusTrap } from "./use-focus-trap";
 
 const PANEL_ID = "dashboard-mobile-nav";
 
@@ -14,6 +15,7 @@ export function MobileNav({ businessName }: { businessName: string }) {
   const attentionCount = useAttentionCount();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
+  const panelRef = useFocusTrap(isOpen);
 
   useEffect(() => {
     if (wasOpenRef.current && !isOpen) {
@@ -78,7 +80,10 @@ export function MobileNav({ businessName }: { businessName: string }) {
           />
           <nav
             id={PANEL_ID}
+            ref={panelRef as React.RefObject<HTMLElement>}
             aria-label="Dashboard, mobile"
+            aria-modal="true"
+            role="dialog"
             className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-1 overflow-y-auto border-r border-ds-border bg-ds-surface p-4 shadow-xl"
           >
             {NAV_ITEMS.map((item) => {

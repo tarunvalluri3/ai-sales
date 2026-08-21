@@ -38,7 +38,7 @@ export type WidgetBusinessContext = {
 };
 
 const BUSINESS_COLUMNS =
-  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position";
+  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, published_at";
 
 type WidgetBusinessRow = {
   id: string;
@@ -55,6 +55,7 @@ type WidgetBusinessRow = {
   widget_welcome_text_closed: string | null;
   widget_cta_text: string | null;
   widget_position: WidgetPosition;
+  published_at: string | null;
 };
 
 type WidgetKeyRow = {
@@ -79,7 +80,13 @@ export async function resolveBusinessFromWidgetKey(
     throw new WidgetAuthError();
   }
 
-  if (data.status !== "active" || !origin || !data.allowed_origins.includes(origin)) {
+  // Phase 25c: an unpublished business (published_at null -- the new
+  // "test your AI before publishing" gate) fails closed exactly like an
+  // unknown key or a bad origin. Collapsing it into the same generic
+  // WidgetAuthError is deliberate, not an oversight -- docs/security.md
+  // §10 already establishes that this endpoint must never reveal which
+  // specific check failed.
+  if (data.status !== "active" || !origin || !data.allowed_origins.includes(origin) || !data.businesses.published_at) {
     throw new WidgetAuthError();
   }
 

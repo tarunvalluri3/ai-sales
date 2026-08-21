@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import type { ChatMessage } from "../_lib/use-widget-chat";
 import type { WidgetStrings } from "@/lib/widget-i18n";
 import { PanelHeader } from "./panel-header";
 import { MessageList } from "./message-list";
 import { Composer } from "./composer";
+import { useFocusTrap } from "../_lib/use-focus-trap";
 
 export function Panel({
   businessName,
@@ -37,7 +38,7 @@ export function Panel({
   onRetry: (id: string) => void;
   onClose: () => void;
 }) {
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useFocusTrap(true);
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
@@ -50,8 +51,9 @@ export function Panel({
 
   return (
     <motion.div
-      ref={panelRef}
+      ref={panelRef as React.RefObject<HTMLDivElement>}
       role="dialog"
+      aria-modal="true"
       aria-label={strings.panelTitle}
       initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}

@@ -4,6 +4,8 @@ import { getBusinessForOrg } from "@/lib/business";
 import { WidgetKeyList } from "./widget-key-list";
 import { CreateWidgetKeyForm } from "./create-widget-key-form";
 import { WidgetBrandingForm } from "./widget-branding-form";
+import { PublishButton } from "./publish-button";
+import { SandboxChatPanel } from "../_components/sandbox-chat/sandbox-chat-panel";
 
 export default async function WidgetSettingsPage() {
   const { businessId, orgId } = await requireBusinessContext();
@@ -23,6 +25,10 @@ export default async function WidgetSettingsPage() {
           updating your embedded snippet, confirming it works, then revoking the old key.
         </p>
       </div>
+
+      <PublishButton isPublished={business?.published_at != null} />
+
+      <SandboxChatPanel />
 
       <CreateWidgetKeyForm />
 

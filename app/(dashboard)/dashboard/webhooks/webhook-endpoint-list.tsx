@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import type { WebhookEndpoint } from "@/lib/supabase/types";
 import { deleteWebhookEndpointAction, type WebhookActionState } from "./actions";
+import { EmptyState } from "../_components/state-views";
 
 const initialState: WebhookActionState = {};
 
@@ -57,9 +58,10 @@ function WebhookEndpointRow({ endpoint }: { endpoint: WebhookEndpoint }) {
 export function WebhookEndpointList({ endpoints }: { endpoints: WebhookEndpoint[] }) {
   if (endpoints.length === 0) {
     return (
-      <p className="text-sm text-ds-text-muted">
-        No webhook endpoints yet. Add one above to get notified on new qualified leads.
-      </p>
+      <EmptyState
+        title="No webhook endpoints yet"
+        description="Add one above to get notified on new qualified leads."
+      />
     );
   }
 
