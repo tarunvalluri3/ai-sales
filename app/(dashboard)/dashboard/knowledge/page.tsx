@@ -9,6 +9,7 @@ import { PublishToggleButton } from "./_components/publish-toggle-button";
 import { FileUploadForm } from "./_components/file-upload-form";
 import { UrlImportForm } from "./_components/url-import-form";
 import { RefreshUrlButton } from "./_components/refresh-url-button";
+import { EmptyState } from "../_components/state-views";
 import {
   createKnowledgeDocumentAction,
   deleteKnowledgeDocumentAction,
@@ -41,13 +42,10 @@ export default async function KnowledgePage() {
       </div>
 
       {documents.length === 0 ? (
-        <div className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-6 py-10 text-center">
-          <p className="text-sm font-medium text-ds-text-primary">No knowledge documents yet</p>
-          <p className="mt-1 text-sm text-ds-text-secondary">
-            Add your first document below so your AI sales employee has approved knowledge to draw
-            from.
-          </p>
-        </div>
+        <EmptyState
+          title="No knowledge documents yet"
+          description="Add your first document below so your AI sales employee has approved knowledge to draw from."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {documents.map((document) => (

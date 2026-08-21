@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
 import { listAuditLogForBusiness } from "@/lib/audit-log";
 import type { AuditLogAction } from "@/lib/supabase/types";
+import { EmptyState } from "../_components/state-views";
 
 const ACTION_LABEL: Record<AuditLogAction, string> = {
   "conversation.control_changed": "Conversation control changed",
@@ -16,6 +17,7 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "webhook_endpoint.deleted": "Webhook endpoint deleted",
   "business_hours.updated": "Business hours updated",
   "widget_branding.updated": "Widget branding updated",
+  "business.published": "Business published",
 };
 
 export default async function AuditLogPage() {
@@ -33,13 +35,10 @@ export default async function AuditLogPage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-ds-lg border border-dashed border-ds-border px-4 py-14 text-center">
-          <p className="text-sm font-medium text-ds-text-primary">No audit entries yet</p>
-          <p className="max-w-sm text-xs text-ds-text-muted">
-            Sensitive actions your team takes -- taking over a conversation, dismissing an attention
-            flag, deleting a knowledge document -- will appear here.
-          </p>
-        </div>
+        <EmptyState
+          title="No audit entries yet"
+          description="Sensitive actions your team takes -- taking over a conversation, dismissing an attention flag, deleting a knowledge document -- will appear here."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {entries.map((entry) => (

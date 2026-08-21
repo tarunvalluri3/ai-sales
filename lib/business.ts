@@ -143,6 +143,36 @@ export async function updateWidgetBranding(orgId: string, input: WidgetBrandingI
 }
 
 /**
+ * Marks a business published (Phase 25c "test your AI before publishing"):
+ * sets `published_at` to now, the flag `lib/widget-auth.ts`'s
+ * `resolveBusinessFromWidgetKey()` requires before the public /api/chat
+ * path will serve real chat for this business. `orgId` must come from a
+ * validated session; authorization (org:admin-only) is enforced by the
+ * caller, same convention as `updateBusinessProfile`. Unconditional --
+ * re-publishing an already-published business simply bumps the
+ * timestamp, which is harmless (there is no "unpublish" in this phase).
+ */
+export async function publishBusinessForOrg(orgId: string): Promise<Business> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("businesses")
+    .update({ published_at: new Date().toISOString() })
+    .eq("clerk_org_id", orgId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong publishing your AI. Please try again.",
+      "publishBusinessForOrg failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/**
  * Permanently deletes the business row for a given Clerk org, cascading
  * to every business-owned table (Phase 22e) -- no residual row anywhere.
  * Does NOT touch the Clerk organization itself, by explicit user choice

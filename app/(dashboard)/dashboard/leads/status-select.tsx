@@ -17,6 +17,7 @@ export function StatusSelect({ id, status }: { id: string; status: LeadStatus })
       <input type="hidden" name="id" value={id} />
       <select
         name="status"
+        aria-label="Lead status"
         defaultValue={status}
         disabled={isPending}
         onChange={(event) => event.currentTarget.form?.requestSubmit()}

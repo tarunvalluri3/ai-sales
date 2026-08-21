@@ -4,6 +4,7 @@ import { listServicesForBusiness } from "@/lib/services";
 import { DeleteButton } from "../_components/delete-button";
 import { ServiceForm } from "./service-form";
 import { createServiceAction, deleteServiceAction } from "./actions";
+import { EmptyState } from "../_components/state-views";
 
 export default async function ServicesPage() {
   const { businessId } = await requireBusinessContext();
@@ -19,12 +20,10 @@ export default async function ServicesPage() {
       </div>
 
       {services.length === 0 ? (
-        <div className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-6 py-10 text-center">
-          <p className="text-sm font-medium text-ds-text-primary">No services yet</p>
-          <p className="mt-1 text-sm text-ds-text-secondary">
-            Add your first service below so your AI sales employee can answer questions about it.
-          </p>
-        </div>
+        <EmptyState
+          title="No services yet"
+          description="Add your first service below so your AI sales employee can answer questions about it."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {services.map((service) => (

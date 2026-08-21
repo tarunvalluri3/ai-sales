@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createWidgetKey, revokeWidgetKey, updateWidgetKeyOrigins } from "@/lib/widget-keys";
-import { updateWidgetBranding } from "@/lib/business";
+import { updateWidgetBranding, publishBusinessForOrg } from "@/lib/business";
 import { widgetBrandingSchema } from "@/lib/schemas/business";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
@@ -182,5 +182,43 @@ export async function updateWidgetBrandingAction(
   await recordAuditLogEntry(businessId, userId, "widget_branding.updated", "business", businessId);
 
   revalidatePath("/dashboard/widget-settings");
+  return { success: true };
+}
+
+export type PublishBusinessState = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
+ * Phase 25c "test your AI before publishing": the one-way switch that
+ * lets lib/widget-auth.ts's resolveBusinessFromWidgetKey() start serving
+ * real chat for this business's widget keys. Used both by the onboarding
+ * "test your AI" step and the ongoing sandbox on /dashboard/widget-settings.
+ */
+export async function publishBusinessAction(
+  _prevState: PublishBusinessState,
+  formData: FormData,
+): Promise<PublishBusinessState> {
+  // Takes no form fields -- the signature is fixed by useActionState's
+  // (prevState, formData) contract, same as every other action here.
+  void formData;
+
+  const { businessId, userId, orgId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) {
+    return { error: authError };
+  }
+
+  try {
+    await publishBusinessForOrg(orgId);
+  } catch (err) {
+    return { error: logAndGetUserMessage(err) };
+  }
+
+  await recordAuditLogEntry(businessId, userId, "business.published", "business", businessId);
+
+  revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding/test");
   return { success: true };
 }

@@ -4,6 +4,7 @@ import { listFaqsForBusiness } from "@/lib/faqs";
 import { DeleteButton } from "../_components/delete-button";
 import { FaqForm } from "./faq-form";
 import { createFaqAction, deleteFaqAction } from "./actions";
+import { EmptyState } from "../_components/state-views";
 
 export default async function FaqsPage() {
   const { businessId } = await requireBusinessContext();
@@ -19,12 +20,10 @@ export default async function FaqsPage() {
       </div>
 
       {faqs.length === 0 ? (
-        <div className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-6 py-10 text-center">
-          <p className="text-sm font-medium text-ds-text-primary">No FAQs yet</p>
-          <p className="mt-1 text-sm text-ds-text-secondary">
-            Add your first FAQ below so your AI sales employee can answer it directly.
-          </p>
-        </div>
+        <EmptyState
+          title="No FAQs yet"
+          description="Add your first FAQ below so your AI sales employee can answer it directly."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {faqs.map((faq) => (

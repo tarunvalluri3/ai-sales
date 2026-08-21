@@ -4,6 +4,7 @@ import { listProductsForBusiness } from "@/lib/products";
 import { DeleteButton } from "../_components/delete-button";
 import { ProductForm } from "./product-form";
 import { createProductAction, deleteProductAction } from "./actions";
+import { EmptyState } from "../_components/state-views";
 
 export default async function ProductsPage() {
   const { businessId } = await requireBusinessContext();
@@ -19,12 +20,10 @@ export default async function ProductsPage() {
       </div>
 
       {products.length === 0 ? (
-        <div className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-6 py-10 text-center">
-          <p className="text-sm font-medium text-ds-text-primary">No products yet</p>
-          <p className="mt-1 text-sm text-ds-text-secondary">
-            Add your first product below so your AI sales employee can answer questions about it.
-          </p>
-        </div>
+        <EmptyState
+          title="No products yet"
+          description="Add your first product below so your AI sales employee can answer questions about it."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {products.map((product) => (

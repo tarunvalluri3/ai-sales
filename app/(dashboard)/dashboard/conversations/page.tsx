@@ -3,6 +3,7 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listConversationsForBusiness } from "@/lib/conversations";
 import { listLeadsForBusiness } from "@/lib/leads";
+import { EmptyState } from "../_components/state-views";
 
 export default async function ConversationsPage() {
   const { businessId } = await requireBusinessContext();
@@ -25,13 +26,10 @@ export default async function ConversationsPage() {
       </div>
 
       {conversations.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-ds-lg border border-dashed border-ds-border px-4 py-14 text-center">
-          <p className="text-sm font-medium text-ds-text-primary">No conversations yet</p>
-          <p className="max-w-sm text-xs text-ds-text-muted">
-            Conversations started from your chat widget will appear here, with prospect and AI messages
-            in real time.
-          </p>
-        </div>
+        <EmptyState
+          title="No conversations yet"
+          description="Conversations started from your chat widget will appear here, with prospect and AI messages in real time."
+        />
       ) : (
         <ul className="flex flex-col gap-2">
           {conversations.map((conversation) => (

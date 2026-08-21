@@ -3,6 +3,7 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { listLeadsForBusiness } from "@/lib/leads";
 import { StatusSelect } from "./status-select";
 import type { LeadQualification } from "@/lib/supabase/types";
+import { EmptyState } from "../_components/state-views";
 
 const QUALIFICATION_STYLE: Record<LeadQualification, string> = {
   hot: "bg-ds-accent-soft-bg text-ds-accent-muted",
@@ -25,12 +26,10 @@ export default async function LeadsPage() {
       </div>
 
       {leads.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-ds-lg border border-dashed border-ds-border px-4 py-14 text-center">
-          <p className="text-sm font-medium text-ds-text-primary">No leads yet</p>
-          <p className="max-w-sm text-xs text-ds-text-muted">
-            When a prospect shares contact details, the AI captures them here for follow-up.
-          </p>
-        </div>
+        <EmptyState
+          title="No leads yet"
+          description="When a prospect shares contact details, the AI captures them here for follow-up."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {leads.map((lead) => (
