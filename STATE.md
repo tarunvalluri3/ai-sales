@@ -2,7 +2,73 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (in-app chat widget install guide added on top of Phase 25c, not yet committed/merged)
+Last updated: 2026-08-31 (AI decline-rule prompt fix added on top of the widget install guide, not yet committed/merged)
+
+---
+
+## AI answer-quality fix: loosened the decline rule for on-topic questions — implemented 2026-08-31
+
+The user reported the chatbot "only generates leads" instead of answering, with real
+evidence: a prospect asked "Can you build an ai agent for me?" on a business with a
+published, Ready "AI Agents Service Page" knowledge document, and the AI declined
+("I do not have specific information...") and pushed straight to collecting contact
+details instead of answering from that page. Diagnosed via a read-only investigation
+(three parallel Explore agents plus direct reading of `lib/retrieval.ts` and the
+`match_knowledge_chunks` SQL function) before writing any code, per the Plan Mode
+workflow. Root cause: `searchKnowledgeChunks`/`match_knowledge_chunks` has no
+similarity floor — it always returns the top-5 nearest chunks for a business with any
+published knowledge, so the relevant page was almost certainly retrieved. The actual
+failure was in `lib/rag.ts`'s `SYSTEM_TEMPLATE` and the `usedContext` schema
+description, written strictly enough that the model treated "retrieved passage isn't
+phrased as a direct answer to the question" as equivalent to category-4/unknown —
+declining rather than using an on-topic, published knowledge page. This is a
+prompt-wording problem, not a retrieval or architecture problem.
+
+**Fix, per the user's explicit choice (loosen the decline rule, not add a similarity
+threshold):** in `lib/rag.ts`, the `SYSTEM_TEMPLATE`'s "four kinds of information"
+rules and category-4 instruction now explicitly state that a retrieved passage counts
+as usable context whenever it's about the same product/service/topic the prospect is
+asking about — including capability/availability phrasings ("can you...", "do you
+offer...", "is it possible to...") — even when the wording differs from the question;
+category 4 (unknown/decline) is now reserved for when nothing retrieved is genuinely
+about a different topic entirely. `SalesEmployeeResponseSchema`'s `usedContext` field
+description and the prompt's own "Set usedContext to..." rule were updated to match,
+so the structured-output field stays consistent with the new standard. No other
+behavior changed: `FALLBACK_MESSAGE`, the zero-retrieval early return, escalation
+rules (still escalate on complaints/explicit human requests/commitments), the
+tool-calling loop, and `MAX_TOOL_ITERATIONS` are all untouched.
+
+**Checks:** `npm run lint` — pass, zero errors/warnings. `npx tsc --noEmit` — pass.
+`npm run build` — pass, all 31 routes.
+
+**Known limitation, not glossed over:** no live browser/live-Gemini click-through this
+session reproducing the exact screenshot scenario (or the regression checks for a
+genuinely-unrelated question and an existing product/FAQ tool-call) — that would need
+a real Clerk-authenticated session against the sandbox chat workspace
+(`/dashboard/widget-settings` or `/onboarding/test`), which wasn't set up for this
+pass. This is a wording fix validated by inspection of the exact prompt text and the
+concrete failure case, not by a live or quantitative eval. **Next step for whoever
+picks this up: exercise the sandbox chat workspace with the exact screenshot question
+against a real published knowledge page, plus the two regression cases (a genuinely
+unrelated question; an existing product/FAQ tool-triggering question), and watch for
+the opposite failure mode — the AI now answering questions it shouldn't.**
+
+**Files changed:** `lib/rag.ts` only (`SYSTEM_TEMPLATE`, `SalesEmployeeResponseSchema`'s
+`usedContext` description). **Packages added:** none. **Migrations:** none.
+**Environment variables:** none.
+
+**Deferred, per the user's own staging choice (separate follow-up plans, not started):**
+(1) Chatbase-style prefilled/suggested starter questions in the widget — confirmed not
+to exist anywhere today (no UI, no i18n strings, no `businesses` column); would need a
+new data source (top FAQs or a business-configurable list), new widget UI wired to the
+existing `sendMessage()` call in `use-widget-chat.ts`, and new i18n keys across all 6
+languages. (2) Real-time-outside-the-tab dashboard notifications — confirmed today's
+only mechanisms are 3-second polling components (`AttentionProvider`,
+`LiveConversationPanel`) that only run while a `/dashboard/*` tab is open, plus Phase
+25b's once-daily Resend digest email (currently non-functional in production: no
+verified sending domain, `RESEND_API_KEY`/`NOTIFICATION_EMAIL_FROM` unset on Vercel).
+No Web Push, Notification API, WebSocket, or Supabase Realtime subscription exists
+anywhere in the repo today.
 
 ---
 
