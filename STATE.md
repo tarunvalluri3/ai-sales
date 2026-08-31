@@ -2,7 +2,91 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (Stage 2 of the "generalize the AI's business understanding" work implemented, migration applied and verified live against production; Stage C merged, PR #18)
+Last updated: 2026-08-31 (Stage 3 of the "generalize the AI's business understanding" work implemented and verified live; Stage 2 merged to main)
+
+---
+
+## Stage 3 — on-demand knowledge-base search tool — implemented 2026-08-31
+
+Third and final stage of the "generalize the AI's business understanding" work
+(Stage C, Stage 2 above). Had no confirmed design going in -- unlike Stage 2, which
+carried a design from a prior session, STATE.md only described Stage 3 as "a
+broader-answering fallback that reads knowledge documents directly, for whatever
+extraction doesn't cover." Asked the user one focused question with three concrete
+directions before writing any code (per `AGENTS.md` §11): (1) give the AI an
+on-demand `search_knowledge_base` tool, (2) passively broaden the existing top-5
+retrieval when it looks thin, or (3) feed small businesses their entire knowledge
+base unconditionally. **The user chose (1).**
+
+**What was actually missing.** `lib/rag.ts`'s `KnowledgeRetriever` already runs an
+automatic top-5 semantic search over every business's published knowledge documents
+on every turn, regardless of source type -- so a baseline "reads knowledge documents
+directly" fallback already existed. What it lacked was a way for the model to look
+*again*, with a reformulated or broader query, when that single automatic pass and
+the structured tools (Stage 2) both came up short -- exactly the gap for general
+document content that isn't shaped as a discrete product/service/FAQ (a policy, a
+warranty term, an about-us fact).
+
+**Design, as built:**
+1. New tool `lib/tools/search-knowledge-base.ts` (`search_knowledge_base`), added to
+   the same `bindTools([...])` array as the other four tools in `lib/rag.ts` --
+   no new loop, no new `MAX_TOOL_ITERATIONS` (still 2; a follow-up tool call after
+   an initial miss already fits within the existing cap, same reasoning as any other
+   two-tool sequence). Its executor wraps the existing tenant-scoped
+   `searchKnowledgeChunks()` (`lib/retrieval.ts`, unchanged) with a limit of 8
+   (broader than the passive pass's 5, since this is the deliberate "dig deeper"
+   step) and never throws, matching every other tool executor's contract.
+2. System prompt (`SYSTEM_TEMPLATE`, `lib/rag.ts`) updated: a new rule instructs the
+   model to try `search_knowledge_base` -- reformulating the question if needed --
+   after the other tools and the passive reference context both fail, before
+   declining into category 4 (unknown). The `usedContext` schema description and
+   rule text were both extended to credit a `search_knowledge_base` result as
+   grounding, matching how a passively-retrieved passage already counts.
+3. **Citations extended, not just answering.** Chunk IDs a `search_knowledge_base`
+   call actually surfaced are now merged (deduped via `Set`) into the response's
+   `sourceChunkIds`, alongside the passively-retrieved documents' chunk IDs -- so a
+   citation shown to the business owner (Phase 24's `messages.source_chunk_ids`)
+   reflects everything the model actually drew on, not just the automatic pass.
+4. No migration, no schema change -- this stage is entirely within the AI
+   orchestration layer, reusing an existing, already tenant-scoped retrieval
+   function. No new pgTAP test needed for the same reason; the full suite was
+   re-run anyway (all 22 pass) as a sanity check.
+
+**End-to-end verification, live, 2026-08-31.** `scripts/run-evals.mjs` (this
+project's own standing regression harness for `lib/rag.ts` changes) is currently
+broken against its own "Acme Test Co." fixture -- `column businesses.widget_key
+does not exist`, a pre-existing mismatch with the Phase 24 widget-keys-table
+refactor, unrelated to this change and out of Stage 3's scope to fix (flagged here,
+not silently worked around). In its place, a temporary dev-only route (never
+committed, deleted immediately after use) called `askSalesEmployee()` directly
+against the same live fixture, with real Gemini calls:
+- **Tool mechanics**: `executeSearchKnowledgeBase()` called directly returned real,
+  correct passages (Acme's actual "Support Hours" document).
+- **Regression**: the existing golden-path checks (`Test Product - 1`'s price
+  answered correctly; a nonexistent "Quantum Flux Capacitor 9000" correctly gets no
+  invented price) still pass with the fifth tool added and the prompt changed.
+- **Passive-sufficient case**: asked about Acme's real support hours -- the model
+  answered correctly straight from the passive top-5 context (`toolCallCount: 0`),
+  confirming the new tool doesn't fire needlessly when the automatic pass already
+  covers it (Acme's entire 5-document corpus already fits inside that top-5, so this
+  particular case couldn't exercise the tool's necessity -- see next point for that).
+- **Real autonomous invocation, confirmed live**: asked a genuinely unrelated
+  question (international shipping to Antarctica) that none of Acme's 5 documents
+  cover. Server logs confirm the model *did* call `search_knowledge_base` on its own
+  via real Gemini function-calling (`tool_invoked` for `search_knowledge_base`,
+  `toolCallCount: 1`) before declining -- and declined correctly afterward, with no
+  fabricated answer, once the tool also came up empty. This is the concrete proof
+  the tool is correctly wired into Gemini's function-calling, not just correct in
+  isolation.
+All test conversations/messages/metrics/cache rows were deleted afterward;
+independently re-verified as zero-residue in production. `npm run lint`,
+`npm run typecheck`, `npm run build`, and `npm test` (all 22 pgTAP files) all pass.
+
+**Known gap, unrelated to this change**: `scripts/run-evals.mjs` needs a real fix
+(update it to resolve a widget key via the `widget_keys` table, matching Phase 24's
+schema, instead of a `businesses.widget_key` column that no longer exists) --
+flagged for whoever next needs to run the eval suite, not fixed here since it was
+out of scope for this task.
 
 ---
 
