@@ -2,7 +2,87 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (real root-cause fix for the AI decline-rule complaint, on top of the (already merged, PR #14) prompt-wording fix; not yet committed/merged)
+Last updated: 2026-08-31 (escalation-gating fix, on top of the already-merged ingestion/list-tool fix (PR #15) and decline-rule fix (PR #14); not yet committed/merged)
+
+---
+
+## Escalation-gating fix: AI no longer defaults to "connect a human" on the first uncertain turn — implemented 2026-08-31
+
+After PR #14 (decline-rule wording) and PR #15 (URL-ingestion bug + `list_products_and_services`
+tool), the user asked for a broader production-readiness review of the chatbot and, from a live
+screenshot, flagged a real remaining behavioral problem: "What about the AI services?" still got
+"I don't have specific information... Would you like me to connect you with a team member?" as
+the *very first* response to that question. Root cause, confirmed by reading `lib/rag.ts`'s
+`SYSTEM_TEMPLATE`: the prompt only modeled two outcomes when the AI is unsure — answer
+confidently, or decline and immediately offer a human/contact-info collection. There was no
+modeled middle ground of "share what I do know and ask a clarifying question." This also meant
+`PRODUCT.md` §7's own escalation contract was only partially built: it specifies escalation
+should fire when the AI "hits the same unknown repeatedly," not on the first unclear question —
+that trigger had no implementation at all; only explicit-human-request/complaint/commitment were
+wired.
+
+**Fix, in `lib/rag.ts`'s `SYSTEM_TEMPLATE` and `SalesEmployeeResponseSchema`:** (1) tool use
+(`check_product_details`/`check_faq_topic`/`list_products_and_services`) is now instructed as
+mandatory-first before declining an offerings question, not a soft suggestion; (2) a new rule
+gives the model an explicit middle path — share partial/adjacent information and ask a
+clarifying question rather than opening with "I don't have that information"; (3) the
+human-handoff/contact-collection offer is now explicitly gated to four real triggers matching
+`PRODUCT.md` §7 exactly (explicit request, complaint, unauthorized commitment, or **this same
+question/topic already came up unresolved earlier in this conversation** — newly implemented,
+using the `history` already in the model's context) instead of firing as a reflex on any
+ordinary first unclear question; (4) `escalate`'s schema description updated to match.
+
+**Checks:** `npm run lint` — pass. `npx tsc --noEmit` — pass. `npm run build` — pass, all 31
+routes.
+
+**Live verification against real Gemini + real production Supabase data**, via a standalone
+one-off harness (not committed — `lib/rag.ts` can't be imported outside Next's bundler due to
+its `@/` path aliases and `server-only` import graph, so the harness reimplemented the same
+retrieval → tool-loop → structured-output pipeline in plain JS using the exact new
+`SYSTEM_TEMPLATE` text, run against the real `Waves Web Studio` business
+(`89362a30-69d5-4f00-969e-b94e94716f6e`), real `match_knowledge_chunks`, real
+`list_products_and_services`/`check_product_details`/`check_faq_topic` executors, and real
+`gemini-3.1-flash-lite` calls):
+- **"What about the AI services?" (first time)** — answered with what it actually knows (web
+  services: landing pages, SaaS, e-commerce) and asked a clarifying question about the
+  prospect's AI goals. `escalate: false`. No human offer. **This is the exact case that was
+  broken before this fix.**
+- **Same question asked again in the same conversation** — now correctly escalates:
+  `escalate: true`, `escalationReason: "The prospect has asked about AI services twice, and I
+  do not have information on that in our current service offerings."`
+- **Regression — "Can I talk to a real person please?"** — still escalates immediately,
+  `escalate: true`, unchanged.
+- **Regression — "What services do you offer?"** — still answers directly and confidently
+  (lists the real services, `escalate: false`) — the fix did not make the AI more hesitant on
+  questions it can already answer well.
+
+**Files changed:** `lib/rag.ts` only. **Packages added:** none. **Migrations:** none.
+**Environment variables:** none.
+
+**Known limitation, not glossed over:** (1) still a wording-level fix validated by inspection
+plus a real (if standalone-harness) Gemini run, not a quantitative eval — `docs/phases.md`'s
+Phase 22 already scopes a proper AI eval set (hallucination, escalation correctness,
+lead-capture accuracy) as separate future work. (2) "Same unknown recurring" detection relies on
+the model reading its own conversation history correctly each turn, not a deterministic
+code-level check — worth watching for over/under-detection in real usage. (3) In the
+verification run, `list_products_and_services` was invoked even for the "talk to a real person"
+test case — harmless (within `MAX_TOOL_ITERATIONS = 2`, read-only) but an unnecessary extra
+model/tool round-trip; not fixed here, worth a look if tool-call cost becomes a concern.
+
+**Broader production-readiness gap list, surfaced during this session's investigation but out of
+scope for this fix (backlog, awaiting prioritization):** no prefilled/suggested starter questions
+or quick-reply chips in the widget (Chatbase's signature feature — confirmed nothing like this
+exists anywhere in the widget UI, i18n strings, or `businesses` schema); AI answers render as
+plain text, not markdown (`message-bubble.tsx` renders `message.content` as a raw string — a
+list or bold text in an answer shows literal `**`/`-` characters); no response streaming (`docs/
+phases.md` Phase 11 explicitly deferred this to "only if explicitly approved," and the current
+two-call tool-loop-then-structured-output architecture — a real Gemini provider constraint,
+documented in `docs/architecture.md`'s "AI tool-calling" section: a single call can't carry both
+`tools` and `responseSchema` — would need real rework to stream); no thumbs-up/down or "was this
+helpful" feedback mechanism anywhere; no business-configurable escalation trigger keywords
+(`PRODUCT.md` §7 specifies this, never built); no structured lead-capture form (contact info
+only ever collected conversationally); conversation history hard-truncates at the last 20
+messages with no summarization for longer conversations.
 
 ---
 
