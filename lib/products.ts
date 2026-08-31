@@ -42,19 +42,41 @@ export async function getProduct(businessId: string, id: string): Promise<Produc
   return data;
 }
 
-/** Lists all products for a business. `businessId` must come from `requireBusinessContext()`. */
+/** Lists all approved products for a business. `businessId` must come from `requireBusinessContext()`. Excludes unreviewed extractions -- see `listPendingReviewProducts`. */
 export async function listProductsForBusiness(businessId: string): Promise<Product[]> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("products")
     .select("*")
     .eq("business_id", businessId)
+    .eq("status", "approved")
     .order("created_at", { ascending: true });
 
   if (error) {
     throw new AppError(
       "Something went wrong loading your products. Please try again.",
       "listProductsForBusiness failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/** Lists products extracted from a knowledge document that are awaiting review. `businessId` must come from `requireBusinessContext()`. */
+export async function listPendingReviewProducts(businessId: string): Promise<Product[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("status", "draft")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading products awaiting review. Please try again.",
+      "listPendingReviewProducts failed",
       error,
     );
   }
@@ -148,4 +170,68 @@ export async function deleteProduct(businessId: string, id: string): Promise<boo
   await deleteGeneratedDocument(businessId, "product", id);
 
   return true;
+}
+
+/**
+ * Approves a pending extracted product: flips it to 'approved' and syncs
+ * its generated knowledge document, the same call `createProduct` already
+ * makes -- so an approved extraction becomes tool-queryable and
+ * RAG-retrievable through the exact same path as a manually created
+ * product, no second code path. Scoped to `status = 'draft'` so this can
+ * never re-sync an already-approved row. `false` for a cross-tenant,
+ * nonexistent, or already-approved id.
+ */
+export async function approveProductDraft(businessId: string, id: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("products")
+    .update({ status: "approved" })
+    .eq("business_id", businessId)
+    .eq("id", id)
+    .eq("status", "draft")
+    .select();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong approving this product. Please try again.",
+      "approveProductDraft failed",
+      error,
+    );
+  }
+
+  const product = data[0];
+  if (!product) {
+    return false;
+  }
+
+  await syncGeneratedDocument(businessId, "product", product.id, product.name, buildKnowledgeContent(product));
+
+  return true;
+}
+
+/**
+ * Rejects (deletes) a pending extracted product. Safe without a
+ * `deleteGeneratedDocument` call -- a draft never gets a generated
+ * document synced for it (see `approveProductDraft`). Scoped to
+ * `status = 'draft'` so this can never delete an already-approved row.
+ */
+export async function rejectProductDraft(businessId: string, id: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("products")
+    .delete()
+    .eq("business_id", businessId)
+    .eq("id", id)
+    .eq("status", "draft")
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong rejecting this product. Please try again.",
+      "rejectProductDraft failed",
+      error,
+    );
+  }
+
+  return data.length > 0;
 }

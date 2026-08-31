@@ -61,6 +61,7 @@ export async function executeCheckProductDetails(
     .from("products")
     .select("name, description, price")
     .eq("business_id", businessId)
+    .eq("status", "approved")
     .ilike("name", escapeLikePattern(query))
     .maybeSingle();
 
@@ -78,6 +79,7 @@ export async function executeCheckProductDetails(
     .from("services")
     .select("name, description, price")
     .eq("business_id", businessId)
+    .eq("status", "approved")
     .ilike("name", escapeLikePattern(query))
     .maybeSingle();
 

@@ -42,19 +42,41 @@ export async function getService(businessId: string, id: string): Promise<Servic
   return data;
 }
 
-/** Lists all services for a business. `businessId` must come from `requireBusinessContext()`. */
+/** Lists all approved services for a business. `businessId` must come from `requireBusinessContext()`. Excludes unreviewed extractions -- see `listPendingReviewServices`. */
 export async function listServicesForBusiness(businessId: string): Promise<Service[]> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("services")
     .select("*")
     .eq("business_id", businessId)
+    .eq("status", "approved")
     .order("created_at", { ascending: true });
 
   if (error) {
     throw new AppError(
       "Something went wrong loading your services. Please try again.",
       "listServicesForBusiness failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/** Lists services extracted from a knowledge document that are awaiting review. `businessId` must come from `requireBusinessContext()`. */
+export async function listPendingReviewServices(businessId: string): Promise<Service[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("services")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("status", "draft")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading services awaiting review. Please try again.",
+      "listPendingReviewServices failed",
       error,
     );
   }
@@ -148,4 +170,68 @@ export async function deleteService(businessId: string, id: string): Promise<boo
   await deleteGeneratedDocument(businessId, "service", id);
 
   return true;
+}
+
+/**
+ * Approves a pending extracted service: flips it to 'approved' and syncs
+ * its generated knowledge document, the same call `createService` already
+ * makes -- so an approved extraction becomes tool-queryable and
+ * RAG-retrievable through the exact same path as a manually created
+ * service, no second code path. Scoped to `status = 'draft'` so this can
+ * never re-sync an already-approved row. `false` for a cross-tenant,
+ * nonexistent, or already-approved id.
+ */
+export async function approveServiceDraft(businessId: string, id: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("services")
+    .update({ status: "approved" })
+    .eq("business_id", businessId)
+    .eq("id", id)
+    .eq("status", "draft")
+    .select();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong approving this service. Please try again.",
+      "approveServiceDraft failed",
+      error,
+    );
+  }
+
+  const service = data[0];
+  if (!service) {
+    return false;
+  }
+
+  await syncGeneratedDocument(businessId, "service", service.id, service.name, buildKnowledgeContent(service));
+
+  return true;
+}
+
+/**
+ * Rejects (deletes) a pending extracted service. Safe without a
+ * `deleteGeneratedDocument` call -- a draft never gets a generated
+ * document synced for it (see `approveServiceDraft`). Scoped to
+ * `status = 'draft'` so this can never delete an already-approved row.
+ */
+export async function rejectServiceDraft(businessId: string, id: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("services")
+    .delete()
+    .eq("business_id", businessId)
+    .eq("id", id)
+    .eq("status", "draft")
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong rejecting this service. Please try again.",
+      "rejectServiceDraft failed",
+      error,
+    );
+  }
+
+  return data.length > 0;
 }

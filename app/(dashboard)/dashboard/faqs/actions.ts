@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
-import { createFaq, updateFaq, deleteFaq } from "@/lib/faqs";
+import { createFaq, updateFaq, deleteFaq, approveFaqDraft, rejectFaqDraft } from "@/lib/faqs";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 const faqFieldsSchema = z.object({
@@ -110,6 +110,73 @@ export async function deleteFaqAction(
 
   if (!deleted) {
     return { error: "This FAQ no longer exists." };
+  }
+
+  revalidatePath("/dashboard/faqs");
+  return { success: true };
+}
+
+export type ReviewState = {
+  error?: string;
+  success?: boolean;
+};
+
+/** Approves an FAQ extracted from a knowledge document (Stage 2, STATE.md). */
+export async function approveFaqAction(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid FAQ." };
+  }
+
+  let approved: boolean;
+  try {
+    approved = await approveFaqDraft(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!approved) {
+    return { error: "This FAQ is no longer awaiting review." };
+  }
+
+  revalidatePath("/dashboard/faqs");
+  return { success: true };
+}
+
+/** Rejects (deletes) an FAQ extracted from a knowledge document (Stage 2, STATE.md). */
+export async function rejectFaqAction(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid FAQ." };
+  }
+
+  let rejected: boolean;
+  try {
+    rejected = await rejectFaqDraft(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!rejected) {
+    return { error: "This FAQ is no longer awaiting review." };
   }
 
   revalidatePath("/dashboard/faqs");

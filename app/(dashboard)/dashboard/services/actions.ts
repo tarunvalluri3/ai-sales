@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
-import { createService, updateService, deleteService } from "@/lib/services";
+import { createService, updateService, deleteService, approveServiceDraft, rejectServiceDraft } from "@/lib/services";
 import {
   catalogNameSchema,
   catalogDescriptionSchema,
@@ -118,6 +118,73 @@ export async function deleteServiceAction(
 
   if (!deleted) {
     return { error: "This service no longer exists." };
+  }
+
+  revalidatePath("/dashboard/services");
+  return { success: true };
+}
+
+export type ReviewState = {
+  error?: string;
+  success?: boolean;
+};
+
+/** Approves a service extracted from a knowledge document (Stage 2, STATE.md). */
+export async function approveServiceAction(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid service." };
+  }
+
+  let approved: boolean;
+  try {
+    approved = await approveServiceDraft(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!approved) {
+    return { error: "This service is no longer awaiting review." };
+  }
+
+  revalidatePath("/dashboard/services");
+  return { success: true };
+}
+
+/** Rejects (deletes) a service extracted from a knowledge document (Stage 2, STATE.md). */
+export async function rejectServiceAction(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid service." };
+  }
+
+  let rejected: boolean;
+  try {
+    rejected = await rejectServiceDraft(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!rejected) {
+    return { error: "This service is no longer awaiting review." };
   }
 
   revalidatePath("/dashboard/services");

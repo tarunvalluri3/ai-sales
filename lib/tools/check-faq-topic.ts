@@ -59,6 +59,7 @@ export async function executeCheckFaqTopic(
     .from("faqs")
     .select("question, answer")
     .eq("business_id", businessId)
+    .eq("status", "approved")
     .ilike("question", `%${escapeLikePattern(topic)}%`)
     .order("created_at", { ascending: true })
     .limit(1);

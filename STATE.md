@@ -2,16 +2,15 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (Stage 2 of the "generalize the AI's business understanding" work designed and confirmed with the user, implementation deferred to a new session; Stage C merged, PR #18)
+Last updated: 2026-08-31 (Stage 2 of the "generalize the AI's business understanding" work implemented, migration applied and verified live against production; Stage C merged, PR #18)
 
 ---
 
-## Stage 2 — catalog extraction & review: design confirmed with the user, NOT implemented — 2026-08-31
+## Stage 2 — catalog extraction & review — implemented 2026-08-31
 
-**Not implemented this session.** The user explicitly paused here and will continue in
-a new session — this entry exists so that session doesn't have to re-derive the
-design from scratch. Do not treat anything in this entry as built; there is no new
-migration, no new file, no schema change on disk yet.
+Implemented directly per the user's standing "no prompt files" instruction, from the
+design confirmed with the user in the prior session (see that design restated below --
+it held unchanged through implementation, nothing was redirected).
 
 **The confirmed intent** (restated back to the user and explicitly confirmed correct,
 not assumed): this product must work well for *any* business type, not just one that
@@ -26,12 +25,15 @@ loose semantic retrieval, never the same reliable, tool-backed answering. Stage 
 closes this by extracting structured catalog data *out of* knowledge documents,
 regardless of source type, so the two paths converge.
 
-**Confirmed design** (research done this session against the real schema —
+**Design, as built** (research done against the real schema —
 `lib/products.ts`/`lib/services.ts`/`lib/faqs.ts`, `lib/knowledge-sync.ts`,
 `lib/knowledge.ts`'s publish state machine, `lib/ingestion-queue.ts`, and all three
 AI tool files — not guessed):
 
-1. **New migration**: `products`, `services`, `faqs` each gain a `status` column
+1. **Migration** `supabase/migrations/20260831000000_add_catalog_extraction_review.sql`
+   (applied and verified live against production, this session's only linked target,
+   same standing staging gap as every prior phase): `products`, `services`, `faqs`
+   each gain a `status` column
    (`'draft' | 'approved'`, default `'approved'` — every existing row, and every
    future manually-created row, is unaffected; only extraction ever inserts
    `'draft'`) and a nullable `extracted_from_document_id uuid references
@@ -41,7 +43,7 @@ AI tool files — not guessed):
    confirmed for `products` — not column-scoped), so no new grant statement is
    needed. No RLS policy change needed either — same business-scoped row rule, just
    two new columns on it.
-2. **New extraction step** (`lib/knowledge-extraction.ts`, not yet created): a Gemini
+2. **Extraction step** (`lib/knowledge-extraction.ts`, new): a Gemini
    structured-output call (same `withStructuredOutput` pattern `lib/rag.ts` already
    uses), given a knowledge document's content, extracts distinct
    products/services/FAQs it explicitly describes -- instructed to never infer or
@@ -66,6 +68,10 @@ AI tool files — not guessed):
    automatic-republish deduplication -- a lightweight exact-name-match skip (case
    insensitive, checked against that business's existing draft+approved rows) is the
    only dedup guard, a deliberate v1 simplification, not a robust fuzzy-match system.
+   `publishKnowledgeDocument()`'s return type changed from a bare `boolean` to
+   `{ found, isFirstPublish, title, content }` (its one caller, the action, was updated
+   to match) so the action -- not `lib/knowledge.ts` itself -- decides whether to fire
+   `after()`, keeping the trigger call site where the design specified.
 4. **Review UI**: a new "Pending review" section on each of the existing
    `/dashboard/products`, `/dashboard/services`, `/dashboard/faqs` pages (not a new
    page, and not on the Knowledge page -- review lives where the business owner
@@ -90,15 +96,49 @@ AI tool files — not guessed):
    design per `AGENTS.md` rule 4 (no fabricated business facts) -- everything else
    here is a reasonable default the user can redirect.
 
-**Explicitly not started**: no migration file written, no `lib/knowledge-extraction.ts`,
-no tool-file changes, no dashboard UI, no `lib/supabase/types.ts` updates for the new
-columns. Whoever picks this up next should re-read this entry, confirm the design
-still holds (nothing else changed it), and can go straight to implementation --
-research and user confirmation are both already done.
+**Files changed**: new `supabase/migrations/20260831000000_add_catalog_extraction_review.sql`,
+new `lib/knowledge-extraction.ts`; `lib/supabase/types.ts` (new `CatalogItemStatus`,
+`status`/`extracted_from_document_id` on `Product`/`Service`/`Faq`); `lib/products.ts`,
+`lib/services.ts`, `lib/faqs.ts` (approved-only filter on the existing list function,
+new `listPendingReview*`/`approve*Draft`/`reject*Draft` functions each); `lib/knowledge.ts`
+(new `getKnowledgeDocumentTitles`, `publishKnowledgeDocument`'s return-shape change above);
+`lib/tools/check-product-details.ts`, `lib/tools/list-offerings.ts`,
+`lib/tools/check-faq-topic.ts` (the safety-gate `.eq("status", "approved")` additions);
+`app/(dashboard)/dashboard/knowledge/actions.ts` (extraction trigger wired into
+`publishKnowledgeDocumentAction`, new `extractNowAction`) and a new
+`_components/extract-now-button.tsx`; `app/(dashboard)/dashboard/products|services/faqs/actions.ts`
+(new approve/reject actions each) and `page.tsx` (new "Pending review" section each);
+new shared `app/(dashboard)/dashboard/_components/review-actions.tsx`.
 
-**Stage 3** (broader-answering fallback that reads knowledge documents directly, for
-whatever extraction doesn't cover) remains separate, not-yet-designed, not-yet-started
--- unchanged from Stage C's entry.
+**Checks run**: `npm run typecheck` (clean), `npm run lint` (clean), `npm run build`
+(clean production build, all existing routes present), `npm test` -- all 22 pgTAP files
+passed live against production, confirming the new columns didn't disturb tenant
+isolation on `products`/`services`/`faqs` (existing tests `003`/`004`/`005`). No new
+pgTAP file was added: this migration only adds columns to already-tested tables and
+changes no RLS policy, matching this repo's own precedent (column-only migrations in
+prior phases didn't get a dedicated test file either).
+
+**End-to-end smoke test — run and passed, 2026-08-31**: exercised against the standing
+"Acme Test Co." live production fixture, via a temporary dev-only route (not committed,
+deleted immediately after use) that called the real `extractCatalogFromDocument()`
+against a real Gemini API call, since a genuine Clerk-authenticated browser session
+wasn't available in this environment (no browser-automation tool). Verified live:
+extraction correctly produced one draft product/service/FAQ from real document content;
+a clean numeric price ("$149.99") was extracted correctly, an ambiguous one ("starting
+at $499/mo") was correctly left `null`; re-running extraction on the same document a
+second time inserted zero duplicates (dedup guard holds); a draft product/FAQ was
+confirmed **not** answerable via `check_product_details`/`check_faq_topic` before
+approval, and answerable immediately after. `approveProductDraft`/`rejectServiceDraft`/
+`approveFaqDraft` (lib/products.ts, lib/services.ts, lib/faqs.ts) themselves construct
+their own Clerk-session-bound `createServerSupabaseClient()`, so the test replicated
+their exact SQL via the service-role client instead of calling them directly -- RLS
+itself is already covered live by pgTAP 003-005 (re-run passing, see above). All test
+rows were deleted afterward and independently re-verified as zero-residue in production.
+**Not yet done**: a literal browser click-through of the dashboard's "Pending review"
+Approve/Reject buttons as a signed-in user -- the one part this session's tooling
+genuinely cannot exercise. Stage 3 (broader-answering fallback that reads knowledge
+documents directly, for whatever extraction doesn't cover) remains separate,
+not-yet-designed, not-yet-started.
 
 ---
 
