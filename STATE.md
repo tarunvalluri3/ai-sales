@@ -2,7 +2,97 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (AI decline-rule prompt fix added on top of the widget install guide, not yet committed/merged)
+Last updated: 2026-08-31 (real root-cause fix for the AI decline-rule complaint, on top of the (already merged, PR #14) prompt-wording fix; not yet committed/merged)
+
+---
+
+## Real root cause found: URL knowledge ingestion silently captures near-empty content on JS-rendered pages — implemented 2026-08-31
+
+The prompt-wording fix above (PR #14) turned out to address a real but secondary
+issue. After the user retested with the real production widget/sandbox (screenshots:
+"I want to build an AI Agent for my company/" and "Please list all the services"),
+both still failed. Direct inspection of the live Supabase data for the user's own
+business ("Waves Web Studio") found the actual cause: **every one of its five
+URL-imported knowledge documents** ("AI Agents Service Page," "AI Chatbot Services
+Page," "AI Automation Workflow," "Mobile APP Dev," "Website Home Page") **has exactly
+one knowledge chunk, 16 characters long: `"Waves Web Studio"`** — the page's
+`<title>` and nothing else. Fetching `waveswebstudio.in` directly confirmed why: it's
+a client-rendered React/Vite SPA (`vendor-react`, `vendor-gsap` bundles) whose raw
+server HTML is just `<div id="root"></div>` plus a `<script src="/assets/...">` — the
+real page content only exists after JavaScript runs in a browser.
+`lib/url-ingestion.ts`'s `fetchUrlContent()` does a plain `fetch()` +
+`lib/html-extract.ts`'s regex tag-strip, which cannot execute JavaScript, so for a
+page like this it captures only the `<title>` text — then silently saved that
+16-character stub as a normal, "Ready"/"Published" knowledge document with no
+warning. Separately, the business's one structured Services record ("Web Services
+like Landing Page, SaaS, E-commerce.") has a blank `description` and produced 0
+knowledge chunks, contributing nothing either. **Neither failure had anything to do
+with the SYSTEM_TEMPLATE wording fixed in PR #14** — there was no real content for
+any prompt to be lenient about.
+
+**Fix 1 — reject near-empty URL ingestion instead of silently accepting it.**
+`lib/url-ingestion.ts`'s `fetchUrlContent()` gained `MIN_CONTENT_LENGTH = 100`: text
+shorter than that now throws with a specific, actionable message ("This page only
+returned a small amount of text, which usually means its content is loaded by
+JavaScript... Paste the page's content in manually instead") rather than being
+accepted as a successful import. Applies uniformly to first-time import, manual
+refresh, and the scheduled daily auto-refresh sweep, since all three funnel through
+this one function.
+
+**Fix 2 — a real, unrelated bug this surfaced: `UrlFetchError` never actually reached
+the user.** Every one of `fetchUrlContent()`'s existing specific error messages
+("Could not reach this URL...", "This URL returned an error...", etc.) was thrown as
+a bespoke `UrlFetchError extends Error` class — but `lib/errors.ts`'s
+`logAndGetUserMessage()` (the single funnel every caller routes through) only
+special-cases `AppError`, so every `UrlFetchError` fell through to the generic
+"Something went wrong. Please try again." since Phase 24 shipped. This meant the new
+too-short-content message would have been silently swallowed too. Fixed by throwing
+`AppError` directly from `fetchUrlContent()` (this codebase's one established
+error-with-safe-message convention, used everywhere else, e.g. `lib/retrieval.ts`)
+instead of the dead `UrlFetchError` subclass, which is now removed entirely.
+
+**Fix 3 — a real capability gap: no way to answer "what do you offer"/"list all your
+services."** New `lib/tools/list-offerings.ts` (`list_products_and_services`
+tool, following the exact `bindTools()` shape and tenant-scoping pattern as
+`check_product_details`/`check_faq_topic`) returns every `products`/`services` row
+for the business (capped 30 each), for broad enumeration questions — as opposed to
+`check_product_details`, which only does an exact-name lookup. Bound alongside the
+three existing tools in `lib/rag.ts`'s `bindTools([...])` call, dispatched in the
+existing tool-calling loop, and referenced in `SYSTEM_TEMPLATE`'s rules. Read-only,
+same as `check_product_details`/`check_faq_topic` (doesn't affect
+`shouldCacheResponse`'s side-effecting-tool check, which only cares about
+`request_callback`). Directly verified against the real business's live data: it
+correctly returns the one existing Services row.
+
+**Checks:** `npm run lint` — pass, zero errors/warnings. `npx tsc --noEmit` — pass.
+`npm run build` — pass, all 31 routes. The `list_products_and_services` executor's
+query logic was verified directly against real production Supabase data (bypassing
+the LLM), confirmed to return the business's one real Services row correctly. No live
+Gemini/browser click-through of the full `askSalesEmployee()` path this session.
+
+**Files changed (new):** `lib/tools/list-offerings.ts`. **Modified:** `lib/rag.ts`
+(new tool import, `bindTools()` entry, dispatch branch, `SYSTEM_TEMPLATE` rule),
+`lib/url-ingestion.ts` (`MIN_CONTENT_LENGTH` guard, `UrlFetchError` → `AppError`).
+**Packages added:** none. **Migrations:** none. **Environment variables:** none.
+
+**What the user still needs to do for their own business to actually work well** (not
+a code gap, a data gap): (1) the four AI/mobile-app service knowledge pages are still
+16-character stubs today — either paste each page's real content in manually via
+"Add knowledge manually," or re-run "Refresh" now that it will fail loudly instead of
+silently if the site is still JS-rendered. (2) `list_products_and_services` reads the
+structured `products`/`services` tables, not knowledge documents — right now that's
+only the one "Web Services..." row with a blank description; adding the AI Agents/AI
+Chatbot/AI Automation/Mobile App work as real Service catalog rows (Dashboard →
+Services) would make both this tool and `check_product_details` answer about them
+correctly, not just the knowledge-document path.
+
+**Known limitation, not glossed over:** this remains a wording/tooling-level fix
+validated by inspection, direct data verification, and automated checks — not a live
+Gemini conversation replay of the exact failing screenshots. The next person to touch
+this should retest the sandbox chat with "Can you build an ai agent for me?" and
+"What are all the services you provide?" once the JS-rendered knowledge pages have
+real content, and watch for the AI over-answering questions it shouldn't as a result
+of the loosened decline rule from the prior fix.
 
 ---
 

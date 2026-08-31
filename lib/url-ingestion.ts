@@ -11,10 +11,31 @@ import { knowledgeContentSchema } from "@/lib/schemas/knowledge";
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_BYTES = 2_000_000;
 const MAX_CONTENT_LENGTH = 20_000;
+/**
+ * A plain fetch() + tag-strip (lib/html-extract.ts) cannot run JavaScript,
+ * so a client-rendered page (React/Vue/etc. with no server-side rendering)
+ * returns only its static shell -- typically just the <title> text, since
+ * the real content lives inside a <script> bundle that never executes here.
+ * Observed in production: a real such page extracted to exactly 16
+ * characters ("Waves Web Studio", the <title> alone). Below this floor the
+ * result is almost certainly a JS-rendered shell, not real page content --
+ * reject it loudly instead of silently saving a near-empty document as a
+ * successful import (previously: the model would ground zero real answers
+ * in it while the dashboard still showed "Ready").
+ */
+const MIN_CONTENT_LENGTH = 100;
 
-export class UrlFetchError extends Error {}
-
-/** Fetches a URL and extracts plain text from its HTML body, bounded by size and time. Thrown `UrlFetchError` messages are safe to show a user (no raw network/parse detail). */
+/**
+ * Fetches a URL and extracts plain text from its HTML body, bounded by
+ * size and time. Every failure throws `AppError` with a safe, specific
+ * user-facing message (no raw network/parse detail) -- `logAndGetUserMessage`
+ * (lib/errors.ts) is the single funnel every caller already routes through,
+ * so this is what actually reaches the dashboard. (Previously these threw
+ * a bare `UrlFetchError` subclass that `logAndGetUserMessage` didn't
+ * recognize, so every one of these specific messages was silently replaced
+ * with the generic "Something went wrong" -- fixed here, not just for the
+ * new too-short-content case below.)
+ */
 async function fetchUrlContent(url: string): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -23,30 +44,36 @@ async function fetchUrlContent(url: string): Promise<string> {
   try {
     response = await fetch(url, { signal: controller.signal, redirect: "follow" });
   } catch {
-    throw new UrlFetchError("Could not reach this URL. Check that it's correct and publicly accessible.");
+    throw new AppError("Could not reach this URL. Check that it's correct and publicly accessible.");
   } finally {
     clearTimeout(timeout);
   }
 
   if (!response.ok) {
-    throw new UrlFetchError(`This URL returned an error (status ${response.status}).`);
+    throw new AppError(`This URL returned an error (status ${response.status}).`);
   }
 
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("text/html") && !contentType.includes("text/plain")) {
-    throw new UrlFetchError("This URL doesn't look like a web page (unsupported content type).");
+    throw new AppError("This URL doesn't look like a web page (unsupported content type).");
   }
 
   const buffer = await response.arrayBuffer();
   if (buffer.byteLength > MAX_RESPONSE_BYTES) {
-    throw new UrlFetchError("This page is too large to import.");
+    throw new AppError("This page is too large to import.");
   }
 
   const html = new TextDecoder("utf-8").decode(buffer);
   const text = contentType.includes("text/html") ? extractTextFromHtml(html) : html.trim();
 
   if (text.length === 0) {
-    throw new UrlFetchError("No readable text content was found at this URL.");
+    throw new AppError("No readable text content was found at this URL.");
+  }
+
+  if (text.length < MIN_CONTENT_LENGTH) {
+    throw new AppError(
+      "This page only returned a small amount of text, which usually means its content is loaded by JavaScript and not visible to this importer. Paste the page's content in manually instead using \"Add knowledge manually.\"",
+    );
   }
 
   return text.slice(0, MAX_CONTENT_LENGTH);
