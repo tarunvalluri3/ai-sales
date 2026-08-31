@@ -4,15 +4,17 @@ import { useActionState, useState } from "react";
 import type { WidgetKey } from "@/lib/supabase/types";
 import { updateWidgetKeyOriginsAction, revokeWidgetKeyAction, type WidgetKeyActionState } from "./actions";
 import { CopyKeyButton } from "./copy-key-button";
+import { buildWidgetSnippet } from "./build-widget-snippet";
 import { EmptyState } from "../_components/state-views";
 
 const initialState: WidgetKeyActionState = {};
 
-function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKey }) {
+function WidgetKeyCard({ widgetKey, appOrigin }: { widgetKey: WidgetKey; appOrigin: string }) {
   const [origins, setOrigins] = useState(widgetKey.allowed_origins.join("\n"));
   const [updateState, updateAction, updatePending] = useActionState(updateWidgetKeyOriginsAction, initialState);
   const [revokeState, revokeAction, revokePending] = useActionState(revokeWidgetKeyAction, initialState);
   const isRevoked = widgetKey.status === "revoked";
+  const snippet = buildWidgetSnippet(widgetKey.key, appOrigin);
 
   return (
     <div className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
@@ -21,7 +23,8 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKey }) {
           <code className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2 font-mono text-sm text-ds-text-primary">
             {widgetKey.key}
           </code>
-          <CopyKeyButton value={widgetKey.key} />
+          <CopyKeyButton value={widgetKey.key} label="Copy key" />
+          {!isRevoked ? <CopyKeyButton value={snippet} label="Copy snippet" /> : null}
         </div>
         <span
           className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
@@ -105,7 +108,7 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKey }) {
   );
 }
 
-export function WidgetKeyList({ widgetKeys }: { widgetKeys: WidgetKey[] }) {
+export function WidgetKeyList({ widgetKeys, appOrigin }: { widgetKeys: WidgetKey[]; appOrigin: string }) {
   if (widgetKeys.length === 0) {
     return <EmptyState title="No widget keys yet" description="Create one above to get started." />;
   }
@@ -113,7 +116,7 @@ export function WidgetKeyList({ widgetKeys }: { widgetKeys: WidgetKey[] }) {
   return (
     <div className="flex flex-col gap-4">
       {widgetKeys.map((widgetKey) => (
-        <WidgetKeyCard key={widgetKey.id} widgetKey={widgetKey} />
+        <WidgetKeyCard key={widgetKey.id} widgetKey={widgetKey} appOrigin={appOrigin} />
       ))}
     </div>
   );

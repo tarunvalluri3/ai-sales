@@ -2,7 +2,25 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-24 (Phase 25c implemented, not yet committed/merged — all of Phase 25's staged sub-phases now built; see docs/phases.md for the full item list)
+Last updated: 2026-08-31 (in-app chat widget install guide added on top of Phase 25c, not yet committed/merged)
+
+---
+
+## Widget install guide — implemented 2026-08-31
+
+Built directly per the user's standing "no prompt files" instruction, as a trivial-scope UI addition (no DB/schema/auth/AI-pipeline change) on `/dashboard/widget-settings`, which previously had no self-serve installation instructions at all — only a raw widget key with a "copy key" button and no full `<script>` snippet or platform-specific paste-in steps.
+
+**What was added:** a new collapsible `WidgetInstallGuide` section (`dashboard/widget-settings/widget-install-guide.tsx`) above the publish button, written for a non-technical business owner: Step 1 copies the ready-to-paste `<script src=".../widget-loader.js" data-widget-key="...">` snippet for the business's first active widget key; Step 2 gives paste-in steps for five platforms (plain HTML, WordPress, Shopify, Wix, Squarespace) picked via tabs; Steps 3-5 point at the existing "Allowed origins" field, the existing `PublishButton`, and a manual test check. `WidgetKeyList` (`widget-key-list.tsx`) also gained a per-key "Copy snippet" button next to the existing "Copy key" button, so a rotated/second key's snippet is copyable inline too. Both share a new `buildWidgetSnippet(key, origin)` helper (`build-widget-snippet.ts`).
+
+**Origin resolution:** the snippet's `src` is the app's own request origin (matches `widget-loader.js`'s existing self-resolving design — no `NEXT_PUBLIC_APP_URL`). Resolved **server-side** in `page.tsx` via `headers()` (`x-forwarded-proto` + `host`) and passed down as a plain `appOrigin` prop, not computed client-side with `window.location` — the client-side approach was tried first and reverted because it either produced a hydration mismatch (computing during render) or tripped the `react-hooks/set-state-in-effect` lint rule (computing in a `useEffect`); resolving it once on the server sidesteps both.
+
+**Checks:** `npm run lint` — pass, zero errors/warnings. `npx tsc --noEmit` — pass. `npm run build` — pass, all routes including `/dashboard/widget-settings`. `npm test` (pgTAP) — not required (no database/schema/RLS change) and not run to completion this session; the change touches no data-access layer, so tenant-isolation testing doesn't apply here.
+
+**Files changed (new):** `dashboard/widget-settings/{widget-install-guide.tsx,build-widget-snippet.ts}`. **Modified:** `dashboard/widget-settings/{page.tsx,widget-key-list.tsx,copy-key-button.tsx}` (`CopyKeyButton` gained an optional `label` prop, default `"Copy"`, so it can be reused for "Copy snippet").
+
+**Packages added:** none. **Migrations:** none. **Environment variables added:** none.
+
+**Known limitations:** (1) no live browser click-through this session — lint/typecheck/build all passed, but no one has opened `/dashboard/widget-settings` in an actual browser to confirm the guide renders and "Copy snippet" produces a working tag when pasted into a real page. (2) platform instructions cover five common site builders, not every possible host — anything else falls back to the generic "plain HTML" step. (3) Step 1 only shows a snippet once at least one active (non-revoked) widget key exists; a business with zero keys sees a prompt to create one first, with no inline snippet preview.
 
 ---
 
