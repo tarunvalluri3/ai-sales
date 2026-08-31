@@ -36,8 +36,8 @@ function WidgetKeyCard({ widgetKey, appOrigin }: { widgetKey: WidgetKey; appOrig
       </div>
 
       <p className="text-xs text-ds-text-muted">
-        Created {new Date(widgetKey.created_at).toLocaleString()}
-        {widgetKey.revoked_at ? ` · Revoked ${new Date(widgetKey.revoked_at).toLocaleString()}` : ""}
+        Created {new Date(widgetKey.created_at).toLocaleString("en-US")}
+        {widgetKey.revoked_at ? ` · Revoked ${new Date(widgetKey.revoked_at).toLocaleString("en-US")}` : ""}
       </p>
 
       {isRevoked ? (
