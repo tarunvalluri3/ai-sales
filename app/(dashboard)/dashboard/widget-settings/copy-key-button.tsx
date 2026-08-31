@@ -3,11 +3,11 @@
 import { useState } from "react";
 
 /**
- * Pure UI sugar around the existing widget_key display value below --
- * copies the already-rendered key to the clipboard. Adds no new data,
+ * Pure UI sugar around an already-rendered value (the widget key, or the
+ * full embed snippet) -- copies it to the clipboard. Adds no new data,
  * no new server call, no new config option.
  */
-export function CopyKeyButton({ value }: { value: string }) {
+export function CopyKeyButton({ value, label = "Copy" }: { value: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -51,7 +51,7 @@ export function CopyKeyButton({ value }: { value: string }) {
               strokeWidth="2"
             />
           </svg>
-          Copy
+          {label}
         </>
       )}
     </button>
