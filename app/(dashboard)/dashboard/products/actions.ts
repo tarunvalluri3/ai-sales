@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
-import { createProduct, updateProduct, deleteProduct } from "@/lib/products";
+import { createProduct, updateProduct, deleteProduct, approveProductDraft, rejectProductDraft } from "@/lib/products";
 import {
   catalogNameSchema,
   catalogDescriptionSchema,
@@ -118,6 +118,73 @@ export async function deleteProductAction(
 
   if (!deleted) {
     return { error: "This product no longer exists." };
+  }
+
+  revalidatePath("/dashboard/products");
+  return { success: true };
+}
+
+export type ReviewState = {
+  error?: string;
+  success?: boolean;
+};
+
+/** Approves a product extracted from a knowledge document (Stage 2, STATE.md). */
+export async function approveProductAction(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid product." };
+  }
+
+  let approved: boolean;
+  try {
+    approved = await approveProductDraft(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!approved) {
+    return { error: "This product is no longer awaiting review." };
+  }
+
+  revalidatePath("/dashboard/products");
+  return { success: true };
+}
+
+/** Rejects (deletes) a product extracted from a knowledge document (Stage 2, STATE.md). */
+export async function rejectProductAction(
+  _prevState: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid product." };
+  }
+
+  let rejected: boolean;
+  try {
+    rejected = await rejectProductDraft(businessId, parsed.data.id);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!rejected) {
+    return { error: "This product is no longer awaiting review." };
   }
 
   revalidatePath("/dashboard/products");

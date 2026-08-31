@@ -1,14 +1,23 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
-import { listProductsForBusiness } from "@/lib/products";
+import { listProductsForBusiness, listPendingReviewProducts } from "@/lib/products";
+import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
 import { DeleteButton } from "../_components/delete-button";
+import { ReviewActions } from "../_components/review-actions";
 import { ProductForm } from "./product-form";
-import { createProductAction, deleteProductAction } from "./actions";
+import { createProductAction, deleteProductAction, approveProductAction, rejectProductAction } from "./actions";
 import { EmptyState } from "../_components/state-views";
 
 export default async function ProductsPage() {
   const { businessId } = await requireBusinessContext();
-  const products = await listProductsForBusiness(businessId);
+  const [products, pendingProducts] = await Promise.all([
+    listProductsForBusiness(businessId),
+    listPendingReviewProducts(businessId),
+  ]);
+  const sourceDocumentIds = pendingProducts
+    .map((product) => product.extracted_from_document_id)
+    .filter((id): id is string => id !== null);
+  const documentTitleById = await getKnowledgeDocumentTitles(businessId, sourceDocumentIds);
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -18,6 +27,38 @@ export default async function ProductsPage() {
           What your AI sales employee can tell prospects you sell.
         </p>
       </div>
+
+      {pendingProducts.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-medium text-ds-text-primary">Pending review</h2>
+          <ul className="flex flex-col gap-3">
+            {pendingProducts.map((product) => (
+              <li
+                key={product.id}
+                className="flex items-center justify-between gap-4 rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <p className="truncate font-medium text-ds-text-primary">{product.name}</p>
+                  {product.description ? (
+                    <p className="line-clamp-2 text-sm text-ds-text-secondary">{product.description}</p>
+                  ) : null}
+                  <p className="text-xs text-ds-text-muted">
+                    Extracted from: {product.extracted_from_document_id
+                      ? (documentTitleById.get(product.extracted_from_document_id) ?? "a deleted document")
+                      : "unknown source"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-4">
+                  {product.price ? (
+                    <span className="text-sm font-semibold text-ds-accent">${product.price}</span>
+                  ) : null}
+                  <ReviewActions approveAction={approveProductAction} rejectAction={rejectProductAction} id={product.id} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {products.length === 0 ? (
         <EmptyState

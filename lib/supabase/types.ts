@@ -44,12 +44,17 @@ export type WidgetKey = {
   revoked_at: string | null;
 };
 
+/** Stage 2 (STATE.md): gates a catalog row extracted from a knowledge document behind human review before it's answerable by the AI. Every manually-created row keeps the 'approved' default -- only lib/knowledge-extraction.ts ever inserts 'draft'. */
+export type CatalogItemStatus = "draft" | "approved";
+
 export type Product = {
   id: string;
   business_id: string;
   name: string;
   description: string | null;
   price: string | null;
+  status: CatalogItemStatus;
+  extracted_from_document_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -60,6 +65,8 @@ export type Service = {
   name: string;
   description: string | null;
   price: string | null;
+  status: CatalogItemStatus;
+  extracted_from_document_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -69,6 +76,8 @@ export type Faq = {
   business_id: string;
   question: string;
   answer: string;
+  status: CatalogItemStatus;
+  extracted_from_document_id: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -9,6 +9,7 @@ import { PublishToggleButton } from "./_components/publish-toggle-button";
 import { FileUploadForm } from "./_components/file-upload-form";
 import { UrlImportForm } from "./_components/url-import-form";
 import { RefreshUrlButton } from "./_components/refresh-url-button";
+import { ExtractNowButton } from "./_components/extract-now-button";
 import { EmptyState } from "../_components/state-views";
 import {
   createKnowledgeDocumentAction,
@@ -97,6 +98,7 @@ export default async function KnowledgePage() {
                   <RetryIngestionButton action={retryIngestionAction} id={document.id} />
                 ) : null}
                 {document.source_type === "url" ? <RefreshUrlButton id={document.id} /> : null}
+                {document.status === "published" ? <ExtractNowButton id={document.id} /> : null}
                 {document.status === "draft" ? (
                   <PublishToggleButton
                     action={publishKnowledgeDocumentAction}

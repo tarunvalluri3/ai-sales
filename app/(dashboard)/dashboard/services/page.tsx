@@ -1,14 +1,23 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
-import { listServicesForBusiness } from "@/lib/services";
+import { listServicesForBusiness, listPendingReviewServices } from "@/lib/services";
+import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
 import { DeleteButton } from "../_components/delete-button";
+import { ReviewActions } from "../_components/review-actions";
 import { ServiceForm } from "./service-form";
-import { createServiceAction, deleteServiceAction } from "./actions";
+import { createServiceAction, deleteServiceAction, approveServiceAction, rejectServiceAction } from "./actions";
 import { EmptyState } from "../_components/state-views";
 
 export default async function ServicesPage() {
   const { businessId } = await requireBusinessContext();
-  const services = await listServicesForBusiness(businessId);
+  const [services, pendingServices] = await Promise.all([
+    listServicesForBusiness(businessId),
+    listPendingReviewServices(businessId),
+  ]);
+  const sourceDocumentIds = pendingServices
+    .map((service) => service.extracted_from_document_id)
+    .filter((id): id is string => id !== null);
+  const documentTitleById = await getKnowledgeDocumentTitles(businessId, sourceDocumentIds);
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -18,6 +27,38 @@ export default async function ServicesPage() {
           What your AI sales employee can tell prospects you offer.
         </p>
       </div>
+
+      {pendingServices.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-sm font-medium text-ds-text-primary">Pending review</h2>
+          <ul className="flex flex-col gap-3">
+            {pendingServices.map((service) => (
+              <li
+                key={service.id}
+                className="flex items-center justify-between gap-4 rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
+              >
+                <div className="flex min-w-0 flex-col gap-0.5">
+                  <p className="truncate font-medium text-ds-text-primary">{service.name}</p>
+                  {service.description ? (
+                    <p className="line-clamp-2 text-sm text-ds-text-secondary">{service.description}</p>
+                  ) : null}
+                  <p className="text-xs text-ds-text-muted">
+                    Extracted from: {service.extracted_from_document_id
+                      ? (documentTitleById.get(service.extracted_from_document_id) ?? "a deleted document")
+                      : "unknown source"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-4">
+                  {service.price ? (
+                    <span className="text-sm font-semibold text-ds-accent">${service.price}</span>
+                  ) : null}
+                  <ReviewActions approveAction={approveServiceAction} rejectAction={rejectServiceAction} id={service.id} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {services.length === 0 ? (
         <EmptyState

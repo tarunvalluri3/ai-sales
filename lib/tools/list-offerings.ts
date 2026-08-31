@@ -54,6 +54,7 @@ export async function executeListOfferings(
     .from("products")
     .select("name, description, price")
     .eq("business_id", businessId)
+    .eq("status", "approved")
     .order("created_at", { ascending: true })
     .limit(MAX_OFFERINGS_PER_TABLE);
 
@@ -66,6 +67,7 @@ export async function executeListOfferings(
     .from("services")
     .select("name, description, price")
     .eq("business_id", businessId)
+    .eq("status", "approved")
     .order("created_at", { ascending: true })
     .limit(MAX_OFFERINGS_PER_TABLE);
 

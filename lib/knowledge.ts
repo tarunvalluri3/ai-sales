@@ -275,6 +275,14 @@ export async function enqueueIngestion(
   return data.length > 0;
 }
 
+export type PublishKnowledgeDocumentResult = {
+  found: boolean;
+  /** True if `document.version` was still 1 at the moment this was called -- i.e. this is the document's first-ever publish, not a republish. Stage 2's extraction trigger (dashboard/knowledge/actions.ts) fires only on this. */
+  isFirstPublish: boolean;
+  title: string;
+  content: string;
+};
+
 /**
  * Publishes a draft (or republishes a previously unpublished) manual
  * knowledge document -- the approval step gating whether its chunks are
@@ -282,7 +290,7 @@ export async function enqueueIngestion(
  * and filters status = 'published'). Snapshots the current title/content
  * into knowledge_document_versions as an immutable history row before
  * flipping status, and bumps `version`. `actorUserId` must come from
- * `requireBusinessContext()`. Returns `false` for a cross-tenant,
+ * `requireBusinessContext()`. `found: false` for a cross-tenant,
  * nonexistent, or non-manual id, same not-found contract as every other
  * mutation in this file.
  */
@@ -290,7 +298,7 @@ export async function publishKnowledgeDocument(
   businessId: string,
   id: string,
   actorUserId: string,
-): Promise<boolean> {
+): Promise<PublishKnowledgeDocumentResult> {
   const supabase = createServerSupabaseClient();
 
   const { data: document, error: fetchError } = await supabase
@@ -302,9 +310,10 @@ export async function publishKnowledgeDocument(
     .maybeSingle();
 
   if (fetchError || !document) {
-    return false;
+    return { found: false, isFirstPublish: false, title: "", content: "" };
   }
 
+  const isFirstPublish = document.version === 1;
   const nextVersion = document.version + 1;
   const now = new Date().toISOString();
 
@@ -340,7 +349,7 @@ export async function publishKnowledgeDocument(
     );
   }
 
-  return true;
+  return { found: true, isFirstPublish, title: document.title, content: document.content };
 }
 
 /** Takes a published manual document back to draft -- its chunks immediately stop being retrieval-eligible, without deleting them (a re-publish needs no re-ingestion). See `publishKnowledgeDocument` for the not-found contract. */
@@ -364,6 +373,35 @@ export async function unpublishKnowledgeDocument(businessId: string, id: string)
   }
 
   return data.length > 0;
+}
+
+/**
+ * Resolves `{ id -> title }` for a set of knowledge document ids, scoped to
+ * the given business -- used by the products/services/FAQs "Pending
+ * review" sections (Stage 2, STATE.md) to show which document an extracted
+ * draft came from. Business-scoped like every other lookup here, so an id
+ * from another business simply resolves to nothing.
+ */
+export async function getKnowledgeDocumentTitles(
+  businessId: string,
+  ids: string[],
+): Promise<Map<string, string>> {
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("knowledge_documents")
+    .select("id, title")
+    .eq("business_id", businessId)
+    .in("id", ids);
+
+  if (error || !data) {
+    return new Map();
+  }
+
+  return new Map(data.map((document) => [document.id, document.title]));
 }
 
 export type CitedChunk = {

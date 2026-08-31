@@ -13,6 +13,7 @@ import {
   enqueueIngestion,
   publishKnowledgeDocument,
   unpublishKnowledgeDocument,
+  getKnowledgeDocument,
 } from "@/lib/knowledge";
 import { knowledgeTitleSchema, knowledgeContentSchema } from "@/lib/schemas/knowledge";
 import { logAndGetUserMessage } from "@/lib/errors";
@@ -21,6 +22,7 @@ import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createFileKnowledgeDocument } from "@/lib/file-ingestion";
 import { createUrlKnowledgeDocument, refreshUrlKnowledgeDocument } from "@/lib/url-ingestion";
+import { extractCatalogFromDocument } from "@/lib/knowledge-extraction";
 
 /**
  * Kicks the background ingestion queue right after this request finishes
@@ -260,20 +262,76 @@ export async function publishKnowledgeDocumentAction(
     return { error: "Invalid knowledge document." };
   }
 
-  let published: boolean;
+  let result: Awaited<ReturnType<typeof publishKnowledgeDocument>>;
   try {
-    published = await publishKnowledgeDocument(businessId, parsed.data.id, userId);
+    result = await publishKnowledgeDocument(businessId, parsed.data.id, userId);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
 
-  if (!published) {
+  if (!result.found) {
     return { error: "This knowledge document no longer exists." };
   }
 
   await recordAuditLogEntry(businessId, userId, "knowledge.published", "knowledge_document", parsed.data.id);
 
+  // Stage 2 (STATE.md): only a document's first-ever publish triggers
+  // catalog extraction -- a republish (e.g. after an edit) does not
+  // re-extract, avoiding duplicate drafts on every edit/publish cycle.
+  // "Extract now" (below) is the deliberate manual escape hatch for
+  // re-running extraction later.
+  if (result.isFirstPublish) {
+    const title = result.title;
+    const content = result.content;
+    after(() => extractCatalogFromDocument(businessId, parsed.data.id, title, content));
+  }
+
   revalidatePath("/dashboard/knowledge");
+  return { success: true };
+}
+
+export type ExtractNowState = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
+ * Manual escape hatch to (re-)run catalog extraction on an already
+ * published manual/file/url document -- e.g. after a URL refresh adds new
+ * content, or a document published before Stage 2 shipped. Deduplication
+ * against existing rows happens in `extractCatalogFromDocument` itself
+ * (exact case-insensitive name/question match); this action only checks
+ * that the document exists and is published, since an unpublished
+ * document's content isn't yet business-approved.
+ */
+export async function extractNowAction(
+  _prevState: ExtractNowState,
+  formData: FormData,
+): Promise<ExtractNowState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = z.object({ id: z.string().uuid() }).safeParse({ id: formData.get("id") });
+  if (!parsed.success) {
+    return { error: "Invalid knowledge document." };
+  }
+
+  const document = await getKnowledgeDocument(businessId, parsed.data.id);
+  if (!document) {
+    return { error: "This knowledge document no longer exists." };
+  }
+  if (document.status !== "published") {
+    return { error: "Publish this document before extracting catalog data from it." };
+  }
+
+  const documentId = document.id;
+  const title = document.title;
+  const content = document.content;
+  after(() => extractCatalogFromDocument(businessId, documentId, title, content));
+
   return { success: true };
 }
 
