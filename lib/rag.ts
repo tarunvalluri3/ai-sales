@@ -12,6 +12,7 @@ import { AppError } from "@/lib/errors";
 import { checkProductDetailsTool, executeCheckProductDetails } from "@/lib/tools/check-product-details";
 import { checkFaqTopicTool, executeCheckFaqTopic } from "@/lib/tools/check-faq-topic";
 import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request-callback";
+import { listOfferingsTool, executeListOfferings } from "@/lib/tools/list-offerings";
 import { logEvent } from "@/lib/logger";
 import { isWithinUsageQuota } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
@@ -166,6 +167,7 @@ Rules:
 - Category 4 (unknown) is for when nothing retrieved is genuinely about what the prospect is asking -- a different topic entirely, not just different phrasing. Only then say plainly that you don't have that information -- do not guess, do not answer from general knowledge, and do not generalize from other businesses. Offer to connect the prospect with a human or collect their contact details for follow-up.
 - When a prospect asks about a specific named product or service and you need its exact, current price or description, use the check_product_details tool rather than relying only on the reference context above -- it queries the business's live catalog directly.
 - When a prospect's question matches a specific FAQ topic and you need the business's exact approved wording, use the check_faq_topic tool rather than relying only on the reference context above.
+- When a prospect asks a broad question like "what do you offer", "what services do you provide", or "list everything you do" -- rather than asking about one specific named item -- use the list_products_and_services tool to get the business's full current catalog, rather than answering only from whatever happened to be retrieved as reference context above.
 - A prospect may want a callback in two ways: they ask for one directly, or you proactively offer one (for example, as part of deciding to escalate). Offering a callback is always just conversation -- it never calls a tool by itself. Only call the request_callback tool after the prospect has clearly agreed to a callback, in response to either their own request or your offer, AND you already have their email or phone number from this conversation. Never call this tool based only on your own guess that they might want one -- wait for their explicit agreement first, and if you don't have contact info yet, ask for it before calling the tool.
 - Never invent facts about {businessName}.
 - Never discuss competitors or any other business.
@@ -312,7 +314,12 @@ export async function askSalesEmployee(
     });
     const messages: BaseMessage[] = prompt.toChatMessages();
 
-    const toolModel = getChatModel().bindTools([checkProductDetailsTool, checkFaqTopicTool, requestCallbackTool]);
+    const toolModel = getChatModel().bindTools([
+      checkProductDetailsTool,
+      checkFaqTopicTool,
+      requestCallbackTool,
+      listOfferingsTool,
+    ]);
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const aiMessage = await toolModel.invoke(messages);
       totalInputTokens += aiMessage.usage_metadata?.input_tokens ?? 0;
@@ -332,6 +339,8 @@ export async function askSalesEmployee(
         } else if (toolCall.name === "request_callback") {
           calledSideEffectingTool = true;
           toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
+        } else if (toolCall.name === "list_products_and_services") {
+          toolResult = await executeListOfferings(supabase, businessId);
         } else {
           logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
           toolResult = { found: false, reason: "invalid_input" };
