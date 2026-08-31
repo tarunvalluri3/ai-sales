@@ -45,7 +45,7 @@ function WebhookEndpointRow({ endpoint }: { endpoint: WebhookEndpoint }) {
         </form>
       </div>
       <SecretReveal secret={endpoint.secret} />
-      <p className="text-xs text-ds-text-muted">Created {new Date(endpoint.created_at).toLocaleString()}</p>
+      <p className="text-xs text-ds-text-muted">Created {new Date(endpoint.created_at).toLocaleString("en-US")}</p>
       {state.error ? (
         <span role="alert" className="text-xs text-ds-danger">
           {state.error}

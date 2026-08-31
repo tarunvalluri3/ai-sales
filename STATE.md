@@ -2,7 +2,44 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (escalation-gating fix, on top of the already-merged ingestion/list-tool fix (PR #15) and decline-rule fix (PR #14); not yet committed/merged)
+Last updated: 2026-08-31 (hydration locale fix, on top of the already-merged escalation-gating fix (PR #16), ingestion/list-tool fix (PR #15), and decline-rule fix (PR #14); not yet committed/merged)
+
+---
+
+## Hydration fix: locale-dependent date formatting — implemented 2026-08-31
+
+Live bug report, unrelated to the AI prompt work below: `/dashboard/widget-settings`
+threw a real "Recoverable Error" hydration mismatch in the browser — server-rendered
+"8/24/2026, 9:21:38 PM" vs. client-rendered "24/8/2026, 9:21:38 pm" for the same
+timestamp, in `widget-key-list.tsx`'s `WidgetKeyCard`. Root cause: `new
+Date(...).toLocaleString()` with no explicit locale argument defaults to whatever
+locale the runtime resolves — the Next.js server process and a visitor's browser can
+disagree, and this is a `"use client"` component, so its SSR HTML must byte-match its
+client-side hydration render exactly. Grepped every `toLocaleString()` call site
+repo-wide: the identical unset-locale pattern also exists in
+`webhook-endpoint-list.tsx` (another client component — same latent bug, fixed
+preemptively) and in `audit-log/page.tsx`/`conversations/page.tsx`/`conversations/
+[id]/page.tsx` (Server Components with no `"use client"` — these render once,
+server-side only, so there's no hydration step for them to mismatch against; left
+unchanged, in scope discipline, since they aren't actually broken).
+
+**Fix:** both `widget-key-list.tsx` and `webhook-endpoint-list.tsx` now pass an
+explicit `"en-US"` locale to every `toLocaleString()` call, so server and client
+always agree regardless of either environment's default locale settings. Trivial-scope
+per `AGENTS.md` §5 (2 files, ~3 lines, no DB/auth/AI change) — implemented directly.
+
+**Checks:** `npm run lint` — pass. `npx tsc --noEmit` — pass. `npm run build` — pass,
+all 31 routes.
+
+**Files changed:** `app/(dashboard)/dashboard/widget-settings/widget-key-list.tsx`,
+`app/(dashboard)/dashboard/webhooks/webhook-endpoint-list.tsx`. **Packages added:**
+none. **Migrations:** none. **Environment variables:** none.
+
+**Known limitation:** no live browser re-check this session confirming the error
+overlay is actually gone on `/dashboard/widget-settings` — the fix is a well-understood,
+standard resolution for this exact class of Next.js hydration error (explicit locale
+eliminates the server/client formatting disagreement structurally), but worth a quick
+manual reload to confirm.
 
 ---
 
