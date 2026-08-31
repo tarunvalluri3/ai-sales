@@ -2,7 +2,120 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (hydration locale fix, on top of the already-merged escalation-gating fix (PR #16), ingestion/list-tool fix (PR #15), and decline-rule fix (PR #14); not yet committed/merged)
+Last updated: 2026-08-31 (headless-rendering fallback for JS-rendered site ingestion, Stage C of a 3-stage "generalize the AI's business understanding" fix; not yet committed/merged)
+
+---
+
+## Stage C: headless-rendering fallback for JS-rendered website ingestion — implemented 2026-08-31
+
+First of a 3-stage fix (staged per the user's explicit choice), addressing a broader
+gap the user raised: the AI can't reliably learn a business's offerings from arbitrary
+knowledge sources (URL/PDF/manual text) the way it can from manually-entered
+Products/Services/FAQs. Stage order (also the user's choice): fix ingestion first,
+since nothing else matters if the underlying content is still empty. Stage 2 (LLM
+extraction of catalog entries from knowledge documents, as drafts for owner review)
+and Stage 3 (broader-answering fallback reading knowledge documents directly) are
+separate, not-yet-started plans.
+
+**Confirmed, again, that this was still broken**: Waves Web Studio's five URL-sourced
+knowledge documents were still 16-character stubs (`"Waves Web Studio"`, the page
+`<title>` only) — queried live from `knowledge_chunks` before starting. Root cause
+(established in an earlier pass, PR #15): `lib/url-ingestion.ts`'s
+`fetchUrlContent()` does a plain `fetch()` + regex tag-strip, which cannot execute
+JavaScript — confirmed by fetching Waves' own raw HTML directly: it's a
+client-rendered Vite/React SPA whose server response is just
+`<div id="root"></div>` plus a `<script>` tag.
+
+**Fix**: new `lib/browser-render.ts`'s `renderPageText()` — a real headless-Chromium
+render, used only as a fallback when the existing fast path (`fetch()` +
+`extractTextFromHtml()`) returns fewer than `MIN_CONTENT_LENGTH` (100) characters
+(PR #15's existing signal). `lib/url-ingestion.ts`'s `fetchUrlContent()` now tries
+the fast path first (unchanged, zero added latency for the common
+static/server-rendered case), then falls back to a render attempt, then only throws
+the "paste manually" `AppError` if *both* fail. Per the user's explicit choice, this
+is a **self-hosted** approach (`puppeteer-core` + `@sparticuz/chromium-min`), not a
+managed rendering API/vendor — no new secret, no new paid service, matching this
+project's consistent "no new infra unless justified" pattern (D4/D8).
+
+**Technical grounding verified before implementing, not assumed** (per this project's
+standing discipline): read the actually-installed Next.js docs
+(`node_modules/next/dist/docs/.../maxDuration.md`) and confirmed `maxDuration` set at
+the page level extends the default timeout of every Server Action invoked from that
+page (Server Actions have no other mechanism to get more time) — so
+`app/(dashboard)/dashboard/knowledge/page.tsx` gained `export const maxDuration = 60`
+(same value as `/api/chat`'s existing precedent), covering both
+`createUrlKnowledgeDocumentAction` and `refreshUrlKnowledgeDocumentAction`. Also
+confirmed `puppeteer-core`/`@sparticuz/chromium`/`@sparticuz/chromium-min` are all
+already in Next's built-in `serverExternalPackages` auto-opt-out list — no
+`next.config.ts` bundler config needed. `app/api/cron/process-ingestion-queue/route.ts`
+also gained `maxDuration = 60`, since `refreshDueUrlKnowledgeSources()` fetches up to
+5 URLs sequentially per sweep and several slow renders could add up.
+
+**Local development**: `@sparticuz/chromium-min`'s binary is Linux-only (built for
+serverless platforms), so `lib/browser-render.ts` uses a new optional
+`LOCAL_CHROMIUM_PATH` env var (checked first) to point at a developer's own installed
+Chrome/Edge/Chromium locally; unset (as it will be in production) it uses the remote
+`chromium-min` pack, pinned to the exact installed npm package version
+(`149.0.0` — this package does not follow semver and can have breaking changes at the
+patch level, per its own README, so the pinned remote pack must match the installed
+version exactly). Deliberately did **not** add the full `puppeteer` package as a
+devDependency for this — `puppeteer-core` can launch any locally-installed system
+Chrome directly via `executablePath`, which is the package's own documented local-dev
+pattern; avoids a second heavy dependency and any ambiguity in Next's bundler tracing
+of an unused-in-production import.
+
+**Checks:** `npm run lint` — pass, zero errors/warnings. `npm run typecheck` — pass.
+`npm run build` — pass, all 31 routes (confirms no bundling issue with the two new
+packages).
+
+**Real-world verification, the actual motivating case**: ran the exact rendering logic
+(via a standalone script using the real `puppeteer-core` + local Chrome, not a mock)
+against all five of Waves Web Studio's broken URLs. Every one now extracts real
+content — 7,870 to 16,014 characters each (vs. 16 before), confirmed to be genuine
+page-specific text, not a repeated shell: the AI Agents page's render includes "AI
+AGENT DEVELOPMENT SERVICES — Intelligent AI Agents That Automate Workflows, Make
+Decisions & Execute Tasks... Go beyond conversations with custom AI agents built to
+think, plan, and take action..." — exactly the content needed to correctly answer
+"Can you build an AI agent for me?", the question that started this whole
+investigation.
+
+**Files changed (new):** `lib/browser-render.ts`. **Modified:** `lib/url-ingestion.ts`,
+`app/(dashboard)/dashboard/knowledge/page.tsx`,
+`app/api/cron/process-ingestion-queue/route.ts`, `lib/env.ts` (new optional
+`LOCAL_CHROMIUM_PATH`), `docs/security.md` (env var table + rationale).
+
+**Packages added:** `puppeteer-core` (^25.9.0), `@sparticuz/chromium-min` (^149.0.0) —
+both production dependencies. No devDependency added (see local-dev note above).
+
+**Migrations:** none. **Environment variables:** `LOCAL_CHROMIUM_PATH` — optional,
+local-dev only, unset in production.
+
+**Known limitation, not glossed over:** (1) the actual render *mechanics* were
+directly verified against real production data (above) — but the full
+`fetchUrlContent()`/`renderPageText()` integration (the `AppError` wrapping, the
+`MAX_CONTENT_LENGTH` slicing, the fast-path/slow-path branch) was verified by code
+review plus the checks above, not by invoking the real dashboard action through an
+authenticated browser session — that's the user's own real account, and per this
+session's earlier established preference, live-authenticated-account testing is left
+to the user rather than impersonated. **Next step for the user**: click "Refresh" on
+each of Waves Web Studio's five URL knowledge documents in `/dashboard/knowledge`, and
+confirm the content now looks real (not a 16-character stub) before publishing them.
+(2) Headless rendering is meaningfully slower for the sites that need it (several
+seconds to ~15-20s cold start) — only triggered for the minority of sites that fail
+the fast path, but noticeably slower than today's near-instant fetch for those sites.
+(3) This is the first genuinely new "infra-shaped" dependency category in this project
+(a headless browser) — a deliberate, explicit escalation beyond the historical
+smallest-footprint pattern, justified because there's no smaller alternative for
+executing JavaScript. (4) `refreshDueUrlKnowledgeSources`'s sequential 5-URL loop
+could still, in a worst case (several slow-render URLs due the same day), not finish
+all 5 within one 60s sweep — acceptable degradation already built into the existing
+design (picked up next day; per-URL failures don't block others). (5) **Separate
+discrepancy found, not fixed here**: `.env.example` is excluded by `.gitignore`'s
+broad `.env*` pattern and has never actually been committed to the repo (confirmed
+via `git ls-files`) — every "update `.env.example`" noted across this project's prior
+phases only ever changed a local, untracked file, invisible to anyone else cloning the
+repo or reviewing a PR diff. Not fixed unilaterally (a `.gitignore` change is a real,
+separate decision); flagged for the user to decide.
 
 ---
 

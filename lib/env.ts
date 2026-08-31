@@ -24,6 +24,7 @@ const envSchema = z.object({
   CRON_SECRET: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   NOTIFICATION_EMAIL_FROM: z.string().min(1).optional(),
+  LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

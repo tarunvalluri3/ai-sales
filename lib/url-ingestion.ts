@@ -2,6 +2,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { extractTextFromHtml } from "@/lib/html-extract";
+import { renderPageText } from "@/lib/browser-render";
 import { enqueueIngestion } from "@/lib/knowledge";
 import { AppError } from "@/lib/errors";
 import { logEvent } from "@/lib/logger";
@@ -19,22 +20,23 @@ const MAX_CONTENT_LENGTH = 20_000;
  * Observed in production: a real such page extracted to exactly 16
  * characters ("Waves Web Studio", the <title> alone). Below this floor the
  * result is almost certainly a JS-rendered shell, not real page content --
- * reject it loudly instead of silently saving a near-empty document as a
- * successful import (previously: the model would ground zero real answers
- * in it while the dashboard still showed "Ready").
+ * fall back to a real headless-browser render (lib/browser-render.ts)
+ * rather than silently saving a near-empty document as a successful import
+ * (previously: the model would ground zero real answers in it while the
+ * dashboard still showed "Ready").
  */
 const MIN_CONTENT_LENGTH = 100;
 
 /**
- * Fetches a URL and extracts plain text from its HTML body, bounded by
- * size and time. Every failure throws `AppError` with a safe, specific
- * user-facing message (no raw network/parse detail) -- `logAndGetUserMessage`
- * (lib/errors.ts) is the single funnel every caller already routes through,
- * so this is what actually reaches the dashboard. (Previously these threw
- * a bare `UrlFetchError` subclass that `logAndGetUserMessage` didn't
- * recognize, so every one of these specific messages was silently replaced
- * with the generic "Something went wrong" -- fixed here, not just for the
- * new too-short-content case below.)
+ * Fetches a URL and extracts plain text, bounded by size and time. Tries a
+ * plain fetch() + tag-strip first (fast, works for the large majority of
+ * server-rendered/static sites, unchanged from before); if that returns too
+ * little text, falls back to a real headless-browser render
+ * (lib/browser-render.ts) for client-rendered (JS-only) sites. Every failure
+ * throws `AppError` with a safe, specific user-facing message (no raw
+ * network/parse detail) -- `logAndGetUserMessage` (lib/errors.ts) is the
+ * single funnel every caller already routes through, so this is what
+ * actually reaches the dashboard.
  */
 async function fetchUrlContent(url: string): Promise<string> {
   const controller = new AbortController();
@@ -66,17 +68,21 @@ async function fetchUrlContent(url: string): Promise<string> {
   const html = new TextDecoder("utf-8").decode(buffer);
   const text = contentType.includes("text/html") ? extractTextFromHtml(html) : html.trim();
 
-  if (text.length === 0) {
-    throw new AppError("No readable text content was found at this URL.");
+  if (text.length >= MIN_CONTENT_LENGTH) {
+    return text.slice(0, MAX_CONTENT_LENGTH);
   }
 
-  if (text.length < MIN_CONTENT_LENGTH) {
+  // The fast path returned too little (or no) text -- almost certainly a
+  // client-rendered page. Try a real browser render before giving up.
+  const rendered = await renderPageText(url);
+
+  if (rendered.length < MIN_CONTENT_LENGTH) {
     throw new AppError(
-      "This page only returned a small amount of text, which usually means its content is loaded by JavaScript and not visible to this importer. Paste the page's content in manually instead using \"Add knowledge manually.\"",
+      "This page didn't have enough readable content, even after rendering it directly -- it may require sign-in, block automated access, or genuinely have little text. Paste the page's content in manually instead using \"Add knowledge manually.\"",
     );
   }
 
-  return text.slice(0, MAX_CONTENT_LENGTH);
+  return rendered.slice(0, MAX_CONTENT_LENGTH);
 }
 
 /**

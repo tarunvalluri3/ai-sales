@@ -102,6 +102,7 @@ Core set:
 | `CRON_SECRET` | **no** |
 | `RESEND_API_KEY` | **no** |
 | `NOTIFICATION_EMAIL_FROM` | config |
+| `LOCAL_CHROMIUM_PATH` | config, local dev only |
 
 Add a variable only when a feature actually requires it. Razorpay and WhatsApp variables are deferred to their phases. Keep the live list in `STATE.md` §5 in sync.
 
@@ -114,6 +115,8 @@ Add a variable only when a feature actually requires it. Razorpay and WhatsApp v
 `RESEND_API_KEY`/`NOTIFICATION_EMAIL_FROM` (Phase 25b) are optional -- `lib/notifications.ts`'s daily digest silently no-ops (one log line) rather than failing startup or the cron route when unset, since email delivery is a nice-to-have on top of the in-app "needs attention" badge/audit trail, not a path anything else depends on.
 
 Supabase key names above reflect the current `publishable`/`secret` key system (Phase 3), not the legacy `anon`/`service_role` naming, which Supabase is deprecating by end of 2026.
+
+`LOCAL_CHROMIUM_PATH` is optional, local-dev-only -- `lib/browser-render.ts`'s production headless-rendering path (`@sparticuz/chromium-min`) only runs on Linux, so this points at a developer's own installed Chrome/Edge/Chromium to exercise that fallback path locally. Left unset in production; the deployed Vercel function (Linux) always uses the remote `chromium-min` pack instead.
 
 Validate required env vars at startup and fail loudly rather than at first use.
 
