@@ -8,6 +8,15 @@ import { sendDailyDigestEmails } from "@/lib/notifications";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
+ * `refreshDueUrlKnowledgeSources()` fetches up to 5 URLs sequentially per
+ * run and can now fall back to a real headless-browser render
+ * (lib/browser-render.ts) for JS-rendered sites -- extended to match
+ * `/api/chat`'s existing `maxDuration` so several slow renders in one sweep
+ * don't risk the platform's default timeout.
+ */
+export const maxDuration = 60;
+
+/**
  * Daily Vercel Cron backstop, shared across every background queue this
  * app has (vercel.json) -- the normal-latency path for each is its own
  * `after()` call right after the triggering write (knowledge ingestion:

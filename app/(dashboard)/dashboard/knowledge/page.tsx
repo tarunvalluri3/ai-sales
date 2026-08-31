@@ -18,6 +18,18 @@ import {
   unpublishKnowledgeDocumentAction,
 } from "./actions";
 
+/**
+ * Extends the default Server Action timeout for every action invoked from
+ * this page -- per Next.js's documented behavior, `maxDuration` set at the
+ * page level applies to its Server Actions (Server Actions have no other
+ * way to get more than the platform default). Needed for
+ * `createUrlKnowledgeDocumentAction`/`refreshUrlKnowledgeDocumentAction`
+ * (`./actions.ts`), which can now fall back to a real headless-browser
+ * render (lib/browser-render.ts) for JS-rendered sites -- same value as
+ * `/api/chat`'s existing `maxDuration`.
+ */
+export const maxDuration = 60;
+
 const SOURCE_LABEL: Record<string, string> = {
   manual: "Manual",
   file: "File",
