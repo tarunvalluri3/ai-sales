@@ -584,6 +584,23 @@ The tool's log line is businessId + conversationId + outcome only — never
 the prospect's actual contact info, unlike the read tools' query-string
 logging, since this one touches real PII.
 
+**A fifth tool, `search_knowledge_base` (`lib/tools/search-knowledge-base.ts`,
+Stage 3, STATE.md), joined the same array.** Unlike the other four, it isn't
+a new authorized query surface — it wraps the same tenant-scoped
+`searchKnowledgeChunks()` (`lib/retrieval.ts`) that `KnowledgeRetriever`
+already calls automatically once per turn, just with a larger limit (8 vs.
+5) and a query the model can reformulate. It exists because that automatic
+pass runs once, against the prospect's literal wording; this tool lets the
+model try again, deliberately, when the automatic pass and the other four
+tools both come up short — the fallback for knowledge-document content
+that Stage 2's extraction doesn't turn into a discrete product/service/FAQ
+row (a policy, a warranty term, an about-us fact). Verified live that
+Gemini's function-calling actually invokes it autonomously in this
+situation, not just that the executor works in isolation (STATE.md has the
+full verification record). Chunk IDs it surfaces are merged into the
+response's `sourceChunkIds` alongside the passively-retrieved ones, so a
+citation reflects everything the model actually drew on.
+
 ### Lead extraction (Phase 10) — superseded, modules removed in Phase 19b
 
 **`lib/lead-extraction.ts` and `lib/lead-capture.ts` (including
