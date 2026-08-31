@@ -2,7 +2,103 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-08-31 (headless-rendering fallback for JS-rendered site ingestion, Stage C of a 3-stage "generalize the AI's business understanding" fix; not yet committed/merged)
+Last updated: 2026-08-31 (Stage 2 of the "generalize the AI's business understanding" work designed and confirmed with the user, implementation deferred to a new session; Stage C merged, PR #18)
+
+---
+
+## Stage 2 — catalog extraction & review: design confirmed with the user, NOT implemented — 2026-08-31
+
+**Not implemented this session.** The user explicitly paused here and will continue in
+a new session — this entry exists so that session doesn't have to re-derive the
+design from scratch. Do not treat anything in this entry as built; there is no new
+migration, no new file, no schema change on disk yet.
+
+**The confirmed intent** (restated back to the user and explicitly confirmed correct,
+not assumed): this product must work well for *any* business type, not just one that
+happens to fill in every dashboard section the way Waves Web Studio does. Different
+businesses will populate different combinations of knowledge sources — an e-commerce
+business mainly via Products, a services business via Services, another purely via
+its website URL. Today, the AI's "smart" answering (`check_product_details`,
+`list_products_and_services`, `check_faq_topic`) only ever sees structured
+Products/Services/FAQs rows — a business that only ever adds a URL knowledge document
+(now that Stage C can actually ingest real content from one) still gets only
+loose semantic retrieval, never the same reliable, tool-backed answering. Stage 2
+closes this by extracting structured catalog data *out of* knowledge documents,
+regardless of source type, so the two paths converge.
+
+**Confirmed design** (research done this session against the real schema —
+`lib/products.ts`/`lib/services.ts`/`lib/faqs.ts`, `lib/knowledge-sync.ts`,
+`lib/knowledge.ts`'s publish state machine, `lib/ingestion-queue.ts`, and all three
+AI tool files — not guessed):
+
+1. **New migration**: `products`, `services`, `faqs` each gain a `status` column
+   (`'draft' | 'approved'`, default `'approved'` — every existing row, and every
+   future manually-created row, is unaffected; only extraction ever inserts
+   `'draft'`) and a nullable `extracted_from_document_id uuid references
+   knowledge_documents(id) on delete set null` (provenance, for the review UI to show
+   "extracted from: <document title>"). Existing grants on all three tables are
+   table-level (`grant select, insert, update, delete ... to authenticated`,
+   confirmed for `products` — not column-scoped), so no new grant statement is
+   needed. No RLS policy change needed either — same business-scoped row rule, just
+   two new columns on it.
+2. **New extraction step** (`lib/knowledge-extraction.ts`, not yet created): a Gemini
+   structured-output call (same `withStructuredOutput` pattern `lib/rag.ts` already
+   uses), given a knowledge document's content, extracts distinct
+   products/services/FAQs it explicitly describes -- instructed to never infer or
+   invent anything not stated, and to leave `price` null rather than guess at an
+   ambiguous figure (e.g. "starting at $499/mo"). Each result is inserted as
+   `status: 'draft'` with `extracted_from_document_id` set -- **deliberately not**
+   synced into a knowledge document (`syncGeneratedDocument()`) at insert time, so an
+   unreviewed extraction can never become retrievable via RAG or answerable via tools
+   before a human approves it (the same trust boundary `knowledge_documents.status`
+   already enforces, applied consistently here).
+3. **Extraction trigger, confirmed timing**: only on a document's *first* publish
+   (`knowledge_documents.version === 1` at the moment `publishKnowledgeDocument()` is
+   called, before its own increment -- a reliable, already-available signal, no new
+   tracking needed) for `source_type` in `manual`/`file`/`url` only (never
+   `product`/`service`/`faq` -- those documents are themselves already mirrors of
+   catalog data; extracting them back would be circular). Triggered via `after()`
+   from `publishKnowledgeDocumentAction` (`dashboard/knowledge/actions.ts`), covered
+   by that page's existing `maxDuration = 60` (added in Stage C) -- no new queue/cron
+   needed for v1. A **manual "Extract now" button** per published URL/file/manual
+   document is the deliberate escape hatch for re-running extraction later (e.g.
+   after a URL refresh adds new content) without needing to solve robust
+   automatic-republish deduplication -- a lightweight exact-name-match skip (case
+   insensitive, checked against that business's existing draft+approved rows) is the
+   only dedup guard, a deliberate v1 simplification, not a robust fuzzy-match system.
+4. **Review UI**: a new "Pending review" section on each of the existing
+   `/dashboard/products`, `/dashboard/services`, `/dashboard/faqs` pages (not a new
+   page, and not on the Knowledge page -- review lives where the business owner
+   already manages that data type), showing each draft item's extracted fields, its
+   source document, and Approve/Reject actions. **Approve**: flips `status` to
+   `'approved'` and *then* calls the existing `syncGeneratedDocument()` -- the exact
+   same function a manual create already uses -- so an approved item becomes both
+   tool-queryable and RAG-retrievable, fully unified with the manual-entry path, no
+   second code path. **Reject**: deletes the row (safe -- nothing was ever synced for
+   a draft, so no `deleteGeneratedDocument()` counterpart call is needed). Both
+   gated `org:member`+, matching the existing product/service/FAQ write gate. New
+   `listPendingReviewProducts()`/`...Services()`/`...Faqs()` functions, and the
+   existing `listProductsForBusiness()`/etc. gain `.eq("status", "approved")` so a
+   draft never appears in the normal list, an export, or analytics until reviewed.
+5. **AI-tool safety gate (the actual enforcement point, not just UI polish)**:
+   `lib/tools/check-product-details.ts` (both the products and services queries),
+   `lib/tools/list-offerings.ts` (both queries), and `lib/tools/check-faq-topic.ts`
+   all need `.eq("status", "approved")` added -- confirmed today none of the three
+   files filter by anything but `business_id`, so without this change a draft
+   extraction would be immediately answerable by the AI the moment it's inserted,
+   defeating the entire review step. This is the one non-negotiable part of the
+   design per `AGENTS.md` rule 4 (no fabricated business facts) -- everything else
+   here is a reasonable default the user can redirect.
+
+**Explicitly not started**: no migration file written, no `lib/knowledge-extraction.ts`,
+no tool-file changes, no dashboard UI, no `lib/supabase/types.ts` updates for the new
+columns. Whoever picks this up next should re-read this entry, confirm the design
+still holds (nothing else changed it), and can go straight to implementation --
+research and user confirmation are both already done.
+
+**Stage 3** (broader-answering fallback that reads knowledge documents directly, for
+whatever extraction doesn't cover) remains separate, not-yet-designed, not-yet-started
+-- unchanged from Stage C's entry.
 
 ---
 
