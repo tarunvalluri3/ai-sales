@@ -13,7 +13,7 @@ export function Sidebar({ businessName }: { businessName: string }) {
   return (
     <nav
       aria-label="Dashboard"
-      className="hidden w-64 shrink-0 flex-col gap-1 border-r border-ds-border bg-ds-surface p-4 md:flex"
+      className="sticky top-0 hidden max-h-screen w-64 shrink-0 flex-col gap-1 self-start overflow-y-auto border-r border-ds-border bg-ds-surface p-4 md:flex"
     >
       <div className="mb-6 flex items-center gap-3 px-2">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-ds-sm bg-ds-surface-elevated text-sm font-semibold text-ds-accent">

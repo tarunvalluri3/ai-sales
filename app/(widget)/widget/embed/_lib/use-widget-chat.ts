@@ -13,6 +13,12 @@ export type ChatMessage = {
   escalate?: boolean;
 };
 
+export type RecentChatSummary = {
+  id: string;
+  createdAt: string;
+  preview: string | null;
+};
+
 const MAX_MESSAGE_LENGTH = 2000;
 const RESPONSE_TIMEOUT_MS = 30_000;
 const RATE_LIMIT_COOLDOWN_MS = 5_000;
@@ -32,6 +38,8 @@ export function useWidgetChat(strings: WidgetStrings) {
   // records it idempotently, so re-sending it on later messages is
   // harmless.
   const [consentGiven, setConsentGiven] = useState(false);
+  const [recentChats, setRecentChats] = useState<RecentChatSummary[] | null>(null);
+  const [isLoadingRecentChats, setIsLoadingRecentChats] = useState(false);
   const conversationIdRef = useRef<string | null>(null);
   const hasSucceededRef = useRef(false);
   const consentGivenRef = useRef(false);
@@ -105,6 +113,9 @@ export function useWidgetChat(strings: WidgetStrings) {
         if (message.messages.length === 0) return;
         setMessages((prev) => (prev.length > 0 ? prev : message.messages.map((m) => ({ id: m.id, role: m.role, content: m.content }))));
         hasSucceededRef.current = true;
+      } else if (message.type === "widget:recent_chats_result") {
+        setIsLoadingRecentChats(false);
+        setRecentChats(message.conversations);
       }
     }
 
@@ -163,6 +174,42 @@ export function useWidgetChat(strings: WidgetStrings) {
     setConsentGiven(value);
   }, []);
 
+  /** Phase 25d "start new chat": resets this widget instance's own state and tells the loader to clear its stored/in-memory conversation id. */
+  const startNewChat = useCallback(() => {
+    pendingRef.current.clear();
+    hasSucceededRef.current = false;
+    conversationIdRef.current = null;
+    setMessages([]);
+    setIsAwaitingResponse(false);
+    setIsCoolingDown(false);
+    setPanelError(null);
+    postToParent({ type: "widget:new_chat" });
+  }, []);
+
+  /** Phase 25d "view recent chats": asks the loader (the only context that can make the authorized fetch) for this visitor's past conversations. */
+  const requestRecentChats = useCallback(() => {
+    setIsLoadingRecentChats(true);
+    setRecentChats(null);
+    postToParent({ type: "widget:recent_chats_request" });
+  }, []);
+
+  /**
+   * Phase 25d: picking a conversation from "view recent chats". Clears
+   * this instance's own message list first -- by the time the loader's
+   * "widget:restore" reply arrives, `messages` is already empty, so the
+   * existing restore handler's "only apply if currently empty" rule
+   * applies unchanged, even for a picked conversation with zero messages.
+   */
+  const switchConversation = useCallback((conversationId: string) => {
+    pendingRef.current.clear();
+    hasSucceededRef.current = false;
+    setMessages([]);
+    setIsAwaitingResponse(false);
+    setIsCoolingDown(false);
+    setPanelError(null);
+    postToParent({ type: "widget:switch_conversation", conversationId });
+  }, []);
+
   return {
     messages,
     isAwaitingResponse,
@@ -172,5 +219,10 @@ export function useWidgetChat(strings: WidgetStrings) {
     setConsentGiven: setConsent,
     sendMessage,
     retryMessage,
+    startNewChat,
+    recentChats,
+    isLoadingRecentChats,
+    requestRecentChats,
+    switchConversation,
   };
 }

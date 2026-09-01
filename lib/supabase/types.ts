@@ -140,6 +140,7 @@ export type Conversation = {
   business_id: string;
   source: string | null;
   source_url: string | null;
+  visitor_id: string | null;
   control: ConversationControl;
   needs_attention: boolean;
   consent_given: boolean;

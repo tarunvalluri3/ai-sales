@@ -56,6 +56,13 @@ const bodySchema = z.object({
   message: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
   consentGiven: z.boolean().optional(),
   pageUrl: z.string().max(2048).optional(),
+  // Phase 25d "recent chats": a client-generated, unauthenticated
+  // correlation id (public/widget-loader.js localStorage), stamped onto
+  // a newly created conversation so app/api/chat/recent/route.ts can
+  // later list this visitor's own past conversations. Never an identity
+  // or authorization signal -- see lib/conversations.ts's
+  // listRecentConversationsForVisitor() doc comment.
+  visitorId: z.string().trim().min(1).max(100).optional(),
 });
 
 /**
@@ -94,7 +101,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId, message, consentGiven, pageUrl } = parsed.data;
+  const { widgetKey, conversationId, message, consentGiven, pageUrl, visitorId } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
 
@@ -133,7 +140,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!conversation) {
-      conversation = await createConversation(supabase, business.businessId, "chat_widget", sanitizeSourceUrl(pageUrl));
+      conversation = await createConversation(
+        supabase,
+        business.businessId,
+        "chat_widget",
+        sanitizeSourceUrl(pageUrl),
+        visitorId ?? null,
+      );
     }
 
     const conversationAllowed = await checkAndIncrementRateLimit(

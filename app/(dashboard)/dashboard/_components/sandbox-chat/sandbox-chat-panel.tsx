@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ConversationMessage } from "@/lib/rag";
+import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { sendSandboxMessage } from "./actions";
 
 type DisplayMessage = ConversationMessage & { id: string; failed?: boolean };
@@ -29,6 +30,16 @@ export function SandboxChatPanel() {
   const [error, setError] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function handleStartNewChat() {
+    if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    conversationIdRef.current = null;
+    setMessages([]);
+    setInput("");
+    setError(null);
+    setIsPending(false);
+    setIsSlow(false);
+  }
 
   async function handleSend() {
     const text = input.trim();
@@ -65,13 +76,24 @@ export function SandboxChatPanel() {
 
   return (
     <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-ds-text-primary">Test your AI</h2>
-        <p className="text-sm text-ds-text-secondary">
-          Chat with your AI sales employee exactly as a prospect would -- this uses your real
-          products, services, FAQs, and knowledge, but nothing here is visible to prospects or
-          counted as a real lead unless you say something that triggers a callback request.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold text-ds-text-primary">Test your AI</h2>
+          <p className="text-sm text-ds-text-secondary">
+            Chat with your AI sales employee exactly as a prospect would -- this uses your real
+            products, services, FAQs, and knowledge, but nothing here is visible to prospects or
+            counted as a real lead unless you say something that triggers a callback request.
+          </p>
+        </div>
+        {messages.length > 0 ? (
+          <button
+            type="button"
+            onClick={handleStartNewChat}
+            className="shrink-0 rounded-ds-sm border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          >
+            Start new chat
+          </button>
+        ) : null}
       </div>
 
       <div
@@ -94,7 +116,7 @@ export function SandboxChatPanel() {
                     : "bg-ds-surface text-ds-text-primary"
                 } ${m.failed ? "border border-ds-danger" : ""}`}
               >
-                {m.content}
+                {renderWidgetMarkdown(m.content)}
               </div>
               {m.failed ? <span className="text-2xs text-ds-danger">Failed to send</span> : null}
             </div>

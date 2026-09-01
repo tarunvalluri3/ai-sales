@@ -80,13 +80,66 @@ export type WidgetRestoreMessage = {
   messages: { id: string; role: "user" | "assistant" | "human_agent"; content: string }[];
 };
 
+/**
+ * Sent by this iframe to the loader (Phase 25d "start new chat"): the
+ * loader clears its own stored conversation id and resets all
+ * loader-owned send/poll state, so the next "widget:send" creates a
+ * genuinely fresh conversation. Purely a request -- there is no reply,
+ * the iframe clears its own message list itself.
+ */
+export type WidgetNewChatMessage = {
+  type: "widget:new_chat";
+};
+
+/**
+ * Sent by this iframe to the loader (Phase 25d "view recent chats"):
+ * only the loader can make the authorized /api/chat/recent fetch (same
+ * constraint as every other request -- see this file's own doc comment
+ * on why the loader, not this iframe, owns every real network call).
+ */
+export type WidgetRecentChatsRequestMessage = {
+  type: "widget:recent_chats_request";
+};
+
+/**
+ * Sent by the loader back to this iframe with the result of a
+ * "widget:recent_chats_request". `conversations` is empty (not an
+ * error) when this visitor has no other conversations, or when the
+ * request itself failed -- the widget UI treats both the same way (Phase
+ * 25d), since distinguishing them isn't worth a second message type.
+ */
+export type WidgetRecentChatsResultMessage = {
+  type: "widget:recent_chats_result";
+  conversations: { id: string; createdAt: string; preview: string | null }[];
+};
+
+/**
+ * Sent by this iframe to the loader when the prospect picks a
+ * conversation from "view recent chats" (Phase 25d). The loader stores
+ * this as the new active conversation id and re-runs the same
+ * /api/chat/restore fetch it already does on page load, replying with a
+ * fresh "widget:restore" -- selecting a past conversation reuses the
+ * existing restore mechanism rather than introducing a second one.
+ */
+export type WidgetSwitchConversationMessage = {
+  type: "widget:switch_conversation";
+  conversationId: string;
+};
+
 export type FromParentMessage =
   | WidgetViewportMessage
   | WidgetResponseMessage
   | WidgetErrorMessage
   | WidgetPollResultMessage
-  | WidgetRestoreMessage;
-export type ToParentMessage = WidgetResizeMessage | WidgetSendMessage | WidgetPanelOpenMessage;
+  | WidgetRestoreMessage
+  | WidgetRecentChatsResultMessage;
+export type ToParentMessage =
+  | WidgetResizeMessage
+  | WidgetSendMessage
+  | WidgetPanelOpenMessage
+  | WidgetNewChatMessage
+  | WidgetRecentChatsRequestMessage
+  | WidgetSwitchConversationMessage;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -147,6 +200,18 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
             typeof message.content === "string",
         );
         return { type: "widget:restore", messages };
+      }
+      return null;
+    case "widget:recent_chats_result":
+      if (Array.isArray(data.conversations)) {
+        const conversations = data.conversations.filter(
+          (conversation): conversation is WidgetRecentChatsResultMessage["conversations"][number] =>
+            isPlainObject(conversation) &&
+            typeof conversation.id === "string" &&
+            typeof conversation.createdAt === "string" &&
+            (conversation.preview === null || typeof conversation.preview === "string"),
+        );
+        return { type: "widget:recent_chats_result", conversations };
       }
       return null;
     default:

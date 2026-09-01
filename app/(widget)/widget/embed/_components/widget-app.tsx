@@ -111,6 +111,11 @@ export function WidgetApp({
               onSend={chat.sendMessage}
               onRetry={chat.retryMessage}
               onClose={handleClose}
+              onStartNewChat={chat.startNewChat}
+              recentChats={chat.recentChats}
+              isLoadingRecentChats={chat.isLoadingRecentChats}
+              onRequestRecentChats={chat.requestRecentChats}
+              onSelectRecentChat={chat.switchConversation}
             />
           </div>
         ) : (

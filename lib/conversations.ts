@@ -19,10 +19,11 @@ export async function createConversation(
   businessId: string,
   source: string | null,
   sourceUrl: string | null = null,
+  visitorId: string | null = null,
 ): Promise<Conversation> {
   const { data, error } = await supabase
     .from("conversations")
-    .insert({ business_id: businessId, source, source_url: sourceUrl })
+    .insert({ business_id: businessId, source, source_url: sourceUrl, visitor_id: visitorId })
     .select()
     .single();
 
@@ -121,6 +122,48 @@ export async function getConversationForBusiness(
   }
 
   return data;
+}
+
+export type RecentConversationSummary = {
+  id: string;
+  createdAt: string;
+};
+
+/**
+ * Lists a visitor's own past conversations for a business (Phase 25d
+ * "recent chats"), most recent first. Scoped on BOTH `businessId` and
+ * `visitorId` -- never on the widget key alone, since a widget key is
+ * shared across a business's entire visitor base and returning all of
+ * its conversations for one key would leak one visitor's chat history to
+ * another (docs/security.md §4). `businessId` must come from
+ * `resolveBusinessFromWidgetKey()`; `visitorId` is a client-generated,
+ * unauthenticated correlation id, not an identity credential -- this is
+ * a UX convenience (letting a returning visitor find their own recent
+ * conversations), not an authorization boundary.
+ */
+export async function listRecentConversationsForVisitor(
+  supabase: SupabaseClient,
+  businessId: string,
+  visitorId: string,
+  limit = 10,
+): Promise<RecentConversationSummary[]> {
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("id, created_at")
+    .eq("business_id", businessId)
+    .eq("visitor_id", visitorId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your recent chats. Please try again.",
+      "listRecentConversationsForVisitor failed",
+      error,
+    );
+  }
+
+  return data.map((row) => ({ id: row.id, createdAt: row.created_at }));
 }
 
 /**
