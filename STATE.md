@@ -2,7 +2,23 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-01 (AI capability toggles — replaced the exclusive "conversion goal" with independent, combinable capability toggles + image-gated recommendation cards — implemented and verified live; Phase C — appointment booking — implemented and verified live; scripts/run-evals.mjs's stale widget_key fixture lookup fixed)
+Last updated: 2026-09-01 (Production bug fix: Gemini embedding-quota exhaustion was causing real 500s on the live Waves Web Studio widget — fixed and verified live; AI capability toggles — replaced the exclusive "conversion goal" with independent, combinable capability toggles + image-gated recommendation cards — implemented and verified live; Phase C — appointment booking — implemented and verified live; scripts/run-evals.mjs's stale widget_key fixture lookup fixed)
+
+---
+
+## Production bug fix: Gemini embedding-quota exhaustion causing real 500s — fixed and verified live 2026-09-01
+
+The user reported a real production error on their own live widget (waveswebstudio.in): a "Something went wrong. Check your connection and try again." error, working again on Retry but recurring after a few more messages. Diagnosed from real Vercel production logs (`vercel logs`), not guessed: every chat turn's retrieval step embeds the prospect's question (`lib/retrieval.ts` → `lib/embeddings.ts`), and Gemini's embedding-model API enforces a per-minute quota (`aiplatform.googleapis.com/.../embed_content_requests_per_minute_per_base_model`) that a handful of messages in quick succession was exhausting -- `429 RESOURCE_EXHAUSTED`, thrown as an uncaught error all the way up to `app/api/chat/route.ts`'s catch-all, returned as a raw 500. This exact transient `429` had been observed and dismissed as "resolved by retrying seconds later" during this session's own earlier live-testing (Phase B1+B2, Phase C, the AI-capability-toggles entry above) -- this report is the first confirmation it's a real, recurring issue affecting actual prospect traffic, not just test-session noise.
+
+**Fix, in `lib/embeddings.ts` and `lib/rag.ts`:** (1) `TruncatedGeminiEmbeddings.embedDocuments()` now retries up to 3 attempts (short backoff, ~2s total added latency worst case) specifically for a detected rate-limit error (`status === 429` or a `RESOURCE_EXHAUSTED` message match), leaving every other error path unretried and unchanged. (2) New exported `isEmbeddingRateLimitError()` lets a caller detect what survives those retries. (3) `askSalesEmployee()`'s retrieval call (`retriever.invoke(question)`) is now wrapped in a try/catch: on a surviving rate-limit error, it returns the same graceful-degrade shape Phase 22h's usage-quota branch already established (`USAGE_QUOTA_EXCEEDED_MESSAGE`, `escalate: true` so a human follows up) instead of throwing -- any other retrieval error still propagates and hard-fails exactly as before, so this doesn't silently swallow genuine bugs. No change to the chat-completion (non-embedding) Gemini calls -- the confirmed failure was specifically the embedding step.
+
+**Checks:** `npx tsc --noEmit` — pass. `npm run lint` — pass, zero errors/warnings. `npm run build` — pass, all routes.
+
+**Live verification against real production, immediately after deploying** (`vercel logs` used throughout, not assumed): fired 8 real, rapid `/api/chat` messages at Waves Web Studio's actual live widget key/business (`89362a30-...`). **Every single one returned HTTP 200 -- zero 500s.** 3 of the 8 genuinely hit the still-exhausted quota (confirmed via a real `ai_embedding_rate_limited` log line for each) and returned the graceful "We're experiencing high demand right now..." message with `escalate: true`, instead of the broken error the user had been seeing; the other 5 answered normally and correctly. This is the exact bug reproduced and confirmed fixed against the real failure condition, not a synthetic test.
+
+**Files changed:** `lib/embeddings.ts`, `lib/rag.ts`. **Packages added:** none. **Migrations:** none. **Environment variables:** none.
+
+**Known limitation, not glossed over:** this smooths over and gracefully degrades the symptom -- it does not raise Gemini's actual account-level embedding quota, which remains low enough for a handful of concurrent/rapid messages to exhaust it. The user should consider requesting a quota increase from Google Cloud (link in the error message this project's logs capture) if this business's real traffic volume keeps triggering the degrade message during normal (non-burst) use. The 8 live-verification conversations above were created against the real Waves Web Studio business (not a fixture) and were left in place, same "live-testing artifacts are real data" precedent as this session's earlier AI-capability-toggles entry.
 
 ---
 
