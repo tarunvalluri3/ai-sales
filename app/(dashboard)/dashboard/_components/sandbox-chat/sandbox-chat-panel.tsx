@@ -2,10 +2,15 @@
 
 import { useRef, useState } from "react";
 import type { ConversationMessage } from "@/lib/rag";
+import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { sendSandboxMessage } from "./actions";
 
-type DisplayMessage = ConversationMessage & { id: string; failed?: boolean };
+type DisplayMessage = ConversationMessage & {
+  id: string;
+  failed?: boolean;
+  recommendedProducts?: RecommendedItem[];
+};
 
 const SLOW_RESPONSE_NOTICE_MS = 12_000;
 
@@ -59,7 +64,10 @@ export function SandboxChatPanel() {
       const result = await sendSandboxMessage(conversationIdRef.current, history, text);
       if (result.ok) {
         conversationIdRef.current = result.conversationId;
-        setMessages((prev) => [...prev, { id: newId(), role: "assistant", content: result.answer }]);
+        setMessages((prev) => [
+          ...prev,
+          { id: newId(), role: "assistant", content: result.answer, recommendedProducts: result.recommendedProducts },
+        ]);
       } else {
         setMessages((prev) => prev.map((m) => (m.id === userMessage.id ? { ...m, failed: true } : m)));
         setError(result.error);
@@ -118,6 +126,29 @@ export function SandboxChatPanel() {
               >
                 {renderWidgetMarkdown(m.content)}
               </div>
+              {m.recommendedProducts && m.recommendedProducts.length > 0 ? (
+                <div className="flex max-w-[85%] flex-wrap gap-2">
+                  {m.recommendedProducts.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex w-40 flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-2"
+                    >
+                      {item.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- arbitrary business-supplied catalog image URL
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          className="h-20 w-full rounded-ds-sm object-cover"
+                        />
+                      ) : null}
+                      <span className="text-xs font-medium text-ds-text-primary">{item.name}</span>
+                      {item.priceDisplay ? (
+                        <span className="text-2xs text-ds-text-secondary">{item.priceDisplay}</span>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               {m.failed ? <span className="text-2xs text-ds-danger">Failed to send</span> : null}
             </div>
           ))

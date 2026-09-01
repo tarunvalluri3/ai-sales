@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { parseFromParentMessage, postToParent, type WidgetErrorKind } from "./post-message";
+import { parseFromParentMessage, postToParent, type WidgetErrorKind, type WidgetRecommendedProduct } from "./post-message";
 import type { WidgetStrings } from "@/lib/widget-i18n";
 
 export type ChatMessage = {
@@ -11,6 +11,7 @@ export type ChatMessage = {
   status?: "sending" | "error";
   errorKind?: WidgetErrorKind;
   escalate?: boolean;
+  recommendedProducts?: WidgetRecommendedProduct[];
 };
 
 export type RecentChatSummary = {
@@ -63,7 +64,13 @@ export function useWidgetChat(strings: WidgetStrings) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === pending.assistantPlaceholderId
-              ? { id: m.id, role: "assistant", content: message.answer, escalate: message.escalate }
+              ? {
+                  id: m.id,
+                  role: "assistant",
+                  content: message.answer,
+                  escalate: message.escalate,
+                  recommendedProducts: message.recommendedProducts,
+                }
               : m,
           ),
         );

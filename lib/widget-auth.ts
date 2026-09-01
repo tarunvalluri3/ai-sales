@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
-import type { WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
+import type { AiConversionGoal, WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
 
 /**
  * Thrown for any widget-key/origin resolution failure. Deliberately
@@ -35,10 +35,11 @@ export type WidgetBusinessContext = {
     website: string | null;
   };
   language: WidgetLanguage;
+  conversionGoal: AiConversionGoal;
 };
 
 const BUSINESS_COLUMNS =
-  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, published_at";
+  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, ai_conversion_goal, published_at";
 
 type WidgetBusinessRow = {
   id: string;
@@ -56,6 +57,7 @@ type WidgetBusinessRow = {
   widget_cta_text: string | null;
   widget_position: WidgetPosition;
   widget_suggested_questions: string[] | null;
+  ai_conversion_goal: AiConversionGoal;
   published_at: string | null;
 };
 
@@ -102,6 +104,7 @@ export async function resolveBusinessFromWidgetKey(
       website: data.businesses.website,
     },
     language: data.businesses.widget_language,
+    conversionGoal: data.businesses.ai_conversion_goal,
   };
 }
 

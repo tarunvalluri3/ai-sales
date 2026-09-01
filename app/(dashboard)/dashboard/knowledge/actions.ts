@@ -22,7 +22,7 @@ import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createFileKnowledgeDocument } from "@/lib/file-ingestion";
 import { createUrlKnowledgeDocument, refreshUrlKnowledgeDocument } from "@/lib/url-ingestion";
-import { extractCatalogFromDocument } from "@/lib/knowledge-extraction";
+import { extractCatalogFromDocument, extractCatalogFromPdfDocument } from "@/lib/knowledge-extraction";
 
 /**
  * Kicks the background ingestion queue right after this request finishes
@@ -34,6 +34,11 @@ import { extractCatalogFromDocument } from "@/lib/knowledge-extraction";
  */
 function triggerIngestionProcessing(): void {
   after(() => processIngestionQueue());
+}
+
+/** Phase B2 (STATE.md): the only signal this project keeps for "was this file a PDF" -- the original filename, preserved as the tail of storage_path (lib/file-ingestion.ts). No dedicated mime-type column exists; adding one for this alone was judged unnecessary scope. */
+function isPdfStoragePath(storagePath: string | null): boolean {
+  return storagePath != null && storagePath.toLowerCase().endsWith(".pdf");
 }
 
 const knowledgeFieldsSchema = z.object({
@@ -283,7 +288,12 @@ export async function publishKnowledgeDocumentAction(
   if (result.isFirstPublish) {
     const title = result.title;
     const content = result.content;
-    after(() => extractCatalogFromDocument(businessId, parsed.data.id, title, content));
+    const storagePath = result.storagePath;
+    after(() =>
+      isPdfStoragePath(storagePath)
+        ? extractCatalogFromPdfDocument(businessId, parsed.data.id, title, content, storagePath!)
+        : extractCatalogFromDocument(businessId, parsed.data.id, title, content),
+    );
   }
 
   revalidatePath("/dashboard/knowledge");
@@ -330,7 +340,12 @@ export async function extractNowAction(
   const documentId = document.id;
   const title = document.title;
   const content = document.content;
-  after(() => extractCatalogFromDocument(businessId, documentId, title, content));
+  const storagePath = document.storage_path;
+  after(() =>
+    isPdfStoragePath(storagePath)
+      ? extractCatalogFromPdfDocument(businessId, documentId, title, content, storagePath!)
+      : extractCatalogFromDocument(businessId, documentId, title, content),
+  );
 
   return { success: true };
 }

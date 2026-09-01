@@ -27,6 +27,9 @@ export default async function EditProductPage({
           initialName={product.name}
           initialDescription={product.description ?? ""}
           initialPrice={product.price ?? ""}
+          initialImageUrl={product.image_url ?? ""}
+          initialCategory={product.category ?? ""}
+          initialPriceAmount={product.price_amount != null ? String(product.price_amount) : ""}
           submitLabel="Save changes"
           pendingLabel="Saving…"
         />

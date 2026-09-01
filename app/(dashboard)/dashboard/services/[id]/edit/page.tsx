@@ -27,6 +27,9 @@ export default async function EditServicePage({
           initialName={service.name}
           initialDescription={service.description ?? ""}
           initialPrice={service.price ?? ""}
+          initialImageUrl={service.image_url ?? ""}
+          initialCategory={service.category ?? ""}
+          initialPriceAmount={service.price_amount != null ? String(service.price_amount) : ""}
           submitLabel="Save changes"
           pendingLabel="Saving…"
         />

@@ -30,12 +30,33 @@ export type WidgetSendMessage = {
   consentGiven: boolean;
 };
 
+/**
+ * Phase B1 (STATE.md, "AI sales agent, not chatbot"): items the
+ * recommend_products tool returned this turn, only ever present for a
+ * business whose ai_conversion_goal is 'recommend_products'. Sourced
+ * straight from lib/tools/recommend-products.ts's RecommendedItem shape
+ * through the /api/chat response -- this type is a hand-kept-in-sync
+ * duplicate for the postMessage boundary, same convention as this file's
+ * own doc comment about public/widget-loader.js.
+ */
+export type WidgetRecommendedProduct = {
+  type: "product" | "service";
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  priceDisplay: string | null;
+  priceAmount: number | null;
+  imageUrl: string | null;
+};
+
 export type WidgetResponseMessage = {
   type: "widget:response";
   requestId: string;
   conversationId: string;
   answer: string;
   escalate: boolean;
+  recommendedProducts: WidgetRecommendedProduct[];
 };
 
 export type WidgetErrorKind = "unauthorized" | "rate_limited" | "failure";
@@ -161,12 +182,27 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
         typeof data.answer === "string" &&
         typeof data.escalate === "boolean"
       ) {
+        const recommendedProducts = Array.isArray(data.recommendedProducts)
+          ? data.recommendedProducts.filter(
+              (item): item is WidgetRecommendedProduct =>
+                isPlainObject(item) &&
+                (item.type === "product" || item.type === "service") &&
+                typeof item.id === "string" &&
+                typeof item.name === "string" &&
+                (item.description === null || typeof item.description === "string") &&
+                (item.category === null || typeof item.category === "string") &&
+                (item.priceDisplay === null || typeof item.priceDisplay === "string") &&
+                (item.priceAmount === null || typeof item.priceAmount === "number") &&
+                (item.imageUrl === null || typeof item.imageUrl === "string"),
+            )
+          : [];
         return {
           type: "widget:response",
           requestId: data.requestId,
           conversationId: data.conversationId,
           answer: data.answer,
           escalate: data.escalate,
+          recommendedProducts,
         };
       }
       return null;

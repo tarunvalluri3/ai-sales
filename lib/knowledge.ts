@@ -281,6 +281,8 @@ export type PublishKnowledgeDocumentResult = {
   isFirstPublish: boolean;
   title: string;
   content: string;
+  /** Phase B2 (STATE.md): non-null only for a file-sourced document whose original upload was stored (lib/file-ingestion.ts) -- lets the publish trigger pick the PDF-image extraction path over the text-only one when this is a PDF. */
+  storagePath: string | null;
 };
 
 /**
@@ -303,14 +305,14 @@ export async function publishKnowledgeDocument(
 
   const { data: document, error: fetchError } = await supabase
     .from("knowledge_documents")
-    .select("id, title, content, version")
+    .select("id, title, content, version, storage_path")
     .eq("business_id", businessId)
     .eq("id", id)
     .in("source_type", ["manual", "file", "url"])
     .maybeSingle();
 
   if (fetchError || !document) {
-    return { found: false, isFirstPublish: false, title: "", content: "" };
+    return { found: false, isFirstPublish: false, title: "", content: "", storagePath: null };
   }
 
   const isFirstPublish = document.version === 1;
@@ -349,7 +351,13 @@ export async function publishKnowledgeDocument(
     );
   }
 
-  return { found: true, isFirstPublish, title: document.title, content: document.content };
+  return {
+    found: true,
+    isFirstPublish,
+    title: document.title,
+    content: document.content,
+    storagePath: document.storage_path,
+  };
 }
 
 /** Takes a published manual document back to draft -- its chunks immediately stop being retrieval-eligible, without deleting them (a re-publish needs no re-ingestion). See `publishKnowledgeDocument` for the not-found contract. */

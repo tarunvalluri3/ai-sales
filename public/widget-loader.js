@@ -412,6 +412,7 @@
             conversationId: body.data.conversationId,
             answer: body.data.answer,
             escalate: body.data.escalate,
+            recommendedProducts: body.data.recommendedProducts || [],
           },
           appOrigin,
         );

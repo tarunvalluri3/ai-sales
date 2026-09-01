@@ -8,10 +8,16 @@ export type ServiceInput = {
   name: string;
   description: string | null;
   price: string | null;
+  image_url: string | null;
+  category: string | null;
+  price_amount: number | null;
 };
 
 function buildKnowledgeContent(input: ServiceInput): string {
   const parts = [input.name];
+  if (input.category) {
+    parts.push(`Category: ${input.category}`);
+  }
   if (input.description) {
     parts.push(input.description);
   }

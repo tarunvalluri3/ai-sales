@@ -22,6 +22,15 @@ const FRAME_DENY_SOURCES = [
 const nextConfig: NextConfig = {
   /* config options here */
   devIndicators: false,
+  // Phase B2 (STATE.md, "AI sales agent, not chatbot" -- PDF catalog
+  // photos): @napi-rs/canvas ships a native binding (.node addon via
+  // js-binding.js) that Turbopack cannot bundle into a Server Component
+  // chunk ("non-ecmascript placeable asset") -- confirmed by a real build
+  // failure, not assumed. Next's own default externalized-packages list
+  // (node_modules/next/dist/docs) already covers the classic `canvas`
+  // package for exactly this reason, but not this one, so it needs an
+  // explicit opt-out here to use native `require` instead of bundling.
+  serverExternalPackages: ["@napi-rs/canvas"],
   async headers() {
     return [
       {

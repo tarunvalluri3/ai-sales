@@ -5,6 +5,7 @@ import type { ChatMessage } from "../_lib/use-widget-chat";
 import type { WidgetStrings } from "@/lib/widget-i18n";
 import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { EscalationBanner } from "./escalation-banner";
+import { ProductRecommendationCards } from "./product-recommendation-cards";
 
 function errorCopy(strings: WidgetStrings, kind: NonNullable<ChatMessage["errorKind"]>): string {
   if (kind === "unauthorized") return strings.errorUnauthorized;
@@ -57,6 +58,9 @@ export function MessageBubble({
         </span>
       ) : null}
       <div className={bubbleClass}>{renderWidgetMarkdown(message.content)}</div>
+      {message.recommendedProducts && message.recommendedProducts.length > 0 ? (
+        <ProductRecommendationCards items={message.recommendedProducts} />
+      ) : null}
       {message.status === "error" && message.errorKind ? (
         <div className="mt-1.5 flex items-center gap-2">
           <span className="text-xs text-widget-error">{errorCopy(strings, message.errorKind)}</span>

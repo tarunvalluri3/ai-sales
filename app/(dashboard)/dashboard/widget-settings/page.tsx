@@ -6,6 +6,7 @@ import { WidgetKeyList } from "./widget-key-list";
 import { CreateWidgetKeyForm } from "./create-widget-key-form";
 import { WidgetBrandingForm } from "./widget-branding-form";
 import { SuggestedQuestionsForm } from "./suggested-questions-form";
+import { ConversionGoalForm } from "./conversion-goal-form";
 import { PublishButton } from "./publish-button";
 import { WidgetInstallGuide } from "./widget-install-guide";
 import { SandboxChatPanel } from "../_components/sandbox-chat/sandbox-chat-panel";
@@ -56,6 +57,8 @@ export default async function WidgetSettingsPage() {
       />
 
       <SuggestedQuestionsForm initialQuestions={business?.widget_suggested_questions ?? []} />
+
+      <ConversionGoalForm initialGoal={business?.ai_conversion_goal ?? "generate_leads"} />
     </div>
   );
 }

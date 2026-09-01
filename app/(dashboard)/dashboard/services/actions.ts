@@ -10,6 +10,9 @@ import {
   catalogNameSchema,
   catalogDescriptionSchema,
   catalogPriceSchema,
+  catalogImageUrlSchema,
+  catalogCategorySchema,
+  catalogPriceAmountSchema,
 } from "@/lib/schemas/catalog";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -17,6 +20,9 @@ const serviceFieldsSchema = z.object({
   name: catalogNameSchema,
   description: catalogDescriptionSchema,
   price: catalogPriceSchema,
+  image_url: catalogImageUrlSchema,
+  category: catalogCategorySchema,
+  price_amount: catalogPriceAmountSchema,
 });
 
 const updateServiceSchema = serviceFieldsSchema.extend({
@@ -42,6 +48,9 @@ export async function createServiceAction(
     name: formData.get("name"),
     description: formData.get("description"),
     price: formData.get("price"),
+    image_url: formData.get("image_url"),
+    category: formData.get("category"),
+    price_amount: formData.get("price_amount"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Enter a valid service." };
@@ -72,6 +81,9 @@ export async function updateServiceAction(
     name: formData.get("name"),
     description: formData.get("description"),
     price: formData.get("price"),
+    image_url: formData.get("image_url"),
+    category: formData.get("category"),
+    price_amount: formData.get("price_amount"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Enter a valid service." };
