@@ -49,8 +49,14 @@ export async function renderPdfPageToPng(
       scale: RENDER_SCALE,
     });
     return new Uint8Array(buffer);
-  } catch {
-    logEvent("pdf_page_render_failed", businessId, { pageNumber }, "error");
+  } catch (error) {
+    // Temporary: this codepath's failure mode has never been observed on a
+    // real Vercel deployment (see this file's doc comment) -- capture the
+    // actual error message once, to diagnose, then revert to the plain
+    // catch. Never anything but the native error's own message -- no PDF
+    // content, no business data.
+    const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    logEvent("pdf_page_render_failed", businessId, { pageNumber, errorMessage: errorMessage.slice(0, 500) }, "error");
     return null;
   }
 }
