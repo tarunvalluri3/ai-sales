@@ -167,7 +167,7 @@
   var lastKnownMessageAt = null;
   var knownMessageIds = {};
   var pollTimeoutId = null;
-  var POLL_INTERVAL_MS = 6000;
+  var POLL_INTERVAL_MS = 3000;
 
   function schedulePoll() {
     if (pollTimeoutId) return;

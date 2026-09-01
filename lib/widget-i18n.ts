@@ -63,6 +63,7 @@ export type WidgetStrings = {
   recentChatsEmpty: string;
   recentChatsLoading: string;
   backLabel: string;
+  suggestedQuestionsLabel: string;
 };
 
 const EN: WidgetStrings = {
@@ -95,6 +96,7 @@ const EN: WidgetStrings = {
   recentChatsEmpty: "No previous chats yet.",
   recentChatsLoading: "Loading…",
   backLabel: "Back",
+  suggestedQuestionsLabel: "Suggested questions",
 };
 
 const ES: WidgetStrings = {
@@ -127,6 +129,7 @@ const ES: WidgetStrings = {
   recentChatsEmpty: "Aún no hay chats anteriores.",
   recentChatsLoading: "Cargando…",
   backLabel: "Atrás",
+  suggestedQuestionsLabel: "Preguntas sugeridas",
 };
 
 const FR: WidgetStrings = {
@@ -159,6 +162,7 @@ const FR: WidgetStrings = {
   recentChatsEmpty: "Pas encore de discussion précédente.",
   recentChatsLoading: "Chargement…",
   backLabel: "Retour",
+  suggestedQuestionsLabel: "Questions suggérées",
 };
 
 const DE: WidgetStrings = {
@@ -191,6 +195,7 @@ const DE: WidgetStrings = {
   recentChatsEmpty: "Noch keine früheren Chats.",
   recentChatsLoading: "Wird geladen…",
   backLabel: "Zurück",
+  suggestedQuestionsLabel: "Vorgeschlagene Fragen",
 };
 
 const PT: WidgetStrings = {
@@ -223,6 +228,7 @@ const PT: WidgetStrings = {
   recentChatsEmpty: "Ainda não há conversas anteriores.",
   recentChatsLoading: "A carregar…",
   backLabel: "Voltar",
+  suggestedQuestionsLabel: "Perguntas sugeridas",
 };
 
 const HI: WidgetStrings = {
@@ -254,6 +260,7 @@ const HI: WidgetStrings = {
   recentChatsEmpty: "अभी तक कोई पिछली चैट नहीं है।",
   recentChatsLoading: "लोड हो रहा है…",
   backLabel: "वापस",
+  suggestedQuestionsLabel: "सुझाए गए प्रश्न",
 };
 
 const DICTIONARIES: Record<WidgetLanguage, WidgetStrings> = { en: EN, es: ES, fr: FR, de: DE, pt: PT, hi: HI };

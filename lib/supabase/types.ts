@@ -16,6 +16,7 @@ export type Business = {
   widget_cta_text: string | null;
   widget_position: WidgetPosition;
   widget_language: WidgetLanguage;
+  widget_suggested_questions: string[] | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
@@ -218,7 +219,8 @@ export type AuditLogAction =
   | "webhook_endpoint.deleted"
   | "business_hours.updated"
   | "widget_branding.updated"
-  | "business.published";
+  | "business.published"
+  | "widget_suggested_questions.updated";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

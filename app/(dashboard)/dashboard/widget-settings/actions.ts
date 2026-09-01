@@ -5,8 +5,9 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createWidgetKey, revokeWidgetKey, updateWidgetKeyOrigins } from "@/lib/widget-keys";
-import { updateWidgetBranding, publishBusinessForOrg } from "@/lib/business";
-import { widgetBrandingSchema } from "@/lib/schemas/business";
+import { getBusinessForOrg, updateWidgetBranding, updateWidgetSuggestedQuestions, publishBusinessForOrg } from "@/lib/business";
+import { widgetBrandingSchema, widgetSuggestedQuestionsSchema } from "@/lib/schemas/business";
+import { generateSuggestedQuestions, NoBusinessContentError } from "@/lib/widget-suggested-questions";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -220,5 +221,76 @@ export async function publishBusinessAction(
 
   revalidatePath("/dashboard/widget-settings");
   revalidatePath("/onboarding/test");
+  return { success: true };
+}
+
+export type GenerateSuggestedQuestionsState = {
+  questions?: string[];
+  error?: string;
+};
+
+/**
+ * Phase 25e: proposes prefilled widget questions via Gemini, grounded in
+ * this business's own products/services/FAQs -- never persisted here.
+ * Called directly from the client (not via useActionState/<form>, since
+ * there's no form data involved), so it can return fresh candidates the
+ * client merges into its own editable draft list.
+ */
+export async function generateSuggestedQuestionsAction(): Promise<GenerateSuggestedQuestionsState> {
+  const { orgId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const business = await getBusinessForOrg(orgId);
+  if (!business) {
+    return { error: "Business not found." };
+  }
+
+  try {
+    const questions = await generateSuggestedQuestions(business.id, business.name, business.description);
+    return { questions };
+  } catch (err) {
+    if (err instanceof NoBusinessContentError) {
+      return { error: err.message };
+    }
+    return { error: logAndGetUserMessage(err) };
+  }
+}
+
+export type SaveSuggestedQuestionsState = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
+ * Persists the owner's reviewed/edited list of suggested questions
+ * (Phase 25e) -- the AI only ever proposes (generateSuggestedQuestionsAction
+ * above); this is the one write path, same "AI proposes, human approves"
+ * shape as every other AI-assisted content feature in this app. Called
+ * directly from the client with the final array, not via a `<form>`.
+ */
+export async function saveSuggestedQuestionsAction(questions: string[]): Promise<SaveSuggestedQuestionsState> {
+  const { businessId, userId, orgId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = widgetSuggestedQuestionsSchema.safeParse(questions);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Enter valid suggested questions." };
+  }
+
+  try {
+    await updateWidgetSuggestedQuestions(orgId, parsed.data);
+  } catch (err) {
+    return { error: logAndGetUserMessage(err) };
+  }
+
+  await recordAuditLogEntry(businessId, userId, "widget_suggested_questions.updated", "business", businessId);
+
+  revalidatePath("/dashboard/widget-settings");
   return { success: true };
 }

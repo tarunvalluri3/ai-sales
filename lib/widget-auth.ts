@@ -38,7 +38,7 @@ export type WidgetBusinessContext = {
 };
 
 const BUSINESS_COLUMNS =
-  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, published_at";
+  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, published_at";
 
 type WidgetBusinessRow = {
   id: string;
@@ -55,6 +55,7 @@ type WidgetBusinessRow = {
   widget_welcome_text_closed: string | null;
   widget_cta_text: string | null;
   widget_position: WidgetPosition;
+  widget_suggested_questions: string[] | null;
   published_at: string | null;
 };
 
@@ -114,6 +115,7 @@ export type WidgetBranding = {
   welcomeTextClosed: string | null;
   ctaText: string | null;
   position: WidgetPosition;
+  suggestedQuestions: string[];
 };
 
 /**
@@ -151,5 +153,6 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
     welcomeTextClosed: data.businesses.widget_welcome_text_closed,
     ctaText: data.businesses.widget_cta_text,
     position: data.businesses.widget_position,
+    suggestedQuestions: data.businesses.widget_suggested_questions ?? [],
   };
 }

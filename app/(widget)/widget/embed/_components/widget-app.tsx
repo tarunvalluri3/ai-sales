@@ -23,6 +23,7 @@ export function WidgetApp({
   accentColor,
   logoUrl,
   ctaText,
+  suggestedQuestions,
 }: {
   businessName: string;
   language: WidgetLanguage;
@@ -31,6 +32,7 @@ export function WidgetApp({
   accentColor: string | null;
   logoUrl: string | null;
   ctaText: string;
+  suggestedQuestions: string[];
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewport, setViewport] = useState({ width: 1280, height: 800 });
@@ -102,6 +104,7 @@ export function WidgetApp({
               strings={strings}
               greeting={greeting}
               logoUrl={logoUrl}
+              suggestedQuestions={suggestedQuestions}
               messages={chat.messages}
               isAwaitingResponse={chat.isAwaitingResponse}
               isCoolingDown={chat.isCoolingDown}

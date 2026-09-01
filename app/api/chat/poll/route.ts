@@ -25,7 +25,12 @@ import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 
 const RATE_LIMIT_WINDOW_SECONDS = 300;
 const POLL_IP_LIMIT = 300;
-const POLL_CONVERSATION_LIMIT = 100;
+// Phase 25e: widget poll interval tightened 6s -> 3s to reduce staff-reply
+// latency, so this budget was raised in step (100 -> 150) to keep the same
+// safety margin above continuous-polling cadence (300s / 3s = 100 requests
+// from scheduled polling alone; the extra room covers pollNow()'s
+// out-of-schedule triggers on tab refocus/panel reopen).
+const POLL_CONVERSATION_LIMIT = 150;
 const POLL_RESULT_LIMIT = 50;
 
 const bodySchema = z.object({

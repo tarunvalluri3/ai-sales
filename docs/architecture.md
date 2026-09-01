@@ -1040,22 +1040,26 @@ type shapes (documented since Phase 12) now also covers
 change) and `widget:poll_result` (loader → iframe).
 
 **Rate limiting for poll traffic is intentionally separate from Phase
-11's message-send scopes.** Two new `rate_limit_counters` scopes,
-`poll_ip` (300/5min) and `poll_conversation` (100/5min), sized around
-the widget's actual 6-second poll interval -- reusing the existing
-generic scope/identifier/window mechanism (D4's precedent), not a new
-rate-limiting system. The dashboard's polling Server Action gets no new
-rate limit at all: it is Clerk-authenticated and tenant-scoped via
+11's message-send scopes.** Two `rate_limit_counters` scopes, `poll_ip`
+(300/5min) and `poll_conversation` (150/5min, raised from 100/5min in
+Phase 25e alongside the widget interval tightening below) -- reusing the
+existing generic scope/identifier/window mechanism (D4's precedent), not
+a new rate-limiting system. The dashboard's polling Server Action gets no
+new rate limit at all: it is Clerk-authenticated and tenant-scoped via
 `requireBusinessContext()`, and this codebase has never rate-limited a
 Server Action -- Phase 11's limits exist specifically because that
 endpoint is public and unauthenticated.
 
 **Poll intervals differ by side, reasoned separately, not identical by
-default:** the widget polls every 6 seconds (mid-band of a 5-8s target,
-balancing responsiveness against genuinely unbounded anonymous
-traffic); the dashboard polls every 3 seconds (a single authenticated
-staff session actively waiting on the next prospect message, bounded
-traffic). Both use a self-rescheduling `setTimeout`, not `setInterval`,
+default:** the widget polls every 3 seconds (tightened from 6s in Phase
+25e in response to real user-reported staff-reply latency; `poll_conversation`'s
+150/5min budget was raised in step, leaving the same margin above
+continuous-polling cadence -- 300s / 3s = 100 scheduled requests, headroom
+above that for `pollNow()`'s out-of-schedule triggers); the dashboard
+polls every 1 second (tightened from 3s in the same pass -- a single
+authenticated staff session actively waiting on the next prospect
+message, bounded traffic, no rate limit to budget against). Both use a
+self-rescheduling `setTimeout`, not `setInterval`,
 so a slow poll can never overlap with the next one. Both pause on
 `document.visibilitychange` (tab hidden); the widget additionally
 pauses while its panel is closed (`widget:panel_open`) and while a
@@ -1093,7 +1097,8 @@ only lower it.
 `MobileNav` are both always mounted (CSS-hidden by breakpoint), so a
 single client component, `AttentionProvider`, is mounted once in
 `dashboard/layout.tsx` and owns the poll
-(`pollAttentionCountAction()`, 3-second self-rescheduling `setTimeout`,
+(`pollAttentionCountAction()`, 1-second self-rescheduling `setTimeout`
+(Phase 25e, tightened from 3s),
 same pause-on-hidden/resume-with-immediate-poll shape as
 `LiveConversationPanel`). It exposes the count via a small React
 Context (`useAttentionCount()`), consumed by both nav components to

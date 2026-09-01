@@ -18,6 +18,7 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "business_hours.updated": "Business hours updated",
   "widget_branding.updated": "Widget branding updated",
   "business.published": "Business published",
+  "widget_suggested_questions.updated": "Suggested questions updated",
 };
 
 export default async function AuditLogPage() {

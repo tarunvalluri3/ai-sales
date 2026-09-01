@@ -96,6 +96,18 @@ export const widgetPositionSchema = z.enum(["bottom-right", "bottom-left"]);
 
 export const widgetLanguageSchema = z.enum(SUPPORTED_WIDGET_LANGUAGES);
 
+/**
+ * AI-suggested prefilled questions (Phase 25e), saved only after the
+ * owner reviews/edits the AI's proposal on /dashboard/widget-settings --
+ * this schema validates the final, human-approved list, not the AI's raw
+ * output. Trimmed, deduped, blanks dropped; capped at 6 to match the
+ * businesses_widget_suggested_questions_shape DB check.
+ */
+export const widgetSuggestedQuestionsSchema = z
+  .array(z.string().trim().min(1).max(120))
+  .max(6, "You can save at most 6 suggested questions.")
+  .transform((questions) => [...new Set(questions)]);
+
 export const widgetBrandingSchema = z.object({
   accentColor: widgetAccentColorSchema,
   logoUrl: widgetLogoUrlSchema,

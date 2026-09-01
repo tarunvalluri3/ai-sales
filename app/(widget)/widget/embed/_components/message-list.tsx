@@ -15,12 +15,16 @@ export function MessageList({
   strings,
   isAwaitingResponse,
   onRetry,
+  suggestedQuestions,
+  onSend,
 }: {
   messages: ChatMessage[];
   greeting: string;
   strings: WidgetStrings;
   isAwaitingResponse: boolean;
   onRetry: (id: string) => void;
+  suggestedQuestions: string[];
+  onSend: (text: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wasNearBottomRef = useRef(true);
@@ -51,6 +55,20 @@ export function MessageList({
       {messages.length === 0 ? (
         <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground">
           {greeting}
+        </div>
+      ) : null}
+      {messages.length === 0 && suggestedQuestions.length > 0 ? (
+        <div className="flex flex-col gap-1.5" aria-label={strings.suggestedQuestionsLabel}>
+          {suggestedQuestions.map((question) => (
+            <button
+              key={question}
+              type="button"
+              onClick={() => onSend(question)}
+              className="w-fit max-w-[85%] rounded-full border border-widget-border-strong px-3.5 py-2 text-left text-sm text-widget-foreground transition-colors hover:bg-widget-assistant-bubble"
+            >
+              {question}
+            </button>
+          ))}
         </div>
       ) : null}
       {messages.map((message) => (

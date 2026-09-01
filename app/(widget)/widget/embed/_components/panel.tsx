@@ -15,6 +15,7 @@ export function Panel({
   strings,
   greeting,
   logoUrl,
+  suggestedQuestions,
   messages,
   isAwaitingResponse,
   isCoolingDown,
@@ -34,6 +35,7 @@ export function Panel({
   strings: WidgetStrings;
   greeting: string;
   logoUrl: string | null;
+  suggestedQuestions: string[];
   messages: ChatMessage[];
   isAwaitingResponse: boolean;
   isCoolingDown: boolean;
@@ -116,6 +118,8 @@ export function Panel({
             strings={strings}
             isAwaitingResponse={isAwaitingResponse}
             onRetry={onRetry}
+            suggestedQuestions={suggestedQuestions}
+            onSend={onSend}
           />
           <Composer
             strings={strings}
