@@ -37,16 +37,26 @@ export default async function ProductsPage() {
                 key={product.id}
                 className="flex items-center justify-between gap-4 rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
               >
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <p className="truncate font-medium text-ds-text-primary">{product.name}</p>
-                  {product.description ? (
-                    <p className="line-clamp-2 text-sm text-ds-text-secondary">{product.description}</p>
+                <div className="flex min-w-0 items-center gap-3">
+                  {product.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- catalog photo extracted from an uploaded PDF or hand-entered URL
+                    <img
+                      src={product.image_url}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded-ds-sm object-cover"
+                    />
                   ) : null}
-                  <p className="text-xs text-ds-text-muted">
-                    Extracted from: {product.extracted_from_document_id
-                      ? (documentTitleById.get(product.extracted_from_document_id) ?? "a deleted document")
-                      : "unknown source"}
-                  </p>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <p className="truncate font-medium text-ds-text-primary">{product.name}</p>
+                    {product.description ? (
+                      <p className="line-clamp-2 text-sm text-ds-text-secondary">{product.description}</p>
+                    ) : null}
+                    <p className="text-xs text-ds-text-muted">
+                      Extracted from: {product.extracted_from_document_id
+                        ? (documentTitleById.get(product.extracted_from_document_id) ?? "a deleted document")
+                        : "unknown source"}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-4">
                   {product.price ? (

@@ -207,6 +207,7 @@ export async function POST(request: NextRequest) {
         message,
         history,
         business.language,
+        business.conversionGoal,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);
@@ -253,6 +254,7 @@ export async function POST(request: NextRequest) {
         escalate: response.escalate,
         control: conversation.control,
         asOf: assistantMessageRow.created_at,
+        recommendedProducts: response.recommendedProducts,
       }),
     );
   } catch (error) {

@@ -5,11 +5,18 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createWidgetKey, revokeWidgetKey, updateWidgetKeyOrigins } from "@/lib/widget-keys";
-import { getBusinessForOrg, updateWidgetBranding, updateWidgetSuggestedQuestions, publishBusinessForOrg } from "@/lib/business";
+import {
+  getBusinessForOrg,
+  updateWidgetBranding,
+  updateWidgetSuggestedQuestions,
+  updateConversionGoal,
+  publishBusinessForOrg,
+} from "@/lib/business";
 import { widgetBrandingSchema, widgetSuggestedQuestionsSchema } from "@/lib/schemas/business";
 import { generateSuggestedQuestions, NoBusinessContentError } from "@/lib/widget-suggested-questions";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
+import type { AiConversionGoal } from "@/lib/supabase/types";
 
 const originSchema = z.string().trim().refine(
   (value) => {
@@ -181,6 +188,41 @@ export async function updateWidgetBrandingAction(
   }
 
   await recordAuditLogEntry(businessId, userId, "widget_branding.updated", "business", businessId);
+
+  revalidatePath("/dashboard/widget-settings");
+  return { success: true };
+}
+
+export type ConversionGoalActionState = {
+  error?: string;
+  success?: boolean;
+};
+
+const conversionGoalSchema = z.enum(["generate_leads", "recommend_products"]);
+
+/** Phase B1 (STATE.md): saves the explicit dashboard "conversion goal" choice gating recommend_products. */
+export async function updateConversionGoalAction(
+  _prevState: ConversionGoalActionState,
+  formData: FormData,
+): Promise<ConversionGoalActionState> {
+  const { businessId, userId, orgId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = conversionGoalSchema.safeParse(formData.get("conversionGoal"));
+  if (!parsed.success) {
+    return { error: "Choose a valid conversion goal." };
+  }
+
+  try {
+    await updateConversionGoal(orgId, parsed.data as AiConversionGoal);
+  } catch (err) {
+    return { error: logAndGetUserMessage(err) };
+  }
+
+  await recordAuditLogEntry(businessId, userId, "ai_conversion_goal.updated", "business", businessId);
 
   revalidatePath("/dashboard/widget-settings");
   return { success: true };

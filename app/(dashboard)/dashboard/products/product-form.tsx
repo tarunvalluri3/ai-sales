@@ -14,6 +14,9 @@ export function ProductForm({
   initialName = "",
   initialDescription = "",
   initialPrice = "",
+  initialImageUrl = "",
+  initialCategory = "",
+  initialPriceAmount = "",
   submitLabel,
   pendingLabel,
 }: {
@@ -22,6 +25,9 @@ export function ProductForm({
   initialName?: string;
   initialDescription?: string;
   initialPrice?: string;
+  initialImageUrl?: string;
+  initialCategory?: string;
+  initialPriceAmount?: string;
   submitLabel: string;
   pendingLabel: string;
 }) {
@@ -77,6 +83,52 @@ export function ProductForm({
           inputMode="decimal"
           placeholder="19.99"
           defaultValue={initialPrice}
+          disabled={isPending}
+          className={inputClasses}
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="category" className="text-sm font-medium text-ds-text-secondary">
+            Category <span className="text-ds-text-muted">(optional)</span>
+          </label>
+          <input
+            id="category"
+            name="category"
+            type="text"
+            maxLength={60}
+            placeholder="e.g. Sofas"
+            defaultValue={initialCategory}
+            disabled={isPending}
+            className={inputClasses}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="price_amount" className="text-sm font-medium text-ds-text-secondary">
+            Numeric price <span className="text-ds-text-muted">(optional, for budget matching)</span>
+          </label>
+          <input
+            id="price_amount"
+            name="price_amount"
+            type="text"
+            inputMode="decimal"
+            placeholder="499.00"
+            defaultValue={initialPriceAmount}
+            disabled={isPending}
+            className={inputClasses}
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="image_url" className="text-sm font-medium text-ds-text-secondary">
+          Image URL <span className="text-ds-text-muted">(optional)</span>
+        </label>
+        <input
+          id="image_url"
+          name="image_url"
+          type="url"
+          placeholder="https://example.com/product-photo.jpg"
+          defaultValue={initialImageUrl}
           disabled={isPending}
           className={inputClasses}
         />

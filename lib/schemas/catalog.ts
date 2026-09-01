@@ -28,3 +28,35 @@ export const catalogPriceSchema = z
     "Enter a valid price, e.g. 19.99.",
   )
   .transform((value) => (value === "" ? null : value));
+
+/**
+ * Phase B1 (STATE.md, "AI sales agent, not chatbot"): three optional
+ * fields backing budget-aware, image-backed recommendations. `image_url`
+ * and `category` are display/filter metadata; `price_amount` is a real
+ * number kept alongside `price` (free text) specifically for budget
+ * comparisons -- `price` stays the source of truth for what's shown to a
+ * prospect (some businesses will always want "Contact for pricing").
+ */
+export const catalogImageUrlSchema = z
+  .string()
+  .optional()
+  .transform((value) => value?.trim() ?? "")
+  .refine((value) => value === "" || z.string().url().safeParse(value).success, "Enter a valid image URL.")
+  .transform((value) => (value === "" ? null : value));
+
+export const catalogCategorySchema = z
+  .string()
+  .optional()
+  .transform((value) => value?.trim() ?? "")
+  .refine((value) => value.length <= 60, "Category must be 60 characters or fewer.")
+  .transform((value) => (value === "" ? null : value));
+
+export const catalogPriceAmountSchema = z
+  .string()
+  .optional()
+  .transform((value) => value?.trim() ?? "")
+  .refine(
+    (value) => value === "" || /^\d+(\.\d{1,2})?$/.test(value),
+    "Enter a valid numeric price, e.g. 499.00.",
+  )
+  .transform((value) => (value === "" ? null : Number(value)));

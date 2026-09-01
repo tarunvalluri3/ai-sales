@@ -10,6 +10,9 @@ import {
   catalogNameSchema,
   catalogDescriptionSchema,
   catalogPriceSchema,
+  catalogImageUrlSchema,
+  catalogCategorySchema,
+  catalogPriceAmountSchema,
 } from "@/lib/schemas/catalog";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -17,6 +20,9 @@ const productFieldsSchema = z.object({
   name: catalogNameSchema,
   description: catalogDescriptionSchema,
   price: catalogPriceSchema,
+  image_url: catalogImageUrlSchema,
+  category: catalogCategorySchema,
+  price_amount: catalogPriceAmountSchema,
 });
 
 const updateProductSchema = productFieldsSchema.extend({
@@ -42,6 +48,9 @@ export async function createProductAction(
     name: formData.get("name"),
     description: formData.get("description"),
     price: formData.get("price"),
+    image_url: formData.get("image_url"),
+    category: formData.get("category"),
+    price_amount: formData.get("price_amount"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Enter a valid product." };
@@ -72,6 +81,9 @@ export async function updateProductAction(
     name: formData.get("name"),
     description: formData.get("description"),
     price: formData.get("price"),
+    image_url: formData.get("image_url"),
+    category: formData.get("category"),
+    price_amount: formData.get("price_amount"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Enter a valid product." };

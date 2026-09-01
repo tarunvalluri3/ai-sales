@@ -6,11 +6,12 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createConversation, getConversationForBusiness } from "@/lib/conversations";
 import { createMessage } from "@/lib/messages";
 import { askSalesEmployee, type ConversationMessage } from "@/lib/rag";
+import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { SANDBOX_CONVERSATION_SOURCE } from "./constants";
 
 export type SandboxChatResult =
-  | { ok: true; conversationId: string; answer: string }
+  | { ok: true; conversationId: string; answer: string; recommendedProducts: RecommendedItem[] }
   | { ok: false; error: string };
 
 /**
@@ -75,6 +76,7 @@ export async function sendSandboxMessage(
       trimmed,
       [...history, { role: "user", content: trimmed }],
       business.widget_language,
+      business.ai_conversion_goal,
     );
 
     await createMessage(
@@ -87,7 +89,12 @@ export async function sendSandboxMessage(
       response.grounded,
     );
 
-    return { ok: true, conversationId: conversation.id, answer: response.answer };
+    return {
+      ok: true,
+      conversationId: conversation.id,
+      answer: response.answer,
+      recommendedProducts: response.recommendedProducts,
+    };
   } catch (error) {
     return { ok: false, error: logAndGetUserMessage(error) };
   }

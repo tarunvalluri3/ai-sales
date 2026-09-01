@@ -17,6 +17,7 @@ export type Business = {
   widget_position: WidgetPosition;
   widget_language: WidgetLanguage;
   widget_suggested_questions: string[] | null;
+  ai_conversion_goal: AiConversionGoal;
   published_at: string | null;
   created_at: string;
   updated_at: string;
@@ -24,6 +25,7 @@ export type Business = {
 
 export type WidgetPosition = "bottom-right" | "bottom-left";
 export type WidgetLanguage = "en" | "es" | "fr" | "de" | "pt" | "hi";
+export type AiConversionGoal = "generate_leads" | "recommend_products";
 
 export type BusinessHours = {
   business_id: string;
@@ -54,6 +56,9 @@ export type Product = {
   name: string;
   description: string | null;
   price: string | null;
+  image_url: string | null;
+  category: string | null;
+  price_amount: number | null;
   status: CatalogItemStatus;
   extracted_from_document_id: string | null;
   created_at: string;
@@ -66,6 +71,9 @@ export type Service = {
   name: string;
   description: string | null;
   price: string | null;
+  image_url: string | null;
+  category: string | null;
+  price_amount: number | null;
   status: CatalogItemStatus;
   extracted_from_document_id: string | null;
   created_at: string;
@@ -220,7 +228,8 @@ export type AuditLogAction =
   | "business_hours.updated"
   | "widget_branding.updated"
   | "business.published"
-  | "widget_suggested_questions.updated";
+  | "widget_suggested_questions.updated"
+  | "ai_conversion_goal.updated";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

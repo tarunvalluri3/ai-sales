@@ -2,6 +2,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Business } from "@/lib/supabase/types";
 import type { BusinessProfileInput, WidgetBrandingInput } from "@/lib/schemas/business";
+import type { AiConversionGoal } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 
 /** Postgres unique-violation error code. */
@@ -165,6 +166,34 @@ export async function updateWidgetSuggestedQuestions(orgId: string, questions: s
     throw new AppError(
       "Something went wrong saving your suggested questions. Please try again.",
       "updateWidgetSuggestedQuestions failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/**
+ * Sets a business's AI "conversion goal" (Phase B1, STATE.md): an explicit
+ * dashboard setting, never auto-inferred, gating whether `lib/rag.ts`
+ * binds the recommend_products tool and how it phrases its closing CTA.
+ * `orgId` must come from a validated session; authorization
+ * (org:admin-only) is enforced by the caller, same convention as
+ * `updateWidgetBranding`.
+ */
+export async function updateConversionGoal(orgId: string, goal: AiConversionGoal): Promise<Business> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("businesses")
+    .update({ ai_conversion_goal: goal })
+    .eq("clerk_org_id", orgId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong updating your AI's conversion goal. Please try again.",
+      "updateConversionGoal failed",
       error,
     );
   }
