@@ -2,6 +2,7 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { getBusinessForOrg } from "@/lib/business";
 import { listBusinessHours } from "@/lib/business-hours";
 import { BusinessHoursForm } from "./business-hours-form";
+import { AppointmentSettingsForm } from "./appointment-settings-form";
 
 export default async function BusinessHoursPage() {
   const { businessId, orgId } = await requireBusinessContext();
@@ -19,6 +20,11 @@ export default async function BusinessHoursPage() {
       </div>
 
       <BusinessHoursForm hours={hours} slaMinutes={business?.sla_minutes ?? null} timezone={business?.timezone ?? "UTC"} />
+
+      <AppointmentSettingsForm
+        enabled={business?.appointments_enabled ?? false}
+        slotMinutes={business?.appointment_slot_minutes ?? 30}
+      />
     </div>
   );
 }

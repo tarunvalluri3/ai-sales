@@ -15,6 +15,8 @@ import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request
 import { listOfferingsTool, executeListOfferings } from "@/lib/tools/list-offerings";
 import { searchKnowledgeBaseTool, executeSearchKnowledgeBase } from "@/lib/tools/search-knowledge-base";
 import { recommendProductsTool, executeRecommendProducts, type RecommendedItem } from "@/lib/tools/recommend-products";
+import { checkAvailableSlotsTool, executeCheckAvailableSlots } from "@/lib/tools/check-available-slots";
+import { bookAppointmentTool, executeBookAppointment } from "@/lib/tools/book-appointment";
 import { logEvent } from "@/lib/logger";
 import { isWithinUsageQuota } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
@@ -83,6 +85,16 @@ function formatLanguageInstruction(language: WidgetLanguage): string {
 function formatRecommendationInstruction(conversionGoal: AiConversionGoal): string {
   if (conversionGoal !== "recommend_products") return "";
   return `\nWhen you have specific product/service matches to show, call recommend_products (not list_products_and_services) once you know enough about what the prospect needs -- pass their budget/category if they gave one. Its results (including any image) are shown to the prospect automatically as product cards, so mention them naturally in your answer without trying to describe, link, or restate an image yourself.\n`;
+}
+
+/**
+ * Phase C: only businesses with appointment booking enabled get this
+ * instruction (and the two scheduling tools bound below) -- every other
+ * business keeps the exact prior prompt/behavior unchanged.
+ */
+function formatAppointmentInstruction(appointmentsEnabled: boolean): string {
+  if (!appointmentsEnabled) return "";
+  return `\nIf the prospect wants to schedule a call, demo, or consultation, call check_available_slots to see real open times before suggesting any -- never guess or invent a time yourself. Once the prospect clearly agrees to one specific slot from that list AND you already have their email or phone number from this conversation, call book_appointment with that slot's exact startsAt value. Booking is always pending the business's own confirmation -- tell the prospect their time is requested and the team will confirm it, never that it's already confirmed.\n`;
 }
 
 /** Renders the optional business-profile fields as prompt lines, omitting anything the business hasn't filled in -- never a blank "Description: " line. */
@@ -175,6 +187,7 @@ const SalesEmployeeResponseSchema = z.object({
 const SYSTEM_TEMPLATE = `You are a sales employee of {businessName} -- not a support chatbot. Your job is to understand what this prospect actually needs, recommend the specific thing from {businessName}'s real offerings that fits, and keep the conversation moving toward a real outcome (more detail, a concrete recommendation, or getting them in touch with the team) rather than just answering a question and stopping. You represent only {businessName} to this prospect -- never any other business.
 {languageInstruction}
 {recommendationInstruction}
+{appointmentInstruction}
 {businessProfileContext}
 Reference context (retrieved business knowledge, relevant to the current question):
 {context}
@@ -261,6 +274,7 @@ export async function askSalesEmployee(
   history: ConversationMessage[] = [],
   language: WidgetLanguage = "en",
   conversionGoal: AiConversionGoal = "generate_leads",
+  appointmentsEnabled: boolean = false,
 ): Promise<SalesEmployeeResponse> {
   // Phase 22h: checked before any Gemini call this turn would make,
   // including the embedding call retrieval itself makes -- a business
@@ -353,6 +367,7 @@ export async function askSalesEmployee(
       businessName,
       languageInstruction: formatLanguageInstruction(language),
       recommendationInstruction: formatRecommendationInstruction(conversionGoal),
+      appointmentInstruction: formatAppointmentInstruction(appointmentsEnabled),
       businessProfileContext: formatBusinessProfileContext(businessProfile),
       question,
       history: toLangchainHistory(history),
@@ -366,6 +381,7 @@ export async function askSalesEmployee(
       listOfferingsTool,
       searchKnowledgeBaseTool,
       ...(conversionGoal === "recommend_products" ? [recommendProductsTool] : []),
+      ...(appointmentsEnabled ? [checkAvailableSlotsTool, bookAppointmentTool] : []),
     ];
     const toolModel = getChatModel().bindTools(tools);
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
@@ -403,6 +419,11 @@ export async function askSalesEmployee(
             recommendedProducts = recommendResult.items;
           }
           toolResult = recommendResult;
+        } else if (toolCall.name === "check_available_slots") {
+          toolResult = await executeCheckAvailableSlots(supabase, businessId, toolCall.args);
+        } else if (toolCall.name === "book_appointment") {
+          calledSideEffectingTool = true;
+          toolResult = await executeBookAppointment(supabase, businessId, conversationId, toolCall.args);
         } else {
           logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
           toolResult = { found: false, reason: "invalid_input" };

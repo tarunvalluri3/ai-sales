@@ -51,20 +51,39 @@ async function preflight() {
 }
 
 async function getAcmeFixture() {
-  const { data, error } = await supabase
+  const { data: business, error: businessError } = await supabase
     .from("businesses")
-    .select("id, widget_key")
+    .select("id")
     .eq("name", ACME_BUSINESS_NAME)
     .maybeSingle();
 
-  if (error || !data) {
+  if (businessError || !business) {
     console.error(
-      `Could not find the "${ACME_BUSINESS_NAME}" business to eval against (${error?.message ?? "no row"}). This eval suite depends on that standing test business existing -- see docs/eval-suite.md.`,
+      `Could not find the "${ACME_BUSINESS_NAME}" business to eval against (${businessError?.message ?? "no row"}). This eval suite depends on that standing test business existing -- see docs/eval-suite.md.`,
     );
     process.exit(1);
   }
 
-  return data;
+  // Phase 24 moved widget keys off businesses.widget_key and into their own
+  // widget_keys table (rotation, multiple origins per key -- see
+  // lib/widget-auth.ts). Resolve Acme's active key the same way the real
+  // widget-auth path does.
+  const { data: widgetKeyRow, error: widgetKeyError } = await supabase
+    .from("widget_keys")
+    .select("key")
+    .eq("business_id", business.id)
+    .eq("status", "active")
+    .limit(1)
+    .maybeSingle();
+
+  if (widgetKeyError || !widgetKeyRow) {
+    console.error(
+      `Could not find an active widget key for "${ACME_BUSINESS_NAME}" (${widgetKeyError?.message ?? "no row"}). See lib/widget-auth.ts / the widget_keys table.`,
+    );
+    process.exit(1);
+  }
+
+  return { id: business.id, widget_key: widgetKeyRow.key };
 }
 
 async function sendChatMessage(widgetKey, message, { consentGiven } = {}) {

@@ -208,6 +208,7 @@ export async function POST(request: NextRequest) {
         history,
         business.language,
         business.conversionGoal,
+        business.appointmentsEnabled,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);

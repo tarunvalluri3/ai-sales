@@ -173,6 +173,21 @@ function WebhooksIcon(props: IconProps) {
   );
 }
 
+function AppointmentsIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M5 4.5V3m10 1.5V3M4 7.5h12M4.5 5h11A1.5 1.5 0 0 1 17 6.5v9A1.5 1.5 0 0 1 15.5 17h-11A1.5 1.5 0 0 1 3 15.5v-9A1.5 1.5 0 0 1 4.5 5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="m7.5 11 1.7 1.7L13 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function BusinessHoursIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
@@ -197,6 +212,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Knowledge", href: "/dashboard/knowledge", icon: KnowledgeIcon },
   { label: "Conversations", href: "/dashboard/conversations", icon: ConversationsIcon },
   { label: "Leads", href: "/dashboard/leads", icon: LeadsIcon },
+  { label: "Appointments", href: "/dashboard/appointments", icon: AppointmentsIcon },
   { label: "Analytics", href: "/dashboard/analytics", icon: AnalyticsIcon },
   { label: "Widget Settings", href: "/dashboard/widget-settings", icon: WidgetIcon },
   { label: "Webhooks", href: "/dashboard/webhooks", icon: WebhooksIcon },
