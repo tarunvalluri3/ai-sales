@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import type { ChatMessage } from "../_lib/use-widget-chat";
 import type { WidgetStrings } from "@/lib/widget-i18n";
+import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { EscalationBanner } from "./escalation-banner";
 
 function errorCopy(strings: WidgetStrings, kind: NonNullable<ChatMessage["errorKind"]>): string {
@@ -55,7 +56,7 @@ export function MessageBubble({
           {strings.teamMemberLabel}
         </span>
       ) : null}
-      <div className={bubbleClass}>{message.content}</div>
+      <div className={bubbleClass}>{renderWidgetMarkdown(message.content)}</div>
       {message.status === "error" && message.errorKind ? (
         <div className="mt-1.5 flex items-center gap-2">
           <span className="text-xs text-widget-error">{errorCopy(strings, message.errorKind)}</span>

@@ -143,6 +143,36 @@ export async function updateWidgetBranding(orgId: string, input: WidgetBrandingI
 }
 
 /**
+ * Saves the business's reviewed/edited list of AI-suggested prefilled
+ * widget questions (Phase 25e). `questions` must already be the final,
+ * human-approved list -- validated shape only, no AI call happens here
+ * (see `lib/widget-suggested-questions.ts` for generation). An empty
+ * array clears the setting (falls back to no chips shown, not an error).
+ * `orgId` must come from a validated session; authorization
+ * (org:admin-only) is enforced by the caller, same convention as
+ * `updateWidgetBranding`.
+ */
+export async function updateWidgetSuggestedQuestions(orgId: string, questions: string[]): Promise<Business> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("businesses")
+    .update({ widget_suggested_questions: questions.length > 0 ? questions : null })
+    .eq("clerk_org_id", orgId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong saving your suggested questions. Please try again.",
+      "updateWidgetSuggestedQuestions failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
+/**
  * Marks a business published (Phase 25c "test your AI before publishing"):
  * sets `published_at` to now, the flag `lib/widget-auth.ts`'s
  * `resolveBusinessFromWidgetKey()` requires before the public /api/chat

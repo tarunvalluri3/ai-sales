@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { pollAttentionCountAction } from "../actions";
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 1000;
 
 const AttentionCountContext = createContext<number>(0);
 
@@ -40,8 +40,8 @@ function playAttentionChime(context: AudioContext) {
  * Owns the single, shared poll for the count of conversations needing
  * attention across the whole dashboard (Phase 15c) -- mounted once in
  * dashboard/layout.tsx, not duplicated per nav surface. Same
- * self-rescheduling 3-second poll shape as LiveConversationPanel
- * (Phase 15b): pause on tab-hidden, immediate poll on resume, cleanup
+ * self-rescheduling poll shape as LiveConversationPanel (Phase 15b,
+ * interval tightened to 1s Phase 25e): pause on tab-hidden, immediate poll on resume, cleanup
  * on unmount (only ever unmounted by leaving /dashboard/* entirely).
  *
  * The chime plays only when the count genuinely increases relative to

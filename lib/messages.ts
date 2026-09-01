@@ -117,6 +117,38 @@ export async function listMessagesForConversation(
 }
 
 /**
+ * Returns the first prospect-authored message of a conversation, tenant-
+ * scoped, for use as a short preview string (Phase 25d "recent chats"
+ * listing). Null if the conversation has no user message yet (should not
+ * happen for a real conversation, but a listing must not throw over it).
+ */
+export async function getFirstUserMessage(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("content")
+    .eq("business_id", businessId)
+    .eq("conversation_id", conversationId)
+    .eq("role", "user")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your recent chats. Please try again.",
+      "getFirstUserMessage failed",
+      error,
+    );
+  }
+
+  return data?.content ?? null;
+}
+
+/**
  * Returns messages created strictly after `after` (an ISO timestamp),
  * chronological (oldest-first), for polling (Phase 15b). Used by both
  * app/api/chat/poll/route.ts (widget-side, `excludeRoles: ["user"]` --

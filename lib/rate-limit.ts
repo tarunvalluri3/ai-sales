@@ -2,7 +2,14 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
 
-export type RateLimitScope = "ip" | "key" | "conversation" | "poll_ip" | "poll_conversation" | "restore_ip";
+export type RateLimitScope =
+  | "ip"
+  | "key"
+  | "conversation"
+  | "poll_ip"
+  | "poll_conversation"
+  | "restore_ip"
+  | "recent_chats_ip";
 
 /**
  * Atomically increments the fixed-window counter for (scope, identifier)

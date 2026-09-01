@@ -9,7 +9,7 @@ import { MessageBubble } from "./message-bubble";
 import { DismissAttentionButton } from "../../_components/dismiss-attention-button";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
 
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 1000;
 
 /**
  * Owns polling state for one conversation detail page (Phase 15b).
