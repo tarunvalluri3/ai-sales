@@ -1,6 +1,14 @@
 import "server-only";
+import { createRequire } from "node:module";
 import { configureUnPDF, renderPageAsImage } from "unpdf";
 import { logEvent } from "@/lib/logger";
+
+// `import.meta.resolve` isn't available in this route's actual bundled
+// runtime (confirmed live: threw "s.resolve is not a function" on
+// Vercel) -- createRequire's CJS-style resolution is the portable
+// fallback, and works correctly with pdfjs-dist in
+// `serverExternalPackages` (real, unbundled files on disk at deploy time).
+const require = createRequire(import.meta.url);
 
 /**
  * Phase B2 (STATE.md, "AI sales agent, not chatbot" -- PDF catalog
@@ -42,8 +50,7 @@ async function ensureConfigured(): Promise<void> {
   if (!configured) {
     configured = (async () => {
       const pdfjsModule = await import("pdfjs-dist");
-      const packageUrl = import.meta.resolve("pdfjs-dist/package.json");
-      pdfjsModule.GlobalWorkerOptions.workerSrc = new URL("./build/pdf.worker.mjs", packageUrl).href;
+      pdfjsModule.GlobalWorkerOptions.workerSrc = require.resolve("pdfjs-dist/build/pdf.worker.mjs");
       await configureUnPDF({ pdfjs: () => Promise.resolve(pdfjsModule) });
     })();
   }
