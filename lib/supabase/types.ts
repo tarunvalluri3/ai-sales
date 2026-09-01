@@ -19,6 +19,8 @@ export type Business = {
   widget_suggested_questions: string[] | null;
   ai_conversion_goal: AiConversionGoal;
   published_at: string | null;
+  appointments_enabled: boolean;
+  appointment_slot_minutes: number;
   created_at: string;
   updated_at: string;
 };
@@ -203,6 +205,29 @@ export type Lead = {
   updated_at: string;
 };
 
+/**
+ * Phase C: booking always starts 'pending' (the user's confirmed choice --
+ * owner approval required, the AI's book_appointment tool never inserts
+ * 'confirmed' directly). A human moves it to 'confirmed'/'declined' from
+ * the dashboard; a confirmed appointment can later be 'cancelled'.
+ */
+export type AppointmentStatus = "pending" | "confirmed" | "declined" | "cancelled";
+
+export type Appointment = {
+  id: string;
+  business_id: string;
+  conversation_id: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: AppointmentStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type WebhookEndpointStatus = "active" | "disabled";
 
 export type WebhookEndpoint = {
@@ -229,7 +254,11 @@ export type AuditLogAction =
   | "widget_branding.updated"
   | "business.published"
   | "widget_suggested_questions.updated"
-  | "ai_conversion_goal.updated";
+  | "ai_conversion_goal.updated"
+  | "appointment_settings.updated"
+  | "appointment.confirmed"
+  | "appointment.declined"
+  | "appointment.cancelled";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

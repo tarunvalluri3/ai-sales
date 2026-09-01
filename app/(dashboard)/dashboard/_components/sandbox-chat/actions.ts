@@ -77,6 +77,7 @@ export async function sendSandboxMessage(
       [...history, { role: "user", content: trimmed }],
       business.widget_language,
       business.ai_conversion_goal,
+      business.appointments_enabled,
     );
 
     await createMessage(

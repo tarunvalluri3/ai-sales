@@ -142,7 +142,33 @@ Leads are always tenant-owned and only ever visible to members of the owning bus
 
 ---
 
-## 9. Implementation phasing
+## 9. Appointment model
+
+Resolved decisions (STATE.md, "Phase C"). Appointment booking is off by default and explicit per business (`businesses.appointments_enabled`) — never auto-inferred, same principle as the AI conversion goal (§7).
+
+Availability is a **recurring weekly schedule**, not a manually-maintained calendar: it reuses the business's existing `business_hours` (day-of-week open/close times) and `timezone`, sliced into fixed-length slots (`businesses.appointment_slot_minutes`). A business with no configured hours has no bookable slots — it is never treated as always-open for booking, unlike `business_hours`' own "unconfigured = always open" default for SLA routing.
+
+Capacity is **one booking per slot** — once a slot has a pending or confirmed appointment, no other prospect can be offered or book it.
+
+Booking always **requires the business's own confirmation**: the AI's `book_appointment` tool only ever creates a `pending` appointment. A human must confirm or decline it in the dashboard before it's final. The AI must tell the prospect their request is pending, never that it's confirmed.
+
+| Field | Type | Notes |
+|---|---|---|
+| `business_id` | required | automatic, from the conversation's tenant context |
+| `conversation_id` | optional | links to the source conversation when booked via chat |
+| `contact_name` | optional | volunteered by prospect |
+| `contact_email` | conditionally required | at least one of email/phone required |
+| `contact_phone` | conditionally required | at least one of email/phone required |
+| `starts_at` / `ends_at` | required | the booked slot, in UTC |
+| `status` | required, defaults `pending` | pending → confirmed / declined; confirmed → cancelled |
+| `notes` | optional | free-text context the prospect gave |
+| `created_at` / `updated_at` | automatic | timestamps |
+
+Same contact-info rule as leads (§8): a booking is only created once at least one of `contact_email`/`contact_phone` is present, and only after the conversation's own consent flag is set.
+
+---
+
+## 10. Implementation phasing
 
 The authoritative phase order and exit criteria are in `docs/phases.md`. The currently active phase is in `STATE.md`.
 
@@ -150,7 +176,7 @@ Do not build the whole product in one phase. Do not silently implement a future 
 
 ---
 
-## 10. Out of scope until explicitly scheduled
+## 11. Out of scope until explicitly scheduled
 
 - WhatsApp integration (Phase 16)
 - Razorpay billing (Phase 17)
@@ -166,6 +192,6 @@ Do not build the whole product in one phase. Do not silently implement a future 
 
 ---
 
-## 11. What "working" means for v1
+## 12. What "working" means for v1
 
 The product is minimally viable when a business owner can: sign up, onboard, add products/services/FAQs and some approved knowledge, embed a chat widget, and watch a real prospect conversation produce a correctly-attributed lead in their dashboard — with the AI never answering a business question it has no grounding for, and never surfacing another business's information.
