@@ -9,14 +9,13 @@ import {
   getBusinessForOrg,
   updateWidgetBranding,
   updateWidgetSuggestedQuestions,
-  updateConversionGoal,
+  updateAiCapabilities,
   publishBusinessForOrg,
 } from "@/lib/business";
 import { widgetBrandingSchema, widgetSuggestedQuestionsSchema } from "@/lib/schemas/business";
 import { generateSuggestedQuestions, NoBusinessContentError } from "@/lib/widget-suggested-questions";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
-import type { AiConversionGoal } from "@/lib/supabase/types";
 
 const originSchema = z.string().trim().refine(
   (value) => {
@@ -193,36 +192,44 @@ export async function updateWidgetBrandingAction(
   return { success: true };
 }
 
-export type ConversionGoalActionState = {
+export type AiCapabilitiesActionState = {
   error?: string;
   success?: boolean;
 };
 
-const conversionGoalSchema = z.enum(["generate_leads", "recommend_products"]);
+const aiCapabilitiesSchema = z.object({
+  recommendProductsEnabled: z.boolean(),
+  appointmentsEnabled: z.boolean(),
+  appointmentSlotMinutes: z.number().int().min(5).max(240),
+});
 
-/** Phase B1 (STATE.md): saves the explicit dashboard "conversion goal" choice gating recommend_products. */
-export async function updateConversionGoalAction(
-  _prevState: ConversionGoalActionState,
+/** Saves all AI capability toggles (recommend_products, appointment booking + its slot length) in one atomic call -- replaces the old exclusive "conversion goal" dropdown. */
+export async function updateAiCapabilitiesAction(
+  _prevState: AiCapabilitiesActionState,
   formData: FormData,
-): Promise<ConversionGoalActionState> {
+): Promise<AiCapabilitiesActionState> {
   const { businessId, userId, orgId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:admin");
   if (authError) {
     return { error: authError };
   }
 
-  const parsed = conversionGoalSchema.safeParse(formData.get("conversionGoal"));
+  const parsed = aiCapabilitiesSchema.safeParse({
+    recommendProductsEnabled: formData.get("recommendProductsEnabled") === "on",
+    appointmentsEnabled: formData.get("appointmentsEnabled") === "on",
+    appointmentSlotMinutes: Number(formData.get("appointmentSlotMinutes")),
+  });
   if (!parsed.success) {
-    return { error: "Choose a valid conversion goal." };
+    return { error: "Slot length must be a whole number of minutes between 5 and 240." };
   }
 
   try {
-    await updateConversionGoal(orgId, parsed.data as AiConversionGoal);
+    await updateAiCapabilities(orgId, parsed.data);
   } catch (err) {
     return { error: logAndGetUserMessage(err) };
   }
 
-  await recordAuditLogEntry(businessId, userId, "ai_conversion_goal.updated", "business", businessId);
+  await recordAuditLogEntry(businessId, userId, "ai_capabilities.updated", "business", businessId);
 
   revalidatePath("/dashboard/widget-settings");
   return { success: true };

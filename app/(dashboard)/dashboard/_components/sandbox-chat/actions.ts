@@ -76,8 +76,7 @@ export async function sendSandboxMessage(
       trimmed,
       [...history, { role: "user", content: trimmed }],
       business.widget_language,
-      business.ai_conversion_goal,
-      business.appointments_enabled,
+      { recommendProductsEnabled: business.recommend_products_enabled, appointmentsEnabled: business.appointments_enabled },
     );
 
     await createMessage(

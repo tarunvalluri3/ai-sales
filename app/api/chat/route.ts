@@ -207,8 +207,7 @@ export async function POST(request: NextRequest) {
         message,
         history,
         business.language,
-        business.conversionGoal,
-        business.appointmentsEnabled,
+        { recommendProductsEnabled: business.recommendProductsEnabled, appointmentsEnabled: business.appointmentsEnabled },
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);

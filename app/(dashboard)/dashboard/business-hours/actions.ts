@@ -5,8 +5,6 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { setBusinessHours, updateBusinessSla, type DayHoursInput } from "@/lib/business-hours";
-import { updateAppointmentSettings } from "@/lib/appointments";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -61,47 +59,6 @@ export async function updateBusinessHoursAction(
   }
 
   await recordAuditLogEntry(businessId, userId, "business_hours.updated", "business", businessId);
-
-  revalidatePath("/dashboard/business-hours");
-  return { success: true };
-}
-
-export type AppointmentSettingsState = {
-  error?: string;
-  success?: boolean;
-};
-
-/**
- * Phase C: appointment booking is derived directly from the business
- * hours set above (its own recurring weekly schedule), so this setting
- * lives on the same page rather than a separate one -- an owner
- * configuring hours and enabling booking is one coherent task.
- */
-export async function updateAppointmentSettingsAction(
-  _prevState: AppointmentSettingsState,
-  formData: FormData,
-): Promise<AppointmentSettingsState> {
-  const { businessId, userId, orgRole } = await requireBusinessContext();
-  const authError = requireMinRole(orgRole, "org:admin");
-  if (authError) {
-    return { error: authError };
-  }
-
-  const enabled = formData.get("appointmentsEnabled") === "on";
-  const slotMinutesRaw = formData.get("appointmentSlotMinutes");
-  const slotMinutes = Number(slotMinutesRaw);
-  if (!Number.isInteger(slotMinutes) || slotMinutes < 5 || slotMinutes > 240) {
-    return { error: "Slot length must be a whole number of minutes between 5 and 240." };
-  }
-
-  try {
-    const supabase = createServerSupabaseClient();
-    await updateAppointmentSettings(supabase, businessId, { enabled, slotMinutes });
-  } catch (error) {
-    return { error: logAndGetUserMessage(error) };
-  }
-
-  await recordAuditLogEntry(businessId, userId, "appointment_settings.updated", "business", businessId);
 
   revalidatePath("/dashboard/business-hours");
   return { success: true };

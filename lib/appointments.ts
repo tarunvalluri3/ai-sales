@@ -329,19 +329,3 @@ export async function declineAppointment(supabase: ServerSupabaseClient, busines
 export async function cancelAppointment(supabase: ServerSupabaseClient, businessId: string, id: string): Promise<boolean> {
   return transitionAppointment(supabase, businessId, id, ["confirmed"], "cancelled");
 }
-
-/** Updates the two appointment-booking settings together -- same "replace as one call" shape as lib/business-hours.ts's setBusinessHours. */
-export async function updateAppointmentSettings(
-  supabase: ServerSupabaseClient,
-  businessId: string,
-  input: { enabled: boolean; slotMinutes: number },
-): Promise<void> {
-  const { error } = await supabase
-    .from("businesses")
-    .update({ appointments_enabled: input.enabled, appointment_slot_minutes: input.slotMinutes })
-    .eq("id", businessId);
-
-  if (error) {
-    throw new AppError("Something went wrong saving your appointment settings. Please try again.", "updateAppointmentSettings failed", error);
-  }
-}
