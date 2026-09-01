@@ -22,11 +22,32 @@ import { logEvent } from "@/lib/logger";
  * from this page still gets created, just without a photo, rather than
  * failing catalog extraction entirely.
  */
-let configured = false;
-function ensureConfigured(): void {
-  if (configured) return;
-  configureUnPDF({ pdfjs: () => import("pdfjs-dist") });
-  configured = true;
+/**
+ * Real bug found live (STATE.md, "PDF page-image rendering root-cause
+ * fix"): this used to be `function ensureConfigured(): void` calling
+ * `configureUnPDF(...)` without awaiting it, and its one caller below
+ * didn't await it either -- a genuine race between this module's
+ * reconfiguration finishing and unpdf's own internal, unconfigured
+ * default resolution (triggered by `lib/file-ingestion.ts`'s plain-text
+ * `extractText()` calls elsewhere) winning first, which is how a fake
+ * "API version 6.3.289 does not match the Worker version 6.1.200" error
+ * -- a real, reproducible failure on Vercel, not a local-only quirk --
+ * came from. Also explicitly sets `GlobalWorkerOptions.workerSrc` to
+ * this exact resolved module's own worker file, per pdfjs-dist's own
+ * documented recommendation that this "should always be set" -- belt
+ * and suspenders against the same class of mismatch recurring.
+ */
+let configured: Promise<void> | null = null;
+async function ensureConfigured(): Promise<void> {
+  if (!configured) {
+    configured = (async () => {
+      const pdfjsModule = await import("pdfjs-dist");
+      const packageUrl = import.meta.resolve("pdfjs-dist/package.json");
+      pdfjsModule.GlobalWorkerOptions.workerSrc = new URL("./build/pdf.worker.mjs", packageUrl).href;
+      await configureUnPDF({ pdfjs: () => Promise.resolve(pdfjsModule) });
+    })();
+  }
+  await configured;
 }
 
 const RENDER_SCALE = 1.5;
@@ -43,7 +64,7 @@ export async function renderPdfPageToPng(
   businessId: string,
 ): Promise<Uint8Array | null> {
   try {
-    ensureConfigured();
+    await ensureConfigured();
     const buffer = await renderPageAsImage(pdfBytes, pageNumber, {
       canvasImport: () => import("@napi-rs/canvas"),
       scale: RENDER_SCALE,
