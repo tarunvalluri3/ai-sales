@@ -2,7 +2,41 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-01 (Production bug fix: Gemini embedding-quota exhaustion was causing real 500s on the live Waves Web Studio widget — fixed and verified live; AI capability toggles — replaced the exclusive "conversion goal" with independent, combinable capability toggles + image-gated recommendation cards — implemented and verified live; Phase C — appointment booking — implemented and verified live; scripts/run-evals.mjs's stale widget_key fixture lookup fixed)
+Last updated: 2026-09-01 (Production bug fix: Gemini embedding-quota exhaustion was causing real 500s on the live Waves Web Studio widget — fixed and verified live; AI capability toggles — replaced the exclusive "conversion goal" with independent, combinable capability toggles + image-gated recommendation cards — implemented and verified live; Phase C — appointment booking — implemented and verified live; scripts/run-evals.mjs's stale widget_key fixture lookup fixed; backlog below compiled and prioritized)
+
+---
+
+## Backlog — prioritized open items (as of 2026-09-01)
+
+A living, prioritized todo list — unlike the phase entries below (an append-only history log), this section should be edited/pruned as items are resolved. Compiled by reading every "Known limitation"/"Known gap"/"Not yet done"/"Next step" note across this file's full history and cross-checking which are still actually open (several older ones — e.g. the AI's decline-rule wording, the URL-ingestion stub bug, the widget-key eval-harness lookup — were already fixed by later phases and are omitted here). Each item names its source phase so the full context can be found by searching this file.
+
+### P0 — user action required, blocks real functionality
+1. **Verify a Resend sending domain and set `RESEND_API_KEY`/`NOTIFICATION_EMAIL_FROM` on Vercel** — confirmed still unset via `vercel env ls production` (2026-09-01). Phase 25b's daily lead/attention-needed digest email silently no-ops without them; nothing is broken, but no business has ever actually received one.
+2. **Create the two custom Clerk org roles** (`org:sales_agent`, `org:analyst_viewer`) in Clerk Dashboard → Organizations → Roles & Permissions, using exactly those key strings (Phase 24). App-side gating is already safe without them (an unrecognized role is denied, never granted) — but the two new RBAC tiers won't differentiate anyone until the roles exist and are assigned.
+3. **Fill in the bracketed legal placeholders** on `/privacy` and `/terms` (entity name, support email, governing jurisdiction) — deliberately left as placeholders (Phase 22a), not launch-ready as-is.
+
+### P1 — real, currently-unverified risk
+4. **Confirm PDF catalog page-image rendering actually works on the real Vercel deployment** (Phase B2). Local verification hit a Windows-specific `ERR_DLOPEN_FAILED` unrelated to production (Linux containers, different binary) — genuinely still unconfirmed either way, and explicitly flagged at the time as "the single most important thing to test" before relying on it.
+5. **Run one real, model-invoked appointment-booking conversation end-to-end** (`check_available_slots` → `book_appointment`) now that the embedding-quota bug (above) is fixed — the tools, slot math, and DB constraints are all independently verified, but the full live Gemini tool-calling path for these two specific tools has never been exercised (Phase C was blocked by the quota bug at the time).
+6. **Click through `/dashboard/appointments`'s Confirm/Decline/Cancel buttons and the new `/dashboard/widget-settings` AI-capabilities checkboxes** in a real signed-in browser session — both were only verified via direct `/api/chat` calls and database state this session.
+7. **Consider requesting a Gemini embedding-quota increase from Google Cloud** if the "We're experiencing high demand..." degrade message keeps firing during real (non-burst) traffic — today's fix stops it from breaking the widget, but doesn't raise the underlying per-minute account quota.
+
+### P2 — known bugs / gaps, lower urgency
+8. `recommend_products` had one occasional `invalid_input` tool-call flake during live testing (self-resolved on retry, model fell back to another tool successfully) — not root-caused.
+9. **The current turn's question is sent to Gemini twice per request** (once via `history`, once via the prompt's own `{question}` slot) — a real cost/latency inefficiency, not a correctness bug, found during Phase 23's caching work and never fixed.
+10. **No staging Supabase environment exists** — confirmed 2026-09-01 (only one project, `bykeztxvejpwfcxgsubm`, is linked). Every migration this project has ever written has only ever been applied directly to production; this has been a standing, repeatedly-flagged gap since Phase 22g.
+11. **Missing pgTAP coverage**: `conversations.visitor_id` scoping on `/api/chat/recent` (Phase 25d); the `businesses_widget_suggested_questions_shape` constraint and its generate/save flow (Phase 25e); the two new Storage buckets from Phase B1/B2 (assessed low-risk/structural at the time, not literally tested).
+12. **Sandbox test conversations pollute real metrics**: `/dashboard/widget-settings`'s sandbox chat panel's conversations count toward real analytics numbers, and a sandbox tester triggering `request_callback` writes a real `leads` row — no sandbox-awareness in either path (Phase 25c).
+13. **Dashboard UI doesn't hide/disable controls a viewer's role can't use** — RBAC is enforced server-side (safe), just not reflected visually yet (Phase 24).
+14. `docs/phases.md`'s Phase 15 exit-criterion wording still describes the pre-D9 model (escalation directly moves control) rather than the confirmed actual behavior (escalation flags attention; a human's deliberate take-over moves control) — flagged at the close of 15a, 15b, and 15c, never corrected.
+
+### Doc accuracy fix made while compiling this list
+- §5's `CRON_SECRET` line claimed "Not yet set on Vercel production" — **false**, confirmed live via `vercel env ls production` (2026-09-01) that it has been set since 2026-08-20, matching the Phase 23 entry (which was correct all along). Corrected in §5 below.
+
+### Deferred by explicit user decision — not gaps, don't silently pick these up
+- WhatsApp (Phase 16), Razorpay billing (Phase 17) — explicitly deferred (decision D11), not cancelled.
+- Real-time push notifications (WebSocket/SSE/Supabase Realtime) — deliberately polling instead (decision D8); polling intervals already tightened twice since.
+- Response streaming, thumbs-up/down feedback, business-configurable escalation trigger keywords, a structured lead-capture form, conversation-history summarization beyond the last 20 messages — surfaced as a backlog list during the 2026-08-31 escalation-gating fix; markdown rendering and prefilled starter questions from that same list were later built (Phase 25d/25e) — the rest remain unbuilt and unscheduled.
 
 ---
 
@@ -1652,7 +1686,7 @@ Pinned by resolved decision D3 (2026-08-12). `GEMINI_API_KEY` and `GEMINI_EMBEDD
 
 `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN`/`SENTRY_AUTH_TOKEN` (Phase 21), `AI_MONTHLY_TOKEN_LIMIT` (Phase 22h) — both optional, see `docs/security.md` §5 for why each degrades safely rather than failing startup.
 
-`CRON_SECRET` — **secret**, server-only, optional. Added Phase 23 (`app/api/cron/process-ingestion-queue/route.ts`). Required in production for the daily cron backstop to authenticate (Vercel signs cron requests with `Authorization: Bearer $CRON_SECRET` when the var is set); unset locally, where the route just fails closed (404) and ingestion still works via the immediate `after()` trigger. **Not yet set on Vercel production** — flagged in the Phase 23 entry above, should be set before relying on the cron backstop for real.
+`CRON_SECRET` — **secret**, server-only, optional. Added Phase 23 (`app/api/cron/process-ingestion-queue/route.ts`). Required in production for the daily cron backstop to authenticate (Vercel signs cron requests with `Authorization: Bearer $CRON_SECRET` when the var is set); unset locally, where the route just fails closed (404) and ingestion still works via the immediate `after()` trigger. **Set on Vercel production since 2026-08-20** (see the Phase 23 entry above) — confirmed still present via `vercel env ls production` on 2026-09-01. This line previously and incorrectly said "not yet set"; corrected (see the top-of-file backlog's "Doc accuracy fix" note).
 
 ---
 
