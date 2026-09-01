@@ -30,7 +30,18 @@ const nextConfig: NextConfig = {
   // (node_modules/next/dist/docs) already covers the classic `canvas`
   // package for exactly this reason, but not this one, so it needs an
   // explicit opt-out here to use native `require` instead of bundling.
-  serverExternalPackages: ["@napi-rs/canvas"],
+  //
+  // `pdfjs-dist`/`unpdf` added after a real production failure (STATE.md,
+  // "PDF page-image rendering root-cause fix"): bundling them let
+  // Turbopack's tracing produce a pdf.js "worker" instance from a
+  // different build than the main-thread API module it loaded
+  // ("API version ... does not match the Worker version ..."), since
+  // pdf.js's own internal worker resolution (and unpdf's `import.meta
+  // .resolve("pdfjs-dist/package.json")` cMap/font lookups) depend on the
+  // real, unbundled package directory existing on disk at deploy time --
+  // confirmed live on Vercel, not assumed from the `@napi-rs/canvas`
+  // precedent alone.
+  serverExternalPackages: ["@napi-rs/canvas", "pdfjs-dist", "unpdf"],
   async headers() {
     return [
       {
