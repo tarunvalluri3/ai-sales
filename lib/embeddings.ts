@@ -15,6 +15,36 @@ import { AppError } from "@/lib/errors";
  * (preserving the LangChain interface for Phase 8's future retriever/
  * vector-store code) but calls @google/genai directly underneath.
  */
+/**
+ * Confirmed live in production (STATE.md): Gemini's embedding-model API
+ * enforces a per-minute quota (`RESOURCE_EXHAUSTED`, HTTP 429) well below
+ * what a handful of chat messages in quick succession can trigger, since
+ * every retrieval call embeds the prospect's question. A brief retry
+ * absorbs short blips; `isEmbeddingRateLimitError` lets a caller detect
+ * the case that survives retries, to degrade gracefully instead of a raw
+ * 500 (see lib/rag.ts's askSalesEmployee()).
+ */
+const RATE_LIMIT_MAX_ATTEMPTS = 3;
+const RATE_LIMIT_BACKOFF_MS = [500, 1500];
+
+function isRateLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const status = (error as { status?: unknown }).status;
+  return status === 429 || /RESOURCE_EXHAUSTED/.test(error.message);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** True if `error` (as thrown by embedTexts/embedText, an AppError wrapping the original cause) is Gemini's embedding-quota rate limit, surviving all retries. */
+export function isEmbeddingRateLimitError(error: unknown): boolean {
+  if (error instanceof AppError) {
+    return isRateLimitError(error.cause);
+  }
+  return isRateLimitError(error);
+}
+
 export class TruncatedGeminiEmbeddings extends Embeddings {
   private readonly client: GoogleGenAI;
   private readonly model: string;
@@ -32,22 +62,35 @@ export class TruncatedGeminiEmbeddings extends Embeddings {
       return [];
     }
 
-    const response = await this.client.models.embedContent({
-      model: this.model,
-      contents: documents,
-      config: { outputDimensionality: this.outputDimensionality },
-    });
+    for (let attempt = 0; attempt < RATE_LIMIT_MAX_ATTEMPTS; attempt++) {
+      try {
+        const response = await this.client.models.embedContent({
+          model: this.model,
+          contents: documents,
+          config: { outputDimensionality: this.outputDimensionality },
+        });
 
-    const embeddings = response.embeddings;
-    if (!embeddings || embeddings.length !== documents.length) {
-      throw new AppError(
-        "Something went wrong generating knowledge embeddings. Please try again.",
-        "TruncatedGeminiEmbeddings.embedDocuments: unexpected response shape",
-        response,
-      );
+        const embeddings = response.embeddings;
+        if (!embeddings || embeddings.length !== documents.length) {
+          throw new AppError(
+            "Something went wrong generating knowledge embeddings. Please try again.",
+            "TruncatedGeminiEmbeddings.embedDocuments: unexpected response shape",
+            response,
+          );
+        }
+
+        return embeddings.map((embedding) => assertDimension(embedding.values, this.outputDimensionality));
+      } catch (error) {
+        const isLastAttempt = attempt === RATE_LIMIT_MAX_ATTEMPTS - 1;
+        if (!isRateLimitError(error) || isLastAttempt) {
+          throw error;
+        }
+        await sleep(RATE_LIMIT_BACKOFF_MS[attempt]);
+      }
     }
 
-    return embeddings.map((embedding) => assertDimension(embedding.values, this.outputDimensionality));
+    // Unreachable -- the loop above always either returns or throws.
+    throw new AppError("Something went wrong generating knowledge embeddings. Please try again.", "embedDocuments: retry loop exited unexpectedly");
   }
 
   async embedQuery(document: string): Promise<number[]> {

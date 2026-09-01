@@ -20,6 +20,7 @@ import { bookAppointmentTool, executeBookAppointment } from "@/lib/tools/book-ap
 import { logEvent } from "@/lib/logger";
 import { isWithinUsageQuota } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
+import { isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 
@@ -338,7 +339,33 @@ export async function askSalesEmployee(
   }
 
   const retriever = new KnowledgeRetriever({ supabase, businessId });
-  const documents = await retriever.invoke(question);
+  let documents: Document<KnowledgeChunkMetadata>[];
+  try {
+    documents = await retriever.invoke(question);
+  } catch (error) {
+    // Confirmed live in production: Gemini's embedding-model quota can be
+    // exhausted by a handful of chat messages in quick succession (every
+    // retrieval call embeds the question). embedTexts() already retries
+    // transient hits -- this is what survives that. Degrade gracefully
+    // (same shape as the usage-quota branch above, including escalate:
+    // true so a human follows up) rather than a raw 500 that would show
+    // the prospect a misleading "check your connection" error for what is
+    // actually a provider-side capacity issue, not a fabricated answer
+    // either way.
+    if (isEmbeddingRateLimitError(error)) {
+      logEvent("ai_embedding_rate_limited", businessId, { conversationId }, "error");
+      return {
+        answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
+        grounded: false,
+        usedContext: false,
+        sourceChunkIds: [],
+        escalate: true,
+        escalationReason: "embedding_rate_limited",
+        recommendedProducts: [],
+      };
+    }
+    throw error;
+  }
 
   if (documents.length === 0) {
     return {
