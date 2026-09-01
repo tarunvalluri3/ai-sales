@@ -13,17 +13,38 @@ export const BookAppointmentInputSchema = z.object({
     .string()
     .trim()
     .min(1)
-    .describe("The exact startsAt value of a slot returned by check_available_slots -- never a time you invent or estimate yourself."),
-  contactName: z.string().trim().max(200).nullable().describe("The prospect's name, only if they volunteered it. Never invented."),
-  contactEmail: z.string().trim().max(200).nullable().describe("The prospect's email, only if they gave it. Never invented."),
-  contactPhone: z.string().trim().max(50).nullable().describe("The prospect's phone number, only if they gave it. Never invented."),
-  notes: z.string().trim().max(500).nullable().describe("Any additional context the prospect mentioned about this appointment, in their own words."),
+    .describe(
+      "The exact startsAt value of a slot from a check_available_slots result you called earlier in this same reply -- never a value from an earlier conversation turn (it is not retained), and never a time you invent, estimate, or reconstruct from words like '9am Wednesday'. If confirming a time offered earlier in the conversation, call check_available_slots again first to get its real current startsAt value.",
+    ),
+  contactName: z
+    .string()
+    .trim()
+    .max(200)
+    .nullable()
+    .describe(
+      "The prospect's name, ONLY if they literally typed it earlier in this conversation. If they never gave a name, you MUST pass null -- do not invent one, and never use a placeholder like 'Prospect', 'Customer', or 'Guest'.",
+    ),
+  contactEmail: z
+    .string()
+    .trim()
+    .max(200)
+    .nullable()
+    .describe("The prospect's email, ONLY if they literally typed it earlier in this conversation. If they never gave one, you MUST pass null -- do not invent or guess one."),
+  contactPhone: z
+    .string()
+    .trim()
+    .max(50)
+    .nullable()
+    .describe(
+      "The prospect's phone number, ONLY if they literally typed it earlier in this conversation. If they never gave one, you MUST pass null -- do not invent one, do not reuse a number from an example, and do not fill it with a placeholder like all the same digit.",
+    ),
+  notes: z.string().trim().max(500).nullable().describe("Any additional context the prospect mentioned about this appointment, in their own words. Null if nothing extra was said."),
 });
 
 export const bookAppointmentTool = {
   name: "book_appointment",
   description:
-    "Requests an appointment at a specific slot returned by check_available_slots. Only call this after the prospect has explicitly agreed to that exact time AND you already have their email or phone number from this conversation. The booking is pending the business's own confirmation -- tell the prospect that, don't say it's confirmed. If the result comes back with reason 'missing_contact_info', ask for their email or phone number before calling this tool again. If it comes back with reason 'consent_required', ask the prospect to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent. If it comes back with reason 'slot_unavailable', that slot was just taken -- call check_available_slots again and offer a different time.",
+    "Requests an appointment at a specific slot returned by check_available_slots. Only call this after the prospect has explicitly agreed to that exact time AND you already have their email or phone number from this conversation. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. The booking is pending the business's own confirmation -- tell the prospect that, don't say it's confirmed. If the result comes back with reason 'missing_contact_info', ask for their email or phone number before calling this tool again. If it comes back with reason 'consent_required', ask the prospect to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent. If it comes back with reason 'slot_unavailable', that slot was just taken -- call check_available_slots again and offer a different time.",
   schema: BookAppointmentInputSchema,
 };
 
