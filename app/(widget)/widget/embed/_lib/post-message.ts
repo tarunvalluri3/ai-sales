@@ -32,8 +32,9 @@ export type WidgetSendMessage = {
 
 /**
  * Phase B1 (STATE.md, "AI sales agent, not chatbot"): items the
- * recommend_products tool returned this turn, only ever present for a
- * business whose ai_conversion_goal is 'recommend_products'. Sourced
+ * recommend_products tool returned this turn that had a real photo, only
+ * ever present for a business whose recommend_products_enabled is true.
+ * Sourced
  * straight from lib/tools/recommend-products.ts's RecommendedItem shape
  * through the /api/chat response -- this type is a hand-kept-in-sync
  * duplicate for the postMessage boundary, same convention as this file's

@@ -20,7 +20,7 @@ import { bookAppointmentTool, executeBookAppointment } from "@/lib/tools/book-ap
 import { logEvent } from "@/lib/logger";
 import { isWithinUsageQuota } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
-import type { AiConversionGoal, WidgetLanguage } from "@/lib/supabase/types";
+import type { WidgetLanguage } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 
 /**
@@ -77,14 +77,13 @@ function formatLanguageInstruction(language: WidgetLanguage): string {
 }
 
 /**
- * Phase B1: only businesses whose ai_conversion_goal is
- * 'recommend_products' get this instruction (and the tool itself bound
- * below) -- every other business keeps the exact prior prompt/behavior
- * unchanged.
+ * Only businesses with recommend_products_enabled get this instruction
+ * (and the tool itself bound below) -- every other business keeps the
+ * exact prior prompt/behavior unchanged.
  */
-function formatRecommendationInstruction(conversionGoal: AiConversionGoal): string {
-  if (conversionGoal !== "recommend_products") return "";
-  return `\nWhen you have specific product/service matches to show, call recommend_products (not list_products_and_services) once you know enough about what the prospect needs -- pass their budget/category if they gave one. Its results (including any image) are shown to the prospect automatically as product cards, so mention them naturally in your answer without trying to describe, link, or restate an image yourself.\n`;
+function formatRecommendationInstruction(recommendProductsEnabled: boolean): string {
+  if (!recommendProductsEnabled) return "";
+  return `\nWhen you have specific product/service matches to show, call recommend_products (not list_products_and_services) once you know enough about what the prospect needs -- pass their budget/category if they gave one. Only matches that have a photo are shown to the prospect automatically as a visual card -- for those, just mention the item naturally without restating its name, price, or image (already visible). For any matching item with no photo, nothing is shown visually -- you must describe it yourself in your reply (name, price if available, and why it fits) so the prospect isn't missing it.\n`;
 }
 
 /**
@@ -95,6 +94,18 @@ function formatRecommendationInstruction(conversionGoal: AiConversionGoal): stri
 function formatAppointmentInstruction(appointmentsEnabled: boolean): string {
   if (!appointmentsEnabled) return "";
   return `\nIf the prospect wants to schedule a call, demo, or consultation, call check_available_slots to see real open times before suggesting any -- never guess or invent a time yourself. Once the prospect clearly agrees to one specific slot from that list AND you already have their email or phone number from this conversation, call book_appointment with that slot's exact startsAt value. Booking is always pending the business's own confirmation -- tell the prospect their time is requested and the team will confirm it, never that it's already confirmed.\n`;
+}
+
+/**
+ * Only non-empty when both recommend_products_enabled and
+ * appointmentsEnabled are on -- with just one capability there's nothing
+ * to chain, and the individual instructions above already cover that case
+ * unchanged. Turns two independently-working capabilities into one
+ * closing move instead of leaving them to passively coexist.
+ */
+function formatCapabilityChainingInstruction(recommendProductsEnabled: boolean, appointmentsEnabled: boolean): string {
+  if (!recommendProductsEnabled || !appointmentsEnabled) return "";
+  return `\nWhen you recommend a specific product or service via recommend_products, proactively offer -- as your closing move for that turn -- to schedule a call, demo, or consultation about it, following the appointment-booking rules above. Treat this as the expected close on top of the individual recommend_products and appointment rules above, not instead of them -- don't let a recommendation and a scheduling offer sit as two disconnected topics in the same conversation.\n`;
 }
 
 /** Renders the optional business-profile fields as prompt lines, omitting anything the business hasn't filled in -- never a blank "Description: " line. */
@@ -120,8 +131,11 @@ export type SalesEmployeeResponse = {
    * straight from the tool result during the loop below -- never
    * restated by the model's own (toolless) final-answer call, which
    * cannot be trusted to reproduce an exact id/image URL. Empty unless
-   * the business's conversionGoal is 'recommend_products' and the model
-   * chose to call the tool.
+   * the business has recommendProductsEnabled on and the model chose to
+   * call the tool. Filtered to items with a real image -- an item the
+   * tool matched but has no photo for is still described by the model in
+   * its own text (see formatRecommendationInstruction), never shown here
+   * as an empty card.
    */
   recommendedProducts: RecommendedItem[];
 };
@@ -188,6 +202,7 @@ const SYSTEM_TEMPLATE = `You are a sales employee of {businessName} -- not a sup
 {languageInstruction}
 {recommendationInstruction}
 {appointmentInstruction}
+{capabilityChainingInstruction}
 {businessProfileContext}
 Reference context (retrieved business knowledge, relevant to the current question):
 {context}
@@ -273,8 +288,10 @@ export async function askSalesEmployee(
   question: string,
   history: ConversationMessage[] = [],
   language: WidgetLanguage = "en",
-  conversionGoal: AiConversionGoal = "generate_leads",
-  appointmentsEnabled: boolean = false,
+  aiCapabilities: { recommendProductsEnabled: boolean; appointmentsEnabled: boolean } = {
+    recommendProductsEnabled: false,
+    appointmentsEnabled: false,
+  },
 ): Promise<SalesEmployeeResponse> {
   // Phase 22h: checked before any Gemini call this turn would make,
   // including the embedding call retrieval itself makes -- a business
@@ -355,8 +372,8 @@ export async function askSalesEmployee(
   // the business owner reflects everything the model actually drew on,
   // not just the passively-retrieved documents.
   const additionalSourceChunkIds = new Set<string>();
-  // Phase B1: populated only if recommend_products is bound (conversionGoal
-  // === 'recommend_products') and the model actually calls it -- captured
+  // Phase B1: populated only if recommend_products is bound
+  // (recommendProductsEnabled) and the model actually calls it -- captured
   // straight from the tool's own result, never from the model's separate,
   // toolless final-answer call (see SalesEmployeeResponse's doc comment).
   let recommendedProducts: RecommendedItem[] = [];
@@ -366,8 +383,12 @@ export async function askSalesEmployee(
       context,
       businessName,
       languageInstruction: formatLanguageInstruction(language),
-      recommendationInstruction: formatRecommendationInstruction(conversionGoal),
-      appointmentInstruction: formatAppointmentInstruction(appointmentsEnabled),
+      recommendationInstruction: formatRecommendationInstruction(aiCapabilities.recommendProductsEnabled),
+      appointmentInstruction: formatAppointmentInstruction(aiCapabilities.appointmentsEnabled),
+      capabilityChainingInstruction: formatCapabilityChainingInstruction(
+        aiCapabilities.recommendProductsEnabled,
+        aiCapabilities.appointmentsEnabled,
+      ),
       businessProfileContext: formatBusinessProfileContext(businessProfile),
       question,
       history: toLangchainHistory(history),
@@ -380,8 +401,8 @@ export async function askSalesEmployee(
       requestCallbackTool,
       listOfferingsTool,
       searchKnowledgeBaseTool,
-      ...(conversionGoal === "recommend_products" ? [recommendProductsTool] : []),
-      ...(appointmentsEnabled ? [checkAvailableSlotsTool, bookAppointmentTool] : []),
+      ...(aiCapabilities.recommendProductsEnabled ? [recommendProductsTool] : []),
+      ...(aiCapabilities.appointmentsEnabled ? [checkAvailableSlotsTool, bookAppointmentTool] : []),
     ];
     const toolModel = getChatModel().bindTools(tools);
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
@@ -416,7 +437,11 @@ export async function askSalesEmployee(
         } else if (toolCall.name === "recommend_products") {
           const recommendResult = await executeRecommendProducts(supabase, businessId, toolCall.args);
           if (recommendResult.found) {
-            recommendedProducts = recommendResult.items;
+            // Only items with a real photo become visual cards -- the
+            // model still sees every matched item (image or not) in
+            // toolResult below, and must describe an image-less item in
+            // its own text instead of relying on a card.
+            recommendedProducts = recommendResult.items.filter((item) => item.imageUrl !== null);
           }
           toolResult = recommendResult;
         } else if (toolCall.name === "check_available_slots") {

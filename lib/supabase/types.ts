@@ -17,7 +17,7 @@ export type Business = {
   widget_position: WidgetPosition;
   widget_language: WidgetLanguage;
   widget_suggested_questions: string[] | null;
-  ai_conversion_goal: AiConversionGoal;
+  recommend_products_enabled: boolean;
   published_at: string | null;
   appointments_enabled: boolean;
   appointment_slot_minutes: number;
@@ -27,7 +27,6 @@ export type Business = {
 
 export type WidgetPosition = "bottom-right" | "bottom-left";
 export type WidgetLanguage = "en" | "es" | "fr" | "de" | "pt" | "hi";
-export type AiConversionGoal = "generate_leads" | "recommend_products";
 
 export type BusinessHours = {
   business_id: string;
@@ -258,7 +257,8 @@ export type AuditLogAction =
   | "appointment_settings.updated"
   | "appointment.confirmed"
   | "appointment.declined"
-  | "appointment.cancelled";
+  | "appointment.cancelled"
+  | "ai_capabilities.updated";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

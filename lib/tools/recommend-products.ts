@@ -9,8 +9,8 @@ type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 /**
  * Phase B1 (STATE.md, "AI sales agent, not chatbot"): a budget/category-
  * aware alternative to list_products_and_services, only bound for
- * businesses whose ai_conversion_goal is 'recommend_products'
- * (lib/rag.ts). Filtering/sorting happens in this function, not via a
+ * businesses whose recommend_products_enabled is true (lib/rag.ts).
+ * Filtering/sorting happens in this function, not via a
  * dynamic PostgREST `.or()` string (no risk of malformed filter syntax
  * from an AI-supplied budget number) -- fetch each table's approved rows,
  * filter/sort in memory, since a single business's catalog is small

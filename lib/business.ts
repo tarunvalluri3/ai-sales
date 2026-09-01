@@ -2,7 +2,6 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Business } from "@/lib/supabase/types";
 import type { BusinessProfileInput, WidgetBrandingInput } from "@/lib/schemas/business";
-import type { AiConversionGoal } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 
 /** Postgres unique-violation error code. */
@@ -174,26 +173,36 @@ export async function updateWidgetSuggestedQuestions(orgId: string, questions: s
 }
 
 /**
- * Sets a business's AI "conversion goal" (Phase B1, STATE.md): an explicit
- * dashboard setting, never auto-inferred, gating whether `lib/rag.ts`
- * binds the recommend_products tool and how it phrases its closing CTA.
- * `orgId` must come from a validated session; authorization
+ * Sets a business's AI capabilities: whether recommend_products and
+ * appointment booking are on (both explicit dashboard settings, never
+ * auto-inferred, gating what `lib/rag.ts` binds and how it chains them --
+ * see formatCapabilityChainingInstruction) and the appointment slot
+ * length. One atomic update so the three fields never end up
+ * inconsistent. `orgId` must come from a validated session; authorization
  * (org:admin-only) is enforced by the caller, same convention as
- * `updateWidgetBranding`.
+ * `updateWidgetBranding`. Lead capture (request_callback) has no setting
+ * here -- it's unconditionally bound in `askSalesEmployee()`.
  */
-export async function updateConversionGoal(orgId: string, goal: AiConversionGoal): Promise<Business> {
+export async function updateAiCapabilities(
+  orgId: string,
+  input: { recommendProductsEnabled: boolean; appointmentsEnabled: boolean; appointmentSlotMinutes: number },
+): Promise<Business> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
-    .update({ ai_conversion_goal: goal })
+    .update({
+      recommend_products_enabled: input.recommendProductsEnabled,
+      appointments_enabled: input.appointmentsEnabled,
+      appointment_slot_minutes: input.appointmentSlotMinutes,
+    })
     .eq("clerk_org_id", orgId)
     .select()
     .single();
 
   if (error) {
     throw new AppError(
-      "Something went wrong updating your AI's conversion goal. Please try again.",
-      "updateConversionGoal failed",
+      "Something went wrong updating your AI's capabilities. Please try again.",
+      "updateAiCapabilities failed",
       error,
     );
   }

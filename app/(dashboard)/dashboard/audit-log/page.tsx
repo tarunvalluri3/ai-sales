@@ -24,6 +24,7 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "appointment.confirmed": "Appointment confirmed",
   "appointment.declined": "Appointment declined",
   "appointment.cancelled": "Appointment cancelled",
+  "ai_capabilities.updated": "AI capabilities updated",
 };
 
 export default async function AuditLogPage() {

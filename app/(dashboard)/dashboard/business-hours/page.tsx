@@ -2,7 +2,6 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { getBusinessForOrg } from "@/lib/business";
 import { listBusinessHours } from "@/lib/business-hours";
 import { BusinessHoursForm } from "./business-hours-form";
-import { AppointmentSettingsForm } from "./appointment-settings-form";
 
 export default async function BusinessHoursPage() {
   const { businessId, orgId } = await requireBusinessContext();
@@ -15,16 +14,16 @@ export default async function BusinessHoursPage() {
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Set the hours your team is available, and how long an escalated conversation should wait
           before it&rsquo;s re-routed to the next team member. Leave a day off to mark it closed. An
-          unconfigured schedule is treated as always open.
+          unconfigured schedule is treated as always open. These hours also drive appointment
+          availability if you turn on appointment booking in{" "}
+          <a href="/dashboard/widget-settings" className="underline hover:text-ds-text-secondary">
+            AI capabilities
+          </a>
+          .
         </p>
       </div>
 
       <BusinessHoursForm hours={hours} slaMinutes={business?.sla_minutes ?? null} timezone={business?.timezone ?? "UTC"} />
-
-      <AppointmentSettingsForm
-        enabled={business?.appointments_enabled ?? false}
-        slotMinutes={business?.appointment_slot_minutes ?? 30}
-      />
     </div>
   );
 }
