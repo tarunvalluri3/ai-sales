@@ -1,7 +1,7 @@
 import "server-only";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { configureUnPDF, renderPageAsImage } from "unpdf";
+import { configureUnPDF, getResolvedPDFJS, renderPageAsImage } from "unpdf";
 import { logEvent } from "@/lib/logger";
 
 // `toHex`/`fromHex`/`toBase64`/`fromBase64` are too new for the installed
@@ -96,12 +96,24 @@ async function ensureConfigured(): Promise<void> {
   if (!configured) {
     configured = (async () => {
       ensureUint8ArrayToHexPolyfill();
-      const pdfjsModule = await import("pdfjs-dist");
+      // A fifth real bug: this used to call `await import("pdfjs-dist")`
+      // directly, *before* configureUnPDF() -- which broke unpdf's own
+      // internal safety order. unpdf's resolvePDFJSImport() calls its
+      // stubBrowserGlobals() (installing a minimal DOMMatrix stub pdf.js
+      // needs just to be imported, since pdf.js references it at module
+      // -evaluation time, not only when actually rendering) *before* it
+      // imports pdfjs-dist itself. Importing pdfjs-dist myself first
+      // skipped that stub entirely, producing "DOMMatrix is not defined"
+      // -- confirmed live. Letting configureUnPDF() do the importing (via
+      // the resolver function) preserves unpdf's intended order; the
+      // resolved module is fetched afterward via getResolvedPDFJS() to
+      // set workerSrc on it, not re-imported.
+      await configureUnPDF({ pdfjs: () => import("pdfjs-dist") });
+      const pdfjsModule = await getResolvedPDFJS();
       const workerSrc = resolvePdfWorkerSrc();
       if (workerSrc) {
         pdfjsModule.GlobalWorkerOptions.workerSrc = workerSrc;
       }
-      await configureUnPDF({ pdfjs: () => Promise.resolve(pdfjsModule) });
     })();
   }
   await configured;
