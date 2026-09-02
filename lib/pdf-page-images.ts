@@ -1,14 +1,26 @@
 import "server-only";
-import { createRequire } from "node:module";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { configureUnPDF, renderPageAsImage } from "unpdf";
 import { logEvent } from "@/lib/logger";
 
-// `import.meta.resolve` isn't available in this route's actual bundled
-// runtime (confirmed live: threw "s.resolve is not a function" on
-// Vercel) -- createRequire's CJS-style resolution is the portable
-// fallback, and works correctly with pdfjs-dist in
-// `serverExternalPackages` (real, unbundled files on disk at deploy time).
-const require = createRequire(import.meta.url);
+/**
+ * Neither `import.meta.resolve` nor `createRequire(...).resolve` return a
+ * real filesystem path here -- confirmed live, twice: the first threw
+ * ("s.resolve is not a function"), the second silently returned a
+ * Turbopack-internal numeric module id (e.g. `983143`) instead of a
+ * string, because this file itself is still bundled/transformed by
+ * Turpoback even though `pdfjs-dist` is marked external -- only code
+ * inside the external package gets real Node `require` semantics, not
+ * code calling into it. `process.cwd()` + plain path joining is pure
+ * string manipulation, not a resolution API, so nothing bundler-shims it;
+ * confirmed live that `process.cwd()` is the deployed function's root
+ * (where `node_modules` actually lives) via a direct existsSync check.
+ */
+function resolvePdfWorkerSrc(): string | null {
+  const candidate = join(process.cwd(), "node_modules/pdfjs-dist/build/pdf.worker.mjs");
+  return existsSync(candidate) ? candidate : null;
+}
 
 /**
  * Phase B2 (STATE.md, "AI sales agent, not chatbot" -- PDF catalog
@@ -50,7 +62,10 @@ async function ensureConfigured(): Promise<void> {
   if (!configured) {
     configured = (async () => {
       const pdfjsModule = await import("pdfjs-dist");
-      pdfjsModule.GlobalWorkerOptions.workerSrc = require.resolve("pdfjs-dist/build/pdf.worker.mjs");
+      const workerSrc = resolvePdfWorkerSrc();
+      if (workerSrc) {
+        pdfjsModule.GlobalWorkerOptions.workerSrc = workerSrc;
+      }
       await configureUnPDF({ pdfjs: () => Promise.resolve(pdfjsModule) });
     })();
   }
