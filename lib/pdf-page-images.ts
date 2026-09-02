@@ -12,6 +12,10 @@ declare global {
   interface Uint8Array {
     toHex?(): string;
   }
+  interface Map<K, V> {
+    getOrInsert?(key: K, value: V): V;
+    getOrInsertComputed?(key: K, callbackFn: (key: K) => V): V;
+  }
 }
 
 /**
@@ -56,6 +60,44 @@ function ensureUint8ArrayToHexPolyfill(): void {
 }
 
 /**
+ * `Map.prototype.getOrInsert`/`getOrInsertComputed()` (the "Map Upsert"
+ * TC39 proposal) only shipped unflagged in Node.js 26 (V8 14.6, May
+ * 2026, confirmed against Node's own release notes) -- an even newer gap
+ * than `toHex`'s, found immediately after fixing that one, live. pdf.js
+ * uses these 16 times internally (confirmed via a direct grep of the
+ * installed `pdf.worker.mjs`) for its own caching, present even in
+ * 6.2.108 -- not a version-specific bleeding-edge choice worth chasing
+ * further downgrades for, especially since npm audit's GHSA-hq66-cqwq-w95j
+ * makes anything below 6.2.108 a real vulnerability, not just an older
+ * API surface. Same self-disabling shape as the `toHex` polyfill above.
+ */
+function ensureMapUpsertPolyfill(): void {
+  if (typeof Map.prototype.getOrInsert !== "function") {
+    Object.defineProperty(Map.prototype, "getOrInsert", {
+      value<K, V>(this: Map<K, V>, key: K, value: V): V {
+        if (this.has(key)) return this.get(key) as V;
+        this.set(key, value);
+        return value;
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+  if (typeof Map.prototype.getOrInsertComputed !== "function") {
+    Object.defineProperty(Map.prototype, "getOrInsertComputed", {
+      value<K, V>(this: Map<K, V>, key: K, callbackFn: (key: K) => V): V {
+        if (this.has(key)) return this.get(key) as V;
+        const value = callbackFn(key);
+        this.set(key, value);
+        return value;
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+}
+
+/**
  * Phase B2 (STATE.md, "AI sales agent, not chatbot" -- PDF catalog
  * photos). `unpdf`'s default build mocks `canvas` for serverless safety
  * (used by lib/file-ingestion.ts's plain text extraction); rendering an
@@ -96,6 +138,7 @@ async function ensureConfigured(): Promise<void> {
   if (!configured) {
     configured = (async () => {
       ensureUint8ArrayToHexPolyfill();
+      ensureMapUpsertPolyfill();
       // A fifth real bug: this used to call `await import("pdfjs-dist")`
       // directly, *before* configureUnPDF() -- which broke unpdf's own
       // internal safety order. unpdf's resolvePDFJSImport() calls its
