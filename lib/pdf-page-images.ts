@@ -30,32 +30,31 @@ function resolvePdfWorkerSrc(): string | null {
  * the real `canvas` npm package (native bindings) -- configured once,
  * lazily, only when a page is actually being rendered.
  *
- * KNOWN, UNVERIFIED RISK (flagged in STATE.md, not glossed over): actual
- * page rendering depends on `@napi-rs/canvas` (prebuilt native bindings,
- * chosen over the classic `canvas` package specifically for better
- * serverless/Vercel compatibility -- confirmed as unpdf's own actual
- * `renderPageAsImage` option by reading its installed .d.ts, not assumed
- * from documentation, which described an older API shape). This has been
- * exercised in local development only -- it has NOT been confirmed
- * working on an actual Vercel deployment. That is exactly why every call
- * site treats a render failure as non-fatal: a product/service extracted
- * from this page still gets created, just without a photo, rather than
- * failing catalog extraction entirely.
- */
-/**
- * Real bug found live (STATE.md, "PDF page-image rendering root-cause
- * fix"): this used to be `function ensureConfigured(): void` calling
- * `configureUnPDF(...)` without awaiting it, and its one caller below
- * didn't await it either -- a genuine race between this module's
- * reconfiguration finishing and unpdf's own internal, unconfigured
- * default resolution (triggered by `lib/file-ingestion.ts`'s plain-text
- * `extractText()` calls elsewhere) winning first, which is how a fake
- * "API version 6.3.289 does not match the Worker version 6.1.200" error
- * -- a real, reproducible failure on Vercel, not a local-only quirk --
- * came from. Also explicitly sets `GlobalWorkerOptions.workerSrc` to
- * this exact resolved module's own worker file, per pdfjs-dist's own
- * documented recommendation that this "should always be set" -- belt
- * and suspenders against the same class of mismatch recurring.
+ * KNOWN, CONFIRMED-STILL-BROKEN on real Vercel production (STATE.md,
+ * "PDF page-image rendering root-cause fix" -- not glossed over, and not
+ * the original "never tested" state anymore). Three real, distinct bugs
+ * were found and fixed by testing live against production, each
+ * confirmed by watching the actual error change to a different one:
+ * (1) `ensureConfigured()` fired its async reconfiguration without
+ * awaiting it, and its caller didn't await it either -- a genuine race
+ * against unpdf's own default resolution (triggered elsewhere by
+ * `lib/file-ingestion.ts`'s plain-text extraction), which is how a fake
+ * "API version does not match the Worker version" error occurred; (2)
+ * `pdfjs-dist`/`unpdf` needed `serverExternalPackages` (next.config.ts),
+ * same class of problem `@napi-rs/canvas` already had; (3) pdf.js's
+ * `GlobalWorkerOptions.workerSrc` needed to be set explicitly (its own
+ * docs: "should always be set"), which itself needed `process.cwd()` +
+ * plain path joining, not `require.resolve`/`import.meta.resolve` --
+ * both returned bundler-internal values, not real filesystem paths, when
+ * called from this still-Turbopack-bundled file (confirmed live via a
+ * temporary diagnostic route, since deleted).
+ *
+ * Still unresolved past that point: `hashOriginal.toHex is not a
+ * function`, somewhere deeper inside pdf.js/@napi-rs/canvas's own
+ * rendering internals -- a genuinely different, unrelated failure,
+ * not investigated further (see STATE.md's backlog). Every call site
+ * still treats a render failure as non-fatal: a product/service
+ * extracted from this page still gets created, just without a photo.
  */
 let configured: Promise<void> | null = null;
 async function ensureConfigured(): Promise<void> {
@@ -93,11 +92,11 @@ export async function renderPdfPageToPng(
     });
     return new Uint8Array(buffer);
   } catch (error) {
-    // Temporary: this codepath's failure mode has never been observed on a
-    // real Vercel deployment (see this file's doc comment) -- capture the
-    // actual error message once, to diagnose, then revert to the plain
-    // catch. Never anything but the native error's own message -- no PDF
-    // content, no business data.
+    // Kept permanently (not the original bare catch{}): this codepath's
+    // failure mode is real and confirmed on production (see this file's
+    // doc comment), so a bare catch swallowing the error entirely made it
+    // undiagnosable. Never anything but the native error's own message --
+    // no PDF content, no business data.
     const errorMessage = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     logEvent("pdf_page_render_failed", businessId, { pageNumber, errorMessage: errorMessage.slice(0, 500) }, "error");
     return null;
