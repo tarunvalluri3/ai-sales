@@ -105,33 +105,46 @@ function ensureMapUpsertPolyfill(): void {
  * the real `canvas` npm package (native bindings) -- configured once,
  * lazily, only when a page is actually being rendered.
  *
- * KNOWN, CONFIRMED-STILL-BROKEN on real Vercel production (STATE.md,
- * "PDF page-image rendering root-cause fix" -- not glossed over, and not
- * the original "never tested" state anymore). Three real, distinct bugs
- * were found and fixed by testing live against production, each
- * confirmed by watching the actual error change to a different one:
+ * CONFIRMED WORKING on real Vercel production (STATE.md, "PDF
+ * page-image rendering root-cause fix") -- not the original "never
+ * tested" state, and not the long stretch of "still broken" in between
+ * either. Verified end-to-end: a real PDF with a real photo, uploaded
+ * through the actual dashboard, produces a product row whose image_url
+ * is a genuinely loadable public image. Getting there took six distinct
+ * real bugs, each found live against production and confirmed fixed by
+ * watching the actual error change to a different one -- not guessed,
+ * not assumed:
  * (1) `ensureConfigured()` fired its async reconfiguration without
- * awaiting it, and its caller didn't await it either -- a genuine race
- * against unpdf's own default resolution (triggered elsewhere by
- * `lib/file-ingestion.ts`'s plain-text extraction), which is how a fake
- * "API version does not match the Worker version" error occurred; (2)
+ * awaiting it, and its caller didn't await it either -- a race against
+ * unpdf's own default resolution (triggered elsewhere by
+ * `lib/file-ingestion.ts`'s plain-text extraction), producing a fake
+ * "API version does not match the Worker version" error; (2)
  * `pdfjs-dist`/`unpdf` needed `serverExternalPackages` (next.config.ts),
  * same class of problem `@napi-rs/canvas` already had; (3) pdf.js's
- * `GlobalWorkerOptions.workerSrc` needed to be set explicitly (its own
- * docs: "should always be set"), which itself needed `process.cwd()` +
- * plain path joining, not `require.resolve`/`import.meta.resolve` --
- * both returned bundler-internal values, not real filesystem paths, when
- * called from this still-Turbopack-bundled file (confirmed live via a
- * temporary diagnostic route, since deleted).
+ * `GlobalWorkerOptions.workerSrc` needed to be set explicitly, which
+ * itself needed `process.cwd()` + plain path joining, not
+ * `require.resolve`/`import.meta.resolve` -- both returned
+ * bundler-internal values, not real filesystem paths, from this
+ * still-Turbopack-bundled file; (4) `Uint8Array.prototype.toHex()` and
+ * (5) `Map.prototype.getOrInsert(Computed)()` are both real JS
+ * language features pdf.js 6.x uses internally that only shipped
+ * unflagged in Node.js 25 and 26 respectively (confirmed against
+ * Node's own release notes) -- this Vercel project runs Node 24 LTS,
+ * so both are polyfilled above, each a no-op the moment the deployed
+ * runtime's own native version exists (see each polyfill's own doc
+ * comment for why downgrading `pdfjs-dist` to dodge these was rejected
+ * -- npm audit GHSA-hq66-cqwq-w95j makes anything below 6.2.108 a real
+ * vulnerability, and 6.2.108 itself still needs the Map polyfill); (6)
+ * this file used to call `await import("pdfjs-dist")` directly, before
+ * `configureUnPDF()` -- breaking unpdf's own internal safety order
+ * (its `stubBrowserGlobals()` installs a `DOMMatrix` stub pdf.js needs
+ * just to be imported, and must run first) -- fixed by letting
+ * `configureUnPDF()` do the importing and fetching the resolved module
+ * afterward via `getResolvedPDFJS()`.
  *
- * A fourth bug was found past that point and fixed the same way (live
- * production testing, root-caused via a temporary diagnostic route):
- * `hashOriginal.toHex is not a function`, from pdf.js's own document-
- * fingerprint code calling `Uint8Array.prototype.toHex()` -- a real
- * Node.js version gap (see `ensureUint8ArrayToHexPolyfill`'s doc
- * comment), not a bundler artifact like the first three. Every call
- * site still treats a render failure as non-fatal: a product/service
- * extracted from this page still gets created, just without a photo.
+ * Every call site still treats a render failure as non-fatal (corrupt
+ * page, an environment regression, etc.): a product/service extracted
+ * from this page still gets created, just without a photo.
  */
 let configured: Promise<void> | null = null;
 async function ensureConfigured(): Promise<void> {
