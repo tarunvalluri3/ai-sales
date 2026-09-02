@@ -4,6 +4,16 @@ import { join } from "node:path";
 import { configureUnPDF, renderPageAsImage } from "unpdf";
 import { logEvent } from "@/lib/logger";
 
+// `toHex`/`fromHex`/`toBase64`/`fromBase64` are too new for the installed
+// TypeScript lib.d.ts to know about yet -- declared here (optional,
+// matching that it may genuinely be absent at runtime) rather than
+// silencing the checker with a cast.
+declare global {
+  interface Uint8Array {
+    toHex?(): string;
+  }
+}
+
 /**
  * Neither `import.meta.resolve` nor `createRequire(...).resolve` return a
  * real filesystem path here -- confirmed live, twice: the first threw
@@ -20,6 +30,29 @@ import { logEvent } from "@/lib/logger";
 function resolvePdfWorkerSrc(): string | null {
   const candidate = join(process.cwd(), "node_modules/pdfjs-dist/build/pdf.worker.mjs");
   return existsSync(candidate) ? candidate : null;
+}
+
+/**
+ * `Uint8Array.prototype.toHex()` only shipped unflagged in Node.js 25
+ * (V8 14.1, October 2025) -- confirmed against Node's own release notes,
+ * not assumed. This Vercel project runs Node 24.x (the LTS track; 25 is
+ * Current, not LTS, so pinning the whole app to it just for this one
+ * pdf.js call is a worse trade than a small polyfill). pdf.js 6.3.289's
+ * document-fingerprint code (`pdf.worker.mjs`'s `fingerprints` getter)
+ * calls this unconditionally while loading any document -- confirmed
+ * live as the exact cause of `hashOriginal.toHex is not a function`.
+ * Only defined if genuinely missing, so this becomes a no-op the moment
+ * the deployed runtime's own native version exists.
+ */
+function ensureUint8ArrayToHexPolyfill(): void {
+  if (typeof Uint8Array.prototype.toHex === "function") return;
+  Object.defineProperty(Uint8Array.prototype, "toHex", {
+    value(this: Uint8Array): string {
+      return Array.from(this, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 /**
@@ -49,17 +82,20 @@ function resolvePdfWorkerSrc(): string | null {
  * called from this still-Turbopack-bundled file (confirmed live via a
  * temporary diagnostic route, since deleted).
  *
- * Still unresolved past that point: `hashOriginal.toHex is not a
- * function`, somewhere deeper inside pdf.js/@napi-rs/canvas's own
- * rendering internals -- a genuinely different, unrelated failure,
- * not investigated further (see STATE.md's backlog). Every call site
- * still treats a render failure as non-fatal: a product/service
+ * A fourth bug was found past that point and fixed the same way (live
+ * production testing, root-caused via a temporary diagnostic route):
+ * `hashOriginal.toHex is not a function`, from pdf.js's own document-
+ * fingerprint code calling `Uint8Array.prototype.toHex()` -- a real
+ * Node.js version gap (see `ensureUint8ArrayToHexPolyfill`'s doc
+ * comment), not a bundler artifact like the first three. Every call
+ * site still treats a render failure as non-fatal: a product/service
  * extracted from this page still gets created, just without a photo.
  */
 let configured: Promise<void> | null = null;
 async function ensureConfigured(): Promise<void> {
   if (!configured) {
     configured = (async () => {
+      ensureUint8ArrayToHexPolyfill();
       const pdfjsModule = await import("pdfjs-dist");
       const workerSrc = resolvePdfWorkerSrc();
       if (workerSrc) {
