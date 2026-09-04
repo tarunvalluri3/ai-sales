@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { getKnowledgeDocument, listChunksForDocument } from "@/lib/knowledge";
 import { KnowledgeForm } from "../../knowledge-form";
 import { updateKnowledgeDocumentAction } from "../../actions";
+import { PermissionNotice } from "../../../_components/state-views";
 
 export default async function EditKnowledgeDocumentPage({
   params,
@@ -10,7 +12,7 @@ export default async function EditKnowledgeDocumentPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
   const document = await getKnowledgeDocument(businessId, id);
 
   if (!document) {
@@ -23,14 +25,18 @@ export default async function EditKnowledgeDocumentPage({
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <h1 className="text-2xl font-semibold text-ds-text-primary">Edit knowledge document</h1>
       <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-        <KnowledgeForm
-          action={updateKnowledgeDocumentAction}
-          id={document.id}
-          initialTitle={document.title}
-          initialContent={document.content}
-          submitLabel="Save changes"
-          pendingLabel="Saving…"
-        />
+        {hasMinRole(orgRole, "org:member") ? (
+          <KnowledgeForm
+            action={updateKnowledgeDocumentAction}
+            id={document.id}
+            initialTitle={document.title}
+            initialContent={document.content}
+            submitLabel="Save changes"
+            pendingLabel="Saving…"
+          />
+        ) : (
+          <PermissionNotice />
+        )}
       </section>
 
       <div className="flex max-w-lg flex-col gap-3">

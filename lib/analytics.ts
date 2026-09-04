@@ -1,6 +1,7 @@
 import "server-only";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
+import { SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -11,6 +12,16 @@ function cutoffIso(daysAgo: number): string {
 }
 
 /**
+ * Same null-safe sandbox exclusion as lib/conversations.ts's own
+ * EXCLUDE_SANDBOX_FILTER. Used two ways below: directly on a
+ * `conversations` query, or via `{ referencedTable: "conversations" }` on
+ * a `messages`/`leads` query that embeds `conversations!inner(source)` --
+ * the `!inner` join in `.select()` is required for the latter, otherwise
+ * the referenced-table filter is silently a no-op.
+ */
+const EXCLUDE_SANDBOX_FILTER = `source.is.null,source.neq.${SANDBOX_CONVERSATION_SOURCE}`;
+
+/**
  * Conversation volume for a business: all-time, last 7 days, last 30
  * days. `businessId` must come from `requireBusinessContext()`.
  */
@@ -19,17 +30,23 @@ export async function getConversationVolumeStats(
   businessId: string,
 ): Promise<{ total: number; last7Days: number; last30Days: number }> {
   const [total, last7Days, last30Days] = await Promise.all([
-    supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId),
     supabase
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("business_id", businessId)
-      .gte("created_at", cutoffIso(7)),
+      .or(EXCLUDE_SANDBOX_FILTER),
     supabase
       .from("conversations")
       .select("id", { count: "exact", head: true })
       .eq("business_id", businessId)
-      .gte("created_at", cutoffIso(30)),
+      .gte("created_at", cutoffIso(7))
+      .or(EXCLUDE_SANDBOX_FILTER),
+    supabase
+      .from("conversations")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .gte("created_at", cutoffIso(30))
+      .or(EXCLUDE_SANDBOX_FILTER),
   ]);
 
   for (const result of [total, last7Days, last30Days]) {
@@ -60,19 +77,22 @@ export async function getMessageVolumeStats(
   const [user, assistant, humanAgent] = await Promise.all([
     supabase
       .from("messages")
-      .select("id", { count: "exact", head: true })
+      .select("id, conversations!inner(source)", { count: "exact", head: true })
       .eq("business_id", businessId)
-      .eq("role", "user"),
+      .eq("role", "user")
+      .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
     supabase
       .from("messages")
-      .select("id", { count: "exact", head: true })
+      .select("id, conversations!inner(source)", { count: "exact", head: true })
       .eq("business_id", businessId)
-      .eq("role", "assistant"),
+      .eq("role", "assistant")
+      .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
     supabase
       .from("messages")
-      .select("id", { count: "exact", head: true })
+      .select("id, conversations!inner(source)", { count: "exact", head: true })
       .eq("business_id", businessId)
-      .eq("role", "human_agent"),
+      .eq("role", "human_agent")
+      .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
   ]);
 
   for (const result of [user, assistant, humanAgent]) {
@@ -106,7 +126,12 @@ export async function getLeadStats(
   byStatus: { new: number; contacted: number; converted: number; lost: number };
   requestedCallback: number;
 }> {
-  const base = () => supabase.from("leads").select("id", { count: "exact", head: true }).eq("business_id", businessId);
+  const base = () =>
+    supabase
+      .from("leads")
+      .select("id, conversations!inner(source)", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" });
 
   const [total, hot, warm, cold, statusNew, contacted, converted, lost, requestedCallback] = await Promise.all([
     base(),
@@ -155,23 +180,30 @@ export async function getFunnelRateStats(
   businessId: string,
 ): Promise<{ qualifiedLeadRate: number; answerFailureRate: number }> {
   const [conversationTotal, qualifiedLeads, assistantTotal, assistantUngrounded] = await Promise.all([
-    supabase.from("conversations").select("id", { count: "exact", head: true }).eq("business_id", businessId),
+    supabase
+      .from("conversations")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .or(EXCLUDE_SANDBOX_FILTER),
     supabase
       .from("leads")
-      .select("id", { count: "exact", head: true })
+      .select("id, conversations!inner(source)", { count: "exact", head: true })
       .eq("business_id", businessId)
-      .in("qualification", ["hot", "warm"]),
+      .in("qualification", ["hot", "warm"])
+      .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
     supabase
       .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId)
-      .eq("role", "assistant"),
-    supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
+      .select("id, conversations!inner(source)", { count: "exact", head: true })
       .eq("business_id", businessId)
       .eq("role", "assistant")
-      .eq("grounded", false),
+      .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
+    supabase
+      .from("messages")
+      .select("id, conversations!inner(source)", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .eq("role", "assistant")
+      .eq("grounded", false)
+      .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
   ]);
 
   for (const result of [conversationTotal, qualifiedLeads, assistantTotal, assistantUngrounded]) {
@@ -216,6 +248,7 @@ export async function getHandoffResponseTimeStats(
     .select("id, attention_flagged_at")
     .eq("business_id", businessId)
     .not("attention_flagged_at", "is", null)
+    .or(EXCLUDE_SANDBOX_FILTER)
     .order("attention_flagged_at", { ascending: false })
     .limit(HANDOFF_SAMPLE_LIMIT);
 

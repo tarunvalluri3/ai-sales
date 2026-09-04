@@ -7,6 +7,27 @@ import { assignNextTeamMember } from "@/lib/team-assignment";
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
 /**
+ * The `conversations.source` value that marks a row as sandbox-only
+ * (Phase 25c "test your AI before publishing"). Never client input --
+ * dashboard/_components/sandbox-chat/actions.ts is the only call site
+ * that sets it. Lives here (not in that "use server" file, which may only
+ * export async functions) so `lib/*.ts` read paths -- conversation
+ * counts/listings here, analytics, request_callback -- can exclude
+ * sandbox rows from real business data without an app-layer import.
+ */
+export const SANDBOX_CONVERSATION_SOURCE = "dashboard_test";
+
+/**
+ * A `.or()` filter fragment excluding sandbox conversations
+ * (`source = 'dashboard_test'`) from a real-data count/list, without also
+ * excluding the small number of legacy rows with `source is null` (pre-
+ * dating the `source` column's consistent use) that a plain `.neq()`
+ * would silently drop -- SQL's `<> ` treats `null <> 'dashboard_test'` as
+ * unknown, not true.
+ */
+const EXCLUDE_SANDBOX_FILTER = `source.is.null,source.neq.${SANDBOX_CONVERSATION_SOURCE}`;
+
+/**
  * Creates a conversation row. Takes the Supabase client as a parameter
  * (rather than constructing one internally) so both the Clerk-authenticated
  * dashboard path and the service-role widget path (app/api/chat/route.ts)
@@ -49,7 +70,8 @@ export async function countConversationsForBusiness(
   const { count, error } = await supabase
     .from("conversations")
     .select("id", { count: "exact", head: true })
-    .eq("business_id", businessId);
+    .eq("business_id", businessId)
+    .or(EXCLUDE_SANDBOX_FILTER);
 
   if (error) {
     throw new AppError(
@@ -79,6 +101,7 @@ export async function listConversationsForBusiness(
     .from("conversations")
     .select("*, messages(count)")
     .eq("business_id", businessId)
+    .or(EXCLUDE_SANDBOX_FILTER)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -249,7 +272,8 @@ export async function countConversationsNeedingAttention(
     .from("conversations")
     .select("id", { count: "exact", head: true })
     .eq("business_id", businessId)
-    .eq("needs_attention", true);
+    .eq("needs_attention", true)
+    .or(EXCLUDE_SANDBOX_FILTER);
 
   if (error) {
     throw new AppError(

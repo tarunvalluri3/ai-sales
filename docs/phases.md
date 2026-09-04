@@ -140,7 +140,7 @@ The model never executes arbitrary code or queries.
 
 Escalation from AI to a human representative. Mechanism is product-defined. The AI must recognize when to stop answering and hand over.
 
-**Exit:** an escalation trigger reliably moves a live conversation to human control and the prospect sees a coherent transition.
+**Exit:** an escalation trigger reliably flags a live conversation as needing attention, a human's deliberate take-over moves it to human control, and the prospect sees a coherent transition.
 
 ## Phase 16 — WhatsApp
 

@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import type { WebhookEndpoint } from "@/lib/supabase/types";
 import { deleteWebhookEndpointAction, type WebhookActionState } from "./actions";
 import { EmptyState } from "../_components/state-views";
+import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: WebhookActionState = {};
 
@@ -26,7 +27,7 @@ function SecretReveal({ secret }: { secret: string }) {
   );
 }
 
-function WebhookEndpointRow({ endpoint }: { endpoint: WebhookEndpoint }) {
+function WebhookEndpointRow({ endpoint, canEdit = true }: { endpoint: WebhookEndpoint; canEdit?: boolean }) {
   const [state, formAction, isPending] = useActionState(deleteWebhookEndpointAction, initialState);
 
   return (
@@ -37,7 +38,8 @@ function WebhookEndpointRow({ endpoint }: { endpoint: WebhookEndpoint }) {
           <input type="hidden" name="id" value={endpoint.id} />
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isPending || !canEdit}
+            title={canEdit ? undefined : ROLE_DENIED_TITLE}
             className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
           >
             {isPending ? "Deleting…" : "Delete"}
@@ -55,7 +57,13 @@ function WebhookEndpointRow({ endpoint }: { endpoint: WebhookEndpoint }) {
   );
 }
 
-export function WebhookEndpointList({ endpoints }: { endpoints: WebhookEndpoint[] }) {
+export function WebhookEndpointList({
+  endpoints,
+  canEdit = true,
+}: {
+  endpoints: WebhookEndpoint[];
+  canEdit?: boolean;
+}) {
   if (endpoints.length === 0) {
     return (
       <EmptyState
@@ -68,7 +76,7 @@ export function WebhookEndpointList({ endpoints }: { endpoints: WebhookEndpoint[
   return (
     <ul className="flex flex-col gap-3">
       {endpoints.map((endpoint) => (
-        <WebhookEndpointRow key={endpoint.id} endpoint={endpoint} />
+        <WebhookEndpointRow key={endpoint.id} endpoint={endpoint} canEdit={canEdit} />
       ))}
     </ul>
   );

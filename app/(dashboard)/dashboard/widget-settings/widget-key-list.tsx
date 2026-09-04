@@ -6,10 +6,19 @@ import { updateWidgetKeyOriginsAction, revokeWidgetKeyAction, type WidgetKeyActi
 import { CopyKeyButton } from "./copy-key-button";
 import { buildWidgetSnippet } from "./build-widget-snippet";
 import { EmptyState } from "../_components/state-views";
+import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: WidgetKeyActionState = {};
 
-function WidgetKeyCard({ widgetKey, appOrigin }: { widgetKey: WidgetKey; appOrigin: string }) {
+function WidgetKeyCard({
+  widgetKey,
+  appOrigin,
+  canEdit = true,
+}: {
+  widgetKey: WidgetKey;
+  appOrigin: string;
+  canEdit?: boolean;
+}) {
   const [origins, setOrigins] = useState(widgetKey.allowed_origins.join("\n"));
   const [updateState, updateAction, updatePending] = useActionState(updateWidgetKeyOriginsAction, initialState);
   const [revokeState, revokeAction, revokePending] = useActionState(revokeWidgetKeyAction, initialState);
@@ -60,7 +69,7 @@ function WidgetKeyCard({ widgetKey, appOrigin }: { widgetKey: WidgetKey; appOrig
               rows={2}
               value={origins}
               onChange={(event) => setOrigins(event.target.value)}
-              disabled={updatePending}
+              disabled={updatePending || !canEdit}
               placeholder="https://example.com"
               className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
             />
@@ -80,7 +89,8 @@ function WidgetKeyCard({ widgetKey, appOrigin }: { widgetKey: WidgetKey; appOrig
             <button
               type="submit"
               form={`update-origins-${widgetKey.id}`}
-              disabled={updatePending}
+              disabled={updatePending || !canEdit}
+              title={canEdit ? undefined : ROLE_DENIED_TITLE}
               className="self-start rounded-ds-md bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
             >
               {updatePending ? "Saving…" : "Save origins"}
@@ -90,7 +100,8 @@ function WidgetKeyCard({ widgetKey, appOrigin }: { widgetKey: WidgetKey; appOrig
               <input type="hidden" name="id" value={widgetKey.id} />
               <button
                 type="submit"
-                disabled={revokePending}
+                disabled={revokePending || !canEdit}
+                title={canEdit ? undefined : ROLE_DENIED_TITLE}
                 className="rounded-ds-md border border-ds-danger px-4 py-2 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60"
               >
                 {revokePending ? "Revoking…" : "Revoke"}
@@ -108,7 +119,15 @@ function WidgetKeyCard({ widgetKey, appOrigin }: { widgetKey: WidgetKey; appOrig
   );
 }
 
-export function WidgetKeyList({ widgetKeys, appOrigin }: { widgetKeys: WidgetKey[]; appOrigin: string }) {
+export function WidgetKeyList({
+  widgetKeys,
+  appOrigin,
+  canEdit = true,
+}: {
+  widgetKeys: WidgetKey[];
+  appOrigin: string;
+  canEdit?: boolean;
+}) {
   if (widgetKeys.length === 0) {
     return <EmptyState title="No widget keys yet" description="Create one above to get started." />;
   }
@@ -116,7 +135,7 @@ export function WidgetKeyList({ widgetKeys, appOrigin }: { widgetKeys: WidgetKey
   return (
     <div className="flex flex-col gap-4">
       {widgetKeys.map((widgetKey) => (
-        <WidgetKeyCard key={widgetKey.id} widgetKey={widgetKey} appOrigin={appOrigin} />
+        <WidgetKeyCard key={widgetKey.id} widgetKey={widgetKey} appOrigin={appOrigin} canEdit={canEdit} />
       ))}
     </div>
   );

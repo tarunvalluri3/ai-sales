@@ -4,6 +4,7 @@ import { useActionState, useEffect } from "react";
 import type { SetControlState } from "../actions";
 import { setConversationControlAction } from "../actions";
 import type { ConversationControl } from "@/lib/supabase/types";
+import { ROLE_DENIED_TITLE } from "../../_components/delete-button";
 
 const initialState: SetControlState = {};
 
@@ -11,10 +12,12 @@ export function ControlToggle({
   conversationId,
   control,
   onChanged,
+  canEdit = true,
 }: {
   conversationId: string;
   control: ConversationControl;
   onChanged?: () => void;
+  canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(setConversationControlAction, initialState);
   const nextControl: ConversationControl = control === "human" ? "ai" : "human";
@@ -45,7 +48,8 @@ export function ControlToggle({
         <input type="hidden" name="control" value={nextControl} />
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !canEdit}
+          title={canEdit ? undefined : ROLE_DENIED_TITLE}
           className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
           {isPending ? "Updating…" : control === "human" ? "Hand back to AI" : "Take over this conversation"}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { listLeadsForBusiness } from "@/lib/leads";
 import { StatusSelect } from "./status-select";
 import type { LeadQualification } from "@/lib/supabase/types";
@@ -12,7 +13,8 @@ const QUALIFICATION_STYLE: Record<LeadQualification, string> = {
 };
 
 export default async function LeadsPage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:sales_agent");
   const leads = await listLeadsForBusiness(businessId);
 
   return (
@@ -49,7 +51,7 @@ export default async function LeadsPage() {
                     {lead.qualification}
                   </span>
                 </div>
-                <StatusSelect id={lead.id} status={lead.status} />
+                <StatusSelect id={lead.id} status={lead.status} canEdit={canEdit} />
               </div>
               <p className="text-sm text-ds-text-secondary">
                 {lead.contact_email ?? "—"} · {lead.contact_phone ?? "—"}

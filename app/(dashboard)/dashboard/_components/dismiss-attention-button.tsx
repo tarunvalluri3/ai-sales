@@ -3,15 +3,18 @@
 import { useActionState, useEffect } from "react";
 import type { DismissAttentionState } from "../conversations/actions";
 import { dismissAttentionAction } from "../conversations/actions";
+import { ROLE_DENIED_TITLE } from "./delete-button";
 
 const initialState: DismissAttentionState = {};
 
 export function DismissAttentionButton({
   conversationId,
   onDismissed,
+  canEdit = true,
 }: {
   conversationId: string;
   onDismissed?: () => void;
+  canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(dismissAttentionAction, initialState);
 
@@ -29,7 +32,8 @@ export function DismissAttentionButton({
       <input type="hidden" name="conversationId" value={conversationId} />
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || !canEdit}
+        title={canEdit ? undefined : ROLE_DENIED_TITLE}
         className="rounded-ds-sm border border-ds-border-strong px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? "Dismissing…" : "Dismiss"}

@@ -4,15 +4,18 @@ import { useActionState, useEffect, useRef } from "react";
 import type { SendReplyState } from "../actions";
 import { sendHumanReplyAction } from "../actions";
 import type { Message } from "@/lib/supabase/types";
+import { ROLE_DENIED_TITLE } from "../../_components/delete-button";
 
 const initialState: SendReplyState = {};
 
 export function ReplyComposer({
   conversationId,
   onSent,
+  canEdit = true,
 }: {
   conversationId: string;
   onSent?: (message: Message) => void;
+  canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(sendHumanReplyAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
@@ -46,14 +49,15 @@ export function ReplyComposer({
         rows={3}
         required
         maxLength={2000}
-        disabled={isPending}
+        disabled={isPending || !canEdit}
         className="resize-none rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         placeholder="Type your reply to the prospect..."
       />
       <div className="flex items-center justify-between gap-3">
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !canEdit}
+          title={canEdit ? undefined : ROLE_DENIED_TITLE}
           className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
           {isPending ? "Sending…" : "Send reply"}

@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { after } from "next/server";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getConversationForBusiness } from "@/lib/conversations";
+import { getConversationForBusiness, SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { normalizeEmail, normalizePhone } from "@/lib/schemas/lead";
 import { logEvent } from "@/lib/logger";
 import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
@@ -97,6 +97,16 @@ export async function executeRequestCallback(
   if (!conversation.consent_given) {
     logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "consent_required" });
     return { success: false, reason: "consent_required" };
+  }
+
+  // A sandbox test conversation (dashboard/_components/sandbox-chat) must
+  // never write a real lead or fire a real outbound webhook -- both
+  // validation branches above still run normally so the sandbox stays a
+  // realistic preview of the tool's behavior, only the actual persistence
+  // and side effects are skipped.
+  if (conversation.source === SANDBOX_CONVERSATION_SOURCE) {
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "sandbox_skipped" });
+    return { success: true, leadId: "sandbox", created: true };
   }
 
   const { data: existing, error: lookupError } = await supabase

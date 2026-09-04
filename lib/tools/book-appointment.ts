@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getConversationForBusiness } from "@/lib/conversations";
+import { getConversationForBusiness, SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { normalizeEmail, normalizePhone } from "@/lib/schemas/lead";
 import { isSlotAvailable, createAppointment } from "@/lib/appointments";
 import { logEvent } from "@/lib/logger";
@@ -107,6 +107,24 @@ export async function executeBookAppointment(
     return { success: false, reason: "lookup_failed" };
   }
 
+  const label = new Intl.DateTimeFormat("en-US", {
+    timeZone: business.timezone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(parsed.data.startsAt));
+
+  // A sandbox test conversation (dashboard/_components/sandbox-chat) must
+  // never write a real appointment -- the slot-availability check above
+  // still ran normally, so the sandbox stays a realistic preview of the
+  // tool's behavior, only the actual persistence is skipped.
+  if (conversation.source === SANDBOX_CONVERSATION_SOURCE) {
+    logEvent("tool_invoked", businessId, { tool: "book_appointment", conversationId, result: "sandbox_skipped" });
+    return { success: true, appointmentId: "sandbox", label };
+  }
+
   const appointment = await createAppointment(supabase, businessId, {
     conversationId,
     contactName: parsed.data.contactName?.trim() || null,
@@ -125,16 +143,5 @@ export async function executeBookAppointment(
   }
 
   logEvent("tool_invoked", businessId, { tool: "book_appointment", conversationId, result: "created" });
-  return {
-    success: true,
-    appointmentId: appointment.id,
-    label: new Intl.DateTimeFormat("en-US", {
-      timeZone: business.timezone,
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    }).format(new Date(appointment.starts_at)),
-  };
+  return { success: true, appointmentId: appointment.id, label };
 }

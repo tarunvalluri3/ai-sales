@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { listKnowledgeDocumentsForBusiness } from "@/lib/knowledge";
 import { DeleteButton } from "../_components/delete-button";
 import { KnowledgeForm } from "./knowledge-form";
@@ -10,7 +11,7 @@ import { FileUploadForm } from "./_components/file-upload-form";
 import { UrlImportForm } from "./_components/url-import-form";
 import { RefreshUrlButton } from "./_components/refresh-url-button";
 import { ExtractNowButton } from "./_components/extract-now-button";
-import { EmptyState } from "../_components/state-views";
+import { EmptyState, PermissionNotice } from "../_components/state-views";
 import {
   createKnowledgeDocumentAction,
   deleteKnowledgeDocumentAction,
@@ -41,7 +42,8 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 export default async function KnowledgePage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:member");
   const documents = await listKnowledgeDocumentsForBusiness(businessId);
 
   return (
@@ -95,16 +97,17 @@ export default async function KnowledgePage() {
               </div>
               <div className="flex shrink-0 items-center gap-4">
                 {document.ingestion_status === "failed" ? (
-                  <RetryIngestionButton action={retryIngestionAction} id={document.id} />
+                  <RetryIngestionButton action={retryIngestionAction} id={document.id} canEdit={canEdit} />
                 ) : null}
-                {document.source_type === "url" ? <RefreshUrlButton id={document.id} /> : null}
-                {document.status === "published" ? <ExtractNowButton id={document.id} /> : null}
+                {document.source_type === "url" ? <RefreshUrlButton id={document.id} canEdit={canEdit} /> : null}
+                {document.status === "published" ? <ExtractNowButton id={document.id} canEdit={canEdit} /> : null}
                 {document.status === "draft" ? (
                   <PublishToggleButton
                     action={publishKnowledgeDocumentAction}
                     id={document.id}
                     label="Publish"
                     pendingLabel="Publishing…"
+                    canEdit={canEdit}
                   />
                 ) : (
                   <PublishToggleButton
@@ -112,15 +115,18 @@ export default async function KnowledgePage() {
                     id={document.id}
                     label="Unpublish"
                     pendingLabel="Unpublishing…"
+                    canEdit={canEdit}
                   />
                 )}
-                <Link
-                  href={`/dashboard/knowledge/${document.id}/edit`}
-                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                >
-                  Edit
-                </Link>
-                <DeleteButton action={deleteKnowledgeDocumentAction} id={document.id} />
+                {canEdit ? (
+                  <Link
+                    href={`/dashboard/knowledge/${document.id}/edit`}
+                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  >
+                    Edit
+                  </Link>
+                ) : null}
+                <DeleteButton action={deleteKnowledgeDocumentAction} id={document.id} canEdit={canEdit} />
               </div>
             </li>
           ))}
@@ -130,21 +136,25 @@ export default async function KnowledgePage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Add knowledge manually</h2>
-          <KnowledgeForm
-            action={createKnowledgeDocumentAction}
-            submitLabel="Add knowledge"
-            pendingLabel="Adding…"
-          />
+          {canEdit ? (
+            <KnowledgeForm
+              action={createKnowledgeDocumentAction}
+              submitLabel="Add knowledge"
+              pendingLabel="Adding…"
+            />
+          ) : (
+            <PermissionNotice />
+          )}
         </section>
 
         <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Upload a file</h2>
-          <FileUploadForm />
+          {canEdit ? <FileUploadForm /> : <PermissionNotice />}
         </section>
 
         <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Import from a URL</h2>
-          <UrlImportForm />
+          {canEdit ? <UrlImportForm /> : <PermissionNotice />}
         </section>
       </div>
     </div>

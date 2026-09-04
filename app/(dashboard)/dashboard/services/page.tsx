@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { listServicesForBusiness, listPendingReviewServices } from "@/lib/services";
 import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
 import { DeleteButton } from "../_components/delete-button";
 import { ReviewActions } from "../_components/review-actions";
 import { ServiceForm } from "./service-form";
 import { createServiceAction, deleteServiceAction, approveServiceAction, rejectServiceAction } from "./actions";
-import { EmptyState } from "../_components/state-views";
+import { EmptyState, PermissionNotice } from "../_components/state-views";
 
 export default async function ServicesPage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:member");
   const [services, pendingServices] = await Promise.all([
     listServicesForBusiness(businessId),
     listPendingReviewServices(businessId),
@@ -62,7 +64,12 @@ export default async function ServicesPage() {
                   {service.price ? (
                     <span className="text-sm font-semibold text-ds-accent">${service.price}</span>
                   ) : null}
-                  <ReviewActions approveAction={approveServiceAction} rejectAction={rejectServiceAction} id={service.id} />
+                  <ReviewActions
+                    approveAction={approveServiceAction}
+                    rejectAction={rejectServiceAction}
+                    id={service.id}
+                    canEdit={canEdit}
+                  />
                 </div>
               </li>
             ))}
@@ -94,13 +101,15 @@ export default async function ServicesPage() {
                 {service.price ? (
                   <span className="text-sm font-semibold text-ds-accent">${service.price}</span>
                 ) : null}
-                <Link
-                  href={`/dashboard/services/${service.id}/edit`}
-                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                >
-                  Edit
-                </Link>
-                <DeleteButton action={deleteServiceAction} id={service.id} />
+                {canEdit ? (
+                  <Link
+                    href={`/dashboard/services/${service.id}/edit`}
+                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  >
+                    Edit
+                  </Link>
+                ) : null}
+                <DeleteButton action={deleteServiceAction} id={service.id} canEdit={canEdit} />
               </div>
             </li>
           ))}
@@ -109,7 +118,11 @@ export default async function ServicesPage() {
 
       <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-medium text-ds-text-primary">Add a service</h2>
-        <ServiceForm action={createServiceAction} submitLabel="Add service" pendingLabel="Adding…" />
+        {canEdit ? (
+          <ServiceForm action={createServiceAction} submitLabel="Add service" pendingLabel="Adding…" />
+        ) : (
+          <PermissionNotice />
+        )}
       </section>
     </div>
   );

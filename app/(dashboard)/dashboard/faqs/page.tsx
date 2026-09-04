@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { listFaqsForBusiness, listPendingReviewFaqs } from "@/lib/faqs";
 import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
 import { DeleteButton } from "../_components/delete-button";
 import { ReviewActions } from "../_components/review-actions";
 import { FaqForm } from "./faq-form";
 import { createFaqAction, deleteFaqAction, approveFaqAction, rejectFaqAction } from "./actions";
-import { EmptyState } from "../_components/state-views";
+import { EmptyState, PermissionNotice } from "../_components/state-views";
 
 export default async function FaqsPage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:member");
   const [faqs, pendingFaqs] = await Promise.all([
     listFaqsForBusiness(businessId),
     listPendingReviewFaqs(businessId),
@@ -46,7 +48,12 @@ export default async function FaqsPage() {
                       : "unknown source"}
                   </p>
                 </div>
-                <ReviewActions approveAction={approveFaqAction} rejectAction={rejectFaqAction} id={faq.id} />
+                <ReviewActions
+                  approveAction={approveFaqAction}
+                  rejectAction={rejectFaqAction}
+                  id={faq.id}
+                  canEdit={canEdit}
+                />
               </li>
             ))}
           </ul>
@@ -70,13 +77,15 @@ export default async function FaqsPage() {
                 <p className="line-clamp-2 text-sm text-ds-text-secondary">{faq.answer}</p>
               </div>
               <div className="flex shrink-0 items-center gap-4">
-                <Link
-                  href={`/dashboard/faqs/${faq.id}/edit`}
-                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                >
-                  Edit
-                </Link>
-                <DeleteButton action={deleteFaqAction} id={faq.id} />
+                {canEdit ? (
+                  <Link
+                    href={`/dashboard/faqs/${faq.id}/edit`}
+                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  >
+                    Edit
+                  </Link>
+                ) : null}
+                <DeleteButton action={deleteFaqAction} id={faq.id} canEdit={canEdit} />
               </div>
             </li>
           ))}
@@ -85,7 +94,11 @@ export default async function FaqsPage() {
 
       <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-medium text-ds-text-primary">Add an FAQ</h2>
-        <FaqForm action={createFaqAction} submitLabel="Add FAQ" pendingLabel="Adding…" />
+        {canEdit ? (
+          <FaqForm action={createFaqAction} submitLabel="Add FAQ" pendingLabel="Adding…" />
+        ) : (
+          <PermissionNotice />
+        )}
       </section>
     </div>
   );

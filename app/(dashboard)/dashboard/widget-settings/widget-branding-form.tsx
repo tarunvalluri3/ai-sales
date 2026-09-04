@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_LABELS, SUPPORTED_WIDGET_LANGUAGES } from "@/lib/widget-i18n";
 import { updateWidgetBrandingAction, type WidgetBrandingActionState } from "./actions";
+import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: WidgetBrandingActionState = {};
 
@@ -19,6 +20,7 @@ export function WidgetBrandingForm({
   initialCtaText,
   initialPosition,
   initialLanguage,
+  canEdit = true,
 }: {
   initialAccentColor: string;
   initialLogoUrl: string;
@@ -27,6 +29,7 @@ export function WidgetBrandingForm({
   initialCtaText: string;
   initialPosition: WidgetPosition;
   initialLanguage: WidgetLanguage;
+  canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updateWidgetBrandingAction, initialState);
   const reduceMotion = useReducedMotion();
@@ -54,14 +57,14 @@ export function WidgetBrandingForm({
               placeholder="#d7f24e"
               pattern="^#[0-9a-fA-F]{6}$"
               defaultValue={initialAccentColor}
-              disabled={isPending}
+              disabled={isPending || !canEdit}
               className={`flex-1 ${inputClasses}`}
             />
             <input
               type="color"
               aria-label="Pick accent color"
               defaultValue={initialAccentColor || "#d7f24e"}
-              disabled={isPending}
+              disabled={isPending || !canEdit}
               onChange={(event) => {
                 const input = document.getElementById("accentColor") as HTMLInputElement | null;
                 if (input) input.value = event.target.value;
@@ -81,7 +84,7 @@ export function WidgetBrandingForm({
             type="url"
             placeholder="https://example.com/logo.png"
             defaultValue={initialLogoUrl}
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             className={inputClasses}
           />
         </div>
@@ -94,7 +97,7 @@ export function WidgetBrandingForm({
             id="position"
             name="position"
             defaultValue={initialPosition}
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             className={inputClasses}
           >
             <option value="bottom-right">Bottom right</option>
@@ -110,7 +113,7 @@ export function WidgetBrandingForm({
             id="language"
             name="language"
             defaultValue={initialLanguage}
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             className={inputClasses}
           >
             {SUPPORTED_WIDGET_LANGUAGES.map((lang) => (
@@ -133,7 +136,7 @@ export function WidgetBrandingForm({
           maxLength={60}
           placeholder="Chat with us"
           defaultValue={initialCtaText}
-          disabled={isPending}
+          disabled={isPending || !canEdit}
           className={inputClasses}
         />
       </div>
@@ -148,7 +151,7 @@ export function WidgetBrandingForm({
           rows={2}
           maxLength={280}
           defaultValue={initialWelcomeText}
-          disabled={isPending}
+          disabled={isPending || !canEdit}
           className={inputClasses}
         />
       </div>
@@ -163,7 +166,7 @@ export function WidgetBrandingForm({
           rows={2}
           maxLength={280}
           defaultValue={initialWelcomeTextClosed}
-          disabled={isPending}
+          disabled={isPending || !canEdit}
           className={inputClasses}
         />
         <p className="text-xs text-ds-text-muted">
@@ -205,7 +208,8 @@ export function WidgetBrandingForm({
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || !canEdit}
+        title={canEdit ? undefined : ROLE_DENIED_TITLE}
         className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? "Saving…" : "Save widget settings"}

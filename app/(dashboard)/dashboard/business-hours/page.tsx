@@ -1,10 +1,11 @@
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
 import { listBusinessHours } from "@/lib/business-hours";
 import { BusinessHoursForm } from "./business-hours-form";
 
 export default async function BusinessHoursPage() {
-  const { businessId, orgId } = await requireBusinessContext();
+  const { businessId, orgId, orgRole } = await requireBusinessContext();
   const [business, hours] = await Promise.all([getBusinessForOrg(orgId), listBusinessHours(businessId)]);
 
   return (
@@ -23,7 +24,12 @@ export default async function BusinessHoursPage() {
         </p>
       </div>
 
-      <BusinessHoursForm hours={hours} slaMinutes={business?.sla_minutes ?? null} timezone={business?.timezone ?? "UTC"} />
+      <BusinessHoursForm
+        hours={hours}
+        slaMinutes={business?.sla_minutes ?? null}
+        timezone={business?.timezone ?? "UTC"}
+        canEdit={hasMinRole(orgRole, "org:admin")}
+      />
     </div>
   );
 }
