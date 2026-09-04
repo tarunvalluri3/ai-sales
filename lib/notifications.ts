@@ -2,11 +2,20 @@ import "server-only";
 import { Resend } from "resend";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
+import { SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_BUSINESSES_PER_RUN = 200;
 
 const DEFAULT_FROM = "AI Sales <onboarding@resend.dev>";
+
+/**
+ * Same null-safe sandbox exclusion as lib/conversations.ts's own
+ * EXCLUDE_SANDBOX_FILTER -- a business owner's own sandbox testing must
+ * never trigger a "you have a new lead" / "needs attention" email about
+ * itself.
+ */
+const EXCLUDE_SANDBOX_FILTER = `source.is.null,source.neq.${SANDBOX_CONVERSATION_SOURCE}`;
 
 export type NotificationDigestResult = { sent: number; skipped: number; failed: number };
 
@@ -67,14 +76,16 @@ export async function sendDailyDigestEmails(): Promise<NotificationDigestResult>
       const [{ count: newLeadCount }, { count: needsAttentionCount }] = await Promise.all([
         supabase
           .from("leads")
-          .select("id", { count: "exact", head: true })
+          .select("id, conversations!inner(source)", { count: "exact", head: true })
           .eq("business_id", business.id)
-          .gte("created_at", cutoffIso),
+          .gte("created_at", cutoffIso)
+          .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
         supabase
           .from("conversations")
           .select("id", { count: "exact", head: true })
           .eq("business_id", business.id)
-          .eq("needs_attention", true),
+          .eq("needs_attention", true)
+          .or(EXCLUDE_SANDBOX_FILTER),
       ]);
 
       const leads = newLeadCount ?? 0;

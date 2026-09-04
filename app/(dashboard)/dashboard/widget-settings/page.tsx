@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { getBusinessForOrg } from "@/lib/business";
 import { WidgetKeyList } from "./widget-key-list";
@@ -10,9 +11,11 @@ import { AiCapabilitiesForm } from "./ai-capabilities-form";
 import { PublishButton } from "./publish-button";
 import { WidgetInstallGuide } from "./widget-install-guide";
 import { SandboxChatPanel } from "../_components/sandbox-chat/sandbox-chat-panel";
+import { PermissionNotice } from "../_components/state-views";
 
 export default async function WidgetSettingsPage() {
-  const { businessId, orgId } = await requireBusinessContext();
+  const { businessId, orgId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:admin");
   const [widgetKeys, business, requestHeaders] = await Promise.all([
     listWidgetKeysForBusiness(businessId),
     getBusinessForOrg(orgId),
@@ -38,13 +41,13 @@ export default async function WidgetSettingsPage() {
 
       <WidgetInstallGuide widgetKeys={widgetKeys} appOrigin={appOrigin} />
 
-      <PublishButton isPublished={business?.published_at != null} />
+      <PublishButton isPublished={business?.published_at != null} canEdit={canEdit} />
 
       <SandboxChatPanel />
 
-      <CreateWidgetKeyForm />
+      {canEdit ? <CreateWidgetKeyForm /> : <PermissionNotice />}
 
-      <WidgetKeyList widgetKeys={widgetKeys} appOrigin={appOrigin} />
+      <WidgetKeyList widgetKeys={widgetKeys} appOrigin={appOrigin} canEdit={canEdit} />
 
       <WidgetBrandingForm
         initialAccentColor={business?.widget_accent_color ?? ""}
@@ -54,14 +57,16 @@ export default async function WidgetSettingsPage() {
         initialCtaText={business?.widget_cta_text ?? ""}
         initialPosition={business?.widget_position ?? "bottom-right"}
         initialLanguage={business?.widget_language ?? "en"}
+        canEdit={canEdit}
       />
 
-      <SuggestedQuestionsForm initialQuestions={business?.widget_suggested_questions ?? []} />
+      <SuggestedQuestionsForm initialQuestions={business?.widget_suggested_questions ?? []} canEdit={canEdit} />
 
       <AiCapabilitiesForm
         initialRecommendProductsEnabled={business?.recommend_products_enabled ?? false}
         initialAppointmentsEnabled={business?.appointments_enabled ?? false}
         initialAppointmentSlotMinutes={business?.appointment_slot_minutes ?? 30}
+        canEdit={canEdit}
       />
     </div>
   );

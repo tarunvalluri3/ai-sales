@@ -60,6 +60,26 @@ export function ErrorState({
   );
 }
 
+/**
+ * Replaces a role-gated form/control a viewer's role can't use (Phase
+ * P2#10) -- server-side enforcement (lib/auth.ts's `requireMinRole()`)
+ * was already safe before this; this just reflects it visually instead
+ * of showing a control that would fail on submit. Message text matches
+ * `requireMinRole()`'s own denial string by default so the two stay
+ * consistent.
+ */
+export function PermissionNotice({
+  message = "You don't have permission to do this.",
+}: {
+  message?: string;
+}) {
+  return (
+    <p className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-4 py-3 text-xs text-ds-text-muted">
+      {message}
+    </p>
+  );
+}
+
 /** A single skeleton block. Widths/heights are passed via className so callers can compose page-shaped skeletons without a prop explosion. */
 function SkeletonBlock({ className = "" }: { className?: string }) {
   return <div aria-hidden="true" className={`animate-pulse rounded-ds-sm bg-ds-surface-elevated ${className}`} />;

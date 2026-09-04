@@ -1,10 +1,13 @@
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { listWebhookEndpointsForBusiness } from "@/lib/webhooks";
 import { CreateWebhookForm } from "./create-webhook-form";
 import { WebhookEndpointList } from "./webhook-endpoint-list";
+import { PermissionNotice } from "../_components/state-views";
 
 export default async function WebhooksPage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:admin");
   const endpoints = await listWebhookEndpointsForBusiness(businessId);
 
   return (
@@ -20,9 +23,9 @@ export default async function WebhooksPage() {
         </p>
       </div>
 
-      <CreateWebhookForm />
+      {canEdit ? <CreateWebhookForm /> : <PermissionNotice />}
 
-      <WebhookEndpointList endpoints={endpoints} />
+      <WebhookEndpointList endpoints={endpoints} canEdit={canEdit} />
     </div>
   );
 }

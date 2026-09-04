@@ -8,15 +8,25 @@ import {
   type AppointmentActionState,
 } from "./actions";
 import type { AppointmentStatus } from "@/lib/supabase/types";
+import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: AppointmentActionState = {};
 
 /** Confirm/Decline for a pending appointment, or Cancel for a confirmed one -- no action for declined/cancelled (terminal). */
-export function AppointmentActions({ id, status }: { id: string; status: AppointmentStatus }) {
+export function AppointmentActions({
+  id,
+  status,
+  canEdit = true,
+}: {
+  id: string;
+  status: AppointmentStatus;
+  canEdit?: boolean;
+}) {
   const [confirmState, confirmFormAction, isConfirming] = useActionState(confirmAppointmentAction, initialState);
   const [declineState, declineFormAction, isDeclining] = useActionState(declineAppointmentAction, initialState);
   const [cancelState, cancelFormAction, isCancelling] = useActionState(cancelAppointmentAction, initialState);
-  const disabled = isConfirming || isDeclining || isCancelling;
+  const disabled = isConfirming || isDeclining || isCancelling || !canEdit;
+  const disabledTitle = canEdit ? undefined : ROLE_DENIED_TITLE;
   const error = confirmState.error ?? declineState.error ?? cancelState.error;
 
   if (status === "declined" || status === "cancelled") {
@@ -33,6 +43,7 @@ export function AppointmentActions({ id, status }: { id: string; status: Appoint
               <button
                 type="submit"
                 disabled={disabled}
+                title={disabledTitle}
                 className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
               >
                 {isConfirming ? "Confirming…" : "Confirm"}
@@ -43,6 +54,7 @@ export function AppointmentActions({ id, status }: { id: string; status: Appoint
               <button
                 type="submit"
                 disabled={disabled}
+                title={disabledTitle}
                 className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
               >
                 {isDeclining ? "Declining…" : "Decline"}
@@ -55,6 +67,7 @@ export function AppointmentActions({ id, status }: { id: string; status: Appoint
             <button
               type="submit"
               disabled={disabled}
+              title={disabledTitle}
               className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
             >
               {isCancelling ? "Cancelling…" : "Cancel"}

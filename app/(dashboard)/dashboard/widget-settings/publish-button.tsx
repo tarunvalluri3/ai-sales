@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 import { publishBusinessAction, type PublishBusinessState } from "./actions";
+import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: PublishBusinessState = {};
 
-export function PublishButton({ isPublished }: { isPublished: boolean }) {
+export function PublishButton({ isPublished, canEdit = true }: { isPublished: boolean; canEdit?: boolean }) {
   const [state, formAction, isPending] = useActionState(publishBusinessAction, initialState);
   const published = isPublished || state.success === true;
 
@@ -40,7 +41,8 @@ export function PublishButton({ isPublished }: { isPublished: boolean }) {
       <form action={formAction}>
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || !canEdit}
+          title={canEdit ? undefined : ROLE_DENIED_TITLE}
           className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
           {isPending ? "Publishing…" : published ? "Republish" : "Publish"}

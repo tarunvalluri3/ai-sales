@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { updateAiCapabilitiesAction, type AiCapabilitiesActionState } from "./actions";
+import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: AiCapabilitiesActionState = {};
 
@@ -22,10 +23,12 @@ export function AiCapabilitiesForm({
   initialRecommendProductsEnabled,
   initialAppointmentsEnabled,
   initialAppointmentSlotMinutes,
+  canEdit = true,
 }: {
   initialRecommendProductsEnabled: boolean;
   initialAppointmentsEnabled: boolean;
   initialAppointmentSlotMinutes: number;
+  canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updateAiCapabilitiesAction, initialState);
   const [appointmentsEnabled, setAppointmentsEnabled] = useState(initialAppointmentsEnabled);
@@ -46,7 +49,7 @@ export function AiCapabilitiesForm({
             type="checkbox"
             name="recommendProductsEnabled"
             defaultChecked={initialRecommendProductsEnabled}
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             className="mt-0.5"
           />
           <span className="flex flex-col gap-1">
@@ -72,7 +75,7 @@ export function AiCapabilitiesForm({
             name="appointmentsEnabled"
             checked={appointmentsEnabled}
             onChange={(event) => setAppointmentsEnabled(event.target.checked)}
-            disabled={isPending}
+            disabled={isPending || !canEdit}
             className="mt-0.5"
           />
           <span className="flex flex-col gap-1">
@@ -103,7 +106,7 @@ export function AiCapabilitiesForm({
               min={5}
               max={240}
               defaultValue={initialAppointmentSlotMinutes}
-              disabled={isPending}
+              disabled={isPending || !canEdit}
               className={`${inputClasses} max-w-xs`}
             />
           </div>
@@ -132,7 +135,8 @@ export function AiCapabilitiesForm({
 
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || !canEdit}
+        title={canEdit ? undefined : ROLE_DENIED_TITLE}
         className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? "Saving…" : "Save AI capabilities"}

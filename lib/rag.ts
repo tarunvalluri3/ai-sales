@@ -418,7 +418,10 @@ export async function askSalesEmployee(
       ),
       businessProfileContext: formatBusinessProfileContext(businessProfile),
       question,
-      history: toLangchainHistory(history),
+      // `history`'s own last element is this same turn's question (see its
+      // doc comment) -- already sent once via the `{question}` slot above,
+      // so it's dropped here to avoid sending it to Gemini twice.
+      history: toLangchainHistory(history.slice(0, -1)),
     });
     const messages: BaseMessage[] = prompt.toChatMessages();
 

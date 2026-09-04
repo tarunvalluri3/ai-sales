@@ -3,11 +3,12 @@
 import { useActionState } from "react";
 import { extractNowAction } from "../actions";
 import type { ExtractNowState } from "../actions";
+import { ROLE_DENIED_TITLE } from "../../_components/delete-button";
 
 const initialState: ExtractNowState = {};
 
 /** Manual escape hatch (Stage 2, STATE.md) to (re-)run catalog extraction on a published document -- e.g. after a URL refresh adds new content. */
-export function ExtractNowButton({ id }: { id: string }) {
+export function ExtractNowButton({ id, canEdit = true }: { id: string; canEdit?: boolean }) {
   const [state, formAction, isPending] = useActionState(extractNowAction, initialState);
 
   return (
@@ -15,7 +16,8 @@ export function ExtractNowButton({ id }: { id: string }) {
       <input type="hidden" name="id" value={id} />
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || !canEdit}
+        title={canEdit ? undefined : ROLE_DENIED_TITLE}
         className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? "Extracting…" : "Extract now"}

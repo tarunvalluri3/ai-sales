@@ -26,12 +26,14 @@ export function LiveConversationPanel({
   initialNeedsAttention,
   initialMessages,
   initialAsOf,
+  canEdit = true,
 }: {
   conversationId: string;
   initialControl: ConversationControl;
   initialNeedsAttention: boolean;
   initialMessages: Message[];
   initialAsOf: string;
+  canEdit?: boolean;
 }) {
   const [control, setControl] = useState(initialControl);
   const [needsAttention, setNeedsAttention] = useState(initialNeedsAttention);
@@ -113,18 +115,18 @@ export function LiveConversationPanel({
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <ControlToggle conversationId={conversationId} control={control} onChanged={poll} />
+        <ControlToggle conversationId={conversationId} control={control} onChanged={poll} canEdit={canEdit} />
         {needsAttention ? (
           <div className="flex items-center gap-3 rounded-ds-lg border border-ds-border bg-ds-warning-bg px-4 py-2.5">
             <span className="text-sm font-medium text-ds-warning">Needs attention</span>
-            <DismissAttentionButton conversationId={conversationId} onDismissed={poll} />
+            <DismissAttentionButton conversationId={conversationId} onDismissed={poll} canEdit={canEdit} />
           </div>
         ) : null}
       </div>
 
       {control === "human" ? (
         <div className="max-w-2xl">
-          <ReplyComposer conversationId={conversationId} onSent={handleReplySent} />
+          <ReplyComposer conversationId={conversationId} onSent={handleReplySent} canEdit={canEdit} />
         </div>
       ) : null}
 

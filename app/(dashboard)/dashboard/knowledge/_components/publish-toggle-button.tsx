@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import type { PublishState } from "../actions";
+import { ROLE_DENIED_TITLE } from "../../_components/delete-button";
 
 const initialState: PublishState = {};
 
@@ -10,11 +11,13 @@ export function PublishToggleButton({
   id,
   label,
   pendingLabel,
+  canEdit = true,
 }: {
   action: (prevState: PublishState, formData: FormData) => Promise<PublishState>;
   id: string;
   label: string;
   pendingLabel: string;
+  canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(action, initialState);
 
@@ -23,7 +26,8 @@ export function PublishToggleButton({
       <input type="hidden" name="id" value={id} />
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || !canEdit}
+        title={canEdit ? undefined : ROLE_DENIED_TITLE}
         className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? pendingLabel : label}

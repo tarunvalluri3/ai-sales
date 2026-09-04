@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
 import { listAppointmentsForBusiness } from "@/lib/appointments";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -15,7 +16,8 @@ const STATUS_STYLE: Record<AppointmentStatus, string> = {
 };
 
 export default async function AppointmentsPage() {
-  const { businessId, orgId } = await requireBusinessContext();
+  const { businessId, orgId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:member");
   const supabase = createServerSupabaseClient();
   const [business, appointments] = await Promise.all([
     getBusinessForOrg(orgId),
@@ -76,7 +78,7 @@ export default async function AppointmentsPage() {
                   </p>
                   {appointment.notes ? <p className="text-sm text-ds-text-muted">{appointment.notes}</p> : null}
                 </div>
-                <AppointmentActions id={appointment.id} status={appointment.status} />
+                <AppointmentActions id={appointment.id} status={appointment.status} canEdit={canEdit} />
               </div>
               {appointment.conversation_id ? (
                 <div className="border-t border-ds-border pt-3">

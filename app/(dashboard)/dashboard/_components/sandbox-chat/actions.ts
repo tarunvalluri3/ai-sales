@@ -3,12 +3,11 @@
 import { requireBusinessContext } from "@/lib/business-context";
 import { getBusinessForOrg } from "@/lib/business";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { createConversation, getConversationForBusiness } from "@/lib/conversations";
+import { createConversation, getConversationForBusiness, SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { createMessage } from "@/lib/messages";
 import { askSalesEmployee, type ConversationMessage } from "@/lib/rag";
 import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { logAndGetUserMessage } from "@/lib/errors";
-import { SANDBOX_CONVERSATION_SOURCE } from "./constants";
 
 export type SandboxChatResult =
   | { ok: true; conversationId: string; answer: string; recommendedProducts: RecommendedItem[] }
@@ -28,10 +27,13 @@ export type SandboxChatResult =
  * source='dashboard_test' conversations. A metrics-table write inside
  * askSalesEmployee() has no authenticated-role grant and fails silently
  * (best-effort by design) -- sandbox turns are deliberately excluded from
- * per-turn latency/cost metrics, not a bug. Known limitation, documented
- * in STATE.md: lib/analytics.ts's conversation/lead-rate stats do not
- * filter out source='dashboard_test' rows -- retrofitting every analytics
- * query was judged a larger scope expansion than this workspace itself.
+ * per-turn latency/cost metrics, not a bug. lib/analytics.ts's own stats
+ * queries, lib/conversations.ts's real conversation list/counts, and
+ * lib/notifications.ts's daily digest all exclude source='dashboard_test'
+ * rows; lib/tools/{request-callback,book-appointment}.ts skip writing a
+ * real leads/appointments row (and request_callback's webhook) for a
+ * sandbox conversation, while still running their normal validation so
+ * the sandbox stays a realistic preview.
  */
 export async function sendSandboxMessage(
   conversationId: string | null,

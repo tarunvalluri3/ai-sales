@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { listProductsForBusiness, listPendingReviewProducts } from "@/lib/products";
 import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
 import { DeleteButton } from "../_components/delete-button";
 import { ReviewActions } from "../_components/review-actions";
 import { ProductForm } from "./product-form";
 import { createProductAction, deleteProductAction, approveProductAction, rejectProductAction } from "./actions";
-import { EmptyState } from "../_components/state-views";
+import { EmptyState, PermissionNotice } from "../_components/state-views";
 
 export default async function ProductsPage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
+  const canEdit = hasMinRole(orgRole, "org:member");
   const [products, pendingProducts] = await Promise.all([
     listProductsForBusiness(businessId),
     listPendingReviewProducts(businessId),
@@ -62,7 +64,12 @@ export default async function ProductsPage() {
                   {product.price ? (
                     <span className="text-sm font-semibold text-ds-accent">${product.price}</span>
                   ) : null}
-                  <ReviewActions approveAction={approveProductAction} rejectAction={rejectProductAction} id={product.id} />
+                  <ReviewActions
+                    approveAction={approveProductAction}
+                    rejectAction={rejectProductAction}
+                    id={product.id}
+                    canEdit={canEdit}
+                  />
                 </div>
               </li>
             ))}
@@ -94,13 +101,15 @@ export default async function ProductsPage() {
                 {product.price ? (
                   <span className="text-sm font-semibold text-ds-accent">${product.price}</span>
                 ) : null}
-                <Link
-                  href={`/dashboard/products/${product.id}/edit`}
-                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                >
-                  Edit
-                </Link>
-                <DeleteButton action={deleteProductAction} id={product.id} />
+                {canEdit ? (
+                  <Link
+                    href={`/dashboard/products/${product.id}/edit`}
+                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  >
+                    Edit
+                  </Link>
+                ) : null}
+                <DeleteButton action={deleteProductAction} id={product.id} canEdit={canEdit} />
               </div>
             </li>
           ))}
@@ -109,7 +118,11 @@ export default async function ProductsPage() {
 
       <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-medium text-ds-text-primary">Add a product</h2>
-        <ProductForm action={createProductAction} submitLabel="Add product" pendingLabel="Adding…" />
+        {canEdit ? (
+          <ProductForm action={createProductAction} submitLabel="Add product" pendingLabel="Adding…" />
+        ) : (
+          <PermissionNotice />
+        )}
       </section>
     </div>
   );

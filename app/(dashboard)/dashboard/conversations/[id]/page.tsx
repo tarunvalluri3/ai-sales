@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireBusinessContext } from "@/lib/business-context";
+import { hasMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversation } from "@/lib/messages";
@@ -19,7 +20,7 @@ export default async function ConversationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { businessId } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
   const supabase = createServerSupabaseClient();
 
   const conversation = await getConversationForBusiness(supabase, businessId, id);
@@ -47,6 +48,7 @@ export default async function ConversationDetailPage({
         initialNeedsAttention={conversation.needs_attention}
         initialMessages={messages}
         initialAsOf={messages.length > 0 ? messages[messages.length - 1].created_at : conversation.created_at}
+        canEdit={hasMinRole(orgRole, "org:sales_agent")}
       />
 
       {lead ? (
