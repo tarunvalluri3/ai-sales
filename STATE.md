@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-04 (P2 backlog sweep: fixed the duplicate-question-to-Gemini inefficiency, corrected `docs/phases.md`'s stale Phase 15 wording, closed sandbox-test data pollution across analytics/notifications/leads/appointments/webhooks, reflected RBAC restrictions across every role-gated dashboard control, and added 5 new pgTAP files covering appointments, the suggested-questions constraint, both Storage buckets, and visitor-scoped recent-chats — see the entry below)
+Last updated: 2026-09-04 (P0/P1 follow-up: the two custom Clerk org roles now have correct `key` fields (verified live via the Clerk Backend API, not just the Dashboard UI) after the user fixed a doubled `org_` prefix; `request_callback`'s contact-field schema hardened to match `book_appointment`'s anti-fabrication wording; `.env.local`'s trailing whitespace trimmed. Also the P2 backlog sweep further down: fixed the duplicate-question-to-Gemini inefficiency, corrected `docs/phases.md`'s stale Phase 15 wording, closed sandbox-test data pollution across analytics/notifications/leads/appointments/webhooks, reflected RBAC restrictions across every role-gated dashboard control, and added 5 new pgTAP files covering appointments, the suggested-questions constraint, both Storage buckets, and visitor-scoped recent-chats)
 
 ---
 
@@ -11,13 +11,13 @@ Last updated: 2026-09-04 (P2 backlog sweep: fixed the duplicate-question-to-Gemi
 A living, prioritized todo list — unlike the phase entries below (an append-only history log), this section should be edited/pruned as items are resolved. Compiled by reading every "Known limitation"/"Known gap"/"Not yet done"/"Next step" note across this file's full history and cross-checking which are still actually open (several older ones — e.g. the AI's decline-rule wording, the URL-ingestion stub bug, the widget-key eval-harness lookup — were already fixed by later phases and are omitted here). Each item names its source phase so the full context can be found by searching this file.
 
 ### P0 — user action required, blocks real functionality
-1. **Verify a Resend sending domain and set `RESEND_API_KEY`/`NOTIFICATION_EMAIL_FROM` on Vercel** — confirmed still unset via `vercel env ls production` (2026-09-01). Phase 25b's daily lead/attention-needed digest email silently no-ops without them; nothing is broken, but no business has ever actually received one.
-2. **Create the two custom Clerk org roles** (`org:sales_agent`, `org:analyst_viewer`) in Clerk Dashboard → Organizations → Roles & Permissions, using exactly those key strings (Phase 24). App-side gating is already safe without them (an unrecognized role is denied, never granted) — but the two new RBAC tiers won't differentiate anyone until the roles exist and are assigned.
-3. **Fill in the bracketed legal placeholders** on `/privacy` and `/terms` (entity name, support email, governing jurisdiction) — deliberately left as placeholders (Phase 22a), not launch-ready as-is.
+1. **Verify a Resend sending domain and set `RESEND_API_KEY`/`NOTIFICATION_EMAIL_FROM` on Vercel** — confirmed still unset via `vercel env ls production` (2026-09-01). Phase 25b's daily lead/attention-needed digest email silently no-ops without them; nothing is broken, but no business has ever actually received one. **Deliberately deferred by the user (2026-09-04)** — no domain purchased yet.
+2. ~~Create the two custom Clerk org roles~~ — done 2026-09-04, see the entry below.
+3. **Fill in the bracketed legal placeholders** on `/privacy` and `/terms` (entity name, support email, governing jurisdiction) — deliberately left as placeholders (Phase 22a), not launch-ready as-is. **Blocked on the user**: this app cannot invent a legal entity name, support email, or governing jurisdiction (AGENTS.md §3 rule 4 -- no fabricated facts -- applies here too), so this needs the three real values from the user before it can be done.
 
 ### P1 — real, currently-unverified risk
 4. **Consider requesting a Gemini embedding-quota increase from Google Cloud** if the "We're experiencing high demand..." degrade message keeps firing during real (non-burst) traffic — the 2026-09-01 fix stops it from breaking the widget, but doesn't raise the underlying per-minute account quota.
-5. **Audit `request_callback` for the same contact-info-fabrication risk `book_appointment` just had** (see the detailed entry below) -- both tools share the same nullable-contact-field schema shape, and `request_callback` was never specifically tested with a partial-contact-info scenario (email only, no name/phone) the way `book_appointment` just was live. Not confirmed broken, just not confirmed safe either.
+5. ~~Audit `request_callback` for the same contact-info-fabrication risk `book_appointment` just had~~ — done 2026-09-04, see the entry below.
 
 ### P2 — known bugs / gaps, lower urgency
 6. `recommend_products` had one occasional `invalid_input` tool-call flake during live testing (self-resolved on retry, model fell back to another tool successfully) — not root-caused.
@@ -26,7 +26,7 @@ A living, prioritized todo list — unlike the phase entries below (an append-on
 9. ~~Sandbox test conversations pollute real metrics~~ — fixed 2026-09-04, see the entry below.
 10. ~~Dashboard UI doesn't hide/disable controls a viewer's role can't use~~ — fixed 2026-09-04, see the entry below.
 11. ~~`docs/phases.md`'s Phase 15 exit-criterion wording~~ — fixed 2026-09-04, see the entry below.
-12. **`.env.local` has trailing whitespace on at least `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SECRET_KEY`'s values** (found 2026-09-02: a raw file read showed `"https://....supabase.co   "`, three trailing spaces) -- harmless for the app itself (`process.env` reads still worked; Next/dotenv-style parsers commonly trim), but broke a bare shell-variable `curl` call during this session's cleanup until explicitly trimmed. Not fixed here (a local, untracked, gitignored file — nothing to commit) but worth a manual trim next time this file is hand-edited.
+12. ~~`.env.local` has trailing whitespace~~ — trimmed 2026-09-04 (`CLERK_SECRET_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` all had it; a plain `sed -i 's/[ \t]*$//' .env.local` across the whole file, no secret values ever printed). A local, untracked, gitignored file — nothing to commit, this was a direct local edit.
 13. **`pdfjs-dist` is pinned to an exact patch version (`6.2.108`, no `^`/`~` range)** with two small Node-version polyfills load-bearing alongside it (see the detailed entry below) — revisit this pin (and consider removing the polyfills) once this Vercel project's default Node runtime reaches 26+, or if `pdfjs-dist` cuts a new release both patching GHSA-hq66-cqwq-w95j's CVE class *and* not depending on Node 25/26-only JS features.
 
 ### Resolved since the backlog was first compiled (2026-09-01 → 2026-09-02)
@@ -42,6 +42,11 @@ A living, prioritized todo list — unlike the phase entries below (an append-on
 - ~~Dashboard UI doesn't hide/disable controls a viewer's role can't use~~ — done, see the detailed entry below.
 - ~~`docs/phases.md`'s Phase 15 exit-criterion wording~~ — done, see the detailed entry below.
 
+### Resolved 2026-09-04 (P0/P1 follow-up, after the P2 sweep)
+- ~~Create the two custom Clerk org roles~~ — the user created them, but the Dashboard auto-generated `key` fields as `org:org_sales_agent`/`org:org_analyst_viewer` (a doubled `org_` prefix) instead of the exact `org:sales_agent`/`org:analyst_viewer` `lib/auth.ts` requires -- caught by querying the Clerk Backend API's `GET /v1/organization_roles` directly (its `key` field, not the Dashboard's display `name` column, is what actually lands on a session) rather than trusting a paraphrase or the Dashboard screenshot's Role-name column alone. User fixed the `key` fields; re-verified via the same API call that they now read exactly `org:sales_agent`/`org:analyst_viewer`.
+- ~~Audit `request_callback` for the same contact-info-fabrication risk `book_appointment` just had~~ — done, see the detailed entry below.
+- ~~`.env.local` has trailing whitespace~~ — trimmed directly (local file, not committed).
+
 ### Doc accuracy fix made while compiling this list
 - §5's `CRON_SECRET` line claimed "Not yet set on Vercel production" — **false**, confirmed live via `vercel env ls production` (2026-09-01) that it has been set since 2026-08-20, matching the Phase 23 entry (which was correct all along). Corrected in §5 below.
 
@@ -49,6 +54,24 @@ A living, prioritized todo list — unlike the phase entries below (an append-on
 - WhatsApp (Phase 16), Razorpay billing (Phase 17) — explicitly deferred (decision D11), not cancelled.
 - Real-time push notifications (WebSocket/SSE/Supabase Realtime) — deliberately polling instead (decision D8); polling intervals already tightened twice since.
 - Response streaming, thumbs-up/down feedback, business-configurable escalation trigger keywords, a structured lead-capture form, conversation-history summarization beyond the last 20 messages — surfaced as a backlog list during the 2026-08-31 escalation-gating fix; markdown rendering and prefilled starter questions from that same list were later built (Phase 25d/25e) — the rest remain unbuilt and unscheduled.
+
+---
+
+## P0/P1 follow-up: Clerk role keys verified, request_callback hardened, .env.local trimmed — 2026-09-04
+
+Direct continuation of the P2 sweep below (same day). After that PR merged, the user asked what was left on the original backlog; deferred the Resend domain item themselves (no domain purchased yet) and asked for everything else doable without further input to just be completed.
+
+**Clerk custom org roles (P0 item 2).** The user had already created both roles in Clerk's Dashboard and reported the key strings back in chat, but the wording was ambiguous enough (`"org:analyst_viewer : KEY - org:org_analyst_viewer"`) to verify rather than trust. Queried Clerk's Backend API directly (`GET https://api.clerk.com/v1/organization_roles` with `CLERK_SECRET_KEY` -- the plural-form endpoint; the singular `organization_role` 404s) and confirmed a real misconfiguration: both roles' `key` field (not their display `name` -- `key` is what actually lands in a member's session and is what `lib/auth.ts`'s `ROLE_RANK` compares against) had a doubled `org_` prefix -- `org:org_sales_agent` and `org:org_analyst_viewer` instead of the required `org:sales_agent`/`org:analyst_viewer`. With those keys, both roles would have silently done nothing -- `hasMinRole()` treats any unrecognized role string as rank -1, denying everything, exactly the same as if the roles didn't exist. The user then shared a Clerk Dashboard screenshot showing the same wrong keys, independently confirming the API read. After the user corrected the `key` field on each role in the Dashboard (Clerk's Backend API doesn't expose role CRUD, so this can only be done from the Dashboard UI), the same API query was re-run and now returns exactly `org:sales_agent` -> `org:sales_agent` and `org:analyst_viewer` -> `org:analyst_viewer`. This P0 item is now genuinely done -- app-side gating was already safe before this (an unrecognized role is denied, never granted), so nothing was broken in the interim, but the two RBAC tiers now actually differentiate members once assigned.
+
+**`request_callback` contact-fabrication hardening (P1 item 5, `lib/tools/request-callback.ts`).** `book_appointment`'s contact-field schema descriptions were hardened after a live bug (see the 2026-09-02 appointment-booking entry further below) caught the model inventing a placeholder name/phone; `request_callback` shared the identical nullable-contact-field shape but had never been updated to match, and was flagged as an unconfirmed-but-plausible P1 risk rather than a confirmed bug. Brought the wording in line, field-for-field: `contactName`/`contactEmail`/`contactPhone` now say "ONLY if they literally typed it earlier in this conversation... you MUST pass null" with the same explicit anti-placeholder examples (`'Prospect'`, `'Customer'`, `'Guest'`; "do not fill it with a placeholder like all the same digit"); the tool's own top-level description gained the same "Pass ONLY contact details the prospect actually typed... never invent, guess, or placeholder" line `book_appointment`'s description already had. No behavior change outside the schema's own descriptive text -- the executor function (`executeRequestCallback`) is untouched; this only changes what instruction Gemini receives, matching the exact fix shape that resolved the analogous `book_appointment` bug. Not re-verified with a fresh live conversation this session (see known limitations).
+
+**`.env.local` trailing whitespace (P2 item 12).** Trimmed directly (`sed -i 's/[ \t]*$//' .env.local`, no secret values ever printed to the terminal) -- `CLERK_SECRET_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, and `SUPABASE_SECRET_KEY` all had trailing spaces. A local, untracked, gitignored file; nothing to commit, no deploy or restart required (Next's own env loading already trimmed these transparently, per the original 2026-09-02 finding -- this only fixes tools like a bare shell `curl` that don't).
+
+**Checks:** `npx tsc --noEmit` -- pass. `npm run lint` -- pass, zero errors/warnings. `npm run build` -- pass, all routes. No pgTAP run needed (no schema/RLS change).
+
+**Files changed:** `lib/tools/request-callback.ts`. **Not committed:** `.env.local` (gitignored). **Migrations:** none. **Environment variables:** none added; existing ones' raw formatting cleaned up locally only.
+
+**Known limitation, not glossed over:** the `request_callback` hardening was not re-verified with a fresh live conversation (email-only scenario, confirm the resulting lead has no fabricated name/phone) the way the original `book_appointment` fix was -- this session judged it adequately covered by the fact it's a pure wording change mirroring an already-live-verified fix in a structurally identical sibling tool, but that's an inference, not a repeated live test.
 
 ---
 
