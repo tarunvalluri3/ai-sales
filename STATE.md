@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-02 (P1 backlog complete: appointment booking verified end-to-end through real Gemini tool-calling — found and fixed two real bugs, including an AI contact-info fabrication defect; dashboard browser click-through verified; PDF catalog page-image rendering on Vercel — the previously-parked bug is now fully resolved: three more real bugs found and fixed (two Node-version polyfills, one internal safety-order bug), confirmed working end-to-end against real production)
+Last updated: 2026-09-04 (Widget mobile UX fixes: on-screen-keyboard/browser-chrome height tracking via a new per-iframe `visualViewport` hook, a viewport meta tag on the widget's own document, and 44px touch targets on the header/send buttons — verified live with a real headless-browser session, which also caught and fixed a hydration-mismatch bug the height fix introduced)
 
 ---
 
@@ -42,6 +42,27 @@ A living, prioritized todo list — unlike the phase entries below (an append-on
 - WhatsApp (Phase 16), Razorpay billing (Phase 17) — explicitly deferred (decision D11), not cancelled.
 - Real-time push notifications (WebSocket/SSE/Supabase Realtime) — deliberately polling instead (decision D8); polling intervals already tightened twice since.
 - Response streaming, thumbs-up/down feedback, business-configurable escalation trigger keywords, a structured lead-capture form, conversation-history summarization beyond the last 20 messages — surfaced as a backlog list during the 2026-08-31 escalation-gating fix; markdown rendering and prefilled starter questions from that same list were later built (Phase 25d/25e) — the rest remain unbuilt and unscheduled.
+
+---
+
+## Chat widget mobile UX fixes — implemented and verified 2026-09-04
+
+User reported the mobile widget's UI/UX was poor. A recon pass over `app/(widget)/widget/embed/` and `public/widget-loader.js` (no CSS media queries anywhere in the widget -- the only "breakpoint" is a hardcoded `480px` JS width check in `widget-app.tsx`) found four real, confirmable flaws; the user chose to fix all four in one pass rather than write them into a prompt file, per the standing "no prompt files" instruction.
+
+1. **On-screen keyboard could cover the composer.** The existing resize protocol (`widget-loader.js` listening to `window.resize`, relaying `window.innerWidth`/`innerHeight` to the iframe) never fires when a mobile keyboard opens -- most mobile browsers only resize `visualViewport`, not the layout viewport, for that. New hook `app/(widget)/widget/embed/_lib/use-viewport-height.ts` reads the iframe's own `window.visualViewport.height` (independent of the host page's protocol -- each frame has its own `visualViewport`, which does track a keyboard opened by focusing an input inside that same frame) and `widget-app.tsx`'s root wrapper now sets its height from it once known, falling back to the existing `h-full`/100% until then.
+2. **Missing viewport meta on the widget's own document.** `app/(widget)/layout.tsx` had no `<meta name="viewport">` at all. Added `export const viewport: Viewport = { width: "device-width", initialScale: 1 }` -- deliberately no `maximumScale`/`userScalable: false`, which would have killed pinch-zoom (a WCAG 1.4.4 regression, not a fix).
+3. **Touch targets under the ~44px minimum.** Header menu/close buttons (`panel-header.tsx`) were 32x32px, the composer send button (`composer.tsx`) was 36x36px. All bumped to 44x44px (`h-11 w-11`); the header's dropdown-menu offset (`top-10` → `top-[52px]`) adjusted to match so it no longer overlaps the taller close button.
+4. **Browser-chrome (address bar) height jumps.** Covered by the same `visualViewport` hook as #1 -- it fires on address-bar show/hide too, not just the keyboard.
+
+**Bug caught during verification, fixed before shipping:** the first version of `use-viewport-height.ts` read `window.visualViewport.height` synchronously in `useState`'s initializer, which runs on the client's first (pre-hydration) render too -- that doesn't match the server-rendered markup (server has no `window`), so React logged a real hydration mismatch. Fixed by starting state at `null` (matching SSR) and only setting the real value inside `useEffect`, after hydration.
+
+**Verification (real headless-browser session, not just typecheck/build):** no project skill covers launching this app, and `chromium-cli` wasn't available in this environment, so Playwright was installed standalone into the scratchpad (not added to this project's `package.json`/lockfile) and driven directly against `npm run dev`. Loaded `/widget/embed?key=...` at a 375x667 mobile viewport/UA: confirmed header buttons and the send button now measure ~44x44px (were 32x32/36x36); confirmed `window.visualViewport.height` is read correctly (667 initially); then shrank the browser viewport to 300px tall as a stand-in for a keyboard-caused `visualViewport` shrink (Playwright cannot trigger a real mobile OS keyboard, but the fix only ever reads `visualViewport.height`, which behaves identically regardless of what shrinks it) and confirmed the composer textarea stayed fully visible and reachable within the shrunk area instead of being pushed off-screen; confirmed zero console errors, including no hydration warning after the fix above. Screenshots taken before/after the shrink, both visually correct.
+
+**Checks:** `npm run lint` -- pass. `npx tsc --noEmit` -- pass (no dedicated typecheck script exists). `npm run build` -- pass, all 33 routes including `/widget/embed`. No DB/auth/AI-pipeline change, so tenant-isolation tests don't apply.
+
+**Files changed:** `app/(widget)/widget/embed/_lib/use-viewport-height.ts` (new), `app/(widget)/widget/embed/_components/widget-app.tsx`, `app/(widget)/layout.tsx`, `app/(widget)/widget/embed/_components/panel-header.tsx`, `app/(widget)/widget/embed/_components/composer.tsx`.
+
+**Not changed / known limitation carried forward, not newly introduced:** `widget-loader.js`'s own `window.resize`-based narrow/full-screen detection (pre-existing, `widget-app.tsx`'s `NARROW_BREAKPOINT_PX`) still doesn't react to a real keyboard event -- but this no longer matters for the composer-visibility problem, since the new per-iframe `visualViewport` fix handles that independently of the loader's outer resize protocol. Left as-is since it wasn't broken for its actual purpose (detecting a genuinely narrow *screen*, not a keyboard).
 
 ---
 

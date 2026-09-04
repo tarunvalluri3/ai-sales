@@ -85,7 +85,7 @@ export function Composer({
           aria-label={strings.sendLabel}
           onClick={handleSend}
           disabled={disabled || !value.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path

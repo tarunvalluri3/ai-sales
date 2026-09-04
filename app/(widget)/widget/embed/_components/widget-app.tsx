@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { useWidgetChat } from "../_lib/use-widget-chat";
 import { parseFromParentMessage, postToParent } from "../_lib/post-message";
+import { useViewportHeight } from "../_lib/use-viewport-height";
 import { LauncherButton } from "./launcher-button";
 import { Panel } from "./panel";
 import type { WidgetStrings } from "@/lib/widget-i18n";
@@ -39,6 +40,7 @@ export function WidgetApp({
   const launcherButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
   const chat = useWidgetChat(strings);
+  const visualViewportHeight = useViewportHeight();
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -94,7 +96,13 @@ export function WidgetApp({
   return (
     <div
       className="h-full w-full"
-      style={accentColor ? ({ "--widget-primary": accentColor } as React.CSSProperties) : undefined}
+      style={{
+        ...(accentColor ? ({ "--widget-primary": accentColor } as React.CSSProperties) : undefined),
+        // Overrides the h-full/100% above with the iframe's own visible
+        // (post-keyboard, post-address-bar) height, once known -- see
+        // use-viewport-height.ts. Falls back to 100% until then.
+        ...(visualViewportHeight != null ? { height: visualViewportHeight } : undefined),
+      }}
     >
       <AnimatePresence initial={false} mode="wait">
         {isOpen ? (
