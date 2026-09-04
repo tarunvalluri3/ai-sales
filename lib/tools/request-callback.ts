@@ -15,10 +15,29 @@ const QUALIFICATION_REASON = "Prospect explicitly requested a callback via chat.
 const SOURCE = "request_callback_tool";
 
 export const RequestCallbackInputSchema = z.object({
-  contactName: z.string().trim().max(200).nullable().describe("The prospect's name, only if they volunteered it. Never invented."),
-  contactEmail: z.string().trim().max(200).nullable().describe("The prospect's email, only if they gave it. Never invented."),
-  contactPhone: z.string().trim().max(50).nullable().describe("The prospect's phone number, only if they gave it. Never invented."),
-  notes: z.string().trim().max(500).nullable().describe("Any preferred callback time or additional context the prospect mentioned, in their own words."),
+  contactName: z
+    .string()
+    .trim()
+    .max(200)
+    .nullable()
+    .describe(
+      "The prospect's name, ONLY if they literally typed it earlier in this conversation. If they never gave a name, you MUST pass null -- do not invent one, and never use a placeholder like 'Prospect', 'Customer', or 'Guest'.",
+    ),
+  contactEmail: z
+    .string()
+    .trim()
+    .max(200)
+    .nullable()
+    .describe("The prospect's email, ONLY if they literally typed it earlier in this conversation. If they never gave one, you MUST pass null -- do not invent or guess one."),
+  contactPhone: z
+    .string()
+    .trim()
+    .max(50)
+    .nullable()
+    .describe(
+      "The prospect's phone number, ONLY if they literally typed it earlier in this conversation. If they never gave one, you MUST pass null -- do not invent one, do not reuse a number from an example, and do not fill it with a placeholder like all the same digit.",
+    ),
+  notes: z.string().trim().max(500).nullable().describe("Any preferred callback time or additional context the prospect mentioned, in their own words. Null if nothing extra was said."),
 });
 
 /**
@@ -27,7 +46,7 @@ export const RequestCallbackInputSchema = z.object({
 export const requestCallbackTool = {
   name: "request_callback",
   description:
-    "Creates or updates a callback request for the current conversation. Only call this after the prospect has clearly agreed to a callback (in response to either their own request or your offer) AND you already have their email or phone number from this conversation. If the result comes back with reason 'missing_contact_info', ask the prospect for their email or phone number before calling this tool again -- do not call it again without contact info. If the result comes back with reason 'consent_required', tell the prospect you need their consent to store their details and ask them to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent.",
+    "Creates or updates a callback request for the current conversation. Only call this after the prospect has clearly agreed to a callback (in response to either their own request or your offer) AND you already have their email or phone number from this conversation. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. If the result comes back with reason 'missing_contact_info', ask the prospect for their email or phone number before calling this tool again -- do not call it again without contact info. If the result comes back with reason 'consent_required', tell the prospect you need their consent to store their details and ask them to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent.",
   schema: RequestCallbackInputSchema,
 };
 
