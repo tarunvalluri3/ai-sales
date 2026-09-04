@@ -87,7 +87,7 @@ export function PanelHeader({
             aria-haspopup="menu"
             aria-expanded={isMenuOpen}
             onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+            className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="5" cy="12" r="1.75" fill="currentColor" />
@@ -98,7 +98,7 @@ export function PanelHeader({
           {isMenuOpen ? (
             <div
               role="menu"
-              className="absolute right-0 top-10 z-10 w-52 overflow-hidden rounded-xl border border-widget-border-strong bg-widget-surface py-1 text-widget-foreground shadow-xl shadow-black/20"
+              className="absolute right-0 top-[52px] z-10 w-52 overflow-hidden rounded-xl border border-widget-border-strong bg-widget-surface py-1 text-widget-foreground shadow-xl shadow-black/20"
             >
               <button
                 type="button"
@@ -131,7 +131,7 @@ export function PanelHeader({
           type="button"
           aria-label={strings.closeChatLabel}
           onClick={onClose}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
