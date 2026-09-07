@@ -5,6 +5,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversation } from "@/lib/messages";
 import { getLeadForConversation } from "@/lib/leads";
+import { getProduct } from "@/lib/products";
+import { getService } from "@/lib/services";
 import { LiveConversationPanel } from "../_components/live-conversation-panel";
 import type { LeadQualification } from "@/lib/supabase/types";
 
@@ -32,6 +34,19 @@ export default async function ConversationDetailPage({
     listMessagesForConversation(supabase, businessId, conversation.id),
     getLeadForConversation(businessId, conversation.id),
   ]);
+
+  // Resolved to a real name rather than shown as a raw id -- a lead's
+  // matched product/service can be edited or deleted after the lead was
+  // created, so this honestly says "no longer available" rather than
+  // guessing (/impeccable clarify: the row used to show the bare id).
+  let interestName: string | null = null;
+  if (lead?.interest_id) {
+    if (lead.interest_type === "product") {
+      interestName = (await getProduct(businessId, lead.interest_id))?.name ?? null;
+    } else if (lead.interest_type === "service") {
+      interestName = (await getService(businessId, lead.interest_id))?.name ?? null;
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
@@ -68,7 +83,7 @@ export default async function ConversationDetailPage({
           </p>
           <p className="text-sm text-ds-text-secondary">
             Interest: {lead.interest_type ?? "—"}
-            {lead.interest_id ? ` (matched: ${lead.interest_id})` : ""}
+            {lead.interest_id ? ` — ${interestName ?? "no longer available"}` : ""}
           </p>
           <p className="text-sm text-ds-text-muted">AI-written reason: {lead.qualification_reason}</p>
           {lead.notes ? <p className="text-sm text-ds-text-secondary">Notes: {lead.notes}</p> : null}

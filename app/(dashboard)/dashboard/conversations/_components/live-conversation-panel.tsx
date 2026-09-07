@@ -114,8 +114,14 @@ export function LiveConversationPanel({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3">
-        <ControlToggle conversationId={conversationId} control={control} onChanged={poll} canEdit={canEdit} />
+      <div className="flex flex-wrap items-start gap-3">
+        <ControlToggle
+          conversationId={conversationId}
+          control={control}
+          needsAttention={needsAttention}
+          onChanged={poll}
+          canEdit={canEdit}
+        />
         {needsAttention ? (
           <div className="flex items-center gap-3 rounded-ds-lg border border-ds-border bg-ds-warning-bg px-4 py-2.5">
             <span className="text-sm font-medium text-ds-warning">Needs attention</span>

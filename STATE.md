@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-07 (Conversations list rows now show the lead's contact name and a last-message preview in place of the generic "Chat widget" label, via `/impeccable layout` -- follows the same-day tabs/live-polling entry below. Automated checks clean; still not yet manually click-tested in a real signed-in browser session)
+Last updated: 2026-09-07 (`/impeccable critique` run on `/dashboard/knowledge`, then its P0 fix: delete and unpublish now require a second confirming click instead of firing immediately. Automated checks clean; still not yet manually click-tested in a real signed-in browser session -- see the entry below)
 
 ---
 
@@ -54,6 +54,99 @@ A living, prioritized todo list — unlike the phase entries below (an append-on
 - WhatsApp (Phase 16), Razorpay billing (Phase 17) — explicitly deferred (decision D11), not cancelled.
 - Real-time push notifications (WebSocket/SSE/Supabase Realtime) — deliberately polling instead (decision D8); polling intervals already tightened twice since.
 - Response streaming, thumbs-up/down feedback, business-configurable escalation trigger keywords, a structured lead-capture form, conversation-history summarization beyond the last 20 messages — surfaced as a backlog list during the 2026-08-31 escalation-gating fix; markdown rendering and prefilled starter questions from that same list were later built (Phase 25d/25e) — the rest remain unbuilt and unscheduled.
+
+---
+
+## Knowledge page: critique + P0 confirm-before-delete/unpublish fix — implemented 2026-09-07
+
+Ran `/impeccable critique` on `/dashboard/knowledge` (dual-agent: source-level design review + `detect.mjs` scan; no browser automation tool available this session, so no live overlay). Scored 22/40 (Acceptable). Top finding (P0): `DeleteButton` and the "Unpublish" path of `PublishToggleButton` both submitted immediately on a single click, with no undo, for content the AI is actively citing to real prospects. Full report persisted to `.impeccable/critique/2026-09-07T16-12-29Z__app-dashboard-dashboard-knowledge-page-tsx.md`. User chose to address all five findings (P0-P3); this entry closes out the P0 only — the remaining four (hidden ingestion-error tooltip, 6-control action row, three side-by-side add-knowledge forms, no success toast) are still open, see Next logical task.
+
+**What changed:**
+- `app/(dashboard)/dashboard/_components/delete-button.tsx` — `DeleteButton` gained an optional `confirmMessage` prop. When passed, the first click swaps the button for an inline row (`confirmMessage` text + a solid-danger "Confirm delete" button + "Cancel") instead of submitting; omitting the prop keeps the original single-click behavior unchanged. This component is shared by products/services/FAQs' delete buttons too — none of those pass the new prop, so their behavior is untouched; only the knowledge page opts in.
+- `app/(dashboard)/dashboard/knowledge/_components/publish-toggle-button.tsx` — `PublishToggleButton` gained the identical `confirmMessage`-gated two-click pattern, used only for the "Unpublish" direction (destructive — pulls a document out of the AI's live context) and not "Publish" (additive, already one click).
+- `app/(dashboard)/dashboard/knowledge/page.tsx` — wires `confirmMessage` for both: delete says "Your AI is using this in live conversations. Delete anyway?" for a published document or "Delete this document?" for a draft; unpublish says "Your AI will stop using this document immediately."
+
+**Database changes:** none. **Environment variables:** none.
+
+**Checks run:** `npm run lint` (clean), `npm run typecheck` (clean), `npm run build` (succeeded), `detect.mjs` on all three changed files (zero findings).
+
+**Known limitation:** not yet click-tested in a real signed-in browser session (no browser automation tool available, route behind Clerk auth). Manual test steps:
+1. On a published knowledge document, click "Delete" — confirm the row swaps to "Your AI is using this in live conversations. Delete anyway?" with Confirm/Cancel, and the document is NOT deleted yet.
+2. Click "Cancel" — confirm it reverts to the plain "Delete" button with no request sent.
+3. Click "Delete" again, then "Confirm delete" — confirm the document is deleted and the button reads "Deleting…" while pending.
+4. On a draft document, click "Delete" — confirm the shorter "Delete this document?" message appears (no "live conversations" clause).
+5. On a published document, click "Unpublish" — confirm it swaps to "Your AI will stop using this document immediately." with Confirm/Cancel before actually unpublishing.
+6. On products/services/FAQs pages, confirm Delete still fires immediately as before (unchanged, since those callers don't pass `confirmMessage`).
+
+**Next logical task:** the remaining four findings from the same critique, in the user's stated priority order — `/impeccable clarify` (surface the hidden ingestion-error tooltip as visible text), `/impeccable distill` (consolidate the up-to-6-control action row into a primary action + overflow menu), `/impeccable layout` (collapse the three side-by-side add-knowledge forms into one entry point), then `/impeccable polish` (success confirmation on publish/unpublish/retry) — plus the still-outstanding real browser walkthrough for this fix.
+
+---
+
+## Leads page: same raw interest_id fix as the conversations detail page — implemented 2026-09-07
+
+Follow-up flagged during the conversations-page polish pass below: `/dashboard/leads/page.tsx` had the identical bug already fixed on the conversation detail page's lead card -- `Interest: product (matched: <uuid>)` shown raw instead of resolved to a name.
+
+**What changed:**
+- `lib/products.ts` — added `listProductsByIds(businessId, ids)`: one batched query for several products at once (`.in("id", ids)`), scoped to `business_id`. Missing/cross-tenant ids are silently absent from the result rather than an error, matching `getProduct()`'s existing no-existence-leak contract.
+- `lib/services.ts` — added the equivalent `listServicesByIds()`.
+- `app/(dashboard)/dashboard/leads/page.tsx` — the leads list can show many leads at once (also unpaginated, like conversations), so this batches every lead's `interest_id` into two queries total (one for all product interests, one for all service interests) rather than one query per row. Builds a single `Map<id, name>` and looks each lead's interest up in it. `Interest: product (matched: <uuid>)` → `Interest: product — <real name>`, or `— no longer available` if the matched item was since deleted, same honest-fallback wording as the conversations fix.
+
+**Database changes:** none. **Environment variables:** none.
+
+**Checks run:** `npm run lint` (clean), `npm run typecheck` (clean), `npm run build` (succeeded), `detect.mjs` on the leads page (zero findings), `/dashboard/leads` confirmed responding (307 auth redirect, no crash).
+
+**Known limitation:** same as everything else today — not manually click-tested in a real signed-in browser session. Manual test: open `/dashboard/leads` with at least one lead that has a `product` or `service` interest with a still-existing match, and confirm the real name renders instead of a UUID.
+
+**Next logical task:** the still-outstanding real browser walkthrough across all of today's changes (conversations tabs/polling, row content, clarify, polish, and this leads fix); separately, the P2 pagination item deferred from the original conversations critique.
+
+---
+
+## Conversations page: polish pass — closes the critique→shape→layout→clarify arc — implemented 2026-09-07
+
+Final `/impeccable polish` pass across everything built on `/dashboard/conversations` today (tabs/live-polling, row content, and the clarify pass). Re-read every touched file together rather than piecemeal, per polish's own instruction that drift hides between passes, not within one. Found and fixed three real defects the earlier steps had each individually introduced:
+
+1. **Keyboard-unreachable tab.** The Needs attention / All tablist used roving `tabIndex` (0 on the selected tab, -1 on the other) — correct per the ARIA tabs pattern, but only half-implemented: without arrow-key handling, a keyboard-only user could never focus the unselected tab at all (Tab skips anything with `tabIndex=-1`, and nothing was listening for arrow keys). Added an `onKeyDown` handler on the tablist for Left/Right that moves focus and switches tabs. This shipped broken in the layout pass and nothing since then had exercised it with a keyboard.
+2. **Misaligned control row.** The clarify pass made `ControlToggle` taller (control row + new helper line), but its sibling "Needs attention" alert box is still single-line, and the parent flex row used `items-center` — so the two boxes stopped lining up at the top edge once one grew. Changed to `items-start`. (`live-conversation-panel.tsx`)
+3. **Redundant per-row badge.** On the Needs-attention tab, every row already satisfies the tab's own filter, so the per-row "Needs attention" pill repeated on 100% of visible rows — pure noise that didn't exist before the tabs were added. Now suppressed specifically on that tab (still shown on "All", where it's informative). Also added `truncate` to the row's meta line, which could newly wrap since the layout pass appended `· {source}` to it for lead-named rows.
+
+**Also found, not fixed (out of scope for this command):** `/dashboard/leads/page.tsx` has the exact same raw-`interest_id`-UUID bug this arc's clarify pass fixed on the conversation detail page (`app/(dashboard)/dashboard/leads/page.tsx:61`, still reads `(matched: ${lead.interest_id})`). Left untouched since it's a different page than what was asked; worth a quick `/impeccable clarify` pass on `/dashboard/leads` separately.
+
+**Files changed:** `conversations-list.tsx`, `control-toggle.tsx`, `live-conversation-panel.tsx`.
+
+**Database/environment changes:** none.
+
+**Checks run:** `npm run lint` (clean), `npm run typecheck` (clean, confirms the new `KeyboardEvent` type import resolves correctly), `npm run build` (succeeded), full `detect.mjs` scan across the conversations surface (zero findings), both `/dashboard/conversations` and `/dashboard/conversations/[id]` confirmed responding (307 auth redirect, no crash). Reviewed the full source diff of today's changes end to end — no accidental churn, no orphaned code.
+
+**Known limitation, unchanged from every pass today:** no real signed-in browser click-through was possible this session (no browser automation tool, route behind Clerk auth). Everything above is verified by re-reading the rendered JSX/logic and running the automated checks, not by seeing it on screen. **This whole arc (tabs, row content, clarify, polish) should get one real manual pass in a browser before being considered fully done** — the individual manual-test-step lists are in the three entries below this one.
+
+**Next logical task:** the actual browser click-through across all of today's changes; separately, the same `interest_id` fix on `/dashboard/leads`; separately, the still-deferred P2 (pagination) from the original critique.
+
+---
+
+## Conversations page: clarify pass — take-over/dismiss microcopy, raw interest_id removed — implemented 2026-09-07
+
+Follows from the same `/impeccable critique` on `/dashboard/conversations` (P1: "No confirmation before pausing the AI"; minor observation: "Dismiss" reads ambiguous) and a fresh `/impeccable clarify` audit of the full interaction path, which also turned up one defect the critique hadn't flagged: the lead card was rendering a raw `interest_id` UUID directly in the UI.
+
+**What changed:**
+- `app/(dashboard)/dashboard/conversations/_components/control-toggle.tsx` — added a persistent helper line under the take-over/hand-back button explaining the actual consequence, grounded in the real code path (`lib/conversations.ts`'s `setConversationControl()` and `app/api/chat/route.ts`'s human-control gate, both re-read to confirm before writing the copy — not guessed): "Taking over pauses AI replies and clears this conversation's alert. You can hand it back anytime" when there's a live alert to clear, a shorter variant without the alert clause when there isn't (new `needsAttention` prop), and "AI replies are paused here. Hand it back anytime to let the AI respond again" once already handed over. No modal/confirmation step added — the action is freely reversible, so per clarify's own guidance that calls for explanatory copy, not an interruption.
+- `app/(dashboard)/dashboard/conversations/_components/live-conversation-panel.tsx` — passes its existing `needsAttention` state through to `ControlToggle`.
+- `app/(dashboard)/dashboard/_components/dismiss-attention-button.tsx` — button label "Dismiss" → "Dismiss alert" (only real usage site: the conversation detail page's attention banner), so it can't read as dismissing the whole conversation.
+- `app/(dashboard)/dashboard/conversations/[id]/page.tsx` — the lead card's "Interest" line no longer shows `(matched: <uuid>)`. It now resolves `interest_id` to the actual product/service name via the existing tenant-scoped `getProduct()`/`getService()` lookups, and honestly says "no longer available" (matching the citation-expander's existing degradation pattern) if the matched item was since edited or deleted, rather than fabricating or hiding the fact that it can't resolve.
+
+**Deliberately unchanged:** the `title`-only tooltip pattern for disabled buttons (`ROLE_DENIED_TITLE`) — flagged for Sam-persona accessibility in the critique, but it's a shared convention used across the entire dashboard (products/services/FAQs delete buttons too), not specific to this page; fixing it here alone would create inconsistency. Candidate for a future `/impeccable audit` applied project-wide. Also unchanged: absolute vs. relative timestamps (a formatting question, not a copy-clarity one), and the `needs_attention` flag's missing "why" (no diagnostic reason is actually stored — inventing one would violate AGENTS.md's no-fabricated-facts rule).
+
+**Database changes:** none. **Environment variables:** none added.
+
+**Checks run:** `npm run lint` (clean), `npm run typecheck` (clean), `npm run build` (succeeded). Full `detect.mjs` scan across the conversations surface plus the dismiss-attention-button file: zero findings. Confirmed the dev server still serves `/dashboard/conversations` without a 500 (307 auth redirect).
+
+**Known limitation:** not yet click-tested in a real signed-in browser session (no browser automation tool available, route behind Clerk auth). Manual test steps:
+1. Open a conversation currently AI-handled with no alert — confirm the helper line reads "Taking over pauses AI replies for this conversation. You can hand it back anytime" (no "alert" clause).
+2. Open a conversation flagged "Needs attention" — confirm the helper line's longer variant appears, take over, and confirm the alert banner disappears as the copy said it would.
+3. Take over a conversation, then hand it back to the AI — confirm the helper line switches to "AI replies are paused here. Hand it back anytime to let the AI respond again," not the take-over wording.
+4. On a conversation with an active alert, click "Dismiss alert" and confirm the label reads correctly before/during (Dismissing…)/after the click.
+5. Open a lead whose `interest_id` points at a still-existing product/service — confirm "Interest: product — <real name>" renders, not a UUID. If reachable, test a lead whose matched product/service was since deleted — confirm it reads "Interest: product — no longer available" instead of erroring or showing a blank/id.
+
+**Next logical task:** `/impeccable polish` — a final pass across all three of today's conversations-page changes (tabs/live-polling, row content, and this clarify pass) together.
 
 ---
 

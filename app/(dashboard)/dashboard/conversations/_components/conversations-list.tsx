@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { pollConversationsAction, type ConversationLeadSummary } from "../actions";
@@ -122,6 +122,18 @@ export function ConversationsList({
   const displayedConversations = tab === "attention" ? attentionConversations : sortedConversations;
   const totalLabel = `${conversations.length} conversation${conversations.length === 1 ? "" : "s"} total`;
 
+  // Arrow-key navigation for the two-tab tablist, per the WAI-ARIA tabs
+  // pattern -- roving tabIndex alone (below) only removes the unselected
+  // tab from the Tab-key order; without this, a keyboard user could never
+  // reach it at all.
+  function handleTabListKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const next = tab === "attention" ? "all" : "attention";
+    setTab(next);
+    document.getElementById(`conversations-tab-${next}`)?.focus();
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -139,6 +151,7 @@ export function ConversationsList({
           <div
             role="tablist"
             aria-label="Filter conversations"
+            onKeyDown={handleTabListKeyDown}
             className="inline-flex w-fit items-center gap-1 rounded-ds-lg border border-ds-border bg-ds-surface p-1"
           >
             <button
@@ -219,6 +232,7 @@ export function ConversationsList({
                         contactName={leadByConversationId.get(conversation.id) ?? null}
                         hasLead={leadByConversationId.has(conversation.id)}
                         lastMessage={lastMessageByConversationId.get(conversation.id) ?? null}
+                        showAttentionBadge={tab !== "attention"}
                       />
                     </motion.li>
                   ))}
@@ -238,18 +252,22 @@ export function ConversationsList({
  * a conversation with no snippet or identity used to be indistinguishable
  * from every other "Chat widget · date" row (/impeccable critique
  * finding). When a name takes the primary slot, the source moves into
- * the meta line instead of disappearing.
+ * the meta line instead of disappearing. `showAttentionBadge` is false on
+ * the Needs-attention tab, where every row would otherwise repeat the
+ * identical badge -- pure noise once the tab itself already says so.
  */
 function ConversationRow({
   conversation,
   contactName,
   hasLead,
   lastMessage,
+  showAttentionBadge,
 }: {
   conversation: ConversationWithMessageCount;
   contactName: string | null;
   hasLead: boolean;
   lastMessage: LastMessagePreview | null;
+  showAttentionBadge: boolean;
 }) {
   const sourceLabel = conversation.source ?? "Chat widget";
   const primaryLabel = contactName ?? sourceLabel;
@@ -267,14 +285,14 @@ function ConversationRow({
             {MESSAGE_ROLE_LABEL[lastMessage.role]}: {lastMessage.content}
           </p>
         ) : null}
-        <p className="text-2xs text-ds-text-muted">
+        <p className="truncate text-2xs text-ds-text-muted">
           {new Date(conversation.created_at).toLocaleString()} · {conversation.messageCount} message
           {conversation.messageCount === 1 ? "" : "s"}
           {showSourceInMeta ? ` · ${sourceLabel}` : ""}
         </p>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {conversation.needs_attention ? (
+        {conversation.needs_attention && showAttentionBadge ? (
           <span className="rounded-ds-sm bg-ds-warning-bg px-2.5 py-1 text-2xs font-semibold tracking-wide-ds text-ds-warning uppercase">
             Needs attention
           </span>

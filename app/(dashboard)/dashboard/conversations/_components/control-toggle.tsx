@@ -11,11 +11,13 @@ const initialState: SetControlState = {};
 export function ControlToggle({
   conversationId,
   control,
+  needsAttention = false,
   onChanged,
   canEdit = true,
 }: {
   conversationId: string;
   control: ConversationControl;
+  needsAttention?: boolean;
   onChanged?: () => void;
   canEdit?: boolean;
 }) {
@@ -32,35 +34,45 @@ export function ControlToggle({
   }, [state]);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-      <span
-        className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
-          control === "human"
-            ? "bg-ds-warning-bg text-ds-warning"
-            : "bg-ds-surface-soft text-ds-text-secondary"
-        }`}
-      >
-        {control === "human" ? "Human-controlled" : "AI-handled"}
-      </span>
-
-      <form action={formAction} className="flex items-center gap-2">
-        <input type="hidden" name="id" value={conversationId} />
-        <input type="hidden" name="control" value={nextControl} />
-        <button
-          type="submit"
-          disabled={isPending || !canEdit}
-          title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+    <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
+            control === "human"
+              ? "bg-ds-warning-bg text-ds-warning"
+              : "bg-ds-surface-soft text-ds-text-secondary"
+          }`}
         >
-          {isPending ? "Updating…" : control === "human" ? "Hand back to AI" : "Take over this conversation"}
-        </button>
-      </form>
-
-      {state.error ? (
-        <span role="alert" className="text-xs text-ds-danger">
-          {state.error}
+          {control === "human" ? "Human-controlled" : "AI-handled"}
         </span>
-      ) : null}
+
+        <form action={formAction} className="flex items-center gap-2">
+          <input type="hidden" name="id" value={conversationId} />
+          <input type="hidden" name="control" value={nextControl} />
+          <button
+            type="submit"
+            disabled={isPending || !canEdit}
+            title={canEdit ? undefined : ROLE_DENIED_TITLE}
+            className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          >
+            {isPending ? "Updating…" : control === "human" ? "Hand back to AI" : "Take over this conversation"}
+          </button>
+        </form>
+
+        {state.error ? (
+          <span role="alert" className="text-xs text-ds-danger">
+            {state.error}
+          </span>
+        ) : null}
+      </div>
+
+      <p className="text-xs text-ds-text-muted">
+        {control === "human"
+          ? "AI replies are paused here. Hand it back anytime to let the AI respond again."
+          : needsAttention
+            ? "Taking over pauses AI replies and clears this conversation's alert. You can hand it back anytime."
+            : "Taking over pauses AI replies for this conversation. You can hand it back anytime."}
+      </p>
     </div>
   );
 }
