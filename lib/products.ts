@@ -48,6 +48,31 @@ export async function getProduct(businessId: string, id: string): Promise<Produc
   return data;
 }
 
+/**
+ * Looks up several products by id in one query, scoped to the business --
+ * for resolving a batch of leads' `interest_id` to display names (leads
+ * list, `/impeccable clarify`) without one query per row. Returns
+ * whichever of the requested ids actually exist for this business;
+ * missing/cross-tenant ids are simply absent from the result, not an
+ * error, matching `getProduct()`'s no-existence-leak contract.
+ */
+export async function listProductsByIds(businessId: string, ids: string[]): Promise<Product[]> {
+  if (ids.length === 0) return [];
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from("products").select("*").eq("business_id", businessId).in("id", ids);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your products. Please try again.",
+      "listProductsByIds failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
 /** Lists all approved products for a business. `businessId` must come from `requireBusinessContext()`. Excludes unreviewed extractions -- see `listPendingReviewProducts`. */
 export async function listProductsForBusiness(businessId: string): Promise<Product[]> {
   const supabase = createServerSupabaseClient();

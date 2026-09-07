@@ -116,6 +116,7 @@ export default async function KnowledgePage() {
                     label="Unpublish"
                     pendingLabel="Unpublishing…"
                     canEdit={canEdit}
+                    confirmMessage="Your AI will stop using this document immediately."
                   />
                 )}
                 {canEdit ? (
@@ -126,7 +127,16 @@ export default async function KnowledgePage() {
                     Edit
                   </Link>
                 ) : null}
-                <DeleteButton action={deleteKnowledgeDocumentAction} id={document.id} canEdit={canEdit} />
+                <DeleteButton
+                  action={deleteKnowledgeDocumentAction}
+                  id={document.id}
+                  canEdit={canEdit}
+                  confirmMessage={
+                    document.status === "published"
+                      ? "Your AI is using this in live conversations. Delete anyway?"
+                      : "Delete this document?"
+                  }
+                />
               </div>
             </li>
           ))}

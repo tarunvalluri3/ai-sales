@@ -40,6 +40,10 @@
   --ds-warning-bg: rgba(217, 169, 79, 0.14);
   --ds-danger: #e0664f;
   --ds-danger-bg: rgba(224, 102, 79, 0.14);
+  /* Dark ink for text on the saturated --ds-danger background -- same role
+     and value as --ds-accent-on, reused for its own AA-verified contrast
+     (~5.5:1) rather than the hardcoded `text-white` this replaced (~3.4:1). */
+  --ds-danger-on: #14130c;
 
   /* Compact editorial type scale -- restrained, a few sizes beyond Tailwind's defaults. */
   --ds-text-2xs: 0.6875rem;
@@ -91,6 +95,7 @@
   --color-ds-warning-bg: var(--ds-warning-bg);
   --color-ds-danger: var(--ds-danger);
   --color-ds-danger-bg: var(--ds-danger-bg);
+  --color-ds-danger-on: var(--ds-danger-on);
 
   --text-2xs: var(--ds-text-2xs);
   --tracking-wide-ds: var(--ds-tracking-wide);

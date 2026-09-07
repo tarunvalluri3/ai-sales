@@ -190,3 +190,53 @@ export async function listMessagesForConversationAfter(
 
   return data;
 }
+
+export type LastMessagePreview = {
+  conversationId: string;
+  role: MessageRole;
+  content: string;
+};
+
+/**
+ * Returns each conversation's single most recent message (any role), for
+ * the conversations list's preview line (`/impeccable layout`). One
+ * query across every requested conversation, not N+1: results come back
+ * created_at-desc across all of them, and only the first (i.e. most
+ * recent) row seen per conversation_id is kept. Capped at 2000 rows as a
+ * defensive bound, same convention as listMessagesForConversation()'s
+ * 500-row cap -- not a real limit at current usage; revisit alongside
+ * the list's own pagination if a business's total message volume across
+ * its still-unpaginated conversation list ever gets close to it.
+ */
+export async function listLastMessagesForConversations(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationIds: string[],
+): Promise<LastMessagePreview[]> {
+  if (conversationIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("conversation_id, role, content")
+    .eq("business_id", businessId)
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: false })
+    .limit(2000);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading conversation previews. Please try again.",
+      "listLastMessagesForConversations failed",
+      error,
+    );
+  }
+
+  const seen = new Set<string>();
+  const previews: LastMessagePreview[] = [];
+  for (const row of data) {
+    if (seen.has(row.conversation_id)) continue;
+    seen.add(row.conversation_id);
+    previews.push({ conversationId: row.conversation_id, role: row.role, content: row.content });
+  }
+  return previews;
+}

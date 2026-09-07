@@ -48,6 +48,31 @@ export async function getService(businessId: string, id: string): Promise<Servic
   return data;
 }
 
+/**
+ * Looks up several services by id in one query, scoped to the business --
+ * for resolving a batch of leads' `interest_id` to display names (leads
+ * list, `/impeccable clarify`) without one query per row. Returns
+ * whichever of the requested ids actually exist for this business;
+ * missing/cross-tenant ids are simply absent from the result, not an
+ * error, matching `getService()`'s no-existence-leak contract.
+ */
+export async function listServicesByIds(businessId: string, ids: string[]): Promise<Service[]> {
+  if (ids.length === 0) return [];
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from("services").select("*").eq("business_id", businessId).in("id", ids);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading your services. Please try again.",
+      "listServicesByIds failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
 /** Lists all approved services for a business. `businessId` must come from `requireBusinessContext()`. Excludes unreviewed extractions -- see `listPendingReviewServices`. */
 export async function listServicesForBusiness(businessId: string): Promise<Service[]> {
   const supabase = createServerSupabaseClient();

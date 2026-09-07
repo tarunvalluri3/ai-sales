@@ -5,7 +5,8 @@ import type { Message } from "@/lib/supabase/types";
 import { getCitationDetailsAction } from "../actions";
 import type { CitedChunk } from "@/lib/knowledge";
 
-const CAPTION: Record<Message["role"], string> = {
+/** Shared across the transcript bubbles and the conversations list preview line -- keep both in sync. */
+export const MESSAGE_ROLE_LABEL: Record<Message["role"], string> = {
   user: "Prospect",
   assistant: "AI",
   human_agent: "Team member",
@@ -50,7 +51,7 @@ export function MessageBubble({ message }: { message: Message }) {
     <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
       <div className={bubbleClassName}>{message.content}</div>
       <span className={`mt-1 text-2xs ${CAPTION_STYLE[message.role]}`}>
-        {CAPTION[message.role]} · {new Date(message.created_at).toLocaleString("en-US")}
+        {MESSAGE_ROLE_LABEL[message.role]} · {new Date(message.created_at).toLocaleString("en-US")}
       </span>
 
       {hasCitations ? (

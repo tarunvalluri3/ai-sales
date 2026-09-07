@@ -27,58 +27,18 @@ export default async function ProfilePage() {
         </p>
       </div>
 
-      {isAdmin ? (
-        <>
-          <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-            <ProfileForm
-              initialName={business.name}
-              initialDescription={business.description ?? ""}
-              initialContactEmail={business.contact_email ?? ""}
-              initialContactPhone={business.contact_phone ?? ""}
-              initialWebsite={business.website ?? ""}
-            />
-          </section>
-          <DangerZone businessName={business.name} />
-        </>
-      ) : (
-        <div className="flex w-full max-w-lg flex-col gap-3">
-          <dl className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-                Business name
-              </dt>
-              <dd className="text-sm text-ds-text-primary">{business.name}</dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-                Description
-              </dt>
-              <dd className="text-sm text-ds-text-primary">{business.description ?? "—"}</dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-                Contact email
-              </dt>
-              <dd className="text-sm text-ds-text-primary">{business.contact_email ?? "—"}</dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-                Contact phone
-              </dt>
-              <dd className="text-sm text-ds-text-primary">{business.contact_phone ?? "—"}</dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-                Website
-              </dt>
-              <dd className="text-sm text-ds-text-primary">{business.website ?? "—"}</dd>
-            </div>
-          </dl>
-          <p className="text-sm text-ds-text-muted">
-            Ask your organization admin to make changes to the business profile.
-          </p>
-        </div>
-      )}
+      <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <ProfileForm
+          initialName={business.name}
+          initialDescription={business.description ?? ""}
+          initialContactEmail={business.contact_email ?? ""}
+          initialContactPhone={business.contact_phone ?? ""}
+          initialWebsite={business.website ?? ""}
+          canEdit={isAdmin}
+        />
+      </section>
+
+      {isAdmin ? <DangerZone businessName={business.name} /> : null}
     </div>
   );
 }
