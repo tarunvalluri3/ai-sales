@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-04 (P0/P1 follow-up: the two custom Clerk org roles now have correct `key` fields (verified live via the Clerk Backend API, not just the Dashboard UI) after the user fixed a doubled `org_` prefix; `request_callback`'s contact-field schema hardened to match `book_appointment`'s anti-fabrication wording; `.env.local`'s trailing whitespace trimmed. Also the P2 backlog sweep further down: fixed the duplicate-question-to-Gemini inefficiency, corrected `docs/phases.md`'s stale Phase 15 wording, closed sandbox-test data pollution across analytics/notifications/leads/appointments/webhooks, reflected RBAC restrictions across every role-gated dashboard control, and added 5 new pgTAP files covering appointments, the suggested-questions constraint, both Storage buckets, and visitor-scoped recent-chats)
+Last updated: 2026-09-07 (Conversations list rows now show the lead's contact name and a last-message preview in place of the generic "Chat widget" label, via `/impeccable layout` -- follows the same-day tabs/live-polling entry below. Automated checks clean; still not yet manually click-tested in a real signed-in browser session)
 
 ---
 
@@ -54,6 +54,65 @@ A living, prioritized todo list — unlike the phase entries below (an append-on
 - WhatsApp (Phase 16), Razorpay billing (Phase 17) — explicitly deferred (decision D11), not cancelled.
 - Real-time push notifications (WebSocket/SSE/Supabase Realtime) — deliberately polling instead (decision D8); polling intervals already tightened twice since.
 - Response streaming, thumbs-up/down feedback, business-configurable escalation trigger keywords, a structured lead-capture form, conversation-history summarization beyond the last 20 messages — surfaced as a backlog list during the 2026-08-31 escalation-gating fix; markdown rendering and prefilled starter questions from that same list were later built (Phase 25d/25e) — the rest remain unbuilt and unscheduled.
+
+---
+
+## Conversations list: contact name + last-message preview on each row — implemented 2026-09-07
+
+Follows from the same `/impeccable critique` on `/dashboard/conversations` (P1: "Rows carry no identity or content, only metadata" — every row read "Chat widget · date · N messages" even when a linked lead already had a real name) and `/impeccable layout`'s pass on the row structure.
+
+**What changed:**
+- `app/(dashboard)/dashboard/conversations/_components/message-bubble.tsx` — exported the existing role→label mapping as `MESSAGE_ROLE_LABEL` (was a private `CAPTION` const) so the list's preview line reuses the exact same "Prospect"/"AI"/"Team member" vocabulary as the transcript itself, instead of a second copy of it.
+- `lib/messages.ts` — added `listLastMessagesForConversations()`: one query across every conversation on the list (not N+1), returning each conversation's single most recent message. Capped at 2000 rows as a defensive bound (same convention as `listMessagesForConversation()`'s existing 500-row cap), scoped by `business_id` independently of the caller-supplied conversation ids (tenant isolation holds even if that list were ever wrong).
+- `app/(dashboard)/dashboard/conversations/actions.ts` — `pollConversationsAction()` now also returns `leads` as `{conversationId, contactName}` pairs (previously just conversation ids, discarding the name already present on the fetched `Lead` rows) and `lastMessages`.
+- `app/(dashboard)/dashboard/conversations/page.tsx` — fetches the same `lastMessages` server-side for the initial render, passed to the list as `initialLastMessages`.
+- `app/(dashboard)/dashboard/conversations/_components/conversations-list.tsx` — row rendering extracted into a `ConversationRow` helper. A row's primary label is now the lead's contact name when one exists (unnamed leads and lead-less conversations still fall back to the source/"Chat widget" label exactly as before — no regression). A new preview line ("Prospect: do you have this in blue?") sits between the name and the metadata line when the conversation has at least one message. When the name takes the primary slot, the conversation's source is appended to the metadata line instead of disappearing from the row entirely.
+
+**Deliberately unchanged:** row badges (Needs attention / Human-controlled / Lead) — kept as-is; the name swap is complementary to the Lead badge; take-over confirmation copy and pagination are still separate, un-started follow-ups from the same critique.
+
+**Database changes:** none — no migration, no new table/column; `listLastMessagesForConversations()` queries the existing `messages` table.
+
+**Environment variables:** none added.
+
+**Checks run:** `npm run lint` (clean), `npm run typecheck` (clean), `npm run build` (succeeded). Impeccable's mechanical layout scan (`detect.mjs --scope layout`) on the full `conversations` surface returned zero findings before and after the change. Confirmed the dev server still serves `/dashboard/conversations` without a 500 (`curl` → 307, expected unauthenticated redirect).
+
+**Known limitation:** same as the tabs/polling entry above — not yet click-tested in a real signed-in browser session (no browser automation tool available this session, route behind Clerk auth). Manual test steps:
+1. Open a conversation that has a linked lead with a `contact_name` set — confirm the row shows the contact's name as the bold primary line instead of "Chat widget", and that the metadata line now also shows the original source (e.g. "· Chat widget") after the message count.
+2. Confirm a preview line appears below the name reading `"<Prospect|AI|Team member>: <snippet>"`, truncating with an ellipsis for a long message rather than wrapping or overflowing.
+3. Open a conversation with a lead that has no `contact_name` (null) — confirm the row still falls back to the source label as primary, and the Lead badge still shows even though the name isn't available.
+4. Open a business with zero messages on a given conversation (freshly created, if reachable) — confirm no preview line renders (no "undefined:" artifact) rather than crashing.
+5. Resize to a narrow/mobile width — confirm all three text lines and the badge row still truncate/wrap cleanly with no horizontal overflow.
+
+**Next logical task:** take-over confirmation microcopy via `/impeccable clarify`, then `/impeccable polish` as the final pass across both of today's changes.
+
+---
+
+## Conversations list: Needs attention / All tabs, flagged-first sort, live polling — implemented 2026-09-07
+
+Follows from `/impeccable critique` on `/dashboard/conversations` (found: the list had no urgency-based sort or filter despite the sidebar and detail view already tracking and polling `needs_attention`, and the list itself never refreshed live) and `/impeccable shape`'s confirmed brief.
+
+**What changed:**
+- `app/(dashboard)/dashboard/conversations/page.tsx` — now only fetches initial `conversations`/`leads` server-side and renders the new client component; no other logic left here.
+- `app/(dashboard)/dashboard/conversations/_components/conversations-list.tsx` (new) — owns the list's live state. Two tabs ("Needs attention (N)" / "All (M)"), both counts derived from the same polled `conversations` array (deliberately not from `useAttentionCount()`'s separate poll, so the tab label can never show a different number than the rows actually displayed under it). Within each tab, flagged conversations sort first, then `created_at` desc, with `id` as a pure tiebreaker so identical timestamps don't jitter between ticks. Polls `pollConversationsAction()` every 1s using the exact same self-rescheduling `setTimeout` pattern as `AttentionProvider`/`LiveConversationPanel` (pause on tab-hidden, immediate poll on resume, cleanup on unmount). Row reordering/enter/exit uses the same `motion/react` `layout`/`AnimatePresence` pattern already established in `LiveConversationPanel`'s message list, respecting `useReducedMotion()`. A distinct empty state ("Nothing needs attention right now") replaces the generic "No conversations yet" copy when the Needs-attention tab is empty but conversations exist overall.
+- `app/(dashboard)/dashboard/conversations/actions.ts` — added `pollConversationsAction()` (no input, business-scoped, mirrors `pollAttentionCountAction()`'s shape), returning the full conversation list plus the set of conversation ids that have a lead.
+
+**Deliberately unchanged:** `lib/conversations.ts`'s `listConversationsForBusiness()` keeps its original plain `created_at` desc order — the dashboard Overview page's `RecentActivity` widget (`app/(dashboard)/dashboard/page.tsx`) slices this same function's result assuming chronological order; re-sorting the shared function would have silently broken that widget. The flagged-first sort is applied only inside the new client component, on its own local copy of the data.
+
+**Out of scope this pass (queued as separate follow-ups per the critique's recommended actions):** row content (message preview / contact name), take-over confirmation copy, and list pagination.
+
+**Database changes:** none. **Environment variables:** none added.
+
+**Checks run:** `npm run lint` (clean), `npm run typecheck` (clean), `npm run build` (succeeded, `/dashboard/conversations` still compiles as a dynamic route). Confirmed the dev server serves the route without a 500 (`curl` → 307 redirect to sign-in, expected for an unauthenticated request).
+
+**Known limitation:** not yet click-tested in a real signed-in browser session — no browser automation tool was available this session and the route sits behind Clerk auth. The user should click through `/dashboard/conversations` manually before considering this fully verified. Manual test steps:
+1. Sign in, open `/dashboard/conversations` with at least one conversation that has `needs_attention = true` and one that doesn't.
+2. Confirm two tabs render: "Needs attention (N)" and "All (M)", with N/M matching reality.
+3. Confirm the Needs-attention tab shows only flagged conversations; All shows everything, flagged ones on top.
+4. Flip a conversation's `needs_attention` from another tab/device (e.g. via the detail page's "Take over" or "Dismiss") and confirm the list updates within ~1s without a manual reload, animating into its new position rather than jumping.
+5. Dismiss the only flagged conversation while on the Needs-attention tab and confirm the tab-specific empty state appears with a working "View all conversations" button.
+6. Test with zero conversations total (a fresh business) — confirm the original "No conversations yet" empty state still renders with no tabs shown.
+
+**Next logical task:** the two P1s from the same critique — row content (last-message preview / contact name) via `/impeccable layout`, and take-over confirmation microcopy via `/impeccable clarify` — followed by `/impeccable polish`.
 
 ---
 

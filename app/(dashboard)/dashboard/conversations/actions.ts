@@ -8,9 +8,17 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   dismissConversationAttention,
   getConversationForBusiness,
+  listConversationsForBusiness,
   setConversationControl,
+  type ConversationWithMessageCount,
 } from "@/lib/conversations";
-import { createMessage, listMessagesForConversationAfter } from "@/lib/messages";
+import { listLeadsForBusiness } from "@/lib/leads";
+import {
+  createMessage,
+  listLastMessagesForConversations,
+  listMessagesForConversationAfter,
+  type LastMessagePreview,
+} from "@/lib/messages";
 import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
@@ -245,6 +253,46 @@ export async function pollConversationAction(
   const asOf = messages.length > 0 ? messages[messages.length - 1].created_at : after;
 
   return { messages, control: conversation.control, needsAttention: conversation.needs_attention, asOf };
+}
+
+export type ConversationLeadSummary = {
+  conversationId: string;
+  contactName: string | null;
+};
+
+export type PollConversationsResult = {
+  conversations: ConversationWithMessageCount[];
+  leads: ConversationLeadSummary[];
+  lastMessages: LastMessagePreview[];
+};
+
+/**
+ * Polled directly from the conversations list view -- same shape as
+ * pollAttentionCountAction (no input, business-scoped, a plain async
+ * function call from a client component). Leads come back as
+ * {conversationId, contactName} pairs (not full Lead rows) -- just
+ * enough to drive the "Lead" badge and, when named, stand in for the
+ * row's primary label (/impeccable layout). lastMessages is one query
+ * across every conversation this poll already knows about (not N+1),
+ * for the row's preview line.
+ */
+export async function pollConversationsAction(): Promise<PollConversationsResult> {
+  const { businessId } = await requireBusinessContext();
+  const supabase = createServerSupabaseClient();
+
+  const conversations = await listConversationsForBusiness(supabase, businessId);
+  const conversationIds = conversations.map((conversation) => conversation.id);
+
+  const [leads, lastMessages] = await Promise.all([
+    listLeadsForBusiness(businessId),
+    listLastMessagesForConversations(supabase, businessId, conversationIds),
+  ]);
+
+  return {
+    conversations,
+    leads: leads.map((lead) => ({ conversationId: lead.conversation_id, contactName: lead.contact_name })),
+    lastMessages,
+  };
 }
 
 const chunkIdSchema = z.string().uuid();

@@ -8,8 +8,13 @@ import { exportBusinessData } from "@/lib/data-export";
 import { businessProfileSchema } from "@/lib/schemas/business";
 import { logAndGetUserMessage } from "@/lib/errors";
 
+export type ProfileFieldErrors = Partial<
+  Record<"name" | "description" | "contactEmail" | "contactPhone" | "website", string>
+>;
+
 export type ProfileFormState = {
   error?: string;
+  fieldErrors?: ProfileFieldErrors;
   success?: boolean;
 };
 
@@ -31,7 +36,16 @@ export async function updateBusinessProfileAction(
     website: formData.get("website"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter a valid business profile." };
+    // Surface every invalid field at once (not just the first) so a
+    // multi-field mistake doesn't take a fix-and-resubmit loop to catch.
+    const fieldErrors: ProfileFieldErrors = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0];
+      if (typeof field === "string" && !(field in fieldErrors)) {
+        fieldErrors[field as keyof ProfileFieldErrors] = issue.message;
+      }
+    }
+    return { error: "Fix the highlighted fields below.", fieldErrors };
   }
 
   try {
