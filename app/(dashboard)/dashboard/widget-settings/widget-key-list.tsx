@@ -6,34 +6,44 @@ import { updateWidgetKeyOriginsAction, revokeWidgetKeyAction, type WidgetKeyActi
 import { CopyKeyButton } from "./copy-key-button";
 import { buildWidgetSnippet } from "./build-widget-snippet";
 import { EmptyState } from "../_components/state-views";
-import { ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { DeleteButton, ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: WidgetKeyActionState = {};
+
+function formatDate(value: string, widgetLanguage: string): string {
+  return new Intl.DateTimeFormat(widgetLanguage, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
 
 function WidgetKeyCard({
   widgetKey,
   appOrigin,
+  widgetLanguage,
   canEdit = true,
 }: {
   widgetKey: WidgetKey;
   appOrigin: string;
+  widgetLanguage: string;
   canEdit?: boolean;
 }) {
   const [origins, setOrigins] = useState(widgetKey.allowed_origins.join("\n"));
+  const [name, setName] = useState(widgetKey.name ?? "");
   const [updateState, updateAction, updatePending] = useActionState(updateWidgetKeyOriginsAction, initialState);
-  const [revokeState, revokeAction, revokePending] = useActionState(revokeWidgetKeyAction, initialState);
   const isRevoked = widgetKey.status === "revoked";
   const snippet = buildWidgetSnippet(widgetKey.key, appOrigin);
+  const hasNoOrigins = !isRevoked && widgetKey.allowed_origins.length === 0;
 
   return (
     <div className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <code className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2 font-mono text-sm text-ds-text-primary">
-            {widgetKey.key}
-          </code>
-          <CopyKeyButton value={widgetKey.key} label="Copy key" />
-          {!isRevoked ? <CopyKeyButton value={snippet} label="Copy snippet" /> : null}
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium text-ds-text-primary">{widgetKey.name || "Unnamed key"}</span>
+          <div className="flex items-center gap-2">
+            <code className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2 font-mono text-sm text-ds-text-primary">
+              {widgetKey.key}
+            </code>
+            <CopyKeyButton value={widgetKey.key} label="Copy key" />
+            {!isRevoked ? <CopyKeyButton value={snippet} label="Copy snippet" /> : null}
+          </div>
         </div>
         <span
           className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
@@ -45,9 +55,17 @@ function WidgetKeyCard({
       </div>
 
       <p className="text-xs text-ds-text-muted">
-        Created {new Date(widgetKey.created_at).toLocaleString("en-US")}
-        {widgetKey.revoked_at ? ` · Revoked ${new Date(widgetKey.revoked_at).toLocaleString("en-US")}` : ""}
+        Created {formatDate(widgetKey.created_at, widgetLanguage)}
+        {widgetKey.revoked_at ? ` · Revoked ${formatDate(widgetKey.revoked_at, widgetLanguage)}` : ""}
+        {" · "}
+        {widgetKey.last_used_at ? `Last used ${formatDate(widgetKey.last_used_at, widgetLanguage)}` : "Never used yet"}
       </p>
+
+      {hasNoOrigins ? (
+        <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+          No allowed origins yet — this key will reject every chat request until you add one below.
+        </p>
+      ) : null}
 
       {isRevoked ? (
         <p className="text-xs text-ds-text-secondary">
@@ -57,6 +75,23 @@ function WidgetKeyCard({
         <div className="flex flex-col gap-2">
           <form id={`update-origins-${widgetKey.id}`} action={updateAction} className="flex flex-col gap-2">
             <input type="hidden" name="id" value={widgetKey.id} />
+            <label
+              htmlFor={`name-${widgetKey.id}`}
+              className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds"
+            >
+              Nickname
+            </label>
+            <input
+              id={`name-${widgetKey.id}`}
+              name="name"
+              type="text"
+              maxLength={100}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              disabled={updatePending || !canEdit}
+              placeholder="Marketing site"
+              className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+            />
             <label
               htmlFor={`origins-${widgetKey.id}`}
               className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds"
@@ -93,26 +128,17 @@ function WidgetKeyCard({
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
               className="self-start rounded-ds-md bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
             >
-              {updatePending ? "Saving…" : "Save origins"}
+              {updatePending ? "Saving…" : "Save"}
             </button>
 
-            <form action={revokeAction}>
-              <input type="hidden" name="id" value={widgetKey.id} />
-              <button
-                type="submit"
-                disabled={revokePending || !canEdit}
-                title={canEdit ? undefined : ROLE_DENIED_TITLE}
-                className="rounded-ds-md border border-ds-danger px-4 py-2 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60"
-              >
-                {revokePending ? "Revoking…" : "Revoke"}
-              </button>
-            </form>
+            <DeleteButton
+              action={revokeWidgetKeyAction}
+              id={widgetKey.id}
+              label="Revoke"
+              canEdit={canEdit}
+              confirmMessage="Any site using this key will stop getting chat responses immediately."
+            />
           </div>
-          {revokeState.error ? (
-            <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
-              {revokeState.error}
-            </p>
-          ) : null}
         </div>
       )}
     </div>
@@ -122,10 +148,12 @@ function WidgetKeyCard({
 export function WidgetKeyList({
   widgetKeys,
   appOrigin,
+  widgetLanguage = "en",
   canEdit = true,
 }: {
   widgetKeys: WidgetKey[];
   appOrigin: string;
+  widgetLanguage?: string;
   canEdit?: boolean;
 }) {
   if (widgetKeys.length === 0) {
@@ -135,7 +163,13 @@ export function WidgetKeyList({
   return (
     <div className="flex flex-col gap-4">
       {widgetKeys.map((widgetKey) => (
-        <WidgetKeyCard key={widgetKey.id} widgetKey={widgetKey} appOrigin={appOrigin} canEdit={canEdit} />
+        <WidgetKeyCard
+          key={widgetKey.id}
+          widgetKey={widgetKey}
+          appOrigin={appOrigin}
+          widgetLanguage={widgetLanguage}
+          canEdit={canEdit}
+        />
       ))}
     </div>
   );

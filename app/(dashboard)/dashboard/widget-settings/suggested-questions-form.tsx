@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { generateSuggestedQuestionsAction, saveSuggestedQuestionsAction } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { EmptyState } from "../_components/state-views";
 
 const MAX_QUESTIONS = 6;
 
@@ -27,6 +28,7 @@ export function SuggestedQuestionsForm({
   const [isSaving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [open, setOpen] = useState(true);
   const reduceMotion = useReducedMotion();
 
   function handleGenerate() {
@@ -77,16 +79,26 @@ export function SuggestedQuestionsForm({
 
   return (
     <div className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-ds-text-primary">Prefilled questions</h2>
-        <p className="text-sm text-ds-text-secondary">
-          Clickable question suggestions shown on your widget&apos;s greeting screen, before a
-          prospect types anything. Generate suggestions from your products, services, and FAQs,
-          then edit or remove any before saving — nothing changes on your live widget until you
-          save.
-        </p>
-      </div>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex items-center justify-between gap-3 text-left"
+        aria-expanded={open}
+      >
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold text-ds-text-primary">Prefilled questions</h2>
+          <p className="text-sm text-ds-text-secondary">
+            Clickable question suggestions shown on your widget&apos;s greeting screen, before a
+            prospect types anything. Generate suggestions from your products, services, and FAQs,
+            then edit or remove any before saving — nothing changes on your live widget until you
+            save.
+          </p>
+        </div>
+        <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
+      </button>
 
+      {open ? (
+        <>
       <button
         type="button"
         onClick={handleGenerate}
@@ -143,10 +155,10 @@ export function SuggestedQuestionsForm({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ds-text-muted">
-          No suggested questions yet — generate some from your catalog, or leave this off to show
-          no chips on the greeting screen.
-        </p>
+        <EmptyState
+          title="No suggested questions yet"
+          description="Generate some from your catalog, or leave this off to show no chips on the greeting screen."
+        />
       )}
 
       <AnimatePresence mode="wait">
@@ -186,6 +198,8 @@ export function SuggestedQuestionsForm({
       >
         {isSaving ? "Saving…" : "Save suggested questions"}
       </button>
+        </>
+      ) : null}
     </div>
   );
 }

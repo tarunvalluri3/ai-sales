@@ -66,6 +66,7 @@ export function KnowledgeForm({
           disabled={isPending}
           className={inputClasses}
         />
+        <p className="text-xs text-ds-text-muted">Up to 20,000 characters.</p>
       </div>
       {state.error ? (
         <p role="alert" className="text-sm text-ds-danger">

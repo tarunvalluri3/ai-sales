@@ -26,6 +26,7 @@ export function CopyKeyButton({ value, label = "Copy" }: { value: string; label?
       type="button"
       onClick={handleCopy}
       disabled={!value}
+      aria-live="polite"
       className="flex shrink-0 items-center gap-1.5 rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-50"
     >
       {copied ? (

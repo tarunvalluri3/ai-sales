@@ -6,7 +6,14 @@ import { ROLE_DENIED_TITLE } from "../../_components/delete-button";
 
 const initialState: RetryIngestionState = {};
 
-/** Re-queues a dead-lettered ('failed') knowledge document for ingestion. `canEdit`: see DeleteButton's doc comment. */
+/**
+ * Re-queues a dead-lettered ('failed') knowledge document for ingestion.
+ * `canEdit`: see DeleteButton's doc comment. Always the row's single
+ * primary action when shown (2026-09-08 distill pass): a failed document
+ * needs this fixed before anything else about it matters, so it takes
+ * the one solid-accent slot rather than competing with Publish/Edit for
+ * it -- see knowledge/page.tsx's primary-action selection.
+ */
 export function RetryIngestionButton({
   action,
   id,
@@ -25,7 +32,7 @@ export function RetryIngestionButton({
         type="submit"
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
       >
         {isPending ? "Retrying…" : "Retry"}
       </button>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
 import { getBusinessForOrg } from "@/lib/business";
+import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { SandboxChatPanel } from "../../dashboard/_components/sandbox-chat/sandbox-chat-panel";
 import { PublishButton } from "../../dashboard/widget-settings/publish-button";
 
@@ -13,8 +14,12 @@ import { PublishButton } from "../../dashboard/widget-settings/publish-button";
  * /dashboard/widget-settings, which reuses these same two components.
  */
 export default async function OnboardingTestPage() {
-  const { orgId } = await requireBusinessContext();
-  const business = await getBusinessForOrg(orgId);
+  const { businessId, orgId } = await requireBusinessContext();
+  const [business, widgetKeys] = await Promise.all([
+    getBusinessForOrg(orgId),
+    listWidgetKeysForBusiness(businessId),
+  ]);
+  const hasActiveKey = widgetKeys.some((key) => key.status !== "revoked");
 
   return (
     <div className="flex flex-1 flex-col items-center gap-6 bg-ds-bg px-6 py-10">
@@ -29,7 +34,7 @@ export default async function OnboardingTestPage() {
 
       <div className="flex w-full max-w-xl flex-col gap-4">
         <SandboxChatPanel />
-        <PublishButton isPublished={business?.published_at != null} />
+        <PublishButton isPublished={business?.published_at != null} hasActiveKey={hasActiveKey} />
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <Link

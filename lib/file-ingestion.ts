@@ -20,6 +20,19 @@ const ACCEPTED_MIME_TYPES = new Set(["text/plain", "text/markdown", "text/x-mark
 const MAX_TEXT_FILE_BYTES = 500_000;
 /** PDFs carry embedded images/formatting overhead a plain-text file doesn't -- a larger cap than MAX_TEXT_FILE_BYTES, still bounded. */
 const MAX_PDF_FILE_BYTES = 15_000_000;
+/**
+ * Matches `knowledgeContentSchema`'s own max and `lib/url-ingestion.ts`'s
+ * identical constant -- extracted text is truncated to this before
+ * validation (2026-09-08 harden pass), not passed straight to
+ * `knowledgeContentSchema.parse()` unguarded. A real PDF catalog
+ * routinely extracts to well over 20,000 characters even though it's
+ * nowhere near the 15 MB *file* size limit above -- the previous
+ * unguarded `.parse()` threw an uncaught `ZodError` for any such file,
+ * surfacing only as a generic, misleading "Something went wrong. Please
+ * try again," on a file that will never succeed no matter how many times
+ * the user retries it.
+ */
+const MAX_CONTENT_LENGTH = 20_000;
 
 export class UnsupportedFileError extends Error {}
 
@@ -83,7 +96,25 @@ export async function createFileKnowledgeDocument(businessId: string, file: File
     rawText = await file.text();
   }
 
-  const content = knowledgeContentSchema.parse(rawText);
+  const parsed = knowledgeContentSchema.safeParse(rawText.slice(0, MAX_CONTENT_LENGTH));
+  if (!parsed.success) {
+    throw new AppError(
+      pdf
+        ? "This PDF doesn't have any extractable text -- it may be a scanned image with no text layer. Try a text-based PDF, or paste the content in manually using \"Add knowledge manually.\""
+        : "This file doesn't have any readable text content.",
+      "createFileKnowledgeDocument content validation failed",
+      parsed.error,
+    );
+  }
+  const content = parsed.data;
+  // Every other creation path (manual, URL) validates its title through
+  // `knowledgeTitleSchema` (1-200 chars) before it ever reaches the
+  // database, and there's no length constraint on the column itself
+  // (`title text not null`) to catch what a schema doesn't -- a file
+  // upload's title came from the raw `file.name` with none of that,
+  // normalized here the same way (2026-09-08 harden pass) rather than
+  // trusting a client-supplied filename to already be well-formed.
+  const title = file.name.trim().slice(0, 200) || "Untitled document";
 
   const supabase = createServerSupabaseClient();
   const { data: document, error } = await supabase
@@ -92,7 +123,7 @@ export async function createFileKnowledgeDocument(businessId: string, file: File
       business_id: businessId,
       source_type: "file",
       source_id: null,
-      title: file.name,
+      title,
       content,
       status: "draft",
     })

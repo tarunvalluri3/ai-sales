@@ -40,22 +40,36 @@ export default async function EditKnowledgeDocumentPage({
       </section>
 
       <div className="flex max-w-lg flex-col gap-3">
-        <h2 className="text-sm font-medium text-ds-text-primary">
-          {chunks.length} chunk{chunks.length === 1 ? "" : "s"} generated
-        </h2>
-        <ul className="flex flex-col gap-2">
-          {chunks.map((chunk) => (
-            <li
-              key={chunk.id}
-              className="max-h-40 overflow-y-auto rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary"
-            >
-              <p className="mb-1 text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-                Chunk {chunk.chunk_index + 1} · {chunk.char_count} characters
-              </p>
-              <p className="whitespace-pre-wrap">{chunk.content}</p>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-sm font-medium text-ds-text-primary">How your AI reads this document</h2>
+          <p className="text-xs text-ds-text-secondary">
+            Long documents are automatically split into smaller pieces so your AI can search and reference the
+            right part of this document when answering a prospect&rsquo;s question.
+          </p>
+        </div>
+        {chunks.length === 0 ? (
+          <p className="text-sm text-ds-text-secondary">
+            {document.ingestion_status === "pending" || document.ingestion_status === "processing"
+              ? "Still processing — check back in a moment."
+              : document.ingestion_status === "failed"
+                ? "Processing failed, so no pieces exist yet. Go back and retry it from the document list."
+                : "No pieces yet."}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {chunks.map((chunk) => (
+              <li
+                key={chunk.id}
+                className="max-h-40 overflow-y-auto rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary"
+              >
+                <p className="mb-1 text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
+                  Piece {chunk.chunk_index + 1} · {chunk.char_count} characters
+                </p>
+                <p className="whitespace-pre-wrap">{chunk.content}</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

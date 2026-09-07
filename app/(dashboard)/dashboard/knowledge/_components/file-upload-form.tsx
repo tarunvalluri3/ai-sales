@@ -31,9 +31,9 @@ export function FileUploadForm() {
         className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary file:mr-3 file:rounded-ds-sm file:border-0 file:bg-ds-accent-soft-bg file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ds-accent-muted disabled:opacity-60"
       />
       <p className="text-xs text-ds-text-muted">
-        A PDF catalog (e.g. products with photos) is extracted into structured products/services on
-        first publish — including a photo for each item, when the PDF has one — for you to review
-        before they go live.
+        If your PDF is a product or service catalog, we&rsquo;ll extract it into structured products and
+        services the first time you publish it, including a photo for each item when the PDF has one. You&rsquo;ll
+        get to review everything before it goes live.
       </p>
       {state.error ? (
         <p role="alert" className="text-sm text-ds-danger">

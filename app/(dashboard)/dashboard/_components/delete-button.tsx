@@ -26,46 +26,70 @@ export const ROLE_DENIED_TITLE = "You don't have permission to do this.";
  * + Cancel" row instead of submitting immediately. Callers where deletion
  * is low-stakes (or where a one-click delete is the established pattern)
  * omit it and keep the original single-click behavior.
+ *
+ * `variant` ("inline", the default) renders the original compact text
+ * link, for callers placing this directly in a row. `"menuitem"` (added
+ * 2026-09-08, knowledge page distill pass) renders a full-width row
+ * meant for a `RowActionsMenu` dropdown instead -- same logic, same
+ * confirm gate, different chrome.
  */
+const TRIGGER_CLASS = {
+  inline:
+    "rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent",
+  menuitem:
+    "block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent",
+} as const;
+
 export function DeleteButton({
   action,
   id,
   label = "Delete",
   canEdit = true,
   confirmMessage,
+  variant = "inline",
 }: {
   action: (prevState: DeleteState, formData: FormData) => Promise<DeleteState>;
   id: string;
   label?: string;
   canEdit?: boolean;
   confirmMessage?: string;
+  variant?: "inline" | "menuitem";
 }) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [confirming, setConfirming] = useState(false);
+  const isMenuItem = variant === "menuitem";
 
   if (confirmMessage && confirming) {
     return (
-      <div className="flex items-center gap-2">
+      <div
+        role={isMenuItem ? "group" : undefined}
+        aria-label={isMenuItem ? confirmMessage : undefined}
+        className={isMenuItem ? "flex flex-col gap-2 px-3.5 py-2" : "flex items-center gap-2"}
+      >
         <span className="text-xs text-ds-text-secondary">{confirmMessage}</span>
-        <form action={formAction} className="flex items-center gap-2">
-          <input type="hidden" name="id" value={id} />
+        <div className="flex items-center gap-2">
+          <form action={formAction}>
+            <input type="hidden" name="id" value={id} />
+            <button
+              type="submit"
+              role={isMenuItem ? "menuitem" : undefined}
+              disabled={isPending}
+              autoFocus
+              className="rounded-ds-sm bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+            >
+              {isPending ? "Deleting…" : "Confirm delete"}
+            </button>
+          </form>
           <button
-            type="submit"
+            type="button"
+            role={isMenuItem ? "menuitem" : undefined}
+            onClick={() => setConfirming(false)}
             disabled={isPending}
-            autoFocus
-            className="rounded-ds-sm bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+            className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
           >
-            {isPending ? "Deleting…" : "Confirm delete"}
+            Cancel
           </button>
-        </form>
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          disabled={isPending}
-          className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-        >
-          Cancel
-        </button>
+        </div>
         {state.error ? (
           <span role="alert" className="text-xs text-ds-danger">
             {state.error}
@@ -78,7 +102,7 @@ export function DeleteButton({
   return (
     <form
       action={formAction}
-      className="flex items-center gap-2"
+      className={isMenuItem ? "block" : "flex items-center gap-2"}
       onSubmit={(event) => {
         if (confirmMessage) {
           event.preventDefault();
@@ -89,14 +113,15 @@ export function DeleteButton({
       <input type="hidden" name="id" value={id} />
       <button
         type="submit"
+        role={isMenuItem ? "menuitem" : undefined}
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className={TRIGGER_CLASS[variant]}
       >
         {isPending ? "Deleting…" : label}
       </button>
       {state.error ? (
-        <span role="alert" className="text-xs text-ds-danger">
+        <span role="alert" className={isMenuItem ? "block px-3.5 py-1 text-xs text-ds-danger" : "text-xs text-ds-danger"}>
           {state.error}
         </span>
       ) : null}

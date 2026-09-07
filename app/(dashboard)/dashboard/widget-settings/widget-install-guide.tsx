@@ -13,15 +13,6 @@ type Platform = {
 
 const PLATFORMS: Platform[] = [
   {
-    id: "html",
-    label: "Plain HTML site",
-    steps: [
-      "Open the HTML file for your site (or your site builder's \"custom code\" area).",
-      "Paste the snippet right before the closing </body> tag, near the bottom of the page.",
-      "Save and re-upload or republish the page.",
-    ],
-  },
-  {
     id: "wordpress",
     label: "WordPress",
     steps: [
@@ -51,28 +42,41 @@ const PLATFORMS: Platform[] = [
     ],
   },
   {
-    id: "squarespace",
-    label: "Squarespace",
+    id: "other",
+    label: "Other / custom site",
     steps: [
-      "In your Squarespace dashboard, go to Settings → Advanced → Code Injection.",
-      "Paste the snippet into the \"Footer\" box.",
-      "Save.",
+      "Most other builders (Squarespace, Webflow, Ghost, Notion, etc.) have a similar \"custom code\" or \"code injection\" area under Settings — paste the snippet there, in the footer/body-end slot.",
+      "Building your own HTML? Paste the snippet right before the closing </body> tag, near the bottom of the page.",
+      "Save and re-upload or republish the page.",
     ],
   },
 ];
 
+function StepDone() {
+  return <span className="text-xs font-medium text-ds-success">✓ Done</span>;
+}
+
 export function WidgetInstallGuide({
   widgetKeys,
   appOrigin,
+  publishedAt,
 }: {
   widgetKeys: WidgetKey[];
   appOrigin: string;
+  publishedAt: string | null;
 }) {
   const [open, setOpen] = useState(true);
   const [platformId, setPlatformId] = useState(PLATFORMS[0].id);
-  const activeKey = widgetKeys.find((key) => key.status !== "revoked");
+  const activeKeys = widgetKeys.filter((key) => key.status !== "revoked");
+  const activeKey = activeKeys[0];
   const snippet = activeKey ? buildWidgetSnippet(activeKey.key, appOrigin) : null;
   const platform = PLATFORMS.find((candidate) => candidate.id === platformId) ?? PLATFORMS[0];
+  // Steps 2 (paste into site) and 5 (live test) have no signal this app can
+  // observe server-side -- deliberately left without a "done" indicator
+  // rather than guessing.
+  const step1Done = activeKeys.length > 0;
+  const step3Done = activeKeys.some((key) => key.allowed_origins.length > 0);
+  const step4Done = publishedAt != null;
 
   return (
     <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
@@ -95,7 +99,10 @@ export function WidgetInstallGuide({
       {open ? (
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium text-ds-text-primary">Step 1 — Copy your snippet</h3>
+            <h3 className="flex items-center gap-2 text-sm font-medium text-ds-text-primary">
+              Step 1 — Copy your snippet
+              {step1Done ? <StepDone /> : null}
+            </h3>
             {snippet ? (
               <div className="flex flex-wrap items-center gap-2">
                 <code className="max-w-full overflow-x-auto rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-xs text-ds-text-primary">
@@ -141,7 +148,10 @@ export function WidgetInstallGuide({
           </div>
 
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-medium text-ds-text-primary">Step 3 — Allow your site&rsquo;s address</h3>
+            <h3 className="flex items-center gap-2 text-sm font-medium text-ds-text-primary">
+              Step 3 — Allow your site&rsquo;s address
+              {step3Done ? <StepDone /> : null}
+            </h3>
             <p className="text-sm text-ds-text-secondary">
               Below, find your widget key and add your website&rsquo;s address (e.g. https://yourbusiness.com)
               under &ldquo;Allowed origins&rdquo; — this tells us it&rsquo;s really your site asking for chat.
@@ -149,7 +159,10 @@ export function WidgetInstallGuide({
           </div>
 
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-medium text-ds-text-primary">Step 4 — Publish</h3>
+            <h3 className="flex items-center gap-2 text-sm font-medium text-ds-text-primary">
+              Step 4 — Publish
+              {step4Done ? <StepDone /> : null}
+            </h3>
             <p className="text-sm text-ds-text-secondary">
               Click the &ldquo;Publish&rdquo; button on this page. Until you publish, visitors will see the
               chat bubble but won&rsquo;t get a response.

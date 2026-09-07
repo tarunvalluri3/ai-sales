@@ -32,17 +32,28 @@ export function AiCapabilitiesForm({
 }) {
   const [state, formAction, isPending] = useActionState(updateAiCapabilitiesAction, initialState);
   const [appointmentsEnabled, setAppointmentsEnabled] = useState(initialAppointmentsEnabled);
+  const [open, setOpen] = useState(true);
 
   return (
     <form action={formAction} className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-ds-text-primary">AI capabilities</h2>
-        <p className="text-sm text-ds-text-secondary">
-          What your AI sales employee can do in a conversation. Turn on as many as apply — they
-          work together.
-        </p>
-      </div>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex items-center justify-between gap-3 text-left"
+        aria-expanded={open}
+      >
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-semibold text-ds-text-primary">AI capabilities</h2>
+          <p className="text-sm text-ds-text-secondary">
+            What your AI sales employee can do in a conversation. Turn on as many as apply — they
+            work together.
+          </p>
+        </div>
+        <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
+      </button>
 
+      {open ? (
+        <>
       <div className="flex flex-col gap-3">
         <label className="flex items-start gap-2 text-sm text-ds-text-primary">
           <input
@@ -141,6 +152,8 @@ export function AiCapabilitiesForm({
       >
         {isPending ? "Saving…" : "Save AI capabilities"}
       </button>
+        </>
+      ) : null}
     </form>
   );
 }

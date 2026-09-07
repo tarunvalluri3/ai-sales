@@ -26,6 +26,7 @@ export default async function WidgetSettingsPage() {
   // NEXT_PUBLIC_APP_URL) so both the guide and the key list can render it
   // without a client-only effect or a hydration mismatch.
   const appOrigin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
+  const hasActiveKey = widgetKeys.some((key) => key.status !== "revoked");
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -39,35 +40,52 @@ export default async function WidgetSettingsPage() {
         </p>
       </div>
 
-      <WidgetInstallGuide widgetKeys={widgetKeys} appOrigin={appOrigin} />
+      <section className="flex flex-col gap-6">
+        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">
+          1. Set up your widget
+        </h2>
+        <WidgetInstallGuide
+          widgetKeys={widgetKeys}
+          appOrigin={appOrigin}
+          publishedAt={business?.published_at ?? null}
+        />
+        {canEdit ? <CreateWidgetKeyForm /> : <PermissionNotice />}
+        <WidgetKeyList
+          widgetKeys={widgetKeys}
+          appOrigin={appOrigin}
+          widgetLanguage={business?.widget_language ?? "en"}
+          canEdit={canEdit}
+        />
+      </section>
 
-      <PublishButton isPublished={business?.published_at != null} canEdit={canEdit} />
+      <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
+        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">2. Go live</h2>
+        <PublishButton isPublished={business?.published_at != null} hasActiveKey={hasActiveKey} canEdit={canEdit} />
+        <SandboxChatPanel />
+      </section>
 
-      <SandboxChatPanel />
+      <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
+        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">3. Customize</h2>
+        <WidgetBrandingForm
+          initialAccentColor={business?.widget_accent_color ?? ""}
+          initialLogoUrl={business?.widget_logo_url ?? ""}
+          initialWelcomeText={business?.widget_welcome_text ?? ""}
+          initialWelcomeTextClosed={business?.widget_welcome_text_closed ?? ""}
+          initialCtaText={business?.widget_cta_text ?? ""}
+          initialPosition={business?.widget_position ?? "bottom-right"}
+          initialLanguage={business?.widget_language ?? "en"}
+          canEdit={canEdit}
+        />
 
-      {canEdit ? <CreateWidgetKeyForm /> : <PermissionNotice />}
+        <SuggestedQuestionsForm initialQuestions={business?.widget_suggested_questions ?? []} canEdit={canEdit} />
 
-      <WidgetKeyList widgetKeys={widgetKeys} appOrigin={appOrigin} canEdit={canEdit} />
-
-      <WidgetBrandingForm
-        initialAccentColor={business?.widget_accent_color ?? ""}
-        initialLogoUrl={business?.widget_logo_url ?? ""}
-        initialWelcomeText={business?.widget_welcome_text ?? ""}
-        initialWelcomeTextClosed={business?.widget_welcome_text_closed ?? ""}
-        initialCtaText={business?.widget_cta_text ?? ""}
-        initialPosition={business?.widget_position ?? "bottom-right"}
-        initialLanguage={business?.widget_language ?? "en"}
-        canEdit={canEdit}
-      />
-
-      <SuggestedQuestionsForm initialQuestions={business?.widget_suggested_questions ?? []} canEdit={canEdit} />
-
-      <AiCapabilitiesForm
-        initialRecommendProductsEnabled={business?.recommend_products_enabled ?? false}
-        initialAppointmentsEnabled={business?.appointments_enabled ?? false}
-        initialAppointmentSlotMinutes={business?.appointment_slot_minutes ?? 30}
-        canEdit={canEdit}
-      />
+        <AiCapabilitiesForm
+          initialRecommendProductsEnabled={business?.recommend_products_enabled ?? false}
+          initialAppointmentsEnabled={business?.appointments_enabled ?? false}
+          initialAppointmentSlotMinutes={business?.appointment_slot_minutes ?? 30}
+          canEdit={canEdit}
+        />
+      </section>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function UrlImportForm() {
       </div>
       <div className="flex flex-col gap-1">
         <label htmlFor="refreshIntervalHours" className="text-sm font-medium text-ds-text-secondary">
-          Auto-refresh every (hours, optional)
+          Auto-refresh (optional)
         </label>
         <input
           id="refreshIntervalHours"
@@ -51,10 +51,14 @@ export function UrlImportForm() {
           type="number"
           min={1}
           max={720}
-          placeholder="Leave blank for a one-time import"
+          placeholder="e.g. 24"
           disabled={isPending}
           className={inputClasses}
         />
+        <p className="text-xs text-ds-text-muted">
+          How often to re-check this page, in hours (1-720, up to 30 days). Leave blank to import it once and
+          never refresh it automatically.
+        </p>
       </div>
       {state.error ? (
         <p role="alert" className="text-sm text-ds-danger">

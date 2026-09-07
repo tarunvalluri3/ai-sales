@@ -18,8 +18,20 @@ export function CreateWidgetKeyForm() {
         </p>
       </div>
       <form action={formAction} className="flex flex-col gap-3">
+        <label htmlFor="new-key-name" className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds">
+          Nickname (optional, e.g. &ldquo;Marketing site&rdquo;)
+        </label>
+        <input
+          id="new-key-name"
+          name="name"
+          type="text"
+          maxLength={100}
+          placeholder="Marketing site"
+          disabled={isPending}
+          className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+        />
         <label htmlFor="new-key-origins" className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds">
-          Allowed origins (one per line)
+          Allowed origins for this new key (optional — add later)
         </label>
         <textarea
           id="new-key-origins"

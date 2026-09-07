@@ -13,43 +13,17 @@ import {
   publishBusinessForOrg,
 } from "@/lib/business";
 import { widgetBrandingSchema, widgetSuggestedQuestionsSchema } from "@/lib/schemas/business";
+import { parseOrigins } from "@/lib/schemas/widget-origin";
 import { generateSuggestedQuestions, NoBusinessContentError } from "@/lib/widget-suggested-questions";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
-
-const originSchema = z.string().trim().refine(
-  (value) => {
-    try {
-      return new URL(value).origin === value;
-    } catch {
-      return false;
-    }
-  },
-  { message: "Enter a canonical origin, e.g. https://example.com (no path, query, or trailing slash)." },
-);
-
-/** Parses the newline/comma-separated origins textarea into a deduped, validated list. Empty input is valid (zero origins) -- the key just fails closed until one is added. */
-function parseOrigins(raw: string): { origins?: string[]; error?: string } {
-  const candidates = raw
-    .split(/[\n,]/)
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
-
-  const unique = [...new Set(candidates)];
-  for (const candidate of unique) {
-    const parsed = originSchema.safeParse(candidate);
-    if (!parsed.success) {
-      return { error: `"${candidate}" is not a valid origin. ${parsed.error.issues[0]?.message ?? ""}` };
-    }
-  }
-
-  return { origins: unique };
-}
 
 export type WidgetKeyActionState = {
   error?: string;
   success?: boolean;
 };
+
+const nameSchema = z.string().trim().max(100, "Nickname must be 100 characters or fewer.").optional();
 
 export async function createWidgetKeyAction(
   _prevState: WidgetKeyActionState,
@@ -66,9 +40,14 @@ export async function createWidgetKeyAction(
     return { error };
   }
 
+  const parsedName = nameSchema.safeParse(formData.get("name") ?? undefined);
+  if (!parsedName.success) {
+    return { error: parsedName.error.issues[0]?.message ?? "Enter a shorter nickname." };
+  }
+
   let created;
   try {
-    created = await createWidgetKey(businessId, origins ?? []);
+    created = await createWidgetKey(businessId, origins ?? [], parsedName.data);
   } catch (err) {
     return { error: logAndGetUserMessage(err) };
   }
@@ -101,9 +80,14 @@ export async function updateWidgetKeyOriginsAction(
     return { error };
   }
 
+  const parsedName = nameSchema.safeParse(formData.get("name") ?? undefined);
+  if (!parsedName.success) {
+    return { error: parsedName.error.issues[0]?.message ?? "Enter a shorter nickname." };
+  }
+
   let updated: boolean;
   try {
-    updated = await updateWidgetKeyOrigins(businessId, parsedId.data.id, origins ?? []);
+    updated = await updateWidgetKeyOrigins(businessId, parsedId.data.id, origins ?? [], parsedName.data);
   } catch (err) {
     return { error: logAndGetUserMessage(err) };
   }
