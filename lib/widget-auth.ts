@@ -95,6 +95,21 @@ export async function resolveBusinessFromWidgetKey(
     throw new WidgetAuthError();
   }
 
+  // Best-effort "last used" bump for the dashboard's key-rotation UI --
+  // deliberately fire-and-forget with errors swallowed. This write must
+  // never fail closed: a business owner deciding whether an old key is
+  // safe to revoke should see a stale timestamp on rare write failure,
+  // not a broken chat response.
+  void supabase
+    .from("widget_keys")
+    .update({ last_used_at: new Date().toISOString() })
+    .eq("key", key)
+    .then(({ error: updateError }) => {
+      if (updateError) {
+        console.error("widget_keys.last_used_at update failed", updateError);
+      }
+    });
+
   return {
     businessId: data.business_id,
     businessName: data.businesses.name,

@@ -31,11 +31,15 @@ export async function listWidgetKeysForBusiness(businessId: string): Promise<Wid
  * simply rejects every request (fails closed, same contract as the old
  * single-key design) until at least one origin is added.
  */
-export async function createWidgetKey(businessId: string, allowedOrigins: string[]): Promise<WidgetKey> {
+export async function createWidgetKey(
+  businessId: string,
+  allowedOrigins: string[],
+  name?: string | null,
+): Promise<WidgetKey> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("widget_keys")
-    .insert({ business_id: businessId, allowed_origins: allowedOrigins })
+    .insert({ business_id: businessId, allowed_origins: allowedOrigins, name: name?.trim() || null })
     .select()
     .single();
 
@@ -50,16 +54,17 @@ export async function createWidgetKey(businessId: string, allowedOrigins: string
   return data;
 }
 
-/** Updates a widget key's allowed origins, scoped to the given business. Returns `false` for a cross-tenant or nonexistent id. */
+/** Updates a widget key's allowed origins and nickname, scoped to the given business. Returns `false` for a cross-tenant or nonexistent id. */
 export async function updateWidgetKeyOrigins(
   businessId: string,
   id: string,
   allowedOrigins: string[],
+  name?: string | null,
 ): Promise<boolean> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("widget_keys")
-    .update({ allowed_origins: allowedOrigins })
+    .update({ allowed_origins: allowedOrigins, name: name?.trim() || null })
     .eq("business_id", businessId)
     .eq("id", id)
     .eq("status", "active")

@@ -42,10 +42,12 @@ export type WidgetKey = {
   id: string;
   business_id: string;
   key: string;
+  name: string | null;
   allowed_origins: string[];
   status: WidgetKeyStatus;
   created_at: string;
   revoked_at: string | null;
+  last_used_at: string | null;
 };
 
 /** Stage 2 (STATE.md): gates a catalog row extracted from a knowledge document behind human review before it's answerable by the AI. Every manually-created row keeps the 'approved' default -- only lib/knowledge-extraction.ts ever inserts 'draft'. */

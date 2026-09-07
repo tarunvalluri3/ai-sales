@@ -1,7 +1,9 @@
 import "server-only";
+import * as Sentry from "@sentry/nextjs";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { regenerateChunksForDocument } from "@/lib/knowledge";
 import { logEvent } from "@/lib/logger";
+import { AppError } from "@/lib/errors";
 import type { KnowledgeDocument } from "@/lib/supabase/types";
 
 /**
@@ -42,10 +44,22 @@ function backoffSeconds(attempts: number): number {
   return Math.min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), MAX_BACKOFF_SECONDS);
 }
 
-/** Never persist a raw error object (may contain content excerpts) -- message text only, truncated. */
-function errorMessageOnly(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 500);
+/**
+ * Never persist a raw error/exception detail as the user-facing
+ * `ingestion_last_error` -- every error this loop can see is already
+ * either an `AppError` (lib/errors.ts's convention: `.userMessage` is
+ * the vetted, safe-to-display string) or an unexpected error type that
+ * has no business being shown verbatim (may be a raw provider/driver
+ * message, occasionally containing request internals). The full detail
+ * still reaches Sentry via the `captureException` call at each throw
+ * site below -- this function is only ever responsible for what a
+ * business owner sees in their dashboard.
+ */
+function safeIngestionErrorMessage(error: unknown): string {
+  if (error instanceof AppError) {
+    return error.userMessage;
+  }
+  return "We couldn't process this document. Please try again, or contact support if it keeps happening.";
 }
 
 /**
@@ -97,12 +111,16 @@ export async function processIngestionQueue(): Promise<ProcessQueueResult> {
       const attempts = document.ingestion_attempts + 1;
       const isDeadLetter = attempts >= MAX_INGESTION_ATTEMPTS;
 
+      Sentry.captureException(error, {
+        extra: { documentId: document.id, businessId: document.business_id, attempts, isDeadLetter },
+      });
+
       await supabase
         .from("knowledge_documents")
         .update({
           ingestion_status: isDeadLetter ? "failed" : "pending",
           ingestion_attempts: attempts,
-          ingestion_last_error: errorMessageOnly(error),
+          ingestion_last_error: safeIngestionErrorMessage(error),
           ingestion_next_attempt_at: new Date(Date.now() + backoffSeconds(attempts) * 1000).toISOString(),
           ingestion_updated_at: new Date().toISOString(),
         })

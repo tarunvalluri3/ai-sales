@@ -6,7 +6,15 @@ import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: PublishBusinessState = {};
 
-export function PublishButton({ isPublished, canEdit = true }: { isPublished: boolean; canEdit?: boolean }) {
+export function PublishButton({
+  isPublished,
+  hasActiveKey,
+  canEdit = true,
+}: {
+  isPublished: boolean;
+  hasActiveKey: boolean;
+  canEdit?: boolean;
+}) {
   const [state, formAction, isPending] = useActionState(publishBusinessAction, initialState);
   const published = isPublished || state.success === true;
 
@@ -31,6 +39,13 @@ export function PublishButton({ isPublished, canEdit = true }: { isPublished: bo
           {published ? "Live" : "Draft"}
         </span>
       </div>
+
+      {!hasActiveKey ? (
+        <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+          You haven&rsquo;t created a widget key yet — publish is safe to click, but nothing will happen until you
+          add one.
+        </p>
+      ) : null}
 
       {state.error ? (
         <p role="alert" className="text-sm text-ds-danger">

@@ -138,7 +138,7 @@ export async function deleteKnowledgeDocumentAction(
 
   let deleted: boolean;
   try {
-    deleted = await deleteKnowledgeDocument(businessId, parsed.data.id);
+    deleted = await deleteOne(businessId, userId, parsed.data.id);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
@@ -146,8 +146,6 @@ export async function deleteKnowledgeDocumentAction(
   if (!deleted) {
     return { error: "This knowledge document no longer exists." };
   }
-
-  await recordAuditLogEntry(businessId, userId, "knowledge.deleted", "knowledge_document", parsed.data.id);
 
   revalidatePath("/dashboard/knowledge");
   return { success: true };
@@ -182,7 +180,19 @@ export async function createFileKnowledgeDocumentAction(
 const urlFieldsSchema = z.object({
   url: z.string().trim().url("Enter a valid URL, e.g. https://example.com/page"),
   title: knowledgeTitleSchema,
-  refreshIntervalHours: z.coerce.number().int().min(1).max(24 * 30).nullable(),
+  // Custom messages (2026-09-08 harden pass) -- without them, a
+  // non-numeric or out-of-range value fell through to Zod's default
+  // "Invalid input"-style message, even though the field's own <input>
+  // (url-import-form.tsx) already documents the 1-720 range as helper
+  // text. A scripted request (or a browser that lets a stray character
+  // through a number input) should get the same clear range, not a
+  // generic validation error.
+  refreshIntervalHours: z.coerce
+    .number({ error: "Enter a number of hours between 1 and 720." })
+    .int("Enter a whole number of hours.")
+    .min(1, "Enter a number of hours between 1 and 720.")
+    .max(24 * 30, "Enter a number of hours between 1 and 720 (30 days).")
+    .nullable(),
 });
 
 export async function createUrlKnowledgeDocumentAction(
@@ -252,6 +262,52 @@ export type PublishState = {
   success?: boolean;
 };
 
+/**
+ * Shared by `publishKnowledgeDocumentAction` and
+ * `bulkPublishKnowledgeDocumentsAction` (2026-09-08 optimize pass) so the
+ * first-publish catalog-extraction trigger only lives in one place --
+ * duplicating it per call site risked the two paths silently drifting
+ * apart. Returns whether the document was actually found (same
+ * not-found contract every mutation on this page already uses); throws
+ * on a real failure, same as `publishKnowledgeDocument` itself.
+ */
+async function publishOne(businessId: string, userId: string, id: string): Promise<boolean> {
+  const result = await publishKnowledgeDocument(businessId, id, userId);
+  if (!result.found) {
+    return false;
+  }
+
+  await recordAuditLogEntry(businessId, userId, "knowledge.published", "knowledge_document", id);
+
+  // Stage 2 (STATE.md): only a document's first-ever publish triggers
+  // catalog extraction -- a republish (e.g. after an edit) does not
+  // re-extract, avoiding duplicate drafts on every edit/publish cycle.
+  // "Extract now" is the deliberate manual escape hatch for re-running
+  // extraction later.
+  if (result.isFirstPublish) {
+    const title = result.title;
+    const content = result.content;
+    const storagePath = result.storagePath;
+    after(() =>
+      isPdfStoragePath(storagePath)
+        ? extractCatalogFromPdfDocument(businessId, id, title, content, storagePath!)
+        : extractCatalogFromDocument(businessId, id, title, content),
+    );
+  }
+
+  return true;
+}
+
+/** Shared by `deleteKnowledgeDocumentAction` and `bulkDeleteKnowledgeDocumentsAction` -- see `publishOne`'s doc comment for why this is factored out. */
+async function deleteOne(businessId: string, userId: string, id: string): Promise<boolean> {
+  const deleted = await deleteKnowledgeDocument(businessId, id);
+  if (!deleted) {
+    return false;
+  }
+  await recordAuditLogEntry(businessId, userId, "knowledge.deleted", "knowledge_document", id);
+  return true;
+}
+
 export async function publishKnowledgeDocumentAction(
   _prevState: PublishState,
   formData: FormData,
@@ -267,37 +323,99 @@ export async function publishKnowledgeDocumentAction(
     return { error: "Invalid knowledge document." };
   }
 
-  let result: Awaited<ReturnType<typeof publishKnowledgeDocument>>;
+  let found: boolean;
   try {
-    result = await publishKnowledgeDocument(businessId, parsed.data.id, userId);
+    found = await publishOne(businessId, userId, parsed.data.id);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
 
-  if (!result.found) {
+  if (!found) {
     return { error: "This knowledge document no longer exists." };
-  }
-
-  await recordAuditLogEntry(businessId, userId, "knowledge.published", "knowledge_document", parsed.data.id);
-
-  // Stage 2 (STATE.md): only a document's first-ever publish triggers
-  // catalog extraction -- a republish (e.g. after an edit) does not
-  // re-extract, avoiding duplicate drafts on every edit/publish cycle.
-  // "Extract now" (below) is the deliberate manual escape hatch for
-  // re-running extraction later.
-  if (result.isFirstPublish) {
-    const title = result.title;
-    const content = result.content;
-    const storagePath = result.storagePath;
-    after(() =>
-      isPdfStoragePath(storagePath)
-        ? extractCatalogFromPdfDocument(businessId, parsed.data.id, title, content, storagePath!)
-        : extractCatalogFromDocument(businessId, parsed.data.id, title, content),
-    );
   }
 
   revalidatePath("/dashboard/knowledge");
   return { success: true };
+}
+
+export type BulkActionState = {
+  error?: string;
+  success?: boolean;
+  count?: number;
+};
+
+const bulkIdsSchema = z
+  .array(z.string().uuid())
+  .min(1, "Select at least one document.");
+
+/**
+ * Publishes every selected document that's still found and owned by the
+ * caller's business, skipping (not failing on) any that error or no
+ * longer exist -- matches `lib/url-ingestion.ts`'s
+ * `refreshDueUrlKnowledgeSources()`'s own per-item resilience pattern:
+ * one bad row in a batch shouldn't block the rest. Each id gets the same
+ * `publishOne()` used by the single-document action, so first-publish
+ * catalog extraction still fires correctly per document.
+ */
+export async function bulkPublishKnowledgeDocumentsAction(
+  _prevState: BulkActionState,
+  formData: FormData,
+): Promise<BulkActionState> {
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = bulkIdsSchema.safeParse(formData.getAll("ids").map(String));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Select at least one document." };
+  }
+
+  let count = 0;
+  for (const id of parsed.data) {
+    try {
+      if (await publishOne(businessId, userId, id)) {
+        count++;
+      }
+    } catch {
+      // Skip this one, keep going -- one bad row shouldn't block the batch.
+    }
+  }
+
+  revalidatePath("/dashboard/knowledge");
+  return count > 0 ? { success: true, count } : { error: "Nothing was published." };
+}
+
+/** Deletes every selected document, same per-item resilience as `bulkPublishKnowledgeDocumentsAction`. The confirm gate lives client-side (knowledge-list.tsx), same convention as the single-document `DeleteButton`. */
+export async function bulkDeleteKnowledgeDocumentsAction(
+  _prevState: BulkActionState,
+  formData: FormData,
+): Promise<BulkActionState> {
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = bulkIdsSchema.safeParse(formData.getAll("ids").map(String));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Select at least one document." };
+  }
+
+  let count = 0;
+  for (const id of parsed.data) {
+    try {
+      if (await deleteOne(businessId, userId, id)) {
+        count++;
+      }
+    } catch {
+      // Skip this one, keep going -- one bad row shouldn't block the batch.
+    }
+  }
+
+  revalidatePath("/dashboard/knowledge");
+  return count > 0 ? { success: true, count } : { error: "Nothing was deleted." };
 }
 
 export type ExtractNowState = {
