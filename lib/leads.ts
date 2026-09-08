@@ -122,3 +122,35 @@ export async function updateLeadStatus(
 
   return data.length > 0;
 }
+
+/**
+ * Same contract as updateLeadStatus(), batched into one query for the
+ * leads-list bulk toolbar instead of N sequential round-trips. Ids
+ * belonging to another business are simply excluded by the `business_id`
+ * filter -- the returned count only reflects rows actually updated, so a
+ * caller can tell the difference between "everything applied" and
+ * "some ids didn't match" without a separate lookup.
+ */
+export async function updateLeadStatusBulk(
+  businessId: string,
+  ids: string[],
+  status: LeadStatus,
+): Promise<number> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("leads")
+    .update({ status })
+    .eq("business_id", businessId)
+    .in("id", ids)
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong updating these leads. Please try again.",
+      "updateLeadStatusBulk failed",
+      error,
+    );
+  }
+
+  return data.length;
+}
