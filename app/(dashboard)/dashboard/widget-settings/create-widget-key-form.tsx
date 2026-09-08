@@ -1,12 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { createWidgetKeyAction, type WidgetKeyActionState } from "./actions";
 
 const initialState: WidgetKeyActionState = {};
 
 export function CreateWidgetKeyForm() {
   const [state, formAction, isPending] = useActionState(createWidgetKeyAction, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state.success) {
+      formRef.current?.reset();
+    }
+  }, [state.success]);
 
   return (
     <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
@@ -17,7 +24,7 @@ export function CreateWidgetKeyForm() {
           blank to create the key first and configure origins after.
         </p>
       </div>
-      <form action={formAction} className="flex flex-col gap-3">
+      <form ref={formRef} action={formAction} className="flex flex-col gap-3">
         <label htmlFor="new-key-name" className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds">
           Nickname (optional, e.g. &ldquo;Marketing site&rdquo;)
         </label>

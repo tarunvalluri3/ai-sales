@@ -38,24 +38,23 @@ export function WidgetBrandingForm({
 
   return (
     <form action={formAction} className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center justify-between gap-3 text-left"
-        aria-expanded={open}
-      >
-        <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          aria-expanded={open}
+        >
           <h2 className="text-lg font-semibold text-ds-text-primary">Branding &amp; language</h2>
-          <p className="text-sm text-ds-text-secondary">
-            Customize how the chat panel looks and greets prospects. Everything here is optional — a
-            field left blank falls back to a sensible default.
-          </p>
-        </div>
-        <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
-      </button>
+          <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
+        </button>
+        <p className="text-sm text-ds-text-secondary">
+          Customize how the chat panel looks and greets prospects. Everything here is optional — a
+          field left blank falls back to a sensible default.
+        </p>
+      </div>
 
-      {open ? (
-        <>
+      <div className={open ? "flex flex-col gap-4" : "hidden"}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label htmlFor="accentColor" className="text-sm font-medium text-ds-text-secondary">
@@ -224,8 +223,7 @@ export function WidgetBrandingForm({
           >
             {isPending ? "Saving…" : "Save widget settings"}
           </button>
-        </>
-      ) : null}
+      </div>
     </form>
   );
 }

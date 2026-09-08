@@ -2,7 +2,33 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-08 (Widget Settings page: closed out nearly every remaining finding from the earlier `/impeccable critique` — locale-aware dates, zero-origin warning, install-guide "done" badges, a `hasActiveKey` guard on Publish, collapsible Customize cards, a `CopyKeyButton` aria-live fix, controlled accent-color state, the shared `EmptyState` in suggested questions, and a real schema addition (`widget_keys.name`/`last_used_at`) with its own migration + pgTAP test. `npm test` now runs 28 files, all pass. See the detailed entry below)
+Last updated: 2026-09-08 (Widget Settings page: independent re-critique after the schema/UI fix pass — 25/40 → 29/40 — found that the new collapsible-card feature itself introduced a real data-loss bug (collapsing a Customize card silently discarded unsaved edits in uncontrolled fields). Fixed that plus two accessibility regressions on the new collapse-toggle buttons, a create-key form that never reset after success, and a nickname-label inconsistency. See the detailed entry below)
+
+---
+
+## Widget Settings page: re-critique + fix for a real bug the collapse feature introduced — implemented 2026-09-08
+
+Independent follow-up `/impeccable critique` run (dual-agent, same protocol) against the page as it stood after the same-day schema/UI fix pass. Scored **29/40**, up from 25/40 — genuine improvement, not a re-measurement of the same issues. Full report persisted at `.impeccable/critique/2026-09-08T07-28-33Z__app-dashboard-dashboard-widget-settings.md`. Detector clean (0 findings); browser inspection unavailable this run because no dev server was listening on localhost:3000 at all (not a Clerk-auth block — confirmed via `curl`/`Get-NetTCPConnection`, not assumed). User chose "fix everything" (the P0 plus both P1s, the P2, and the P3).
+
+**[P0] Collapsing a Customize card silently discarded unsaved edits.** The three collapsible cards (`widget-branding-form.tsx`, `ai-capabilities-form.tsx`, `suggested-questions-form.tsx`) unmounted their body on collapse (`{open ? (<>...</>) : null}`), which meant every uncontrolled field inside (`logoUrl`, `position`, `language`, `ctaText`, both welcome-text fields, `recommendProductsEnabled`, `appointmentSlotMinutes`) reverted to its last-saved value the moment a user collapsed then reopened the card — a real, previously-nonexistent data-loss path introduced by the collapse feature itself. Fixed by switching all three from conditional unmounting to a `hidden`/CSS-class toggle (`className={open ? "flex flex-col gap-4" : "hidden"}`) so the DOM nodes and their live, uncommitted values simply survive being hidden. This also incidentally fixed the minor "slot-length input reverts independently of its still-checked checkbox" inconsistency the critique noted as a side effect of the same root cause.
+
+**[P1] Collapse-toggle buttons had no visible focus indicator.** All four toggle buttons (branding, AI capabilities, suggested questions, and the install guide's own) were the only interactive elements on the page missing the `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent` treatment every other button in this file set carries — added to all four.
+
+**[P1] Collapse-toggle buttons' accessible name included the entire description paragraph.** Each toggle wrapped both its `<h2>` title and full descriptive sentence in one `<button>`, so a screen reader announced the whole concatenated block on every focus. Restructured all four so the description now sits as a sibling `<p>` outside the button — the button's accessible name is now just the title + Hide/Show.
+
+**[P2] `CreateWidgetKeyForm` never reset after a successful create**, leaving stale field values and inviting an unsure user to click Create again and silently duplicate a key. Added a `formRef` + `useEffect` keyed on `state.success` that calls `formRef.current?.reset()`.
+
+**[P3] Nickname field labeling was inconsistent** between the create form ("Nickname (optional, e.g. \"Marketing site\")") and the per-key edit form (bare "Nickname"). Aligned the edit form's label to match.
+
+**Files changed:** `app/(dashboard)/dashboard/widget-settings/{widget-branding-form.tsx,ai-capabilities-form.tsx,suggested-questions-form.tsx,widget-install-guide.tsx,create-widget-key-form.tsx,widget-key-list.tsx}`.
+
+**Database changes:** none. **Environment variables:** none.
+
+**Checks run:** `npm run lint` (clean), `npm run typecheck` (clean), `npm run build` (clean, all 30 routes), `npm test` (pgTAP, all 28 files pass — unaffected by this UI-only change, run anyway per AGENTS.md §7), `detect.mjs --json` on the widget-settings directory (0 findings, both before and after).
+
+**Known limitation:** not yet manually tested in a real signed-in browser session (same standing gap). Manual test steps for a future session: edit a field in a Customize card, collapse the card, reopen it, confirm the edit is still there (not reverted); tab through the four collapse-toggle buttons with a keyboard and confirm each shows a visible focus ring; inspect (or screen-reader-test) that a toggle button's accessible name no longer includes its section's description text; create a widget key, confirm the form clears afterward; edit an existing key's nickname and confirm the label text now matches the create form's.
+
+**Next logical task:** the deferred real-browser walkthrough (same standing gap as the rest of this page's work), or bulk key actions/a docs link-out if the user later decides those are worth building after all.
 
 ---
 
