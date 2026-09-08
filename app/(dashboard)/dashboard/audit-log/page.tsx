@@ -25,6 +25,8 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "appointment.declined": "Appointment declined",
   "appointment.cancelled": "Appointment cancelled",
   "ai_capabilities.updated": "AI capabilities updated",
+  "whatsapp_connection.created": "WhatsApp connected",
+  "whatsapp_connection.deleted": "WhatsApp disconnected",
 };
 
 export default async function AuditLogPage() {

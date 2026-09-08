@@ -188,6 +188,25 @@ function AppointmentsIcon(props: IconProps) {
   );
 }
 
+function WhatsappIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M10 17.5a7.5 7.5 0 1 0-6.5-3.75L3 17l3.4-.9A7.47 7.47 0 0 0 10 17.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7.3 7.7c.15-.4.5-.4.75-.4h.4c.2 0 .35.1.4.3l.4 1.2c.05.2 0 .35-.1.5l-.3.4a4.6 4.6 0 0 0 1.9 1.9l.4-.3c.15-.1.3-.15.5-.1l1.2.4c.2.05.3.2.3.4v.4c0 .25 0 .6-.4.75-.55.2-1.6.35-3-.65a7 7 0 0 1-2.6-2.6c-1-1.4-.85-2.45-.65-3Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function BusinessHoursIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
@@ -216,6 +235,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Analytics", href: "/dashboard/analytics", icon: AnalyticsIcon },
   { label: "Widget Settings", href: "/dashboard/widget-settings", icon: WidgetIcon },
   { label: "Webhooks", href: "/dashboard/webhooks", icon: WebhooksIcon },
+  { label: "WhatsApp", href: "/dashboard/whatsapp", icon: WhatsappIcon },
   { label: "Business Hours", href: "/dashboard/business-hours", icon: BusinessHoursIcon },
   { label: "Audit Log", href: "/dashboard/audit-log", icon: AuditLogIcon },
 ];

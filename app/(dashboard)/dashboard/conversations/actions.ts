@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import {
   dismissConversationAttention,
   getConversationForBusiness,
@@ -23,6 +24,8 @@ import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
+import { getWhatsappConnectionForBusiness, WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
+import { createWhatsappOutboundMessage, sendWhatsappOutboundMessage } from "@/lib/whatsapp-delivery";
 
 const setControlSchema = z.object({
   id: z.string().uuid(),
@@ -130,6 +133,34 @@ export async function sendHumanReplyAction(
     message = await createMessage(supabase, businessId, parsed.data.conversationId, "human_agent", parsed.data.content);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
+  }
+
+  // Phase 16: a staff reply on a WhatsApp-sourced conversation must also
+  // reach the prospect over WhatsApp, not just appear in the dashboard
+  // transcript -- reuses the exact same outbound queue/send function the
+  // AI-reply path uses (app/api/webhooks/whatsapp/route.ts), no parallel
+  // send mechanism. Best-effort: a failed send here must not fail the
+  // staff member's reply itself, since the message is already saved and
+  // visible in the transcript regardless -- the shared daily cron sweep
+  // retries it.
+  if (conversation.source === WHATSAPP_CONVERSATION_SOURCE && conversation.visitor_id) {
+    try {
+      const connection = await getWhatsappConnectionForBusiness(businessId);
+      if (connection?.status === "connected") {
+        const serviceSupabase = createServiceSupabaseClient();
+        const outbound = await createWhatsappOutboundMessage(serviceSupabase, {
+          businessId,
+          conversationId: parsed.data.conversationId,
+          messageId: message.id,
+          toWaId: conversation.visitor_id,
+          phoneNumberId: connection.phone_number_id,
+          content: parsed.data.content,
+        });
+        await sendWhatsappOutboundMessage(outbound.id);
+      }
+    } catch (error) {
+      logAndGetUserMessage(error);
+    }
   }
 
   revalidatePath(`/dashboard/conversations/${parsed.data.conversationId}`);

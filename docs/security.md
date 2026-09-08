@@ -77,6 +77,8 @@ Requirements:
 - The widget endpoint returns only that business's data. It never returns knowledge, leads, conversations, or configuration belonging to anyone else.
 - Prospect-supplied text is untrusted. Validate and bound it.
 
+**Phase 16 (WhatsApp)** adds a second unauthenticated-prospect front door with the same rules, a different identity mechanism: `app/api/webhooks/whatsapp/route.ts` resolves `business_id` from the inbound webhook's `phone_number_id` (never client-supplied), verifies the payload's authenticity via `X-Hub-Signature-256` (HMAC-SHA256 against `WHATSAPP_APP_SECRET`) instead of an origin allowlist, and rate-limits by the sender's WhatsApp id (`whatsapp_webhook` scope) instead of by key/IP. It reuses the exact same `askSalesEmployee()`/conversation/lead/escalation services as the widget — no second AI system.
+
 ---
 
 ## 5. Environment variables
@@ -103,8 +105,12 @@ Core set:
 | `RESEND_API_KEY` | **no** |
 | `NOTIFICATION_EMAIL_FROM` | config |
 | `LOCAL_CHROMIUM_PATH` | config, local dev only |
+| `WHATSAPP_APP_SECRET` | **no** |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | **no** |
 
-Add a variable only when a feature actually requires it. Razorpay and WhatsApp variables are deferred to their phases. Keep the live list in `STATE.md` §5 in sync.
+Add a variable only when a feature actually requires it. Razorpay variables remain deferred to its phase. Keep the live list in `STATE.md` §5 in sync.
+
+`WHATSAPP_APP_SECRET`/`WHATSAPP_WEBHOOK_VERIFY_TOKEN` (Phase 16) are app-level only — one Meta App serves every tenant's own connected number. Per-business `phone_number_id`/`waba_id`/`access_token` are never env vars; they live in `whatsapp_connections`/`whatsapp_credentials`. Both are optional in `lib/env.ts`'s schema (same "degrade, don't fail startup" reasoning as `CRON_SECRET`) — `app/api/webhooks/whatsapp/route.ts` fails closed (401/403) on every request when either is unset, rather than either breaking app startup or accepting an unverified webhook.
 
 `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` are deliberately not in `lib/env.ts`'s required schema (Phase 21) — a missing DSN degrades observability (Sentry silently no-ops), not the app's ability to serve requests, so it does not belong in the fail-fast startup check the way a missing Clerk/Supabase/Gemini variable does.
 
@@ -125,6 +131,8 @@ Validate required env vars at startup and fail loudly rather than at first use.
 ## 6. Secrets
 
 Never expose, and never log: Clerk secret key · Supabase service role key · Gemini API key · Razorpay secret · WhatsApp credentials · webhook secrets · any private integration credential.
+
+"WhatsApp credentials" now covers, concretely (Phase 16): `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, and each business's own `whatsapp_credentials.access_token` — the last of which has zero `authenticated`/`anon` grant at the database level (service-role only), a stricter posture than `webhook_endpoints.secret` (which a business can read back in its own dashboard). Never selected in any dashboard read path or included in a `logEvent()`/`logAndGetUserMessage()` call.
 
 Never place any of these in client components or client bundles.
 
