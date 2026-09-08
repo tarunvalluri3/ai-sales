@@ -80,21 +80,21 @@ export function WidgetInstallGuide({
 
   return (
     <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center justify-between gap-3 text-left"
-        aria-expanded={open}
-      >
-        <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          aria-expanded={open}
+        >
           <h2 className="text-lg font-semibold text-ds-text-primary">Install your chat widget</h2>
-          <p className="text-sm text-ds-text-secondary">
-            A step-by-step guide to adding the chat bubble to your website. No coding experience
-            needed.
-          </p>
-        </div>
-        <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
-      </button>
+          <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
+        </button>
+        <p className="text-sm text-ds-text-secondary">
+          A step-by-step guide to adding the chat bubble to your website. No coding experience
+          needed.
+        </p>
+      </div>
 
       {open ? (
         <div className="flex flex-col gap-6">

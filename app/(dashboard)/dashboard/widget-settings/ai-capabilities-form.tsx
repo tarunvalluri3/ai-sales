@@ -36,24 +36,23 @@ export function AiCapabilitiesForm({
 
   return (
     <form action={formAction} className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center justify-between gap-3 text-left"
-        aria-expanded={open}
-      >
-        <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          aria-expanded={open}
+        >
           <h2 className="text-lg font-semibold text-ds-text-primary">AI capabilities</h2>
-          <p className="text-sm text-ds-text-secondary">
-            What your AI sales employee can do in a conversation. Turn on as many as apply — they
-            work together.
-          </p>
-        </div>
-        <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
-      </button>
+          <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
+        </button>
+        <p className="text-sm text-ds-text-secondary">
+          What your AI sales employee can do in a conversation. Turn on as many as apply — they
+          work together.
+        </p>
+      </div>
 
-      {open ? (
-        <>
+      <div className={open ? "flex flex-col gap-4" : "hidden"}>
       <div className="flex flex-col gap-3">
         <label className="flex items-start gap-2 text-sm text-ds-text-primary">
           <input
@@ -152,8 +151,7 @@ export function AiCapabilitiesForm({
       >
         {isPending ? "Saving…" : "Save AI capabilities"}
       </button>
-        </>
-      ) : null}
+      </div>
     </form>
   );
 }

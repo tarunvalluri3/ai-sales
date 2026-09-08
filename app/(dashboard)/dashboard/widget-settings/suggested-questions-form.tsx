@@ -79,26 +79,25 @@ export function SuggestedQuestionsForm({
 
   return (
     <div className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex items-center justify-between gap-3 text-left"
-        aria-expanded={open}
-      >
-        <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          aria-expanded={open}
+        >
           <h2 className="text-lg font-semibold text-ds-text-primary">Prefilled questions</h2>
-          <p className="text-sm text-ds-text-secondary">
-            Clickable question suggestions shown on your widget&apos;s greeting screen, before a
-            prospect types anything. Generate suggestions from your products, services, and FAQs,
-            then edit or remove any before saving — nothing changes on your live widget until you
-            save.
-          </p>
-        </div>
-        <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
-      </button>
+          <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
+        </button>
+        <p className="text-sm text-ds-text-secondary">
+          Clickable question suggestions shown on your widget&apos;s greeting screen, before a
+          prospect types anything. Generate suggestions from your products, services, and FAQs,
+          then edit or remove any before saving — nothing changes on your live widget until you
+          save.
+        </p>
+      </div>
 
-      {open ? (
-        <>
+      <div className={open ? "flex flex-col gap-4" : "hidden"}>
       <button
         type="button"
         onClick={handleGenerate}
@@ -198,8 +197,7 @@ export function SuggestedQuestionsForm({
       >
         {isSaving ? "Saving…" : "Save suggested questions"}
       </button>
-        </>
-      ) : null}
+      </div>
     </div>
   );
 }

@@ -79,7 +79,7 @@ function WidgetKeyCard({
               htmlFor={`name-${widgetKey.id}`}
               className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds"
             >
-              Nickname
+              Nickname (optional, e.g. &ldquo;Marketing site&rdquo;)
             </label>
             <input
               id={`name-${widgetKey.id}`}
