@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { generateSuggestedQuestionsAction, saveSuggestedQuestionsAction } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { EmptyState } from "../_components/state-views";
+import { inputClasses } from "./input-classes";
 
 const MAX_QUESTIONS = 6;
 
@@ -28,7 +29,10 @@ export function SuggestedQuestionsForm({
   const [isSaving, startSave] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [open, setOpen] = useState(true);
+  // Open by default only while there's nothing saved yet -- once a business
+  // has curated a list, it recedes behind "Show" instead of re-presenting
+  // the whole editable list every visit.
+  const [open, setOpen] = useState(initialQuestions.length === 0);
   const reduceMotion = useReducedMotion();
 
   function handleGenerate() {
@@ -112,13 +116,13 @@ export function SuggestedQuestionsForm({
         <ul className="flex flex-col gap-2">
           {questions.map((question, index) => (
             <li key={index} className="flex items-center gap-2">
-              <div className="flex flex-col">
+              <div className="flex flex-col gap-1 pointer-coarse:gap-2">
                 <button
                   type="button"
                   aria-label="Move up"
                   disabled={isPending || !canEdit || index === 0}
                   onClick={() => moveQuestion(index, -1)}
-                  className="flex h-4 w-5 items-center justify-center text-ds-text-muted transition-colors hover:text-ds-text-primary disabled:opacity-30"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:h-11 pointer-coarse:w-11"
                 >
                   ▲
                 </button>
@@ -127,7 +131,7 @@ export function SuggestedQuestionsForm({
                   aria-label="Move down"
                   disabled={isPending || !canEdit || index === questions.length - 1}
                   onClick={() => moveQuestion(index, 1)}
-                  className="flex h-4 w-5 items-center justify-center text-ds-text-muted transition-colors hover:text-ds-text-primary disabled:opacity-30"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:h-11 pointer-coarse:w-11"
                 >
                   ▼
                 </button>
@@ -139,14 +143,14 @@ export function SuggestedQuestionsForm({
                 disabled={isPending || !canEdit}
                 onChange={(event) => updateQuestion(index, event.target.value)}
                 aria-label={`Suggested question ${index + 1}`}
-                className="flex-1 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60"
+                className={`flex-1 ${inputClasses}`}
               />
               <button
                 type="button"
                 aria-label="Remove question"
                 disabled={isPending || !canEdit}
                 onClick={() => removeQuestion(index)}
-                className="shrink-0 rounded-ds-sm px-2 py-2 text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-danger disabled:opacity-60"
+                className="shrink-0 rounded-ds-sm px-2 py-2 text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-danger disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
               >
                 ✕
               </button>
@@ -177,6 +181,7 @@ export function SuggestedQuestionsForm({
         {success ? (
           <motion.p
             key="success"
+            role="status"
             className="text-sm text-ds-success"
             initial={reduceMotion ? undefined : { opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}

@@ -12,7 +12,7 @@ export const chartColors = {
   warning: "#d9a94f",
   danger: "#e0664f",
   textSecondary: "#a8a190",
-  textMuted: "#746e5f",
+  textMuted: "#948d79",
   border: "rgba(242, 237, 225, 0.1)",
   surfaceElevated: "#1e1b13",
 } as const;

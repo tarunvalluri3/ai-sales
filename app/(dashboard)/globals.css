@@ -30,7 +30,11 @@
 
   --ds-text-primary: #f2ede1;
   --ds-text-secondary: #a8a190;
-  --ds-text-muted: #746e5f;
+  /* Lightened from #746e5f (~3.6:1, failed WCAG AA) to clear 4.5:1 against
+     every surface tier this token appears on (--ds-surface through
+     --ds-surface-soft), while staying visibly dimmer than --ds-text-secondary
+     and holding the same warm hue direction. */
+  --ds-text-muted: #948d79;
   --ds-border: rgba(242, 237, 225, 0.1);
   --ds-border-strong: rgba(242, 237, 225, 0.18);
 

@@ -4,11 +4,9 @@ import { useActionState, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { updateAiCapabilitiesAction, type AiCapabilitiesActionState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { inputClasses } from "./input-classes";
 
 const initialState: AiCapabilitiesActionState = {};
-
-const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
 
 /**
  * Replaces the old exclusive "AI conversion goal" dropdown (Phase B1) with
@@ -32,7 +30,10 @@ export function AiCapabilitiesForm({
 }) {
   const [state, formAction, isPending] = useActionState(updateAiCapabilitiesAction, initialState);
   const [appointmentsEnabled, setAppointmentsEnabled] = useState(initialAppointmentsEnabled);
-  const [open, setOpen] = useState(true);
+  // Open by default only while neither capability is on yet -- once one is
+  // enabled, the card recedes behind "Show" instead of re-presenting itself
+  // every visit.
+  const [open, setOpen] = useState(!initialRecommendProductsEnabled && !initialAppointmentsEnabled);
 
   return (
     <form action={formAction} className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
@@ -137,7 +138,7 @@ export function AiCapabilitiesForm({
           </ErrorOrSuccess>
         ) : null}
         {state.success ? (
-          <ErrorOrSuccess key="success" className="text-ds-success">
+          <ErrorOrSuccess key="success" role="status" className="text-ds-success">
             AI capabilities updated.
           </ErrorOrSuccess>
         ) : null}
@@ -161,7 +162,7 @@ function ErrorOrSuccess({
   className,
   children,
 }: {
-  role?: "alert";
+  role?: "alert" | "status";
   className: string;
   children: React.ReactNode;
 }) {

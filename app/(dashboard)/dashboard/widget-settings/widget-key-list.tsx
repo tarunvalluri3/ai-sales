@@ -37,13 +37,11 @@ function WidgetKeyCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium text-ds-text-primary">{widgetKey.name || "Unnamed key"}</span>
-          <div className="flex items-center gap-2">
-            <code className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2 font-mono text-sm text-ds-text-primary">
-              {widgetKey.key}
-            </code>
-            <CopyKeyButton value={widgetKey.key} label="Copy key" />
-            {!isRevoked ? <CopyKeyButton value={snippet} label="Copy snippet" /> : null}
-          </div>
+          {!isRevoked ? (
+            <div className="flex items-center gap-2">
+              <CopyKeyButton value={snippet} label="Copy snippet" />
+            </div>
+          ) : null}
         </div>
         <span
           className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
@@ -106,8 +104,12 @@ function WidgetKeyCard({
               onChange={(event) => setOrigins(event.target.value)}
               disabled={updatePending || !canEdit}
               placeholder="https://example.com"
+              aria-describedby={`origins-hint-${widgetKey.id}`}
               className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
             />
+            <p id={`origins-hint-${widgetKey.id}`} className="text-xs text-ds-text-muted">
+              Just the address itself, one per line, e.g. https://example.com — no page path or trailing slash.
+            </p>
             {updateState.error ? (
               <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
                 {updateState.error}

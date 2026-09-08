@@ -49,13 +49,19 @@ export default async function WidgetSettingsPage() {
           appOrigin={appOrigin}
           publishedAt={business?.published_at ?? null}
         />
-        {canEdit ? <CreateWidgetKeyForm /> : <PermissionNotice />}
-        <WidgetKeyList
-          widgetKeys={widgetKeys}
-          appOrigin={appOrigin}
-          widgetLanguage={business?.widget_language ?? "en"}
-          canEdit={canEdit}
-        />
+        {/* Create + manage are one continuous task (create a key, then see
+           it appear below) -- grouped tighter than the gap-6 that separates
+           this cluster from the install guide above, so proximity signals
+           the relationship instead of every block reading as equally related. */}
+        <div className="flex flex-col gap-3">
+          {canEdit ? <CreateWidgetKeyForm /> : <PermissionNotice />}
+          <WidgetKeyList
+            widgetKeys={widgetKeys}
+            appOrigin={appOrigin}
+            widgetLanguage={business?.widget_language ?? "en"}
+            canEdit={canEdit}
+          />
+        </div>
       </section>
 
       <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
