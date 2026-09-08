@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
+import { processWhatsappOutboundMessages } from "@/lib/whatsapp-delivery";
 import { refreshDueUrlKnowledgeSources } from "@/lib/url-ingestion";
 import { runSlaEscalationSweep } from "@/lib/sla-routing";
 import { sendDailyDigestEmails } from "@/lib/notifications";
@@ -47,14 +48,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [ingestion, webhooks, urlRefresh, slaRouting, notificationDigest] = await Promise.all([
+    const [ingestion, webhooks, whatsappOutbound, urlRefresh, slaRouting, notificationDigest] = await Promise.all([
       processIngestionQueue(),
       processWebhookDeliveries(),
+      processWhatsappOutboundMessages(),
       refreshDueUrlKnowledgeSources(),
       runSlaEscalationSweep(),
       sendDailyDigestEmails(),
     ]);
-    return jsonSuccess({ ingestion, webhooks, urlRefresh, slaRouting, notificationDigest });
+    return jsonSuccess({ ingestion, webhooks, whatsappOutbound, urlRefresh, slaRouting, notificationDigest });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);
   }

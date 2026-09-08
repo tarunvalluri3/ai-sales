@@ -240,6 +240,24 @@ export type WebhookEndpoint = {
   created_at: string;
 };
 
+export type WhatsappConnectionStatus = "pending" | "connected" | "error" | "disconnected";
+
+export type WhatsappConnection = {
+  id: string;
+  business_id: string;
+  phone_number_id: string;
+  waba_id: string;
+  display_phone_number: string;
+  verified_name: string | null;
+  status: WhatsappConnectionStatus;
+  last_verified_at: string | null;
+  last_error: string | null;
+  connected_at: string | null;
+  access_token_last4: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
 export type AuditLogAction =
   | "conversation.control_changed"
   | "conversation.attention_dismissed"
@@ -260,7 +278,9 @@ export type AuditLogAction =
   | "appointment.confirmed"
   | "appointment.declined"
   | "appointment.cancelled"
-  | "ai_capabilities.updated";
+  | "ai_capabilities.updated"
+  | "whatsapp_connection.created"
+  | "whatsapp_connection.deleted";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 
