@@ -80,7 +80,7 @@ export const widgetLogoUrlSchema = optionalTrimmedNullable.pipe(
     .string()
     .nullable()
     .refine((value) => value === null || z.string().url().safeParse(value).success, {
-      message: "Enter a valid logo image URL.",
+      message: "Enter a full image URL starting with https://, e.g. https://example.com/logo.png.",
     }),
 );
 
@@ -89,7 +89,7 @@ export const widgetWelcomeTextSchema = optionalTrimmedNullable.pipe(
 );
 
 export const widgetCtaTextSchema = optionalTrimmedNullable.pipe(
-  z.string().max(60, "CTA text must be 60 characters or fewer.").nullable(),
+  z.string().max(60, "Chat bubble text must be 60 characters or fewer.").nullable(),
 );
 
 export const widgetPositionSchema = z.enum(["bottom-right", "bottom-left"]);

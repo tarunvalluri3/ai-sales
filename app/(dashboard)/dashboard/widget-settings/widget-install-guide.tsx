@@ -65,7 +65,10 @@ export function WidgetInstallGuide({
   appOrigin: string;
   publishedAt: string | null;
 }) {
-  const [open, setOpen] = useState(true);
+  // Open by default while still setting up (the guide's entire job); once
+  // published, this business has already followed it, so it recedes behind
+  // "Show" instead of reopening the same wall of steps on every visit.
+  const [open, setOpen] = useState(publishedAt == null);
   const [platformId, setPlatformId] = useState(PLATFORMS[0].id);
   const activeKeys = widgetKeys.filter((key) => key.status !== "revoked");
   const activeKey = activeKeys[0];
@@ -96,8 +99,7 @@ export function WidgetInstallGuide({
         </p>
       </div>
 
-      {open ? (
-        <div className="flex flex-col gap-6">
+      <div className={open ? "flex flex-col gap-6" : "hidden"}>
           <div className="flex flex-col gap-2">
             <h3 className="flex items-center gap-2 text-sm font-medium text-ds-text-primary">
               Step 1 — Copy your snippet
@@ -127,7 +129,7 @@ export function WidgetInstallGuide({
                   type="button"
                   onClick={() => setPlatformId(candidate.id)}
                   aria-pressed={candidate.id === platformId}
-                  className={`rounded-ds-sm px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`rounded-ds-sm px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
                     candidate.id === platformId
                       ? "bg-ds-accent text-ds-accent-on"
                       : "border border-ds-border text-ds-text-secondary hover:border-ds-border-strong hover:text-ds-text-primary"
@@ -176,8 +178,7 @@ export function WidgetInstallGuide({
               it and send a test message to make sure it responds.
             </p>
           </div>
-        </div>
-      ) : null}
+      </div>
     </section>
   );
 }

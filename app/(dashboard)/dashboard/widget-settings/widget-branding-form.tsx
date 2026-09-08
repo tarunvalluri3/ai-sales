@@ -6,11 +6,9 @@ import type { WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_LABELS, SUPPORTED_WIDGET_LANGUAGES } from "@/lib/widget-i18n";
 import { updateWidgetBrandingAction, type WidgetBrandingActionState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { inputClasses } from "./input-classes";
 
 const initialState: WidgetBrandingActionState = {};
-
-const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
 
 export function WidgetBrandingForm({
   initialAccentColor,
@@ -33,7 +31,13 @@ export function WidgetBrandingForm({
 }) {
   const [state, formAction, isPending] = useActionState(updateWidgetBrandingAction, initialState);
   const reduceMotion = useReducedMotion();
-  const [open, setOpen] = useState(true);
+  // Open by default only while nothing has been customized yet -- once a
+  // business has set even one of these, the card recedes behind "Show"
+  // instead of re-presenting the full form every visit.
+  const hasCustomization = Boolean(
+    initialAccentColor || initialLogoUrl || initialWelcomeText || initialWelcomeTextClosed || initialCtaText,
+  );
+  const [open, setOpen] = useState(!hasCustomization);
   const [accentColor, setAccentColor] = useState(initialAccentColor);
 
   return (
@@ -136,7 +140,7 @@ export function WidgetBrandingForm({
 
           <div className="flex flex-col gap-1">
             <label htmlFor="ctaText" className="text-sm font-medium text-ds-text-secondary">
-              Launcher CTA text <span className="text-ds-text-muted">(optional, e.g. &ldquo;Chat with us&rdquo;)</span>
+              Chat bubble text <span className="text-ds-text-muted">(optional, e.g. &ldquo;Chat with us&rdquo;)</span>
             </label>
             <input
               id="ctaText"
@@ -204,6 +208,7 @@ export function WidgetBrandingForm({
             {state.success ? (
               <motion.p
                 key="success"
+                role="status"
                 className="text-sm text-ds-success"
                 initial={reduceMotion ? undefined : { opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}

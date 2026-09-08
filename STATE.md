@@ -2,9 +2,142 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-08 (Widget Settings page: independent re-critique after the schema/UI fix pass — 25/40 → 29/40 — found that the new collapsible-card feature itself introduced a real data-loss bug (collapsing a Customize card silently discarded unsaved edits in uncontrolled fields). Fixed that plus two accessibility regressions on the new collapse-toggle buttons, a create-key form that never reset after success, and a nickname-label inconsistency. See the detailed entry below)
+Last updated: 2026-09-08 (Widget Settings page: `/impeccable polish` pass -- final pass closing the audit→harden→adapt→harden→layout→clarify→distill arc from earlier today. A stale P0/P1 critique snapshot from before this arc started was checked and confirmed already resolved (collapse-data-loss fix, focus-visible, accessible names, form-reset, nickname label -- all fixed in a pre-session commit). Found and fixed 3 real, verified drift items this pass caught that six prior passes had missed: `WidgetInstallGuide` was still the one card unmounting its body on collapse instead of using the `hidden`-class pattern every sibling card uses; its platform-picker tabs and `SuggestedQuestionsForm`'s "remove question" button were the only two interactive elements left on the page without a `focus-visible` ring. All three fixed; page is now fully consistent. See the detailed entry below)
 
 ---
+
+## Widget Settings page: final polish pass — closes the day's audit→...→distill arc — implemented 2026-09-08
+
+`/impeccable polish widget-settings page`. This is the finishing pass after seven prior commands today (audit, harden ×2, adapt, layout, clarify, distill) on this same page.
+
+**Checked the stored critique first.** `.impeccable/critique/2026-09-08T07-28-33Z__app-dashboard-dashboard-widget-settings.md` (score 29/40, 1 P0 + 2 P1) predates this session's own work. Verified each finding against current code rather than trusting the snapshot blindly: the P0 (collapse-triggered data loss), both P1s (missing focus-visible on collapse toggles, verbose accessible names), the P2 (create-key form not resetting), and the P3 (nickname label inconsistency) were all already fixed by a commit that landed before this session started (`b31b0b7`, referenced in the STATE.md entry above this arc). Treated as historical context only, not an active backlog — no rework needed.
+
+**Read every file in the directory fresh** (not just the ones touched in the last few passes) and diffed each interactive element's markup against its siblings. Found three real, verifiable inconsistencies six prior passes this session had each individually missed:
+
+1. **`WidgetInstallGuide` was the one card still unmounting its body on collapse** (`{open ? (<div>...) : null}`) while `WidgetBrandingForm`, `AiCapabilitiesForm`, and `SuggestedQuestionsForm` all use `className={open ? "..." : "hidden"}` to keep the DOM mounted (the exact pattern the pre-session P0 fix established, specifically to prevent collapse-triggered data loss). Currently harmless — this component's only state (`platformId`) lives above the conditional — but it was the one piece of drift from a pattern the rest of the page had already standardized on. Converted to match.
+2. **The install guide's 4-tab platform picker had no `focus-visible` ring** — every other button on this page does. A keyboard user tabbing through "WordPress / Shopify / Wix / Other" would lose visible focus tracking on exactly the control they need to pick their platform with. Added the same ring classes used everywhere else in this file set.
+3. **`SuggestedQuestionsForm`'s "✕ Remove question" button had no `focus-visible` ring** — the adjacent "Move up"/"Move down" buttons (fixed in the earlier adapt pass) and every other button in the same file have it; this one alone was missed. Added it.
+
+Also verified (not re-litigated, since already resolved by that specific pass): the accent-color text input's native `pattern` attribute has no custom inline validation message — left as-is; it's a real, minor gap noted by the stored critique, but adding real-time JS validation is new scope beyond a finishing pass, not a drift fix.
+
+**Files changed:** `app/(dashboard)/dashboard/widget-settings/{widget-install-guide.tsx,suggested-questions-form.tsx}`.
+
+**Checks run:** `npm run lint` (clean), `npx tsc --noEmit` (clean), `npm run build` (clean, all 30 routes), `detect.mjs --json` on the whole `widget-settings` directory (0 findings), `git status` diffed against everything touched today — no orphaned files, no unexpected changes outside the nine files this session's full arc modified.
+
+**Not yet verified in a real browser** — no authenticated session available in this pass (a recurring limitation across today's entire arc; every fix in every pass has been code-reviewed and build-verified but not click-tested). Manual test, covering the whole day's arc in one pass: sign in as `org:admin`, open `/dashboard/widget-settings` fresh with nothing configured (everything should render open/expanded), tab through the entire page with keyboard only (every control — including the install guide's platform tabs and each question's remove button — should show a visible lime focus ring), configure and save each of the three Customize cards (confirm each collapses on your *next* visit, not immediately), and confirm a screen reader announces both error and success messages on every form.
+
+**This closes the widget-settings audit→harden→adapt→harden→layout→clarify→distill→polish arc from 2026-09-08.** No further open items from this arc remain.
+
+## Widget Settings page: distill pass — code-level dedup only; one candidate cut flagged, not removed — implemented 2026-09-08
+
+`/impeccable distill widget-settings page`. Assessed all five distill dimensions (information architecture, visual, layout, interaction, content) against the page as it stood after this session's audit→harden→adapt→harden→layout→clarify arc.
+
+**Conclusion: little decorative complexity remains to cut.** The page's 8 card blocks each correspond to a real, independently-scoped product capability (`PRODUCT.md` §7: lead capture/recommendations/appointments are independent business-configurable capabilities, not one flow) — not framework-default clutter. Specific candidates considered and kept, with reasoning:
+- The 4-tab platform picker in `WidgetInstallGuide` — already trimmed once in an earlier critique pass (STATE.md, 2026-09-07); each platform's steps are genuinely different navigation paths a non-technical owner needs verbatim, not padding.
+- The three places "allowed origins" gets explained (page intro, install-guide Step 3, the per-field hint added in the prior clarify pass) — serve three different moments (context-setting, guided walkthrough, just-in-time format help), not restated redundancy.
+- The "Copy snippet" button appearing both in `WidgetInstallGuide` (Step 1) and again on the matching `WidgetKeyCard` — real overlap only while a business is still mid-setup (the install guide is open); the prior layout pass already made the guide default-collapse once published, which removes the duplicate for the common returning-user case. Kept as two legitimate entry points to the same action rather than cut.
+
+**Fixed (code-level only, zero visible/behavioral change):** the exact same `inputClasses` Tailwind string (`rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm...`) was hand-duplicated as a local `const` in both `widget-branding-form.tsx` and `ai-capabilities-form.tsx`, and duplicated a third time inline in `suggested-questions-form.tsx`. Consolidated into one new `input-classes.ts`, imported by all three. (The same string also appears in 8 files *outside* widget-settings — knowledge, conversations, services, products, faqs — left untouched as a separate, larger cross-cutting concern outside this page's approved scope.)
+
+**Flagged, then removed per user decision:** `WidgetKeyCard` showed the raw key value (`<code>{widgetKey.key}</code>`) plus a standalone "Copy key" button, distinct from "Copy snippet." The page's actual user journey (a non-technical owner pasting a snippet into WordPress/Shopify/Wix) never needs the bare key alone — only the full snippet. Since distill.md's own instruction is to stop and ask rather than guess when essential-vs-removable is unclear from the code alone, asked the user via `AskUserQuestion` rather than cutting it unilaterally. **User chose "Remove it."** Both the `<code>` block and the "Copy key" button are gone; only "Copy snippet" remains, shown for active (non-revoked) keys as before. A revoked key's card no longer shows its old key value at all (the description accompanying the user's chosen option explicitly notes the raw key stays available in the database/audit log if ever needed).
+
+**Files changed:** new `app/(dashboard)/dashboard/widget-settings/input-classes.ts`; `app/(dashboard)/dashboard/widget-settings/{widget-branding-form.tsx,ai-capabilities-form.tsx,suggested-questions-form.tsx,widget-key-list.tsx}` (three import the shared `inputClasses`; `widget-key-list.tsx` drops the raw-key display and its "Copy key" button).
+
+**Checks run:** `npm run lint` (clean), `npx tsc --noEmit` (clean), `npm run build` (clean, all 30 routes), `detect.mjs --json` on all five changed files (0 findings, run after each edit).
+
+**Not yet verified in a real browser** — no authenticated session available in this pass. Manual test: sign in, open `/dashboard/widget-settings`, confirm each active key's card shows only "Copy snippet" (no bare key code block, no "Copy key" button), a revoked key's card shows neither, and "Copy snippet" still copies a working, correctly-keyed embed snippet.
+
+**Next logical task:** the earlier-noted `create-widget-key-form.tsx`/`widget-key-list.tsx` `role="status"` follow-up, or `/impeccable polish` to close out this arc.
+
+## Widget Settings page: clarify pass, jargon + inconsistent/vague copy — implemented 2026-09-08
+
+`/impeccable clarify widget-settings page`. Read the full interaction path (labels, placeholders, helper text, and every validation/error string reachable from this page, including `lib/schemas/business.ts` and `lib/schemas/widget-origin.ts`) rather than isolated strings. Most of the page's copy was already good — specific, actionable errors with recovery guidance (the origin-format error, the "no allowed origins yet" warning, the publish-state messaging) were left untouched as positive examples the rest of the app should match. Three real defects found and fixed:
+
+1. **Jargon inconsistent with the page's own established term.** `widget-branding-form.tsx` labeled the launcher's button text "Launcher CTA text" — but the rest of this exact page (the install guide, 4 separate places) already calls the same UI element "the chat bubble," never "the launcher." "CTA" is marketing jargon with no reason to appear in a small-business owner's settings UI. Relabeled to "Chat bubble text," and the matching Zod message in `lib/schemas/business.ts` ("CTA text must be 60 characters or fewer.") updated to match.
+2. **Vague validation message, inconsistent with its sibling fields.** In the same schema object, `widgetAccentColorSchema`'s error gives a concrete example ("Enter a 6-digit hex color, e.g. #d7f24e.") but `widgetLogoUrlSchema`'s said only "Enter a valid logo image URL." — doesn't say what was wrong or how to fix it. Reworded to "Enter a full image URL starting with https://, e.g. https://example.com/logo.png." — reusing the exact example already shown in the field's own placeholder, so the two now agree.
+3. **Format requirement missing near the field, per Forms guidance ("format... before submission," "keep instructions near the field").** Both "Allowed origins" textareas (`create-widget-key-form.tsx`, `widget-key-list.tsx`) had no inline hint — the format (bare origin, e.g. `https://example.com`, no path, no trailing slash) was explained once in the page's top intro paragraph and otherwise only surfaced after a failed submit via `lib/schemas/widget-origin.ts`'s error. Added a caption under each textarea, wired via `aria-describedby` so screen readers announce it as field guidance, not just decoration: "Just the address itself, one per line, e.g. https://example.com — no page path or trailing slash."
+
+**Files changed:** `lib/schemas/business.ts`, `app/(dashboard)/dashboard/widget-settings/{widget-branding-form.tsx,create-widget-key-form.tsx,widget-key-list.tsx}`.
+
+**Checks run:** `npm run lint` (clean), `npx tsc --noEmit` (clean), `npm run build` (clean, all 30 routes), `npm test` (pgTAP, all 28 files pass — unaffected by this copy-only change, run anyway per AGENTS.md §7 since `lib/schemas/business.ts` is shared validation logic), `detect.mjs --json` on all four changed files (0 findings).
+
+**Not yet verified in a real browser** — no authenticated session available in this pass. Manual test: sign in, open `/dashboard/widget-settings`, confirm the branding card's chat-bubble-text field now says "Chat bubble text" (not "Launcher CTA text"); submit an invalid logo URL and confirm the new example-based error; and confirm both origins textareas (create form + an existing key's edit form) now show the format hint beneath them without submitting.
+
+**Next logical task:** the earlier-noted `create-widget-key-form.tsx`/`widget-key-list.tsx` `role="status"` follow-up, or `/impeccable polish` to close out this arc.
+
+## Widget Settings page: layout pass, density-aware default-collapse + grouping — implemented 2026-09-08
+
+`/impeccable layout widget-settings page`. Mechanical scan (`detect.mjs --scope layout`) was clean, as expected — a clean scan can't prove hierarchy or rhythm, so this was a manual structural assessment against the page as it stood after the audit→harden→adapt→harden arc.
+
+**Finding (density):** all four collapsible cards on this page — `WidgetInstallGuide`, `WidgetBrandingForm`, `SuggestedQuestionsForm`, `AiCapabilitiesForm` — initialized their `open` state as a hardcoded `useState(true)`, with no persistence across page loads. The "Hide" toggle exists on every card, but its entire value proposition (letting a returning user land on a scannable list of section titles instead of a wall of open forms) was never realized, since every card silently re-expands to fully-open on every single visit regardless of whether that section is already configured. A business that finished setup weeks ago sees the exact same overwhelming, fully-expanded page as someone setting up for the first time.
+
+Fixed by computing each card's initial `open` from whether it already has real content, using data already passed in as props (no new fetches, no new state, no persistence layer):
+- `WidgetInstallGuide` — open while `publishedAt == null` (still setting up); collapses once published, since the guide's job is done.
+- `WidgetBrandingForm` — open while none of accent color / logo URL / welcome text (open or closed) / CTA text are set; collapses once any are.
+- `SuggestedQuestionsForm` — open while `initialQuestions` is empty; collapses once a list has been saved.
+- `AiCapabilitiesForm` — open while neither `recommendProductsEnabled` nor `appointmentsEnabled` is on; collapses once either is.
+
+This only changes each `useState(true)` call's initial value — the toggle mechanics, the safe "keep mounted, hide via CSS" pattern from the earlier collapse-data-loss fix (`b31b0b7`), and everything else about these components is untouched.
+
+**Finding (rhythm):** Section 1 ("Set up your widget") wrapped `WidgetInstallGuide`, `CreateWidgetKeyForm`/`PermissionNotice`, and `WidgetKeyList` in one flat `gap-6`, giving three blocks with genuinely different relationships (a reference guide; a create action; its resulting list) identical spacing — no cadence distinguished the tightly-coupled create→list pair (create a key, then immediately see it appear below) from the more loosely-related install guide above them. Fixed by nesting the create form and key list in their own `gap-3` group inside the outer `gap-6` flow, so proximity now signals which two blocks are one continuous task.
+
+**Considered and deliberately not changed:** every block on this page (guide, forms, key cards, publish status, sandbox chat) shares identical `rounded-ds-lg border bg-ds-surface p-5` card chrome. This page is Operate mode (task completion, not persuasion), where the mode's own guidance favors predictable, stable structure over differentiated container styles — so uniform card chrome stays. Also left alone: the outer "1. Set up your widget / 2. Go live / 3. Customize" section numbering, which does carry real first-time-setup sequencing information (you need a key before publishing, and customization is genuinely last/optional) rather than being a decorative default; a hypothesized collision with the install guide's own internal "Step 1–5" numbering looked mitigated by the two already using distinct type treatments (small uppercase tracked label vs. sentence-case heading), but this is unverified without a rendered screenshot, so it was left as a noted, low-confidence observation rather than acted on.
+
+**Files changed:** `app/(dashboard)/dashboard/widget-settings/{page.tsx,widget-install-guide.tsx,widget-branding-form.tsx,suggested-questions-form.tsx,ai-capabilities-form.tsx}`.
+
+**Checks run:** `npm run lint` (clean), `npx tsc --noEmit` (clean), `npm run build` (clean, all 30 routes), `detect.mjs --json --scope layout` on the five changed files (0 findings, both before and after).
+
+**Not yet verified in a real browser** — no authenticated session available in this pass. Manual test: sign in as a business with nothing configured yet — confirm all four cards render open. Then sign in as (or simulate) a business with a saved accent color, saved suggested questions, an enabled AI capability, and a published widget — confirm those cards now render collapsed by default, "Show" still expands them, and expanding/collapsing doesn't lose any in-progress edits (re-verifying the earlier collapse-data-loss fix still holds with the new default states). Also confirm the tighter spacing between "Create a new widget key" and the key list list reads as one group without looking cramped.
+
+**Next logical task:** the earlier-noted `create-widget-key-form.tsx`/`widget-key-list.tsx` `role="status"` follow-up, or a `/impeccable polish` pass to close out this arc.
+
+## Widget Settings page: harden pass, `role="status"` on success confirmations — implemented 2026-09-08
+
+Third and last fix from the `/impeccable audit` (17/20) pass. Error messages in these three forms already used `role="alert"`; the sibling success message on save had no ARIA live-region role at all, so a screen reader user got no confirmation their save actually worked. Added `role="status"` (polite — a routine confirmation, not an interruption) to the success branch in all three:
+
+- `widget-branding-form.tsx` — the "Widget settings updated." `motion.p`.
+- `ai-capabilities-form.tsx` — the shared `ErrorOrSuccess` helper only accepted `role="alert"` on its `role` prop type; widened to `"alert" | "status"` and the success call site now passes `role="status"` (the error call site already passed `role="alert"` explicitly, unchanged).
+- `suggested-questions-form.tsx` — the "Suggested questions saved." `motion.p`.
+
+Out of scope, left as-is per the approved scope (user named these three specifically): `create-widget-key-form.tsx`'s "Key created." and `widget-key-list.tsx`'s "Saved." success messages have the identical gap. Worth a follow-up if the user wants full parity across the page.
+
+**Files changed:** `app/(dashboard)/dashboard/widget-settings/{widget-branding-form.tsx,ai-capabilities-form.tsx,suggested-questions-form.tsx}`.
+
+**Checks run:** `npm run lint` (clean), `npx tsc --noEmit` (clean), `npm run build` (clean, all 30 routes), `detect.mjs --json` on the three changed files (0 findings).
+
+**Not yet verified in a real browser/screen reader** — no authenticated session available in this pass. Manual test: sign in, open `/dashboard/widget-settings` with a screen reader running (NVDA/VoiceOver), save each of the three forms, and confirm the success text is announced automatically without needing to navigate to it.
+
+**Audit arc closed** — all three findings from the 2026-09-08 `/impeccable audit` (contrast, touch targets, live-region roles) are now fixed. Re-run `/impeccable audit widget-settings page` to confirm the score improvement, or move on to the noted `create-widget-key-form.tsx`/`widget-key-list.tsx` follow-up.
+
+## Widget Settings page: adapt pass, suggested-questions reorder buttons to a real touch target — implemented 2026-09-08
+
+Second fix from the same `/impeccable audit` (17/20). The ▲/▼ reorder buttons in `suggested-questions-form.tsx` were `h-4 w-5` (16×20px), stacked directly against each other with zero gap — under WCAG 2.5.8's 24×24px AA minimum and far under the 44×44 touch-target guideline, on a control where a mis-tap silently reorders the wrong question.
+
+Used the `pointer-coarse`/`pointer-fine` adaptation technique (Tailwind v4 ships both variants natively, verified in `node_modules/tailwindcss/dist/lib.js`) rather than a flat resize: base size is now 24×24 (`h-6 w-6`, clears AA unconditionally for mouse/keyboard use without inflating this dense, multi-column settings row), and `pointer-coarse:h-11 pointer-coarse:w-11` pushes to a full 44×44 specifically on touchscreens. Added `gap-1`/`pointer-coarse:gap-2` between the stacked pair so the two targets don't touch. Also added the `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent` ring these two buttons were missing — every other interactive element in this file (and the rest of the dashboard) already has it; a real gap, not scope creep, since it's the same "States" check this pass exists to satisfy. The "✕" remove button in the same row was left untouched — not flagged by the audit and out of the approved scope.
+
+**Files changed:** `app/(dashboard)/dashboard/widget-settings/suggested-questions-form.tsx`.
+
+**Checks run:** `npm run lint` (clean), `npx tsc --noEmit` (clean), `npm run build` (clean, all 30 routes), `detect.mjs --json` on the changed file (0 findings).
+
+**Not yet verified in a real browser** — no authenticated session available in this pass. Manual test: sign in, open `/dashboard/widget-settings`, generate or add a few suggested questions, confirm the ▲/▼ buttons have a visibly larger, comfortably spaced hit area (use browser DevTools' touch/coarse-pointer emulation, or a real phone/tablet, to see the 44×44 state — desktop with a mouse will show the smaller 24×24 size by design), and confirm `Tab`-ing to them shows the same lime focus ring as the rest of the page.
+
+**Next logical task:** the audit's remaining P2 — missing `role="status"` on the success-message branches in `widget-branding-form.tsx`, `ai-capabilities-form.tsx`, and `suggested-questions-form.tsx`.
+
+## Widget Settings page: audit → harden pass, `--ds-text-muted` contrast fix (app-wide token) — implemented 2026-09-08
+
+`/impeccable audit widget-settings page` scored the page **17/20 ("Good")**. Detector clean (0 findings, 9 files). Top finding (P1): `--ds-text-muted` (`#746e5f`) computed to ~3.6:1 against `--ds-surface` (worse against `--ds-surface-elevated`/`--ds-surface-soft`), below the 4.5:1 WCAG AA floor for normal text — and this token is the page's (and the whole dashboard's) default "meta/secondary" text color, used 33× in widget-settings alone and in 44 files total. User asked to fix that one finding, scoped explicitly as an app-wide token fix rather than a per-component patch.
+
+Fixed by lightening the token itself, `#746e5f` → `#948d79` (chosen to hold the same warm hue direction as `--ds-text-secondary` per the craft-floor rule against tinting secondary text gray, while staying visibly dimmer than it): clears 4.5:1 against `--ds-surface` (~5.5:1), `--ds-surface-elevated` (~5.2:1), and `--ds-surface-soft` (~4.8:1). One edit in `app/(dashboard)/globals.css` cascades correctly to all 44 consuming files — no per-component changes needed.
+
+Two other spots hardcode the exact same old hex as a documented, intentional duplicate (Clerk's `appearance` API and Recharts' SVG props can't reliably resolve CSS custom properties) and would otherwise have silently drifted out of sync and kept the same contrast failure: `lib/clerk-appearance.ts` (`formFieldHintText`, `dividerText` — both render on the same dark card surface) and `app/(dashboard)/dashboard/_components/charts/chart-colors.ts` (`textMuted`). Both updated to the same new hex. `app/(widget)/widget.css`'s `--widget-muted` also happens to be `#746e5f` but is a separate, intentionally-independent palette (light widget-panel background, per `PRODUCT.md`) — left untouched, not in scope.
+
+**Files changed:** `app/(dashboard)/globals.css`, `lib/clerk-appearance.ts`, `app/(dashboard)/dashboard/_components/charts/chart-colors.ts`.
+
+**Checks run:** `npm run lint` (clean), `npx tsc --noEmit` (clean), `npm run build` (clean, all 30 routes).
+
+**Not yet verified in a real browser** — no authenticated session available in this pass. Manual test: sign in, open `/dashboard/widget-settings` (and any other dashboard page, plus Clerk's sign-in/sign-up screens), confirm muted meta text (timestamps, field hints, "(optional)" labels) now reads clearly against the dark surfaces without looking washed out or breaking the existing lighter/darker hierarchy against `--ds-text-secondary` and `--ds-text-primary`.
+
+**Next logical task:** the audit's two remaining P2s — undersized reorder-button touch targets in `suggested-questions-form.tsx`, and missing `role="status"` on success-message branches across the three save forms.
 
 ## Widget Settings page: re-critique + fix for a real bug the collapse feature introduced — implemented 2026-09-08
 
