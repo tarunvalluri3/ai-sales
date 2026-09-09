@@ -2,7 +2,165 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-08 (WhatsApp dashboard page: new `WhatsappSetupGuide` collapsible section on `app/(dashboard)/dashboard/whatsapp/` walks a business owner through actually creating a Meta Business account, a Meta app + WhatsApp product, finding the phone number ID/WABA ID, and generating a permanent access token — a step beyond the existing per-field hints, which only said *where* each value lives, not *how to create it*. Planned via Claude Code's plan mode (user approved) and modeled directly on `widget-settings/widget-install-guide.tsx`'s collapsible pattern. See the entry below the six prior WhatsApp critique-arc entries.)
+Last updated: 2026-09-09 (`/impeccable polish` final pass on the Leads page — fixed a stray literal newline baked into the header string, de-duplicated the status label/array constants that had drifted into two copies across the critique arc, and closed the three Minor Observations from the original critique. See the entry below.)
+
+---
+
+## Leads page: final polish pass — closes the critique arc — implemented 2026-09-09
+
+Final `/impeccable polish` pass across everything touched by the five-command critique arc on `/dashboard/leads` (layout → harden → clarify → bulk toolbar → adapt, see the entries below). Read the prior critique snapshot (`critique-storage.mjs latest`) as one input, then did an independent read of both files end-to-end per the polish skill's own mandate rather than only checking the snapshot's specific line items.
+
+**Real defect fixed, not just cosmetic**: `leads-list.tsx`'s header string had a literal newline and 10 spaces of indentation baked into the middle of the AI-disclaimer sentence — a leftover from when that text used to wrap across JSX lines inside a single `<p>`. Browsers collapse that whitespace visually, but it was sloppy source, not intentional formatting. Fixed alongside the critique's own "run-on sentence" Minor Observation by splitting the fact (`"N leads total"`) from the AI disclaimer into two separate lines with distinct visual weight (`text-sm`/`text-ds-text-secondary` for the count, `text-xs`/`text-ds-text-muted` for the disclaimer) — the count is what a user scans for, the disclaimer is supporting context.
+
+**De-duplicated drift**: `status-select.tsx` and `leads-list.tsx` had each grown their own copy of the same status vocabulary — `STATUSES`/`STATUS_TABS` (identical arrays, different names) and two separately-typed `STATUS_LABEL` maps with identical content — an artifact of the two files being built in separate passes without ever being cross-checked against each other. New `app/(dashboard)/dashboard/leads/lead-status.ts` exports `LEAD_STATUSES`/`LEAD_STATUS_LABEL` as the single source of truth; both files now import it instead of maintaining their own copy, closing the risk of the two drifting out of sync on a future edit.
+
+**Closed the original critique's three Minor Observations** (never assigned to a command, so never picked up by the four scoped passes):
+- Status text is now rendered via `LEAD_STATUS_LABEL` instead of a CSS `capitalize` class on the raw lowercase enum value, on both the `<select>` and its `<option>`s.
+- `Source:` now renders its value (when present) as a small `bg-ds-surface-soft` chip next to the still-visible "Source:" label — consistent with the qualification badge's tag-like visual language, while keeping the label so an arbitrary free-text value (unlike the fixed-vocabulary badges elsewhere) isn't shown unlabeled and ambiguous.
+- (The header run-on was folded into the defect fix above rather than treated as separate.)
+
+**One additional a11y fix found during the pass**: the qualification badge's only explanation of what "hot"/"warm"/"cold" means (`title="AI-assessed signal -- not verified"`) was hover-only — never reliably exposed to keyboard or touch users, and not screen-reader-guaranteed either (this was flagged under the critique's Sam/accessibility persona red flags, but never turned into an assigned fix). Added a `sr-only` span inside the same badge (`" lead — AI-assessed signal, not verified"`) so the accessible name carries the same context regardless of input method or assistive technology, while leaving the visible `title` tooltip for mouse users unchanged.
+
+**Files changed:** new `app/(dashboard)/dashboard/leads/lead-status.ts`; modified `app/(dashboard)/dashboard/leads/status-select.tsx` and `app/(dashboard)/dashboard/leads/leads-list.tsx`. No change to `actions.ts`, `lib/leads.ts`, or `page.tsx`.
+
+**Checks run:** `npm run lint` — clean. `npx tsc --noEmit` — clean. `npm run build` — clean, all 32 routes compile. `node .../impeccable/scripts/detect.mjs --json` on all three changed files — `[]`, no findings.
+
+**Not yet verified:** no live browser click-through (no dev server running, page is Clerk-auth-gated) — same standing gap as every pass in this arc. Manual test steps: open `/dashboard/leads` and confirm the header shows "N leads total" and the AI disclaimer as two visually distinct lines with no stray whitespace artifacts; confirm the status dropdown shows "New"/"Contacted"/"Converted"/"Lost" (not lowercase); confirm a lead with a `source` value shows it as a small tag next to "Source:"; with a screen reader, confirm each qualification badge announces "hot lead — AI-assessed signal, not verified" (or warm/cold) rather than just the bare word.
+
+**This closes the full `/impeccable critique` → fix arc on `/dashboard/leads`**: critique (19/36) → layout → harden → clarify → bulk toolbar → adapt → polish. No further leads-page work is queued; awaiting new direction.
+
+---
+
+## Leads page: 44px touch targets on coarse pointers — `/impeccable adapt` — implemented 2026-09-09
+
+Fifth and last of the five `/impeccable critique` priority issues on `/dashboard/leads` (see the `/impeccable layout` entry below for the full critique context). This one closed: "Touch targets below 44×44pt" — originally flagged on just the status `<select>` (~30-32px tall) and the "View conversation" link (~20px tap area), from before the `harden`/`clarify`/bulk-toolbar passes existed.
+
+**Scope decision**: the three passes since the critique (`harden`, `clarify`, and the bulk-toolbar feature) all added new small buttons — Confirm lost/Cancel/Undo, the "Show more"/"Show less" toggle, the status-filter tabs, the bulk toolbar's status buttons, and two new checkboxes — none of which existed when the critique ran, so none were in its original two-item list. Leaving those newly-introduced controls small while fixing only the original two would have shipped an inconsistent result under the same command. Extended the fix to every small interactive control the leads page now has.
+
+**Fix**: used this codebase's existing `pointer-coarse:` variant (Tailwind v4's built-in coarse-pointer media feature, already established in `widget-settings/suggested-questions-form.tsx` for the same reason) throughout — every control grows to a 44px minimum tap target on touch/coarse pointers only, staying at its original compact size for mouse/trackpad. This is "detect input method, not just screen size" per the adapt skill's own guidance, not a blanket size increase that would make the page feel oversized on desktop.
+- `status-select.tsx`: the status `<select>`, and the Confirm lost/Cancel/Undo buttons added by the `harden` pass.
+- `leads-list.tsx`: the "View conversation" link, the status-filter tabs, the "Show more"/"Show less" toggle, the select-all and per-row checkboxes (wrapped in a `<label>` with `pointer-coarse:h-11 pointer-coarse:w-11` plus a compensating negative margin, so the checkbox's own visual mark stays small while its clickable area grows — the same "enlarge the hit area, not the mark" approach already used for icon buttons in `suggested-questions-form.tsx`), and the bulk toolbar's status/Confirm lost/Cancel/Clear buttons.
+
+**Explicitly not touched**: the shared `EmptyState`/`ErrorState` "Try again"/"View all leads" button pattern (`_components/state-views.tsx`) — it's used identically across every dashboard page, not something specific to leads, so resizing it here would be a site-wide change outside this page's scope.
+
+**Files changed:** `app/(dashboard)/dashboard/leads/status-select.tsx`, `app/(dashboard)/dashboard/leads/leads-list.tsx`. No change to `actions.ts`, `lib/leads.ts`, or `page.tsx`.
+
+**Checks run:** `npm run lint` — clean. `npx tsc --noEmit` — clean. `npm run build` — clean, all 32 routes compile. `node .../impeccable/scripts/detect.mjs --json` on both changed files — `[]`, no findings.
+
+**Not yet verified:** no live browser click-through, and specifically no real touch-device testing (no dev server running, page is Clerk-auth-gated, no physical device in this environment) — `pointer-coarse:` is a real, well-supported CSS media feature, but its actual on-device tap-target sizing is unverified against a rendered page. Manual test steps: on a touchscreen device (or Chrome DevTools' device toolbar with touch simulation enabled, which does emulate `pointer: coarse`), open `/dashboard/leads` and confirm the status select, tabs, checkboxes, "View conversation" link, "Show more" toggles, and bulk-toolbar buttons all present at least a 44x44px tap area; on a mouse/trackpad (no touch), confirm every control still renders at its original compact size with no visual bloat.
+
+**This closes all five `/impeccable critique` findings from the original run on `/dashboard/leads`** (layout → harden → clarify → bulk toolbar → adapt). Suggested next step per the skill's own hand-off convention: `/impeccable polish` for a final consistency pass across everything changed in this arc, if the user wants one.
+
+**Next logical task:** none queued — this was the last of the five approved critique items. Awaiting further direction.
+
+---
+
+## Leads page: bulk status-change toolbar — closes the critique's 4th finding — implemented 2026-09-09
+
+Fourth of the five `/impeccable critique` priority issues on `/dashboard/leads` (see the `/impeccable layout` entry below for the first three and the full critique context). This one closed: "No bulk actions for repetitive per-lead status updates" — an agent processing many leads had to repeat the same single-select interaction per row.
+
+**Scope note**: the critique's own report mapped this item to `/impeccable optimize`, but that command's actual playbook (checked before starting) is strictly performance work (bundle size, rendering, Core Web Vitals) — it has no coverage for building a new interaction feature like this. Flagged the mismatch to the user and built it as an ordinary feature addition instead, after confirming scope: bulk support for all 4 statuses, and the bulk "lost" action gets the same confirm-before-apply gate the single-lead flow already has (user's call — bulk-losing N leads at once is higher-stakes, not lower).
+
+**Fix**:
+- `lib/leads.ts`: new `updateLeadStatusBulk(businessId, ids, status)` — same tenant-scoping contract as the existing `updateLeadStatus()` (`.eq("business_id", businessId)` plus, here, `.in("id", ids)`), batched into one query instead of N round-trips. Returns the actual updated-row count so a caller can tell "everything applied" from "some ids didn't match" (e.g. a lead someone else deleted mid-selection).
+- `app/(dashboard)/dashboard/leads/actions.ts`: new `bulkUpdateLeadStatusAction` (`org:sales_agent`-gated, same as the single-lead action), validating `ids` (1-500 UUIDs) and `status` via Zod before calling the above.
+- `app/(dashboard)/dashboard/leads/leads-list.tsx`: a checkbox per lead card (hidden entirely when `!canEdit`, matching the codebase's existing "no legitimate reason to see this control" convention) plus a "Select all" checkbox above the list (indeterminate when partially selected, set imperatively via a ref since `indeterminate` has no JSX prop). Selection resets whenever the status-filter tab changes — done via React's "adjust state during render" pattern, not a `useEffect`, since ESLint's `react-hooks/set-state-in-effect` rule correctly flagged the effect version as cascading-render-prone. New `BulkActionsBar`, shown once anything is selected: one small `<form action={formAction}>` per status button (matching this codebase's existing one-form-per-action convention — `DeleteButton`, `StatusSelect` — rather than reading which of several submit buttons in one shared form was clicked), a "Clear" button, and the same "Changed to X · " confirmation pattern `StatusSelect` already uses (no Undo here, since a bulk revert of N leads to N *different* prior statuses isn't a single well-defined action the way single-lead undo is).
+
+**Explicitly out of scope for this pass** (last remaining item from the critique): the P3 touch-target sizing on the status select and "View conversation" link (`/impeccable adapt`).
+
+**Files changed:** `lib/leads.ts`, `app/(dashboard)/dashboard/leads/actions.ts`, `app/(dashboard)/dashboard/leads/leads-list.tsx`. No change to `status-select.tsx` or `page.tsx`.
+
+**Database changes:** none — `updateLeadStatusBulk` reuses the existing `leads` table and its existing RLS policies; no migration needed.
+
+**Tenant isolation:** no new pgTAP test added. The bulk function goes through the exact same tenant-scoping mechanism (`business_id` filter + the authenticated client's existing RLS policy on `leads`) already covered by `010_leads_tenant_isolation.sql` for the single-row `updateLeadStatus` — RLS enforces per-row regardless of whether the query updates one row or many via `.in()`, so the existing test's cross-tenant UPDATE coverage applies unchanged. A dedicated bulk-specific test was judged unnecessary rather than skipped by oversight.
+
+**Checks run:** `npm run lint` — clean (one real issue caught and fixed: the initial tab-reset effect called `setState` synchronously inside `useEffect`, flagged by `react-hooks/set-state-in-effect`; rewritten as a render-time reset per React's own recommended pattern). `npx tsc --noEmit` — clean. `npm run build` — clean, all 32 routes compile. `node .../impeccable/scripts/detect.mjs --json` on all three changed files — `[]`, no findings.
+
+**Not yet verified:** no live browser click-through (no dev server running, page is Clerk-auth-gated). Manual test steps: as a business member who can edit leads, check a few lead checkboxes and confirm the "Select all" label switches to "N selected" and a toolbar with New/Contacted/Converted/Lost/Clear buttons appears; click "Select all" and confirm every visible lead (in the current status tab) gets checked, with the master checkbox showing indeterminate when only some are checked; click a non-"lost" bulk button and confirm all selected leads update, selection clears, and a "N leads changed to X" confirmation shows briefly; select leads and click "Lost" and confirm it does **not** save immediately, showing "Mark N leads as lost? Confirm lost / Cancel" instead; as a non-admin/non-sales_agent member, confirm no checkboxes or toolbar render at all.
+
+**Next logical task:** `/impeccable adapt` on the same page for the touch-target-sizing P3 — the last of the five critique findings — per the user's "everything" scope answer.
+
+---
+
+## Leads page: label AI reasoning apart from notes, clamp long text — `/impeccable clarify` — implemented 2026-09-09
+
+Third of the five `/impeccable critique` priority issues on `/dashboard/leads` (see the `/impeccable layout` entry below for the first two and the full critique context). This one closed: "`qualification_reason` and `notes` render as unbounded, equal-weight plain text" — the AI's stated reason for a hot/warm/cold call sat directly above the human-written `notes` line with identical styling and no label, so nothing but position told a reader which sentence was an AI guess and which was something a teammate actually typed. Neither field had truncation, so a long AI reason or note stretched every card indefinitely.
+
+**Fix**, in `app/(dashboard)/dashboard/leads/leads-list.tsx`:
+- New `LeadTextBlock` component renders each field with an explicit label prefix — "AI reasoning: …" and "Notes: …" — so the distinction is carried in words, not just color or weight (per the skill's own clarify rule: never rely on color/iconography alone to carry the message). This is the actual fix for the critique's "undermines the AI-output-is-untrusted rule in practice" finding: the page already said once at the top that qualification is an AI signal, but the reasoning sentence itself never said so locally.
+- Text over 160 characters (roughly two lines at this card's width) now clamps to 2 lines with a "Show more"/"Show less" toggle, rendered *outside* the clamped paragraph rather than inside it — a toggle inside a `line-clamp`'d node risks being exactly the content the clamp's ellipsis hides once it actually truncates.
+- Visual weight/color of both lines (`text-ds-text-muted` for the AI reason, `text-ds-text-secondary` for notes) is unchanged from before — a stronger visual split (background tint, icon, quote styling) was the critique's stretch suggestion but is left for a future `/impeccable colorize`/`typeset` pass if wanted; this pass is copy-and-truncation only, per the command's own scope.
+
+**Explicitly out of scope for this pass** (remaining items from the same critique): the P2 bulk-action toolbar (`/impeccable optimize`) and the P3 touch-target sizing on the status select and "View conversation" link (`/impeccable adapt`).
+
+**Files changed:** `app/(dashboard)/dashboard/leads/leads-list.tsx` only.
+
+**Checks run:** `npm run lint` — clean. `npx tsc --noEmit` — clean. `npm run build` — clean, all 32 routes compile. `node .../impeccable/scripts/detect.mjs --json` on the changed file — `[]`, no findings.
+
+**Not yet verified:** no live browser click-through (no dev server running, page is Clerk-auth-gated). Manual test steps: open `/dashboard/leads` and confirm every card now reads "AI reasoning: …" above "Notes: …" (when notes exist) instead of an unlabeled sentence; find or create a lead with a `qualification_reason` or `notes` value over ~160 characters and confirm it clamps to 2 lines with a working "Show more" that reveals the full text and toggles back to "Show less"; confirm a short reason/note renders with no toggle at all.
+
+**Next logical task:** `/impeccable optimize` on the same page for the bulk-action-toolbar P2, per the user's "everything" scope answer.
+
+---
+
+## Leads page: status-change confirmation, undo, and a confirm gate on "lost" — `/impeccable harden` — implemented 2026-09-09
+
+Second of the five `/impeccable critique` priority issues on `/dashboard/leads` (see the `/impeccable layout` entry below for the first and the full critique context). This one closed: "Status changes auto-submit instantly with no success confirmation and no undo" — `onChange` called `requestSubmit()` immediately with zero feedback on success and no way to walk back a misclick, worst on the "lost" transition since nothing else on the row hints a lead was ever marked lost once it changes again.
+
+**Fix**, entirely in `app/(dashboard)/dashboard/leads/status-select.tsx`:
+- **Success confirmation.** Every status change that saves now shows an `aria-live="polite"` "Changed to `<Status>`" line beneath the select for 6 seconds, so a save is never silent (closes Nielsen heuristic 1's gap from the critique).
+- **Undo.** That confirmation line carries an "Undo" button — a real reverse `updateLeadStatusAction` call (not a client-only visual revert), so Undo is a genuine second state change, not a fake. Undo bypasses the "lost" confirm gate below since the user just explicitly asked to revert.
+- **Confirm-before-apply on "lost" only.** Picking "lost" no longer auto-submits: it swaps the select for an inline "Mark this lead as lost? Confirm lost / Cancel" row, reusing the exact inline-confirm pattern already established by `_components/delete-button.tsx` (a separate `<form action={formAction}>` for the confirmed submit, not a modal — per the skill's own ban on modals for tasks that need neither interruption nor protected focus). Every other status still saves on pick, unchanged.
+- **Error correctness fix, found while implementing this.** The select was previously *uncontrolled* (`defaultValue`): if a save failed, the browser kept showing whatever the user had picked even though the error banner said it didn't save — implying a partial success that never happened. The select is now controlled off a `displayedStatus` state that snaps back to the real server `status` prop whenever the action errors.
+
+**Explicitly out of scope for this pass** (remaining items from the same critique): the P1 AI-reason/notes visual distinction and truncation (`/impeccable clarify`), the P2 bulk-action toolbar (`/impeccable optimize`), and the P3 touch-target sizing on the status select and "View conversation" link (`/impeccable adapt`).
+
+**Files changed:** `app/(dashboard)/dashboard/leads/status-select.tsx` (full rewrite of its interaction logic; markup classes/tokens unchanged). `actions.ts` and `leads-list.tsx` untouched — `actions.ts` already returned `{ success: true }`, previously unread by the UI.
+
+**Checks run:** `npm run lint` — clean. `npx tsc --noEmit` — clean. `npm run build` — clean, all 32 routes compile. `node .../impeccable/scripts/detect.mjs --json` on the changed file — `[]`, no findings.
+
+**Not yet verified:** no live browser click-through (no dev server running, page is Clerk-auth-gated). Manual test steps: as a business member who can edit leads, change a lead's status to something other than "lost" and confirm a "Changed to `<Status>`" line appears for a few seconds with a working "Undo" that reverts it (also a real second save, confirmed by refreshing afterward); pick "lost" and confirm it does **not** save immediately — instead shows "Mark this lead as lost? Confirm lost / Cancel"; click Cancel and confirm the select reverts to the prior status with no save; click "Confirm lost" and confirm it saves and shows its own "Changed to Lost" + Undo; force a save failure (e.g. revoke edit access mid-session, or throttle/kill the network right after picking a new status) and confirm the select visibly snaps back to the last real status rather than silently keeping the failed pick.
+
+**Next logical task:** `/impeccable clarify` on the same page for the AI-reason/notes visual-distinction P1, per the user's "everything" scope answer.
+
+---
+
+## Leads page: status filter tabs + priority sort — `/impeccable layout` — implemented 2026-09-09
+
+`/impeccable critique` on `/dashboard/leads` (dual-agent design review + detector scan) scored the page 19/36 on Nielsen's heuristics, driven mostly by heuristic 7 (Flexibility and Efficiency) scoring 0: no filter, sort, search, or bulk action existed on the one dashboard page a sales agent is expected to use daily to triage leads — confirmed by direct comparison with the sibling Conversations page, which already solves the identical "which of these need attention" problem with a tabbed filter. User picked "everything" from the 5 flagged priority issues but asked to run them one command at a time, starting with `/impeccable layout` for this top P0.
+
+**Fix**: extracted rendering out of the server component (`page.tsx`) into a new client component, `leads-list.tsx` (`LeadsList`), following the exact architectural split and interaction pattern already established by `conversations/_components/conversations-list.tsx` rather than inventing a new one:
+- A `role="tablist"` status filter — All / New / Contacted / Converted / Lost, each with a live count badge — using the same WAI-ARIA tabs pattern (roving `tabIndex`, `aria-selected`, `aria-controls`, Left/Right arrow-key navigation cycling through all 5 tabs) already in place on Conversations.
+- Default-sort changed from raw fetch order to qualification-first (`hot` → `warm` → `cold`), then most-recent within each tier — the same "priority signal first, then recency" thesis Conversations already applies via its `needs_attention`-first sort, so a sales agent's most urgent lead surfaces at the top of the default "All" view without needing to filter at all.
+- Filtering a tab down to zero results gets its own `EmptyState` ("No `<status>` leads") with a "View all leads" action, distinct from the existing zero-leads-total empty state (unchanged).
+- Reused `motion/react`'s `AnimatePresence`/`layout` list-reflow animation (already a project dependency, already used identically on Conversations) so switching tabs reflows the list smoothly instead of an abrupt re-render, respecting `useReducedMotion()`.
+- `page.tsx` now only fetches `leads`/`interestNameById` (converted from a `Map` to a plain `Record<string, string>` for a clean server→client prop boundary) and `canEdit`, then renders `<LeadsList>` — no other logic left there. `QUALIFICATION_STYLE`, the qualification badge, and every other visual/data detail of the original card markup moved into `leads-list.tsx` unchanged.
+
+**Explicitly out of scope for this pass** (separate items in the same critique, queued for their own commands next): the P0 "status change auto-submits instantly with no success confirmation or undo" (`/impeccable harden`), the P1 AI-reason/notes visual distinction and truncation (`/impeccable clarify`), the P2 bulk-action toolbar (`/impeccable optimize`), and the P3 touch-target sizing on the status select and "View conversation" link (`/impeccable adapt`).
+
+**Files changed:** `app/(dashboard)/dashboard/leads/page.tsx` (trimmed to data-fetch + delegate), new `app/(dashboard)/dashboard/leads/leads-list.tsx`. `status-select.tsx` and `actions.ts` untouched.
+
+**Checks run:** `npm run lint` — clean. `npx tsc --noEmit` — clean. `npm run build` — clean, all 32 routes compile. `node .../impeccable/scripts/detect.mjs --json` on both changed files — `[]`, no findings.
+
+**Not yet verified:** no live browser click-through (no dev server running, page is Clerk-auth-gated) — the tab filter, arrow-key navigation, count badges, empty-per-tab state, and sort order are unverified against a rendered page. Manual test steps: as a business member with at least a few leads across different statuses and qualifications, load `/dashboard/leads`; confirm the "All" tab is selected by default and leads are ordered hot→warm→cold, most-recent-first within each tier; click each status tab and confirm only matching leads show, with each tab's count badge matching; with a tab that has zero matching leads, confirm the "No `<status>` leads" empty state and its "View all leads" button (clicking it returns to "All"); with keyboard focus on a tab, press ArrowRight/ArrowLeft and confirm focus and selection move through all 5 tabs and wrap around at the ends.
+
+**Next logical task:** `/impeccable harden` on the same page for the status-change confirmation/undo P0, per the user's "everything" scope answer.
+
+---
+
+## WhatsApp: fixed missing per-WABA webhook subscription — connections were never actually receiving messages — fixed 2026-09-09
+
+**The bug**: a business connected a real WhatsApp number end-to-end for the first time (the first live test against a real Meta account since Phase 16 shipped) — the dashboard correctly showed "Connected" (phone number ID/access token genuinely verified against Meta's Graph API, row correctly written), but sending a WhatsApp message to that number produced no AI reply. Diagnosed live, not guessed: (1) `vercel env ls production` confirmed `WHATSAPP_APP_SECRET`/`WHATSAPP_WEBHOOK_VERIFY_TOKEN` were never set in Production at all — an operator-side setup step that was always honestly flagged as pending (see the prior "Not yet set in any real environment" note below), not a code gap; (2) a repo-wide grep confirmed `connectWhatsappNumber()` (`lib/whatsapp.ts`) never called Meta's `POST /{waba-id}/subscribed_apps` — this **is** a real implementation gap in the original Phase 16 build, invisible to lint/typecheck/build/pgTAP because it's a missing external API call, only surfaced by an actual live connect+message attempt, which nothing in this environment could exercise until now.
+
+**Fix**: `connectWhatsappNumber()` now calls `POST /{waba-id}/subscribed_apps` (bearer: the business's own access token) after the existing phone-number/token verification and before either database upsert — same "verify first, write second" invariant the function already enforced for the original check, extended to cover this second Meta call. Unconditional on every connect *and* reconnect (idempotent at Meta's end). Two new, distinct error messages (naming the likely real cause — the system user missing `whatsapp_business_management` permission — when Meta returns one) so a failure here reads differently from "wrong phone number ID/token."
+
+`docs/security.md`'s Phase 16 passage gained one clause noting this call exists, next to the existing webhook-verification description.
+
+**Still required (operator-side, cannot be automated in code — Meta App Dashboard + Vercel, one-time)**: generate `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, get `WHATSAPP_APP_SECRET` from the Meta App Dashboard, set both in Vercel Production and redeploy, then register the Callback URL (`https://ai-sales-ashy-eight.vercel.app/api/webhooks/whatsapp`) and matching Verify Token under Meta App Dashboard → WhatsApp → Configuration → Webhook, subscribed to the `messages` field. Once done, the already-"connected" test business needs one **Edit connection** resubmit (with a freshly rotated access token — the previous one was pasted in plaintext during this session's chat and must be treated as compromised) to actually run the new subscription call.
+
+**Checks run:** `npm run lint` — clean. `npm run typecheck` — clean. `npm run build` — clean, all 32 routes compile. No database/schema change, so no new pgTAP coverage needed.
+
+**Not yet verified**: same caveat as the original Phase 16 entry — a full live Meta round-trip (this fix included) is still unverified from this environment; it requires the operator steps above plus a real inbound message to confirm end-to-end. This entry does not claim the bug is *proven* fixed, only that the missing call has been added and the code compiles clean.
 
 ---
 

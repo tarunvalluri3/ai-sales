@@ -82,6 +82,48 @@ export async function connectWhatsappNumber(
     clearTimeout(timeout);
   }
 
+  // Verifying the phone number ID/token only confirms the credentials are
+  // valid -- it does not tell Meta to actually deliver this WABA's
+  // messages to our webhook. That requires this separate, per-WABA
+  // subscription call, unconditionally on every connect/reconnect
+  // (idempotent at Meta's end -- re-subscribing an already-subscribed WABA
+  // is a no-op success). Must succeed before anything is written, same
+  // "verify first, write second" invariant as the check above: a
+  // subscription failure must not silently sit `status='connected'` while
+  // Meta never sends us a single message.
+  const subscribeController = new AbortController();
+  const subscribeTimeout = setTimeout(() => subscribeController.abort(), VERIFY_TIMEOUT_MS);
+  try {
+    const subscribeResponse = await fetch(
+      `${GRAPH_API_BASE}/${encodeURIComponent(input.wabaId)}/subscribed_apps`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${input.accessToken}` },
+        signal: subscribeController.signal,
+      },
+    );
+
+    if (!subscribeResponse.ok) {
+      const errorBody = (await subscribeResponse.json().catch(() => null)) as
+        | { error?: { message?: string } }
+        | null;
+      const metaMessage = errorBody?.error?.message;
+      return {
+        success: false,
+        error: metaMessage
+          ? `Meta refused to subscribe this WhatsApp account to receive messages: ${metaMessage}. Make sure the access token's system user has the "whatsapp_business_management" permission, then try again.`
+          : `Meta accepted your credentials but refused to enable message delivery for this WhatsApp account. Make sure the access token's system user has the "whatsapp_business_management" permission, then try again.`,
+      };
+    }
+  } catch {
+    return {
+      success: false,
+      error: "Couldn't reach Meta's API to enable message delivery for this WhatsApp account. Please try again.",
+    };
+  } finally {
+    clearTimeout(subscribeTimeout);
+  }
+
   const supabase = createServiceSupabaseClient();
   const nowIso = new Date().toISOString();
 
