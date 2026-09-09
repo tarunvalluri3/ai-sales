@@ -78,6 +78,19 @@ export async function updateBusinessSla(businessId: string, slaMinutes: number |
   }
 }
 
+export async function updateBusinessTimezone(businessId: string, timezone: string): Promise<void> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase.from("businesses").update({ timezone }).eq("id", businessId);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong saving your timezone. Please try again.",
+      "updateBusinessTimezone failed",
+      error,
+    );
+  }
+}
+
 /**
  * Whether `businessId` is currently within its configured business
  * hours, in the business's own timezone. A business with no

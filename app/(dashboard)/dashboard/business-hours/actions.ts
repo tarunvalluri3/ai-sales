@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
-import { setBusinessHours, updateBusinessSla, type DayHoursInput } from "@/lib/business-hours";
+import { setBusinessHours, updateBusinessSla, updateBusinessTimezone, type DayHoursInput } from "@/lib/business-hours";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -51,9 +51,19 @@ export async function updateBusinessHoursAction(
     return { error: "SLA minutes must be a positive whole number." };
   }
 
+  const timezoneRaw = formData.get("timezone");
+  const timezone = typeof timezoneRaw === "string" && timezoneRaw.trim() !== "" ? timezoneRaw.trim() : "UTC";
+  try {
+    // Throws for anything that isn't a real IANA timezone name.
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+  } catch {
+    return { error: "Please choose a valid timezone." };
+  }
+
   try {
     await setBusinessHours(businessId, days);
     await updateBusinessSla(businessId, slaMinutes);
+    await updateBusinessTimezone(businessId, timezone);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
