@@ -122,7 +122,7 @@ Resolved decision D6 (`STATE.md`). This is the approved lead field specification
 |---|---|---|
 | `business_id` | required | automatic, from the conversation's tenant context |
 | `conversation_id` | required | automatic, links to the source conversation (Phase 11) |
-| `contact_name` | optional | volunteered by prospect |
+| `contact_name` | optional, but the AI always asks | volunteered by prospect — see the name-asking rule below |
 | `contact_email` | conditionally required | at least one of email/phone required to save a lead |
 | `contact_phone` | conditionally required | at least one of email/phone required to save a lead |
 | `interest_type` | optional | product / service / general — same polymorphic pattern as `knowledge_documents.source_type` |
@@ -138,6 +138,8 @@ Resolved decision D6 (`STATE.md`). This is the approved lead field specification
 | `created_at` / `updated_at` | automatic | timestamps |
 
 **Rule:** a lead is only created once at least one of `contact_email`/`contact_phone` is present — a conversation with no contact info given doesn't produce a lead row at all (avoids junk/empty leads). The `request_callback` tool enforces this same rule as part of its own input contract, not just at the database layer.
+
+**Name-asking rule** (user-requested, 2026-09-10): whenever the AI is about to capture contact details — for a callback (`request_callback`) or an appointment (`book_appointment`) — it now always asks for the prospect's name too, not just email/phone, if it hasn't already been given earlier in the conversation. This is a soft requirement, deliberately not a hard gate: if the prospect declines or doesn't respond with a name, the AI proceeds anyway with `contact_name` null rather than blocking or repeatedly asking — matches the existing flexible email-or-phone pattern rather than adding a second `missing_name`-style hard block. `contact_name` therefore stays a nullable column; this is a conversational-behavior change (`lib/rag.ts`'s system prompt, plus both tools' own descriptions), not a schema or validation change.
 
 **Stalled-lead follow-up** (user-requested, 2026-09-10): a daily background sweep (`lib/stalled-leads.ts`) finds leads still `new`/`contacted` whose conversation has had no new message in 3 days, drafts one short AI follow-up grounded only in that lead's own captured name/notes/interest (never invents a fact, same discipline as §7's AI behavior contract), and sends it **at most once**. Delivery is email-only today (via the same Resend path as the lead/handoff digest, §Phase 25b) — WhatsApp delivery is deliberately not implemented, because Meta only allows a business-initiated message outside the 24-hour customer-service window through a template pre-approved in Meta Business Manager, which this app has no way to create on a business's behalf. A WhatsApp-only stalled lead is recorded as `blocked_no_whatsapp_template` and shown on the dashboard instead.
 
@@ -165,15 +167,25 @@ Booking always **requires the business's own confirmation**: the AI's `book_appo
 |---|---|---|
 | `business_id` | required | automatic, from the conversation's tenant context |
 | `conversation_id` | optional | links to the source conversation when booked via chat |
-| `contact_name` | optional | volunteered by prospect |
+| `contact_name` | optional, but the AI always asks | volunteered by prospect — see §8's name-asking rule, same behavior here |
 | `contact_email` | conditionally required | at least one of email/phone required |
 | `contact_phone` | conditionally required | at least one of email/phone required |
 | `starts_at` / `ends_at` | required | the booked slot, in UTC |
-| `status` | required, defaults `pending` | pending → confirmed / declined; confirmed → cancelled |
+| `status` | required, defaults `pending` | pending → confirmed / declined; confirmed → cancelled / completed / no_show |
 | `notes` | optional | free-text context the prospect gave |
 | `created_at` / `updated_at` | automatic | timestamps |
 
 Same contact-info rule as leads (§8): a booking is only created once at least one of `contact_email`/`contact_phone` is present, and only after the conversation's own consent flag is set.
+
+**Cross-channel booking safety** — availability and the one-booking-per-slot guarantee are enforced purely at the `business_id` + `starts_at` level (app-layer `isSlotAvailable` check, backed by the database's own partial unique index `appointments_active_slot_idx`), never per-conversation or per-channel. The website widget and WhatsApp (Phase 16) both call the identical `book_appointment` tool, so the same slot can never be double-booked regardless of which channel books it first — no separate handling was needed per channel.
+
+**Schedule overrides** (user-requested, 2026-09-10): on top of the recurring weekly `business_hours`, a business can add per-date overrides (`business_hours_exceptions`, `/dashboard/appointments/availability`, `org:admin`-gated like business hours) — a whole-day closure (holiday, leave day), a partial-day closure (lunch break), or an exceptional opening that overrides the normal weekly hours for one date (e.g. an extra Saturday). One override per date; changing one means deleting and re-adding it.
+
+**Visual slot grid and per-slot blocking** (user-requested, 2026-09-10; redesigned the same day after user feedback that the first version was confusing and hard to find): `/dashboard/appointments/availability` — reached via a real "Requests"/"Availability" tab pair (`AppointmentsTabs`), not a buried link — shows a day-by-day list of that date's slots (open slots plain, booked/blocked ones tagged; past slots hidden entirely) with day navigation, a one-click Block/Unblock on any open/blocked slot (`appointment_blocked_slots`, one row per exact slot instant — deliberately a separate table from the date-range `business_hours_exceptions`, which can't express two independently-blocked slots on the same date), and a one-click "Close this day"/"Reopen this day" toggle for the whole-date case. Anything finer (a lunch-break range, an exceptional opening) lives in a collapsed "Advanced" disclosure — the same typed form as before, just no longer the first thing on the page. The grid is generated live from the same recurring `business_hours` + slot-length settings, so newly-eligible slots appear automatically as each day rolls forward — there is no separate "open the next day" step, by construction. No recurring weekly block rule (e.g. "every Friday 12-1pm") exists yet — explicitly deferred, one-off date/slot blocking only.
+
+**Meeting outcomes** (user-requested, 2026-09-10): once a `confirmed` appointment's time has passed, `/dashboard/appointments` offers Mark completed / Mark no-show in place of Cancel, recording whether the meeting actually happened — distinct from `cancelled` (called off before it happened). Both are internal record-keeping only; unlike confirm/decline/cancel, marking an outcome does not notify the prospect. The appointments list has a status filter covering all six statuses.
+
+**Notifications** (user-requested, 2026-09-10): the business's `contact_email` gets an immediate email the moment a prospect's `book_appointment` request creates a new `pending` row — not just the next day's digest. When the business confirms, declines, or cancels an appointment, the prospect gets a reply: an email if they gave one, and — for a WhatsApp-sourced conversation with an active connection, within Meta's 24-hour reply window — a real WhatsApp message too (reusing the same outbound-send path staff replies already use). Outside that window a WhatsApp reply silently can't be sent, the same accepted limitation the stalled-lead follow-up feature (§8) already has.
 
 ---
 

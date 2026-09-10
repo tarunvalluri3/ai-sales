@@ -66,7 +66,7 @@ export default function HomePage() {
               Give your business an AI employee that actually knows it.
             </h1>
             <p className="max-w-lg text-base text-ds-text-secondary md:text-lg">
-              AI Sales answers prospects using your own products, services, FAQs, and approved
+              Waves AI Pilot answers prospects using your own products, services, FAQs, and approved
               knowledge — qualifies who&apos;s worth your time, and hands off to a human the moment one
               is genuinely needed.
             </p>
@@ -165,7 +165,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row">
           <div className="flex items-center gap-2 text-sm font-semibold text-ds-text-primary">
             <span className="size-2 rounded-full bg-ds-accent" aria-hidden="true" />
-            AI Sales
+            Waves AI Pilot
           </div>
           <p className="text-2xs text-ds-text-muted">An AI sales employee, grounded in your own business.</p>
           <div className="flex items-center gap-4 text-2xs text-ds-text-muted">

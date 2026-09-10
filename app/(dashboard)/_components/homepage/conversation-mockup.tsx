@@ -11,7 +11,7 @@ export function ConversationMockup() {
           A
         </span>
         <div className="flex flex-col">
-          <span className="text-xs font-semibold text-ds-text-primary">Acme Co. — AI Sales Employee</span>
+          <span className="text-xs font-semibold text-ds-text-primary">Acme Co. — Waves AI Pilot</span>
           <span className="text-2xs text-ds-success">Online</span>
         </div>
       </div>

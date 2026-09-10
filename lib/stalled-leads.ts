@@ -18,7 +18,7 @@ const STALLED_DAYS = 3;
 const MAX_LEADS_CHECKED_PER_RUN = 25;
 const MAX_DRAFT_LENGTH = 1000;
 
-const DEFAULT_FROM = "AI Sales <onboarding@resend.dev>";
+const DEFAULT_FROM = "Waves AI Pilot <onboarding@resend.dev>";
 
 export type StalledLeadSweepResult = {
   checked: number;

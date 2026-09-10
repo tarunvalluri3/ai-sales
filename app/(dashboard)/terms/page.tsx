@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Terms of Service | AI Sales",
+  title: "Terms of Service | Waves AI Pilot",
 };
 
 /**
@@ -19,16 +19,16 @@ export default function TermsOfServicePage() {
 
         <Section title="Agreement">
           <p>
-            These terms are between <strong>[Legal entity name]</strong> (&quot;AI Sales,&quot;
-            &quot;we&quot;) and the business or person creating an AI Sales account
-            (&quot;customer,&quot; &quot;you&quot;). By creating an account or using AI Sales, you agree
+            These terms are between <strong>[Legal entity name]</strong> (&quot;Waves AI Pilot,&quot;
+            &quot;we&quot;) and the business or person creating a Waves AI Pilot account
+            (&quot;customer,&quot; &quot;you&quot;). By creating an account or using Waves AI Pilot, you agree
             to these terms.
           </p>
         </Section>
 
-        <Section title="What AI Sales does">
+        <Section title="What Waves AI Pilot does">
           <p>
-            AI Sales lets a business configure an AI sales employee grounded in that business&apos;s own
+            Waves AI Pilot lets a business configure an AI sales employee grounded in that business&apos;s own
             products, services, FAQs, and approved knowledge, to talk with prospects through a chat
             widget the business embeds on its own site, qualify leads, and hand off to a human when
             needed.
@@ -48,7 +48,7 @@ export default function TermsOfServicePage() {
             <li>
               You are responsible for obtaining any consent required by applicable law before your
               widget collects a visitor&apos;s personal contact details, and for how your team uses lead
-              data AI Sales surfaces to you.
+              data Waves AI Pilot surfaces to you.
             </li>
             <li>You must not attempt to access another customer&apos;s data, account, or conversations.</li>
           </ul>
@@ -57,7 +57,7 @@ export default function TermsOfServicePage() {
         <Section title="AI output">
           <p>
             AI-generated answers, lead qualification labels, and summaries are automated signals, not
-            verified facts or professional advice. AI Sales is designed to answer only from your
+            verified facts or professional advice. Waves AI Pilot is designed to answer only from your
             approved content and to decline when it doesn&apos;t know something, but it may still be
             wrong. You are responsible for reviewing AI output before relying on it for decisions that
             matter.
@@ -84,7 +84,7 @@ export default function TermsOfServicePage() {
 
         <Section title="Termination">
           <p>
-            You may stop using AI Sales at any time. We may suspend or terminate an account for
+            You may stop using Waves AI Pilot at any time. We may suspend or terminate an account for
             material breach of these terms, including unlawful use or attempts to access another
             customer&apos;s data.
           </p>
@@ -92,7 +92,7 @@ export default function TermsOfServicePage() {
 
         <Section title="Disclaimer and liability">
           <p>
-            AI Sales is provided &quot;as is,&quot; without warranties of any kind. To the maximum extent
+            Waves AI Pilot is provided &quot;as is,&quot; without warranties of any kind. To the maximum extent
             permitted by law, [Legal entity name] is not liable for indirect, incidental, or
             consequential damages arising from your use of the service.
           </p>

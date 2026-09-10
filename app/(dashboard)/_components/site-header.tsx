@@ -39,7 +39,7 @@ export function SiteHeader() {
       <header className="flex items-center justify-center border-b border-ds-border bg-ds-bg px-4 py-4">
         <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-ds-text-primary">
           <span className="size-2 rounded-full bg-ds-accent" aria-hidden="true" />
-          AI Sales
+          Waves AI Pilot
         </Link>
       </header>
     );
@@ -49,7 +49,7 @@ export function SiteHeader() {
     <header className="flex items-center justify-between border-b border-ds-border bg-ds-bg px-6 py-4">
       <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-ds-text-primary">
         <span className="size-2 rounded-full bg-ds-accent" aria-hidden="true" />
-        AI Sales
+        Waves AI Pilot
       </Link>
       <div className="flex items-center gap-5">
         <Show when="signed-out">

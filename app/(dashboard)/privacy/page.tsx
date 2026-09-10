@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Privacy Policy | AI Sales",
+  title: "Privacy Policy | Waves AI Pilot",
 };
 
 /**
@@ -21,8 +21,8 @@ export default function PrivacyPolicyPage() {
 
         <Section title="Who this policy covers">
           <p>
-            This policy is published by <strong>[Legal entity name]</strong> (&quot;AI Sales,&quot;
-            &quot;we,&quot; &quot;us&quot;). It applies to (1) businesses that create an AI Sales account
+            This policy is published by <strong>[Legal entity name]</strong> (&quot;Waves AI Pilot,&quot;
+            &quot;we,&quot; &quot;us&quot;). It applies to (1) businesses that create a Waves AI Pilot account
             (&quot;customers&quot;) and their team members, and (2) prospects who chat with a customer&apos;s
             AI sales widget on the customer&apos;s own website (&quot;visitors&quot;). Contact
             <strong> [support email]</strong> with any privacy question or request.
