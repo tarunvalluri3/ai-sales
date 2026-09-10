@@ -27,6 +27,12 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "ai_capabilities.updated": "AI capabilities updated",
   "whatsapp_connection.created": "WhatsApp connected",
   "whatsapp_connection.deleted": "WhatsApp disconnected",
+  "appointment_exception.created": "Schedule override added",
+  "appointment_exception.deleted": "Schedule override removed",
+  "appointment.completed": "Appointment marked completed",
+  "appointment.no_show": "Appointment marked no-show",
+  "appointment_slot_block.created": "Slot blocked",
+  "appointment_slot_block.deleted": "Slot unblocked",
 };
 
 export default async function AuditLogPage() {

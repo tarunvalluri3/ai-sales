@@ -67,7 +67,7 @@ export type WidgetStrings = {
 };
 
 const EN: WidgetStrings = {
-  panelTitle: "AI Sales Assistant",
+  panelTitle: "Waves AI Pilot",
   panelSubtitle: "Usually replies in seconds",
   openChatLabel: "Open chat",
   closeChatLabel: "Close chat",
@@ -100,7 +100,7 @@ const EN: WidgetStrings = {
 };
 
 const ES: WidgetStrings = {
-  panelTitle: "Asistente de ventas IA",
+  panelTitle: "Waves AI Pilot",
   panelSubtitle: "Normalmente responde en segundos",
   openChatLabel: "Abrir chat",
   closeChatLabel: "Cerrar chat",
@@ -133,7 +133,7 @@ const ES: WidgetStrings = {
 };
 
 const FR: WidgetStrings = {
-  panelTitle: "Assistant commercial IA",
+  panelTitle: "Waves AI Pilot",
   panelSubtitle: "Répond généralement en quelques secondes",
   openChatLabel: "Ouvrir le chat",
   closeChatLabel: "Fermer le chat",
@@ -166,7 +166,7 @@ const FR: WidgetStrings = {
 };
 
 const DE: WidgetStrings = {
-  panelTitle: "KI-Vertriebsassistent",
+  panelTitle: "Waves AI Pilot",
   panelSubtitle: "Antwortet meist in Sekunden",
   openChatLabel: "Chat öffnen",
   closeChatLabel: "Chat schließen",
@@ -199,7 +199,7 @@ const DE: WidgetStrings = {
 };
 
 const PT: WidgetStrings = {
-  panelTitle: "Assistente de vendas IA",
+  panelTitle: "Waves AI Pilot",
   panelSubtitle: "Normalmente responde em segundos",
   openChatLabel: "Abrir chat",
   closeChatLabel: "Fechar chat",
@@ -232,7 +232,7 @@ const PT: WidgetStrings = {
 };
 
 const HI: WidgetStrings = {
-  panelTitle: "एआई सेल्स असिस्टेंट",
+  panelTitle: "Waves AI Pilot",
   panelSubtitle: "आमतौर पर सेकंडों में जवाब देता है",
   openChatLabel: "चैट खोलें",
   closeChatLabel: "चैट बंद करें",

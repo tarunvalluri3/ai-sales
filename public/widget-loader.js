@@ -1,5 +1,5 @@
 /**
- * AI Sales chat widget embed script.
+ * Waves AI Pilot chat widget embed script.
  *
  * Usage: <script src=".../widget-loader.js" data-widget-key="..." data-position="bottom-right"></script>
  *

@@ -4,10 +4,11 @@ import { after } from "next/server";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness, SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { normalizeEmail, normalizePhone } from "@/lib/schemas/lead";
-import { isSlotAvailable, createAppointment } from "@/lib/appointments";
+import { isSlotAvailable, createAppointment, formatSlotLabel } from "@/lib/appointments";
 import { upsertLeadForConversation } from "@/lib/leads";
 import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
+import { sendNewAppointmentRequestEmail } from "@/lib/notifications";
 import { logEvent } from "@/lib/logger";
 import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 
@@ -61,7 +62,7 @@ export const BookAppointmentInputSchema = z.object({
 export const bookAppointmentTool = {
   name: "book_appointment",
   description:
-    "Requests an appointment at a specific slot returned by check_available_slots. Only call this after the prospect has explicitly agreed to that exact time AND you already have their email or phone number from this conversation. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. The booking is pending the business's own confirmation -- tell the prospect that, don't say it's confirmed. If the result comes back with reason 'missing_contact_info', ask for their email or phone number before calling this tool again. If it comes back with reason 'consent_required', ask the prospect to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent. If it comes back with reason 'slot_unavailable', that slot was just taken -- call check_available_slots again and offer a different time.",
+    "Requests an appointment at a specific slot returned by check_available_slots. Only call this after the prospect has explicitly agreed to that exact time AND you already have their email or phone number from this conversation. Before calling, you should have also asked for their name if you don't already have it -- but if they declined or didn't give one, proceed anyway with contactName null; never delay the booking over a missing name. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. The booking is pending the business's own confirmation -- tell the prospect that, don't say it's confirmed. If the result comes back with reason 'missing_contact_info', ask for their email or phone number before calling this tool again. If it comes back with reason 'consent_required', ask the prospect to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent. If it comes back with reason 'slot_unavailable', that slot was just taken -- call check_available_slots again and offer a different time.",
   schema: BookAppointmentInputSchema,
 };
 
@@ -138,14 +139,7 @@ export async function executeBookAppointment(
     return { success: false, reason: "lookup_failed" };
   }
 
-  const label = new Intl.DateTimeFormat("en-US", {
-    timeZone: business.timezone,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(parsed.data.startsAt));
+  const label = formatSlotLabel(new Date(parsed.data.startsAt), business.timezone);
 
   // A sandbox test conversation (dashboard/_components/sandbox-chat) must
   // never write a real appointment -- the slot-availability check above
@@ -174,6 +168,21 @@ export async function executeBookAppointment(
   }
 
   logEvent("tool_invoked", businessId, { tool: "book_appointment", conversationId, result: "created" });
+
+  // Immediate admin alert, deferred past the response so the prospect
+  // never waits on an outbound email send -- same after() pattern this
+  // file already uses below for webhook delivery. Best-effort: the
+  // helper itself never throws (matches lib/notifications.ts's existing
+  // digest-email contract), so no .catch() is needed here, but the
+  // booking itself is already durable by this point regardless.
+  after(() =>
+    sendNewAppointmentRequestEmail(businessId, {
+      contactName: parsed.data.contactName?.trim() || null,
+      contactEmail,
+      contactPhone,
+      label,
+    }),
+  );
 
   const leadResult = await upsertLeadForConversation(supabase, businessId, conversationId, {
     contactName: parsed.data.contactName?.trim() || null,

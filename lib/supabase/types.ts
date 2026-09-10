@@ -36,6 +36,25 @@ export type BusinessHours = {
   end_time: string | null;
 };
 
+/**
+ * A per-date scheduling override on top of the recurring weekly
+ * `business_hours` (Phase C follow-up, 2026-09-10). `is_closed: true`
+ * with a null start/end closes the whole date; with a start/end it
+ * closes just that window (e.g. a lunch break). `is_closed: false`
+ * always carries a start/end -- an exceptional opening that overrides
+ * the normal weekly hours for that one date.
+ */
+export type BusinessHoursException = {
+  id: string;
+  business_id: string;
+  date: string;
+  is_closed: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  reason: string | null;
+  created_at: string;
+};
+
 export type WidgetKeyStatus = "active" | "revoked";
 
 export type WidgetKey = {
@@ -223,9 +242,11 @@ export type LeadFollowUpStatus =
  * Phase C: booking always starts 'pending' (the user's confirmed choice --
  * owner approval required, the AI's book_appointment tool never inserts
  * 'confirmed' directly). A human moves it to 'confirmed'/'declined' from
- * the dashboard; a confirmed appointment can later be 'cancelled'.
+ * the dashboard; a confirmed appointment can later be 'cancelled' (before
+ * its time) or, once its time has passed, marked 'completed'/'no_show'
+ * (2026-09-10 follow-up -- whether the meeting actually happened).
  */
-export type AppointmentStatus = "pending" | "confirmed" | "declined" | "cancelled";
+export type AppointmentStatus = "pending" | "confirmed" | "declined" | "cancelled" | "completed" | "no_show";
 
 export type Appointment = {
   id: string;
@@ -240,6 +261,21 @@ export type Appointment = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/**
+ * A single manually-blocked appointment slot (2026-09-10 follow-up), for
+ * the visual slot-grid UI -- distinct from `BusinessHoursException`,
+ * which blocks a whole date or a time range within one; this blocks one
+ * exact slot instant, so several independent slots on the same date can
+ * each be toggled off separately.
+ */
+export type AppointmentBlockedSlot = {
+  id: string;
+  business_id: string;
+  starts_at: string;
+  reason: string | null;
+  created_at: string;
 };
 
 export type WebhookEndpointStatus = "active" | "disabled";
@@ -293,7 +329,13 @@ export type AuditLogAction =
   | "appointment.cancelled"
   | "ai_capabilities.updated"
   | "whatsapp_connection.created"
-  | "whatsapp_connection.deleted";
+  | "whatsapp_connection.deleted"
+  | "appointment_exception.created"
+  | "appointment_exception.deleted"
+  | "appointment.completed"
+  | "appointment.no_show"
+  | "appointment_slot_block.created"
+  | "appointment_slot_block.deleted";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

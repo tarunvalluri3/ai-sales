@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Sales",
+  title: "Waves AI Pilot",
   description: "An AI sales employee grounded in your business's own knowledge.",
 };
 
