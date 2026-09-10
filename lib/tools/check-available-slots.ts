@@ -10,11 +10,18 @@ export const CheckAvailableSlotsInputSchema = z.object({
   // .min(1) not .positive() -- .positive() emits an "exclusiveMinimum"
   // JSON Schema keyword Gemini's function-declaration parser rejects
   // outright (confirmed live during Phase B1/B2, see lib/tools/recommend-products.ts).
+  // .nullable().optional(), not just .nullable() -- Gemini's function
+  // calling sometimes omits an argument key entirely instead of emitting
+  // an explicit `null` for it, which a bare .nullable() schema rejects as
+  // undefined (see lib/tools/recommend-products.ts for the flake this was
+  // root-caused from). The `?? DEFAULT_DAYS_AHEAD` fallback below already
+  // treats a missing value the same as an explicit null.
   daysAhead: z
     .number()
     .min(1)
     .max(14)
     .nullable()
+    .optional()
     .describe("How many days ahead to look for openings. Null defaults to 7 days."),
 });
 

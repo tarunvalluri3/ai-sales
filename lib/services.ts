@@ -3,6 +3,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Service } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { syncGeneratedDocument, deleteGeneratedDocument } from "@/lib/knowledge-sync";
+import { embedText } from "@/lib/embeddings";
+import { logEvent } from "@/lib/logger";
 
 export type ServiceInput = {
   name: string;
@@ -25,6 +27,24 @@ function buildKnowledgeContent(input: ServiceInput): string {
     parts.push(`Price: ${input.price}`);
   }
   return parts.join("\n\n");
+}
+
+/**
+ * Powers recommend_products' intent-matching (lib/tools/recommend-products.ts,
+ * match_services RPC). Best-effort: a transient embedding failure (rate
+ * limit, provider outage) must never block a service save -- it just
+ * leaves `embedding` null, and match_services' own `embedding is not
+ * null` filter simply excludes the row until it's next saved. Runs on
+ * an admin's dashboard save/approve action, never on the chat request
+ * path, so it can never add latency to a prospect's response.
+ */
+async function computeEmbeddingBestEffort(businessId: string, text: string): Promise<number[] | null> {
+  try {
+    return await embedText(text);
+  } catch {
+    logEvent("service_embedding_failed", businessId, {}, "error");
+    return null;
+  }
 }
 
 /** Looks up a single service, scoped to the given business. `null` if it doesn't exist or belongs to another business. */
@@ -121,9 +141,10 @@ export async function createService(
   input: ServiceInput,
 ): Promise<Service> {
   const supabase = createServerSupabaseClient();
+  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input));
   const { data, error } = await supabase
     .from("services")
-    .insert({ business_id: businessId, ...input })
+    .insert({ business_id: businessId, ...input, embedding })
     .select()
     .single();
 
@@ -152,9 +173,13 @@ export async function updateService(
   input: ServiceInput,
 ): Promise<boolean> {
   const supabase = createServerSupabaseClient();
+  // A failed embedding attempt (`null`) is omitted from the update
+  // payload rather than written, so a transient failure on an edit
+  // never overwrites a previously-successful embedding with null.
+  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input));
   const { data, error } = await supabase
     .from("services")
-    .update(input)
+    .update({ ...input, ...(embedding !== null ? { embedding } : {}) })
     .eq("business_id", businessId)
     .eq("id", id)
     .select("id");
@@ -233,6 +258,14 @@ export async function approveServiceDraft(businessId: string, id: string): Promi
   const service = data[0];
   if (!service) {
     return false;
+  }
+
+  // A draft extraction was never embedded (only createService/updateService
+  // compute it) -- compute it now, on the same admin-triggered approve
+  // action, so an approved item is immediately recommend_products-ready.
+  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(service));
+  if (embedding !== null) {
+    await supabase.from("services").update({ embedding }).eq("business_id", businessId).eq("id", service.id);
   }
 
   await syncGeneratedDocument(businessId, "service", service.id, service.name, buildKnowledgeContent(service));

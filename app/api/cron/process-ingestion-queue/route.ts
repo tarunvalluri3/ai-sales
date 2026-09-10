@@ -6,6 +6,7 @@ import { processWhatsappOutboundMessages } from "@/lib/whatsapp-delivery";
 import { refreshDueUrlKnowledgeSources } from "@/lib/url-ingestion";
 import { runSlaEscalationSweep } from "@/lib/sla-routing";
 import { sendDailyDigestEmails } from "@/lib/notifications";
+import { runStalledLeadFollowUpSweep } from "@/lib/stalled-leads";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -30,7 +31,10 @@ export const maxDuration = 60;
  * Vercel's Hobby plan caps cron jobs and each one to once a day. The
  * handoff/lead email digest (lib/notifications.ts, Phase 25b) has no
  * immediate trigger at all -- it's inherently a once-a-day summary, so
- * this route IS its primary trigger, not just a backstop.
+ * this route IS its primary trigger, not just a backstop. Same for the
+ * stalled-lead follow-up sweep (lib/stalled-leads.ts) -- "gone quiet
+ * for N days" is only ever true once a day, not something an immediate
+ * trigger could meaningfully fire on.
  *
  * Vercel signs cron-triggered requests with `Authorization: Bearer
  * $CRON_SECRET` when that env var is set (Vercel's own documented
@@ -48,15 +52,25 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [ingestion, webhooks, whatsappOutbound, urlRefresh, slaRouting, notificationDigest] = await Promise.all([
-      processIngestionQueue(),
-      processWebhookDeliveries(),
-      processWhatsappOutboundMessages(),
-      refreshDueUrlKnowledgeSources(),
-      runSlaEscalationSweep(),
-      sendDailyDigestEmails(),
-    ]);
-    return jsonSuccess({ ingestion, webhooks, whatsappOutbound, urlRefresh, slaRouting, notificationDigest });
+    const [ingestion, webhooks, whatsappOutbound, urlRefresh, slaRouting, notificationDigest, stalledLeadFollowUp] =
+      await Promise.all([
+        processIngestionQueue(),
+        processWebhookDeliveries(),
+        processWhatsappOutboundMessages(),
+        refreshDueUrlKnowledgeSources(),
+        runSlaEscalationSweep(),
+        sendDailyDigestEmails(),
+        runStalledLeadFollowUpSweep(),
+      ]);
+    return jsonSuccess({
+      ingestion,
+      webhooks,
+      whatsappOutbound,
+      urlRefresh,
+      slaRouting,
+      notificationDigest,
+      stalledLeadFollowUp,
+    });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);
   }

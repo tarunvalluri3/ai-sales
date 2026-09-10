@@ -132,9 +132,16 @@ Resolved decision D6 (`STATE.md`). This is the approved lead field specification
 | `status` | required, defaults `new` | new → contacted → converted / lost |
 | `source` | optional | free text, where the conversation started (e.g. "chat widget", "pricing page") |
 | `requested_callback` | required, defaults `false` | set `true` by the `request_callback` AI tool (Phase 14c) once the prospect has clearly agreed to a callback and given contact info |
+| `follow_up_message` | optional, AI-generated | the drafted re-engagement message for a stalled lead (below), persisted once so it's never silently re-drafted |
+| `follow_up_status` | optional | `sent_email` / `sent_whatsapp` / `blocked_no_whatsapp_template` / `no_contact_channel` / `send_failed` — see "Stalled-lead follow-up" below |
+| `follow_up_sent_at` | optional | set only once a follow-up genuinely sent; the at-most-once gate for the sweep below |
 | `created_at` / `updated_at` | automatic | timestamps |
 
 **Rule:** a lead is only created once at least one of `contact_email`/`contact_phone` is present — a conversation with no contact info given doesn't produce a lead row at all (avoids junk/empty leads). The `request_callback` tool enforces this same rule as part of its own input contract, not just at the database layer.
+
+**Stalled-lead follow-up** (user-requested, 2026-09-10): a daily background sweep (`lib/stalled-leads.ts`) finds leads still `new`/`contacted` whose conversation has had no new message in 3 days, drafts one short AI follow-up grounded only in that lead's own captured name/notes/interest (never invents a fact, same discipline as §7's AI behavior contract), and sends it **at most once**. Delivery is email-only today (via the same Resend path as the lead/handoff digest, §Phase 25b) — WhatsApp delivery is deliberately not implemented, because Meta only allows a business-initiated message outside the 24-hour customer-service window through a template pre-approved in Meta Business Manager, which this app has no way to create on a business's behalf. A WhatsApp-only stalled lead is recorded as `blocked_no_whatsapp_template` and shown on the dashboard instead.
+
+**Cross-channel identity hint** (user-requested, 2026-09-10): the leads dashboard shows an informational "possibly the same prospect as…" note when two leads for the same business share a normalized phone or email across different conversations (e.g. a website-chat lead and a WhatsApp lead). This is a **display-only hint** — it links to the other lead's conversation, it never merges data, and `leads.conversation_id` stays required and unique (one lead per conversation) as resolved above.
 
 **`qualification` (hot/warm/cold + reason) is AI-generated, untrusted, UI/display-only** — the same trust category as Phase 9's `escalate`/`usedContext` fields (`docs/security.md` §8). It must never be the sole gate for whether a human reviews a lead, and the human must always be able to see the full conversation and override it.
 

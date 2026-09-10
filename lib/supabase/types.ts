@@ -64,6 +64,7 @@ export type Product = {
   price_amount: number | null;
   status: CatalogItemStatus;
   extracted_from_document_id: string | null;
+  embedding: number[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -79,6 +80,7 @@ export type Service = {
   price_amount: number | null;
   status: CatalogItemStatus;
   extracted_from_document_id: string | null;
+  embedding: number[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -202,9 +204,20 @@ export type Lead = {
   status: LeadStatus;
   source: string | null;
   requested_callback: boolean;
+  appointment_booked: boolean;
+  follow_up_message: string | null;
+  follow_up_status: LeadFollowUpStatus | null;
+  follow_up_sent_at: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type LeadFollowUpStatus =
+  | "sent_email"
+  | "sent_whatsapp"
+  | "blocked_no_whatsapp_template"
+  | "no_contact_channel"
+  | "send_failed";
 
 /**
  * Phase C: booking always starts 'pending' (the user's confirmed choice --

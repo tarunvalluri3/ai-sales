@@ -4,22 +4,30 @@ import { after } from "next/server";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness, SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { normalizeEmail, normalizePhone } from "@/lib/schemas/lead";
+import { upsertLeadForConversation } from "@/lib/leads";
 import { logEvent } from "@/lib/logger";
+import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
-const NOTES_MAX_LENGTH = 2000;
-const QUALIFICATION_REASON = "Prospect explicitly requested a callback via chat.";
 const SOURCE = "request_callback_tool";
 
+// .nullable().optional() on every field below, not just .nullable() --
+// Gemini's function calling sometimes omits an argument key entirely
+// instead of emitting an explicit `null` for it, which a bare .nullable()
+// schema rejects as undefined (see lib/tools/recommend-products.ts for the
+// flake this was root-caused from). Callers already normalize with `?.` /
+// `?? null`, so accepting an omitted key is a pure robustness gain, not a
+// behavior change.
 export const RequestCallbackInputSchema = z.object({
   contactName: z
     .string()
     .trim()
     .max(200)
     .nullable()
+    .optional()
     .describe(
       "The prospect's name, ONLY if they literally typed it earlier in this conversation. If they never gave a name, you MUST pass null -- do not invent one, and never use a placeholder like 'Prospect', 'Customer', or 'Guest'.",
     ),
@@ -28,16 +36,18 @@ export const RequestCallbackInputSchema = z.object({
     .trim()
     .max(200)
     .nullable()
+    .optional()
     .describe("The prospect's email, ONLY if they literally typed it earlier in this conversation. If they never gave one, you MUST pass null -- do not invent or guess one."),
   contactPhone: z
     .string()
     .trim()
     .max(50)
     .nullable()
+    .optional()
     .describe(
       "The prospect's phone number, ONLY if they literally typed it earlier in this conversation. If they never gave one, you MUST pass null -- do not invent one, do not reuse a number from an example, and do not fill it with a placeholder like all the same digit.",
     ),
-  notes: z.string().trim().max(500).nullable().describe("Any preferred callback time or additional context the prospect mentioned, in their own words. Null if nothing extra was said."),
+  notes: z.string().trim().max(500).nullable().optional().describe("Any preferred callback time or additional context the prospect mentioned, in their own words. Null if nothing extra was said."),
 });
 
 /**
@@ -54,16 +64,6 @@ export type RequestCallbackResult =
   | { success: true; leadId: string; created: boolean }
   | { success: false; reason: "missing_contact_info" | "consent_required" | "invalid_input" | "lookup_failed" };
 
-function appendNotes(existing: string | null, addition: string | null): string | null {
-  if (!addition) return existing;
-  if (!existing) return addition.slice(0, NOTES_MAX_LENGTH);
-  const combined = `${existing}\n\n${addition}`;
-  if (combined.length <= NOTES_MAX_LENGTH) return combined;
-  const budget = NOTES_MAX_LENGTH - existing.length - 2;
-  if (budget <= 0) return existing.slice(0, NOTES_MAX_LENGTH);
-  return `${existing}\n\n${addition.slice(0, budget)}`;
-}
-
 /**
  * Authorized executor for the `request_callback` tool -- the first write
  * action any tool in this codebase can take. `businessId` and
@@ -71,14 +71,15 @@ function appendNotes(existing: string | null, addition: string | null): string |
  * parameters -- neither is part of `RequestCallbackInputSchema`, neither is
  * read from `rawArgs` (docs/security.md §1, §8, §9).
  *
- * Does its own direct, tenant-scoped `leads` queries with the passed-in
- * `supabase` client rather than routing through lib/leads.ts's
- * createLead()/getLeadForConversation() -- those construct a Clerk-session
- * client internally, which has no valid session on the widget's
- * service-role path (the same bug class STATE.md's
- * fix-widget-retrieval-client-injection entry already documents). Reuses
- * lib/conversations.ts's getConversationForBusiness() (already
- * client-injected) as the tenant-ownership guard before any write.
+ * Lead persistence itself goes through lib/leads.ts's
+ * upsertLeadForConversation() (client-injected, shared with
+ * book_appointment) rather than createLead()/getLeadForConversation() --
+ * those construct a Clerk-session client internally, which has no valid
+ * session on the widget's service-role path (the same bug class
+ * STATE.md's fix-widget-retrieval-client-injection entry already
+ * documents). Reuses lib/conversations.ts's getConversationForBusiness()
+ * (already client-injected) as the tenant-ownership guard before any
+ * write.
  *
  * Never throws -- every outcome, including a DB failure, comes back as a
  * structured RequestCallbackResult.
@@ -95,13 +96,6 @@ export async function executeRequestCallback(
     return { success: false, reason: "invalid_input" };
   }
 
-  const contactEmail = normalizeEmail(parsed.data.contactEmail);
-  const contactPhone = normalizePhone(parsed.data.contactPhone);
-  if (contactEmail === null && contactPhone === null) {
-    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "missing_contact_info" });
-    return { success: false, reason: "missing_contact_info" };
-  }
-
   const conversation = await getConversationForBusiness(supabase, businessId, conversationId);
   if (!conversation) {
     logEvent(
@@ -111,6 +105,19 @@ export async function executeRequestCallback(
       "error",
     );
     return { success: false, reason: "lookup_failed" };
+  }
+
+  const contactEmail = normalizeEmail(parsed.data.contactEmail ?? null);
+  // A WhatsApp conversation's visitor_id IS the prospect's real phone
+  // number (Meta's own HMAC-verified wa_id, lib/whatsapp.ts) -- more
+  // trustworthy than anything typed in the chat, so it's used whenever
+  // the prospect didn't separately type a number. Never applied to the
+  // widget's own visitor_id, which is client-generated and untrusted.
+  const waFallbackPhone = conversation.source === WHATSAPP_CONVERSATION_SOURCE ? conversation.visitor_id : null;
+  const contactPhone = normalizePhone(parsed.data.contactPhone ?? null) ?? normalizePhone(waFallbackPhone);
+  if (contactEmail === null && contactPhone === null) {
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "missing_contact_info" });
+    return { success: false, reason: "missing_contact_info" };
   }
 
   if (!conversation.consent_given) {
@@ -128,95 +135,47 @@ export async function executeRequestCallback(
     return { success: true, leadId: "sandbox", created: true };
   }
 
-  const { data: existing, error: lookupError } = await supabase
-    .from("leads")
-    .select("id, contact_name, contact_email, contact_phone, notes")
-    .eq("business_id", businessId)
-    .eq("conversation_id", conversationId)
-    .maybeSingle();
+  const contactName = parsed.data.contactName?.trim() || null;
+  const notes = parsed.data.notes?.trim() || null;
 
-  if (lookupError) {
+  const result = await upsertLeadForConversation(supabase, businessId, conversationId, {
+    contactName,
+    contactEmail,
+    contactPhone,
+    notes,
+    requestedCallback: true,
+    appointmentBooked: false,
+    needsAttention: conversation.needs_attention,
+    interestSpecified: false,
+    source: SOURCE,
+  });
+
+  if (!result.success) {
     logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "lookup_failed" }, "error");
     return { success: false, reason: "lookup_failed" };
   }
 
-  const contactName = parsed.data.contactName?.trim() || null;
-  const notes = parsed.data.notes?.trim() || null;
+  logEvent(
+    "tool_invoked",
+    businessId,
+    { tool: "request_callback", conversationId, result: result.created ? "created" : "updated" },
+  );
 
-  if (existing) {
-    const { data: updated, error: updateError } = await supabase
-      .from("leads")
-      .update({
-        requested_callback: true,
-        contact_name: existing.contact_name ?? contactName,
-        contact_email: existing.contact_email ?? contactEmail,
-        contact_phone: existing.contact_phone ?? contactPhone,
-        notes: appendNotes(existing.notes, notes),
-      })
-      .eq("id", existing.id)
-      .eq("business_id", businessId)
-      .select("id");
-
-    if (updateError) {
-      logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "update_failed" }, "error");
-      return { success: false, reason: "lookup_failed" };
-    }
-
-    if (!updated || updated.length === 0) {
-      logEvent(
-        "tool_invoked",
-        businessId,
-        { tool: "request_callback", conversationId, result: "update_affected_zero_rows" },
-        "error",
-      );
-      return { success: false, reason: "lookup_failed" };
-    }
-
-    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "updated" });
-    return { success: true, leadId: existing.id, created: false };
-  }
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("leads")
-    .insert({
-      business_id: businessId,
-      conversation_id: conversationId,
-      contact_name: contactName,
-      contact_email: contactEmail,
-      contact_phone: contactPhone,
-      interest_type: null,
-      interest_id: null,
-      notes,
-      qualification: "warm",
-      qualification_reason: QUALIFICATION_REASON,
-      source: SOURCE,
-      requested_callback: true,
-    })
-    .select("id")
-    .single();
-
-  if (insertError) {
-    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "insert_failed" }, "error");
-    return { success: false, reason: "lookup_failed" };
-  }
-
-  logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "created" });
-
-  // Phase 24: outbound webhook on a new qualified lead -- every lead
-  // created via this tool starts 'warm' (QUALIFICATION_REASON above),
-  // so a fresh creation is always a qualifying event. Never fired on the
-  // update branch above (an existing lead getting a repeat callback
+  // Phase 24: outbound webhook on a new qualified lead. Never fired on
+  // the update branch (an existing lead getting a repeat callback
   // request is not a *new* qualified lead).
-  await enqueueLeadQualifiedWebhooks(supabase, businessId, {
-    event: "lead.qualified",
-    leadId: inserted.id,
-    conversationId,
-    qualification: "warm",
-    contactEmail,
-    contactPhone,
-    createdAt: new Date().toISOString(),
-  });
-  after(() => processWebhookDeliveries());
+  if (result.created) {
+    await enqueueLeadQualifiedWebhooks(supabase, businessId, {
+      event: "lead.qualified",
+      leadId: result.leadId,
+      conversationId,
+      qualification: result.qualification,
+      contactEmail,
+      contactPhone,
+      createdAt: new Date().toISOString(),
+    });
+    after(() => processWebhookDeliveries());
+  }
 
-  return { success: true, leadId: inserted.id, created: true };
+  return { success: true, leadId: result.leadId, created: result.created };
 }

@@ -15,7 +15,25 @@ import { StatusSelect } from "./status-select";
 import { bulkUpdateLeadStatusAction, type BulkUpdateStatusState } from "./actions";
 import { LEAD_STATUSES, LEAD_STATUS_LABEL } from "./lead-status";
 import { EmptyState } from "../_components/state-views";
-import type { Lead, LeadQualification, LeadStatus } from "@/lib/supabase/types";
+import type { PossibleDuplicateHint } from "@/lib/leads";
+import type { Lead, LeadFollowUpStatus, LeadQualification, LeadStatus } from "@/lib/supabase/types";
+
+const CHANNEL_LABEL: Record<string, string> = {
+  chat_widget: "website chat",
+  whatsapp: "WhatsApp",
+};
+
+function channelLabel(channel: string | null): string {
+  return channel ? (CHANNEL_LABEL[channel] ?? channel) : "another conversation";
+}
+
+const FOLLOW_UP_LABEL: Record<LeadFollowUpStatus, string> = {
+  sent_email: "Follow-up sent by email",
+  sent_whatsapp: "Follow-up sent via WhatsApp",
+  blocked_no_whatsapp_template: "Follow-up drafted, blocked: no approved WhatsApp template",
+  no_contact_channel: "Follow-up drafted, no channel to send it on",
+  send_failed: "Follow-up drafted, delivery failed — will retry",
+};
 
 const QUALIFICATION_STYLE: Record<LeadQualification, string> = {
   hot: "bg-ds-accent-soft-bg text-ds-accent-muted",
@@ -41,10 +59,12 @@ export function LeadsList({
   leads,
   interestNameById,
   canEdit,
+  possibleDuplicatesByLeadId,
 }: {
   leads: Lead[];
   interestNameById: Record<string, string>;
   canEdit: boolean;
+  possibleDuplicatesByLeadId: Record<string, PossibleDuplicateHint[]>;
 }) {
   const [tab, setTab] = useState<TabId>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -240,6 +260,33 @@ export function LeadsList({
                     />
                     {lead.notes ? (
                       <LeadTextBlock label="Notes" text={lead.notes} textClassName="text-sm text-ds-text-secondary" />
+                    ) : null}
+                    {possibleDuplicatesByLeadId[lead.id]?.length ? (
+                      <p className="rounded-ds-sm bg-ds-accent-soft-bg px-2.5 py-1.5 text-xs text-ds-accent-muted">
+                        Possibly the same prospect as{" "}
+                        {possibleDuplicatesByLeadId[lead.id].map((hint, index) => (
+                          <span key={hint.leadId}>
+                            {index > 0 ? ", " : ""}
+                            <Link
+                              href={`/dashboard/conversations/${hint.conversationId}`}
+                              className="font-medium underline-offset-2 hover:underline"
+                            >
+                              a lead from {channelLabel(hint.channel)}
+                            </Link>
+                          </span>
+                        ))}
+                        . Shown as a hint only — nothing here is merged.
+                      </p>
+                    ) : null}
+                    {lead.follow_up_status ? (
+                      <div className="flex flex-col items-start gap-1 rounded-ds-sm bg-ds-surface-soft px-2.5 py-1.5">
+                        <p className="text-xs font-medium text-ds-text-secondary">
+                          {FOLLOW_UP_LABEL[lead.follow_up_status]}
+                        </p>
+                        {lead.follow_up_message ? (
+                          <LeadTextBlock label="Message" text={lead.follow_up_message} textClassName="text-xs text-ds-text-muted" />
+                        ) : null}
+                      </div>
                     ) : null}
                     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ds-border pt-3">
                       <p className="flex items-center gap-1.5 text-xs text-ds-text-muted">
