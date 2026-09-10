@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { escapeLikePattern } from "@/lib/sql-escape";
 import { logEvent } from "@/lib/logger";
+import { embedText } from "@/lib/embeddings";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -10,11 +11,19 @@ type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
  * Phase B1 (STATE.md, "AI sales agent, not chatbot"): a budget/category-
  * aware alternative to list_products_and_services, only bound for
  * businesses whose recommend_products_enabled is true (lib/rag.ts).
- * Filtering/sorting happens in this function, not via a
+ * Budget/category filtering happens in this function, not via a
  * dynamic PostgREST `.or()` string (no risk of malformed filter syntax
- * from an AI-supplied budget number) -- fetch each table's approved rows,
- * filter/sort in memory, since a single business's catalog is small
- * enough that this is simpler and safer than building a filter string.
+ * from an AI-supplied budget number).
+ *
+ * `needs` is embedded once (lib/embeddings.ts) and ranked against each
+ * approved catalog row's own embedding (match_products/match_services,
+ * supabase/migrations/20260910020000_..., computed at save/approve time
+ * in lib/products.ts / lib/services.ts -- never on this request path) so
+ * a recommendation actually reflects what the prospect said, not just a
+ * budget/category cutoff. On any embedding or RPC failure (rate limit,
+ * transient outage), falls back to the prior budget/category-only lookup
+ * (`queryTable` below) so a transient issue degrades gracefully instead
+ * of a hard failure.
  */
 export const RecommendProductsInputSchema = z.object({
   needs: z
@@ -22,22 +31,30 @@ export const RecommendProductsInputSchema = z.object({
     .trim()
     .min(1)
     .max(300)
-    .describe("A short summary of what the prospect said they need -- used for logging only, not as a filter."),
+    .describe("A short summary of what the prospect said they need -- used to semantically match the best-fitting products/services, not just as a log."),
   // .min(0), not .positive() -- .positive() emits an "exclusiveMinimum"
   // JSON Schema keyword that Gemini's function-declaration parser rejects
   // outright ("Unknown name \"exclusiveMinimum\"... Cannot find field"),
   // confirmed via a real 400 from the live API, not assumed. `.min(0)`
   // emits "minimum" instead, which Gemini does support.
+  // .nullable().optional(), not just .nullable() -- Gemini's function
+  // calling sometimes omits an argument key entirely instead of emitting
+  // an explicit `null` for it, which a bare .nullable() schema rejects as
+  // undefined (the root cause of STATE.md's "occasional invalid_input
+  // flake" on this tool). .optional() tolerates the omitted key too;
+  // callers below normalize the resulting `| undefined` to `null`.
   maxBudget: z
     .number()
     .min(0)
     .nullable()
+    .optional()
     .describe("The prospect's stated budget ceiling, if they gave one. Null if no budget was mentioned."),
   category: z
     .string()
     .trim()
     .max(60)
     .nullable()
+    .optional()
     .describe("A specific category to filter to, if the prospect named one (e.g. 'sofas', 'web design'). Null otherwise."),
 });
 
@@ -105,6 +122,32 @@ async function queryTable(
   return data ?? [];
 }
 
+/** Generous candidate pool per table -- narrowed by budget/category below, then capped to MAX_RESULTS. */
+const MATCH_COUNT = 20;
+
+type MatchRow = CatalogRow & { similarity: number };
+
+async function matchTable(
+  supabase: SupabaseClient,
+  fn: "match_products" | "match_services",
+  businessId: string,
+  queryEmbedding: number[],
+): Promise<MatchRow[]> {
+  const { data, error } = await supabase.rpc(fn, {
+    p_business_id: businessId,
+    p_query_embedding: queryEmbedding,
+    p_match_count: MATCH_COUNT,
+  });
+  if (error) {
+    throw error;
+  }
+  return data ?? [];
+}
+
+function matchesCategory(row: CatalogRow, category: string): boolean {
+  return row.category !== null && row.category.toLowerCase().includes(category.toLowerCase());
+}
+
 /**
  * Authorized executor for the `recommend_products` tool. `businessId`
  * comes from `askSalesEmployee`'s own already-trusted parameter, never
@@ -122,49 +165,80 @@ export async function executeRecommendProducts(
     return { found: false, reason: "invalid_input" };
   }
 
-  const { maxBudget, category } = parsed.data;
+  const maxBudget = parsed.data.maxBudget ?? null;
+  const category = parsed.data.category ?? null;
+
+  let combined: (CatalogRow & { type: "product" | "service"; similarity: number | null })[];
+  let usedSemanticMatch: boolean;
 
   try {
+    const queryEmbedding = await embedText(parsed.data.needs);
     const [productRows, serviceRows] = await Promise.all([
-      queryTable(supabase, "products", businessId, category),
-      queryTable(supabase, "services", businessId, category),
+      matchTable(supabase, "match_products", businessId, queryEmbedding),
+      matchTable(supabase, "match_services", businessId, queryEmbedding),
     ]);
 
-    const combined: (CatalogRow & { type: "product" | "service" })[] = [
+    combined = [
       ...productRows.map((row) => ({ ...row, type: "product" as const })),
       ...serviceRows.map((row) => ({ ...row, type: "service" as const })),
     ];
+    usedSemanticMatch = true;
+  } catch {
+    // Embedding/RPC failure (rate limit, transient outage, or nothing in
+    // the catalog has an embedding yet) -- degrade to the prior
+    // budget/category-only lookup rather than a hard failure.
+    try {
+      const [productRows, serviceRows] = await Promise.all([
+        queryTable(supabase, "products", businessId, category),
+        queryTable(supabase, "services", businessId, category),
+      ]);
+      combined = [
+        ...productRows.map((row) => ({ ...row, type: "product" as const, similarity: null })),
+        ...serviceRows.map((row) => ({ ...row, type: "service" as const, similarity: null })),
+      ];
+      usedSemanticMatch = false;
+    } catch {
+      logEvent("tool_invoked", businessId, { tool: "recommend_products", result: "lookup_failed" }, "error");
+      return { found: false, reason: "lookup_failed" };
+    }
+  }
 
-    const withinBudget = combined.filter(
-      (row) => maxBudget === null || row.price_amount === null || row.price_amount <= maxBudget,
-    );
+  // The semantic path fetches a candidate pool by similarity across the
+  // whole catalog (the RPC has no category parameter) -- category is
+  // applied here as the same case-insensitive substring match the
+  // fallback path's `ilike` performs in the database.
+  const categoryFiltered = category ? combined.filter((row) => matchesCategory(row, category)) : combined;
 
+  const withinBudget = categoryFiltered.filter(
+    (row) => maxBudget === null || row.price_amount === null || row.price_amount <= maxBudget,
+  );
+
+  if (usedSemanticMatch) {
+    withinBudget.sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0));
+  } else {
     withinBudget.sort((a, b) => {
       const aPrice = a.price_amount ?? Number.POSITIVE_INFINITY;
       const bPrice = b.price_amount ?? Number.POSITIVE_INFINITY;
       return aPrice - bPrice;
     });
-
-    const items: RecommendedItem[] = withinBudget.slice(0, MAX_RESULTS).map((row) => ({
-      type: row.type,
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      category: row.category,
-      priceDisplay: row.price != null ? String(row.price) : null,
-      priceAmount: row.price_amount,
-      imageUrl: row.image_url,
-    }));
-
-    if (items.length === 0) {
-      logEvent("tool_invoked", businessId, { tool: "recommend_products", result: "none_found" });
-      return { found: false, reason: "none_found" };
-    }
-
-    logEvent("tool_invoked", businessId, { tool: "recommend_products", result: "found" });
-    return { found: true, items };
-  } catch {
-    logEvent("tool_invoked", businessId, { tool: "recommend_products", result: "lookup_failed" }, "error");
-    return { found: false, reason: "lookup_failed" };
   }
+
+  const items: RecommendedItem[] = withinBudget.slice(0, MAX_RESULTS).map((row) => ({
+    type: row.type,
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    category: row.category,
+    priceDisplay: row.price != null ? String(row.price) : null,
+    priceAmount: row.price_amount,
+    imageUrl: row.image_url,
+  }));
+
+  if (items.length === 0) {
+    logEvent("tool_invoked", businessId, { tool: "recommend_products", result: "none_found" });
+    return { found: false, reason: "none_found" };
+  }
+
+  logEvent("tool_invoked", businessId, { tool: "recommend_products", result: "found" });
+  return { found: true, items };
 }

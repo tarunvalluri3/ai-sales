@@ -1,14 +1,34 @@
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
-import { listLeadsForBusiness } from "@/lib/leads";
+import { listLeadsForBusiness, computePossibleDuplicateLeads } from "@/lib/leads";
 import { listProductsByIds } from "@/lib/products";
 import { listServicesByIds } from "@/lib/services";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeadsList } from "./leads-list";
 
 export default async function LeadsPage() {
   const { businessId, orgRole } = await requireBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:sales_agent");
   const leads = await listLeadsForBusiness(businessId);
+
+  // Cross-channel identity hint (dashboard-only, no data merge -- see
+  // lib/leads.ts's computePossibleDuplicateLeads doc comment): resolve
+  // each lead's own conversation channel ("chat_widget" / "whatsapp") so
+  // the hint can say *where* the other lead came from.
+  const conversationIds = [...new Set(leads.map((lead) => lead.conversation_id))];
+  const channelByConversationId: Record<string, string | null> = {};
+  if (conversationIds.length > 0) {
+    const supabase = createServerSupabaseClient();
+    const { data: conversations } = await supabase
+      .from("conversations")
+      .select("id, source")
+      .eq("business_id", businessId)
+      .in("id", conversationIds);
+    for (const conversation of conversations ?? []) {
+      channelByConversationId[conversation.id] = conversation.source;
+    }
+  }
+  const possibleDuplicatesByLeadId = computePossibleDuplicateLeads(leads, channelByConversationId);
 
   // Resolved to real names rather than shown as raw ids -- a lead's
   // matched product/service can be edited or deleted after the lead was
@@ -32,7 +52,12 @@ export default async function LeadsPage() {
 
   return (
     <div className="flex flex-1 flex-col bg-ds-bg p-6">
-      <LeadsList leads={leads} interestNameById={interestNameById} canEdit={canEdit} />
+      <LeadsList
+        leads={leads}
+        interestNameById={interestNameById}
+        canEdit={canEdit}
+        possibleDuplicatesByLeadId={possibleDuplicatesByLeadId}
+      />
     </div>
   );
 }
