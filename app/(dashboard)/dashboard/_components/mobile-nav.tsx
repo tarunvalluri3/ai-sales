@@ -4,15 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NAV_GROUPS, isNavItemActive, formatAttentionBadge } from "./nav-items";
-import { useAttentionCount } from "./attention-provider";
+import { useAttentionCounts } from "./attention-provider";
 import { useFocusTrap } from "./use-focus-trap";
 
 const PANEL_ID = "dashboard-mobile-nav";
 
+function badgeCountForHref(href: string, counts: { conversationsNeedingAttention: number; pendingAppointments: number }): number {
+  if (href === "/dashboard/conversations") return counts.conversationsNeedingAttention;
+  if (href === "/dashboard/appointments") return counts.pendingAppointments;
+  return 0;
+}
+
 export function MobileNav({ businessName }: { businessName: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const attentionCount = useAttentionCount();
+  const attentionCounts = useAttentionCounts();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
   const panelRef = useFocusTrap(isOpen);
@@ -36,7 +42,7 @@ export function MobileNav({ businessName }: { businessName: string }) {
 
   return (
     <div className="md:hidden">
-      <div className="flex items-center justify-between border-b border-ds-border bg-ds-surface px-4 py-3">
+      <div className="flex h-[var(--mobile-nav-height)] items-center justify-between border-b border-ds-border bg-ds-surface px-4">
         <p className="truncate text-sm font-semibold text-ds-text-primary">{businessName}</p>
         <button
           ref={triggerRef}
@@ -98,7 +104,8 @@ export function MobileNav({ businessName }: { businessName: string }) {
                 ) : null}
                 {group.items.map((item) => {
                   const active = isNavItemActive(pathname, item.href);
-                  const showBadge = item.href === "/dashboard/conversations" && attentionCount > 0;
+                  const badgeCount = badgeCountForHref(item.href, attentionCounts);
+                  const showBadge = badgeCount > 0;
                   return (
                     <Link
                       key={item.href}
@@ -115,10 +122,10 @@ export function MobileNav({ businessName }: { businessName: string }) {
                       <span className="flex-1">{item.label}</span>
                       {showBadge ? (
                         <span
-                          aria-label={`${attentionCount} conversation${attentionCount === 1 ? "" : "s"} need attention`}
+                          aria-label={`${badgeCount} ${item.href === "/dashboard/appointments" ? "pending appointment" : "conversation"}${badgeCount === 1 ? "" : "s"}`}
                           className="rounded-full bg-ds-warning px-1.5 py-0.5 text-2xs font-semibold text-ds-bg"
                         >
-                          {formatAttentionBadge(attentionCount)}
+                          {formatAttentionBadge(badgeCount)}
                         </span>
                       ) : null}
                     </Link>

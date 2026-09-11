@@ -5,7 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { NAV_GROUPS, isNavItemActive, formatAttentionBadge } from "./nav-items";
-import { useAttentionCount } from "./attention-provider";
+import { useAttentionCounts } from "./attention-provider";
+
+/** Maps a nav item's href to its live badge count, if it has one. */
+function badgeCountForHref(href: string, counts: { conversationsNeedingAttention: number; pendingAppointments: number }): number {
+  if (href === "/dashboard/conversations") return counts.conversationsNeedingAttention;
+  if (href === "/dashboard/appointments") return counts.pendingAppointments;
+  return 0;
+}
 
 const COLLAPSE_STORAGE_KEY = "dashboard-sidebar-collapsed";
 // Native "storage" events only fire in *other* tabs, not the tab that wrote
@@ -46,7 +53,7 @@ function getServerCollapsedSnapshot(): boolean {
 
 export function Sidebar({ businessName }: { businessName: string }) {
   const pathname = usePathname();
-  const attentionCount = useAttentionCount();
+  const attentionCounts = useAttentionCounts();
   const initial = businessName.trim().charAt(0).toUpperCase() || "?";
 
   // useSyncExternalStore (not useState+useEffect) so the persisted
@@ -59,7 +66,7 @@ export function Sidebar({ businessName }: { businessName: string }) {
   return (
     <nav
       aria-label="Dashboard"
-      className={`sticky top-0 hidden h-screen shrink-0 flex-col gap-1 self-start overflow-x-hidden overflow-y-auto scrollbar-hidden border-r border-ds-border bg-ds-surface p-4 transition-[width] duration-200 md:flex ${
+      className={`hidden h-full shrink-0 flex-col gap-1 overflow-x-hidden overflow-y-auto scrollbar-hidden border-r border-ds-border bg-ds-surface p-4 transition-[width] duration-200 md:flex ${
         collapsed ? "w-16" : "w-64"
       }`}
     >
@@ -99,13 +106,15 @@ export function Sidebar({ businessName }: { businessName: string }) {
           ) : null}
           {group.items.map((item) => {
             const active = isNavItemActive(pathname, item.href);
-            const showBadge = item.href === "/dashboard/conversations" && attentionCount > 0;
+            const badgeCount = badgeCountForHref(item.href, attentionCounts);
+            const showBadge = badgeCount > 0;
+            const badgeText = formatAttentionBadge(badgeCount);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                title={collapsed ? item.label : undefined}
+                title={collapsed ? (showBadge ? `${item.label} (${badgeText})` : item.label) : undefined}
                 className={`flex items-center gap-3 rounded-ds-sm px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
                   collapsed ? "justify-center" : ""
                 } ${
@@ -114,14 +123,30 @@ export function Sidebar({ businessName }: { businessName: string }) {
                     : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
                 }`}
               >
-                <item.icon className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="relative flex shrink-0 items-center justify-center">
+                  <item.icon className="size-3.5" aria-hidden="true" />
+                  {showBadge && collapsed ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-ds-warning px-0.5 text-[0.6rem] leading-none font-semibold text-ds-bg"
+                    >
+                      {badgeText}
+                    </span>
+                  ) : null}
+                </span>
                 <span className={collapsed ? "sr-only" : "flex-1"}>{item.label}</span>
-                {showBadge ? (
+                {showBadge && !collapsed ? (
                   <span
-                    aria-label={`${attentionCount} conversation${attentionCount === 1 ? "" : "s"} need attention`}
+                    aria-label={`${badgeCount} ${item.href === "/dashboard/appointments" ? "pending appointment" : "conversation"}${badgeCount === 1 ? "" : "s"}`}
                     className="rounded-full bg-ds-warning px-1.5 py-0.5 text-2xs font-semibold text-ds-bg"
                   >
-                    {formatAttentionBadge(attentionCount)}
+                    {badgeText}
+                  </span>
+                ) : null}
+                {showBadge && collapsed ? (
+                  <span className="sr-only">
+                    {badgeCount} {item.href === "/dashboard/appointments" ? "pending appointment" : "conversation"}
+                    {badgeCount === 1 ? "" : "s"}
                   </span>
                 ) : null}
               </Link>
