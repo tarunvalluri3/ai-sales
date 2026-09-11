@@ -33,6 +33,8 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "appointment.no_show": "Appointment marked no-show",
   "appointment_slot_block.created": "Slot blocked",
   "appointment_slot_block.deleted": "Slot unblocked",
+  "instagram_connection.created": "Instagram connected",
+  "instagram_connection.deleted": "Instagram disconnected",
 };
 
 export default async function AuditLogPage() {

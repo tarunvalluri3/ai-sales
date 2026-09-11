@@ -27,6 +27,10 @@ const envSchema = z.object({
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
+  INSTAGRAM_APP_ID: z.string().min(1).optional(),
+  INSTAGRAM_APP_SECRET: z.string().min(1).optional(),
+  INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
+  INSTAGRAM_OAUTH_REDIRECT_URI: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

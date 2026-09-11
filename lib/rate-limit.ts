@@ -10,7 +10,8 @@ export type RateLimitScope =
   | "poll_conversation"
   | "restore_ip"
   | "recent_chats_ip"
-  | "whatsapp_webhook";
+  | "whatsapp_webhook"
+  | "instagram_webhook";
 
 /**
  * Atomically increments the fixed-window counter for (scope, identifier)

@@ -40,7 +40,7 @@ The tenant boundary is the **business**. One business has many members. A user m
 - The AI never fabricates business facts. When it does not know, it follows the fallback behavior in §7.
 - The business owns its data and can review, edit, and delete it.
 - Authentication is Clerk. Application data is Supabase PostgreSQL. Vectors are Supabase pgvector. Orchestration is LangChain. The model provider is Gemini.
-- WhatsApp and Razorpay are deliberately late-stage.
+- WhatsApp, Instagram DM, and Razorpay are deliberately late-stage.
 
 ---
 
