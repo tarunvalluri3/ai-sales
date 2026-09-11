@@ -204,6 +204,32 @@ export async function completeInstagramOAuthCallback(
     return { success: false, error: "Couldn't reach Meta's API to complete this connection. Please try again." };
   }
 
+  // Getting a valid token only proves the credentials work -- it does not
+  // tell Meta to actually deliver this account's messages to our webhook.
+  // That requires this separate subscription call, unconditionally on
+  // every connect/reconnect (idempotent at Meta's end). Same "verify
+  // first, subscribe second, write third" invariant as
+  // connectWhatsappNumber()'s WABA subscription call: a subscription
+  // failure must not silently leave `status='connected'` while Meta
+  // never sends us a single message.
+  try {
+    const url = new URL(`${GRAPH_API_BASE}/me/subscribed_apps`);
+    url.searchParams.set("subscribed_fields", "messages");
+    url.searchParams.set("access_token", longLivedToken);
+    const response = await fetchWithTimeout(url.toString(), { method: "POST" });
+    if (!response.ok) {
+      return {
+        success: false,
+        error: "Meta accepted your credentials but refused to enable message delivery for this Instagram account. Please try connecting again.",
+      };
+    }
+  } catch {
+    return {
+      success: false,
+      error: "Couldn't reach Meta's API to enable message delivery for this Instagram account. Please try again.",
+    };
+  }
+
   let igUsername: string | null = null;
   try {
     const url = new URL(`${GRAPH_API_BASE}/me`);

@@ -2,7 +2,25 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-12 (Phase 26 -- Instagram DM -- implemented and live-verified against production. See the entry immediately below.)
+Last updated: 2026-09-12 (Phase 26 follow-up: fixed a real bug found during the user's own live testing -- Instagram connected successfully but the AI never replied to a real DM. See the entry immediately below; read it before touching lib/instagram.ts's completeInstagramOAuthCallback() again.)
+
+---
+
+## Phase 26 follow-up: Instagram messages never reached the webhook -- missing account subscription call -- fixed 2026-09-12
+
+The user completed the OAuth connect flow live on the deployed app (`tarun.v_15`, shown "Connected" correctly) and sent a real DM, but the AI never replied. Diagnosed via `vercel logs` against the production deployment (after linking the local checkout to the Vercel project with the user's live authentication) -- confirmed `/api/oauth/instagram/authorize` and `/api/oauth/instagram/callback` both fired correctly, but **`/api/webhooks/instagram` was never invoked at all**. Meta never delivered anything, despite a "connected" status.
+
+**Root cause, confirmed live against Meta's current docs**: getting a valid OAuth token only proves the credentials work -- it does not tell Meta to actually deliver that account's messages to the app's webhook. A separate, explicit `POST /me/subscribed_apps?subscribed_fields=messages` call (using the connecting account's own token) is required, exactly analogous to WhatsApp's `connectWhatsappNumber()` calling `POST /{waba-id}/subscribed_apps` -- a mechanism this session's original Phase 26 implementation had ported for WhatsApp's shape but missed for Instagram's, since the initial research pass never surfaced it explicitly.
+
+**Fix**: `lib/instagram.ts`'s `completeInstagramOAuthCallback()` now calls `POST /me/subscribed_apps?subscribed_fields=messages` with the long-lived token, unconditionally on every connect/reconnect (idempotent at Meta's end), **before** upserting `instagram_credentials`/`instagram_connections` -- same "verify first, subscribe second, write third" invariant as `connectWhatsappNumber()`: a subscription failure now fails the whole connect attempt with a clear error rather than silently leaving `status='connected'` while Meta delivers nothing. `docs/security.md` §4's Instagram paragraph updated to document this, same as WhatsApp's own paragraph already did.
+
+**Not a schema change, not a new route, no dependency** -- qualified for direct implementation without a new prompt/plan file (`AGENTS.md`'s trivial-change exemption), same session, same feature, a bug found during the user's own explicitly-requested manual test pass.
+
+**Checks**: `npm run lint`/`npx tsc --noEmit`/`npm run build` all pass, same as the original Phase 26 checks.
+
+**User action required to actually fix the already-connected account**: `tarun.v_15`'s existing connection was created before this fix, so it was never subscribed either. The user needs to click **"Reconnect"** on `/dashboard/instagram` once this fix is deployed -- that re-runs the full OAuth flow, including the now-present subscription call. A fresh first-time connect for any other account needs no such extra step.
+
+**Also surfaced this session, not a defect**: diagnosing this required linking the local checkout to the user's Vercel project (`npx vercel link`) to read production function logs -- this triggered a device-auth login flow that succeeded near-instantly (an already-authenticated browser session), and separately wrote a `.env.local` file locally (confirmed still git-ignored, never staged). Worth the user knowing this happened, even though nothing was committed or exposed.
 
 ---
 
