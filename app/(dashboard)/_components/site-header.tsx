@@ -22,7 +22,7 @@ export function SiteHeader() {
 
   if (isDashboard) {
     return (
-      <header className="flex h-[var(--header-height)] shrink-0 items-center justify-end gap-3 border-b border-ds-border bg-ds-surface px-4">
+      <header className="flex items-center justify-end gap-3 border-b border-ds-border bg-ds-surface px-4 py-2.5">
         <OrganizationSwitcher
           hidePersonal
           afterSelectOrganizationUrl="/dashboard"

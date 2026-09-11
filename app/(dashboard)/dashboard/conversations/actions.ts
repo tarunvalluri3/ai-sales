@@ -21,7 +21,6 @@ import {
   type LastMessagePreview,
 } from "@/lib/messages";
 import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
-import { generateConversationSummary } from "@/lib/conversation-summary";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
@@ -325,66 +324,6 @@ export async function pollConversationsAction(): Promise<PollConversationsResult
     leads: leads.map((lead) => ({ conversationId: lead.conversation_id, contactName: lead.contact_name })),
     lastMessages,
   };
-}
-
-const generateSummarySchema = z.object({
-  conversationId: z.string().uuid(),
-});
-
-export type GenerateSummaryState = {
-  error?: string;
-  success?: boolean;
-  summary?: string;
-  messageCount?: number;
-  generatedAt?: string;
-};
-
-/**
- * Generates (or regenerates) the on-demand AI conversation summary shown
- * in the info panel (2026-09-11 inbox redesign) -- see
- * `lib/conversation-summary.ts` for the grounding/cost-bounding rationale.
- * `org:analyst_viewer` is the minimum role (any business member) -- this
- * is a read-oriented helper, not a mutation of business configuration.
- */
-export async function generateConversationSummaryAction(
-  _prevState: GenerateSummaryState,
-  formData: FormData,
-): Promise<GenerateSummaryState> {
-  const { businessId, orgRole } = await requireBusinessContext();
-  const authError = requireMinRole(orgRole, "org:analyst_viewer");
-  if (authError) {
-    return { error: authError };
-  }
-
-  const parsed = generateSummarySchema.safeParse({
-    conversationId: formData.get("conversationId"),
-  });
-  if (!parsed.success) {
-    return { error: "Invalid request." };
-  }
-
-  const supabase = createServerSupabaseClient();
-
-  const conversation = await getConversationForBusiness(supabase, businessId, parsed.data.conversationId);
-  if (!conversation) {
-    return { error: "This conversation no longer exists." };
-  }
-
-  try {
-    const result = await generateConversationSummary(supabase, businessId, parsed.data.conversationId);
-    if (!result) {
-      return { error: "This conversation has no messages yet." };
-    }
-    revalidatePath(`/dashboard/conversations/${parsed.data.conversationId}`);
-    return {
-      success: true,
-      summary: result.summary,
-      messageCount: result.messageCount,
-      generatedAt: result.generatedAt,
-    };
-  } catch (error) {
-    return { error: logAndGetUserMessage(error) };
-  }
 }
 
 const chunkIdSchema = z.string().uuid();

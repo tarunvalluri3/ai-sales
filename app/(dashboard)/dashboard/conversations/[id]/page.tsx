@@ -4,15 +4,17 @@ import { hasMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversation } from "@/lib/messages";
-import { getLeadForConversation, listLeadsForBusiness, computePossibleDuplicateLeads } from "@/lib/leads";
-import { getAppointmentForConversation } from "@/lib/appointments";
-import { getBusinessForOrg } from "@/lib/business";
+import { getLeadForConversation } from "@/lib/leads";
 import { getProduct } from "@/lib/products";
 import { getService } from "@/lib/services";
-import { channelLabel } from "@/lib/conversation-channel";
 import { LiveConversationPanel } from "../_components/live-conversation-panel";
-import { InfoPanel } from "../_components/info-panel";
-import { ConversationPanes } from "../_components/conversation-panes";
+import type { LeadQualification } from "@/lib/supabase/types";
+
+const QUALIFICATION_STYLE: Record<LeadQualification, string> = {
+  hot: "bg-ds-accent-soft-bg text-ds-accent-muted",
+  warm: "bg-ds-success-bg text-ds-success",
+  cold: "bg-ds-surface-soft text-ds-text-muted",
+};
 
 export default async function ConversationDetailPage({
   params,
@@ -20,7 +22,7 @@ export default async function ConversationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { businessId, orgId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireBusinessContext();
   const supabase = createServerSupabaseClient();
 
   const conversation = await getConversationForBusiness(supabase, businessId, id);
@@ -28,12 +30,9 @@ export default async function ConversationDetailPage({
     notFound();
   }
 
-  const [messages, lead, appointment, business, allLeads] = await Promise.all([
+  const [messages, lead] = await Promise.all([
     listMessagesForConversation(supabase, businessId, conversation.id),
     getLeadForConversation(businessId, conversation.id),
-    getAppointmentForConversation(supabase, businessId, conversation.id),
-    getBusinessForOrg(orgId),
-    listLeadsForBusiness(businessId),
   ]);
 
   // Resolved to a real name rather than shown as a raw id -- a lead's
@@ -49,57 +48,48 @@ export default async function ConversationDetailPage({
     }
   }
 
-  // Cross-channel identity hint, same computation as /dashboard/leads --
-  // needs every lead's channel to say *where* a possible duplicate came
-  // from, and every lead (not just this one) to actually find a match.
-  const conversationIds = [...new Set(allLeads.map((l) => l.conversation_id))];
-  const channelByConversationId: Record<string, string | null> = {};
-  if (conversationIds.length > 0) {
-    const { data: conversations } = await supabase
-      .from("conversations")
-      .select("id, source")
-      .eq("business_id", businessId)
-      .in("id", conversationIds);
-    for (const row of conversations ?? []) {
-      channelByConversationId[row.id] = row.source;
-    }
-  }
-  const duplicates = lead ? (computePossibleDuplicateLeads(allLeads, channelByConversationId)[lead.id] ?? []) : [];
-
   return (
-    <ConversationPanes
-      transcript={
-        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-ds-bg">
-          <div className="flex shrink-0 flex-col gap-1 p-4 pb-0 md:p-6 md:pb-0">
-            <h1 className="text-2xl font-semibold text-ds-text-primary">
-              {lead?.contact_name ?? channelLabel(conversation.source)}
-            </h1>
-            <p className="text-sm text-ds-text-secondary">
-              {new Date(conversation.created_at).toLocaleString("en-US")} · {channelLabel(conversation.source)}
-            </p>
-          </div>
+    <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold text-ds-text-primary">Conversation</h1>
+        <p className="text-sm text-ds-text-secondary">
+          {new Date(conversation.created_at).toLocaleString()} · {conversation.source ?? "Chat widget"}
+        </p>
+      </div>
 
-          <LiveConversationPanel
-            conversationId={conversation.id}
-            initialControl={conversation.control}
-            initialNeedsAttention={conversation.needs_attention}
-            initialMessages={messages}
-            initialAsOf={messages.length > 0 ? messages[messages.length - 1].created_at : conversation.created_at}
-            canEdit={hasMinRole(orgRole, "org:sales_agent")}
-          />
+      <LiveConversationPanel
+        conversationId={conversation.id}
+        initialControl={conversation.control}
+        initialNeedsAttention={conversation.needs_attention}
+        initialMessages={messages}
+        initialAsOf={messages.length > 0 ? messages[messages.length - 1].created_at : conversation.created_at}
+        canEdit={hasMinRole(orgRole, "org:sales_agent")}
+      />
+
+      {lead ? (
+        <div className="flex max-w-2xl flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-ds-text-primary">Lead</h2>
+            <span
+              title="AI-assessed signal -- not verified"
+              className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${QUALIFICATION_STYLE[lead.qualification]}`}
+            >
+              {lead.qualification}
+            </span>
+          </div>
+          <p className="font-medium text-ds-text-primary">{lead.contact_name ?? "Unnamed prospect"}</p>
+          <p className="text-sm text-ds-text-secondary">
+            {lead.contact_email ?? "—"} · {lead.contact_phone ?? "—"}
+          </p>
+          <p className="text-sm text-ds-text-secondary">
+            Interest: {lead.interest_type ?? "—"}
+            {lead.interest_id ? ` — ${interestName ?? "no longer available"}` : ""}
+          </p>
+          <p className="text-sm text-ds-text-muted">AI-written reason: {lead.qualification_reason}</p>
+          {lead.notes ? <p className="text-sm text-ds-text-secondary">Notes: {lead.notes}</p> : null}
+          <p className="text-xs text-ds-text-muted">Status: {lead.status}</p>
         </div>
-      }
-      infoPanel={
-        <InfoPanel
-          conversation={conversation}
-          lead={lead}
-          interestName={interestName}
-          appointment={appointment}
-          duplicates={duplicates}
-          messageCount={messages.length}
-          timezone={business?.timezone ?? "UTC"}
-        />
-      }
-    />
+      ) : null}
+    </div>
   );
 }

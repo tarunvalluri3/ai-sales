@@ -38,12 +38,6 @@ const HISTORY_LIMIT = 20;
 const NON_TEXT_REPLY =
   "I can only read text messages right now — could you type your question instead? Thanks for your patience.";
 
-// 2026-09-11 follow-up: sent instead of pure silence when askSalesEmployee()
-// throws, so a prospect never gets met with nothing. Honest, not a
-// fabricated answer -- doesn't claim to know anything about their question.
-const FALLBACK_REPLY =
-  "Sorry, I'm having trouble responding right now — someone from our team will follow up with you shortly.";
-
 type WhatsappWebhookValue = {
   metadata?: { phone_number_id?: string };
   messages?: { id?: string; from?: string; type?: string; text?: { body?: string } }[];
@@ -197,45 +191,20 @@ async function handleInboundMessage(
 
   const history = await listRecentMessages(supabase, businessId, conversation.id, HISTORY_LIMIT);
 
-  let response: Awaited<ReturnType<typeof askSalesEmployee>>;
-  try {
-    response = await askSalesEmployee(
-      supabase,
-      businessId,
-      conversation.id,
-      businessContext.businessName,
-      businessContext.businessProfile,
-      inboundContent,
-      history,
-      businessContext.language,
-      {
-        recommendProductsEnabled: businessContext.recommendProductsEnabled,
-        appointmentsEnabled: businessContext.appointmentsEnabled,
-      },
-    );
-  } catch (error) {
-    // A thrown error here used to mean total silence: the outer POST
-    // handler's own try/catch (which must never fail the webhook
-    // response, or Meta retries the whole payload) swallows it with no
-    // reply ever sent and nothing visible unless someone checks Sentry.
-    // logAndGetUserMessage() still reports to Sentry (2026-09-11
-    // follow-up) -- this doesn't hide the root cause, it just stops the
-    // prospect from being met with silence, and flags the conversation so
-    // a human notices instead of it vanishing.
-    logAndGetUserMessage(error);
-    await sendReply(
-      supabase,
-      businessId,
-      conversation.id,
-      (await createMessage(supabase, businessId, conversation.id, "assistant", FALLBACK_REPLY)).id,
-      phoneNumberId,
-      message.from,
-      FALLBACK_REPLY,
-    );
-    await flagConversationNeedsAttention(supabase, businessId, conversation.id, businessContext.clerkOrgId);
-    logEvent("whatsapp_ai_reply_failed", businessId, { conversationId: conversation.id }, "error");
-    return;
-  }
+  const response = await askSalesEmployee(
+    supabase,
+    businessId,
+    conversation.id,
+    businessContext.businessName,
+    businessContext.businessProfile,
+    inboundContent,
+    history,
+    businessContext.language,
+    {
+      recommendProductsEnabled: businessContext.recommendProductsEnabled,
+      appointmentsEnabled: businessContext.appointmentsEnabled,
+    },
+  );
 
   const assistantMessageRow = await createMessage(
     supabase,
