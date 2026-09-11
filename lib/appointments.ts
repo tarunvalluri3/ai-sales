@@ -480,67 +480,6 @@ export async function getAppointmentForBusiness(supabase: ServerSupabaseClient, 
   return data;
 }
 
-/**
- * Looks up the appointment linked to a conversation, scoped to the given
- * business -- for the conversation detail page's info panel (2026-09-11
- * inbox redesign). Null if this conversation never booked one (the common
- * case). A conversation may in principle have more than one appointment
- * row over time; this returns the most recent by `starts_at`, matching
- * this file's own default ordering.
- */
-export async function getAppointmentForConversation(
-  supabase: ServerSupabaseClient,
-  businessId: string,
-  conversationId: string,
-): Promise<Appointment | null> {
-  const { data, error } = await supabase
-    .from("appointments")
-    .select("*")
-    .eq("business_id", businessId)
-    .eq("conversation_id", conversationId)
-    .order("starts_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw new AppError(
-      "Something went wrong loading this conversation's appointment. Please try again.",
-      "getAppointmentForConversation failed",
-      error,
-    );
-  }
-
-  return data;
-}
-
-/**
- * Returns the number of `pending` appointments for a business, without
- * fetching row data -- backs the dashboard's live "Appointments" nav badge
- * (2026-09-11, same in-dashboard-notification pattern
- * `countConversationsNeedingAttention` already established for
- * Conversations). `businessId` must come from `requireBusinessContext()`.
- */
-export async function countPendingAppointmentsForBusiness(
-  supabase: ServerSupabaseClient,
-  businessId: string,
-): Promise<number> {
-  const { count, error } = await supabase
-    .from("appointments")
-    .select("id", { count: "exact", head: true })
-    .eq("business_id", businessId)
-    .eq("status", "pending");
-
-  if (error) {
-    throw new AppError(
-      "Something went wrong loading appointment requests. Please try again.",
-      "countPendingAppointmentsForBusiness failed",
-      error,
-    );
-  }
-
-  return count ?? 0;
-}
-
 /** Lists a business's appointments, most recently starting first. `businessId` must come from `requireBusinessContext()`. */
 export async function listAppointmentsForBusiness(supabase: ServerSupabaseClient, businessId: string): Promise<Appointment[]> {
   const { data, error } = await supabase

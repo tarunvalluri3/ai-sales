@@ -113,8 +113,8 @@ export function LiveConversationPanel({
   );
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 p-4 pt-3 md:p-6 md:pt-3">
-      <div className="flex shrink-0 flex-wrap items-start gap-3">
+    <>
+      <div className="flex flex-wrap items-start gap-3">
         <ControlToggle
           conversationId={conversationId}
           control={control}
@@ -130,7 +130,13 @@ export function LiveConversationPanel({
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-ds-lg border border-ds-border bg-ds-surface p-4 sm:p-5">
+      {control === "human" ? (
+        <div className="max-w-2xl">
+          <ReplyComposer conversationId={conversationId} onSent={handleReplySent} canEdit={canEdit} />
+        </div>
+      ) : null}
+
+      <div className="flex max-w-2xl flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4 sm:p-5">
         {messages.length === 0 ? (
           <p className="text-sm text-ds-text-muted">No messages yet.</p>
         ) : (
@@ -149,12 +155,6 @@ export function LiveConversationPanel({
           </AnimatePresence>
         )}
       </div>
-
-      {control === "human" ? (
-        <div className="shrink-0">
-          <ReplyComposer conversationId={conversationId} onSent={handleReplySent} canEdit={canEdit} />
-        </div>
-      ) : null}
-    </div>
+    </>
   );
 }

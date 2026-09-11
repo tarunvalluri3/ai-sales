@@ -3,7 +3,6 @@
 import { requireBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { countConversationsNeedingAttention } from "@/lib/conversations";
-import { countPendingAppointmentsForBusiness } from "@/lib/appointments";
 import { logEvent } from "@/lib/logger";
 
 /**
@@ -19,35 +18,21 @@ import { logEvent } from "@/lib/logger";
  */
 const HANDOFF_BACKLOG_ALERT_THRESHOLD = 5;
 
-export type AttentionCounts = {
-  conversationsNeedingAttention: number;
-  pendingAppointments: number;
-};
-
 /**
  * Polled directly from AttentionProvider (a plain async function call
  * from a client component, same pattern as pollConversationAction). No
  * Zod input to validate -- no arguments. Real failures propagate as a
  * rejected promise; the caller's poll loop treats a failure as "try
  * again next tick," not a value to guess (Phase 15c).
- *
- * Returns both the Conversations "needs attention" count and the
- * Appointments "pending" count in one call (2026-09-11) -- one shared
- * 1-second poll backing both nav badges, rather than two independent
- * timers hitting the server every second.
  */
-export async function pollAttentionCountAction(): Promise<AttentionCounts> {
+export async function pollAttentionCountAction(): Promise<number> {
   const { businessId } = await requireBusinessContext();
   const supabase = createServerSupabaseClient();
+  const count = await countConversationsNeedingAttention(supabase, businessId);
 
-  const [conversationsNeedingAttention, pendingAppointments] = await Promise.all([
-    countConversationsNeedingAttention(supabase, businessId),
-    countPendingAppointmentsForBusiness(supabase, businessId),
-  ]);
-
-  if (conversationsNeedingAttention >= HANDOFF_BACKLOG_ALERT_THRESHOLD) {
-    logEvent("handoff_backlog_high", businessId, { count: conversationsNeedingAttention }, "error");
+  if (count >= HANDOFF_BACKLOG_ALERT_THRESHOLD) {
+    logEvent("handoff_backlog_high", businessId, { count }, "error");
   }
 
-  return { conversationsNeedingAttention, pendingAppointments };
+  return count;
 }

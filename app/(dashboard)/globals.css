@@ -5,20 +5,6 @@
   --foreground: #171717;
 
   /*
-   * The dashboard's SiteHeader height -- pinned so it's a predictable,
-   * consistent size rather than whatever its content happens to measure.
-   * Not used for any sticky/viewport-height calc elsewhere (an earlier
-   * attempt at that made a real bug worse -- see conversations/layout.tsx's
-   * doc comment): `Sidebar` and the conversations inbox shell both just
-   * use a plain `sticky top-0 h-screen`, which self-corrects regardless of
-   * this value. Must stay in sync with SiteHeader's own
-   * `h-[var(--header-height)]` (app/(dashboard)/_components/site-header.tsx).
-   */
-  --header-height: 3.5rem;
-  /* Same reasoning as --header-height, for MobileNav's own header bar. Must stay in sync with MobileNav's own `h-[var(--mobile-nav-height)]` (app/(dashboard)/dashboard/_components/mobile-nav.tsx). */
-  --mobile-nav-height: 3.25rem;
-
-  /*
    * Premium design system: deep warm charcoal + warm ivory + electric lime,
    * modeled on the Zajno "Smart Energy Dashboard" reference. Body background
    * stays light for now -- flipping it globally would make every not-yet-
