@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ProfileFormState } from "./actions";
 import { updateBusinessProfileAction } from "./actions";
+import { BUSINESS_TYPES } from "@/lib/schemas/business";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: ProfileFormState = {};
@@ -25,6 +26,7 @@ const legendClasses = "text-2xs font-medium tracking-wide-ds text-ds-text-second
  */
 export function ProfileForm({
   initialName,
+  initialBusinessType,
   initialDescription,
   initialContactEmail,
   initialContactPhone,
@@ -32,6 +34,7 @@ export function ProfileForm({
   canEdit = true,
 }: {
   initialName: string;
+  initialBusinessType: string;
   initialDescription: string;
   initialContactEmail: string;
   initialContactPhone: string;
@@ -73,6 +76,32 @@ export function ProfileForm({
           {fieldErrors.name ? (
             <p id="name-error" className="text-xs text-ds-danger">
               {fieldErrors.name}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="businessType" className="text-sm font-medium text-ds-text-secondary">
+            Business type
+          </label>
+          <select
+            id="businessType"
+            name="businessType"
+            required
+            defaultValue={initialBusinessType}
+            disabled={isPending || !canEdit}
+            aria-invalid={fieldErrors.businessType ? true : undefined}
+            aria-describedby={fieldErrors.businessType ? "businessType-error" : undefined}
+            className={inputClasses}
+          >
+            {BUSINESS_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
+          </select>
+          {fieldErrors.businessType ? (
+            <p id="businessType-error" className="text-xs text-ds-danger">
+              {fieldErrors.businessType}
             </p>
           ) : null}
         </div>

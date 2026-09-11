@@ -3,36 +3,12 @@
 import { useActionState, useState } from "react";
 import { updateBusinessHoursAction, type BusinessHoursState } from "./actions";
 import type { BusinessHours } from "@/lib/supabase/types";
+import { TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: BusinessHoursState = {};
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-/** A curated set of common IANA timezones -- not exhaustive, but covers the regions this app's businesses are most likely to be in. */
-const TIMEZONE_OPTIONS = [
-  "UTC",
-  "America/Los_Angeles",
-  "America/Denver",
-  "America/Chicago",
-  "America/New_York",
-  "America/Sao_Paulo",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Europe/Moscow",
-  "Africa/Cairo",
-  "Asia/Dubai",
-  "Asia/Kolkata",
-  "Asia/Dhaka",
-  "Asia/Bangkok",
-  "Asia/Singapore",
-  "Asia/Shanghai",
-  "Asia/Tokyo",
-  "Asia/Seoul",
-  "Australia/Sydney",
-  "Pacific/Auckland",
-];
 
 const inputClasses =
   "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong disabled:opacity-60";

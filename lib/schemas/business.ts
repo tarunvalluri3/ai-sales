@@ -42,8 +42,32 @@ export const businessWebsiteSchema = optionalTrimmed
   })
   .transform((value) => (value === "" ? null : value));
 
+/**
+ * Business type/industry (2026-09-11) -- descriptive/display-only, same
+ * category as description/contact/website: not read by lib/rag.ts or any AI
+ * behavior. Closed enum matching the businesses_business_type_check DB
+ * constraint (20260911000000) -- keep both in sync if this list changes.
+ */
+export const BUSINESS_TYPES = [
+  { value: "ecommerce", label: "E-commerce / Online store" },
+  { value: "professional_services", label: "Professional services (consulting, agency, legal, accounting)" },
+  { value: "healthcare", label: "Healthcare / Clinic" },
+  { value: "education", label: "Education / Training" },
+  { value: "real_estate", label: "Real estate" },
+  { value: "hospitality", label: "Hospitality / Food & beverage" },
+  { value: "finance", label: "Finance / Insurance" },
+  { value: "technology", label: "Technology / SaaS" },
+  { value: "retail", label: "Retail (physical store)" },
+  { value: "other", label: "Other" },
+] as const;
+
+export const businessTypeSchema = z.enum(
+  BUSINESS_TYPES.map((t) => t.value) as [string, ...string[]],
+);
+
 export const businessProfileSchema = z.object({
   name: businessNameSchema,
+  businessType: businessTypeSchema,
   description: businessDescriptionSchema,
   contactEmail: businessContactEmailSchema,
   contactPhone: businessContactPhoneSchema,
