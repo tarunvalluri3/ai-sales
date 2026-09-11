@@ -3,6 +3,8 @@ import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 import { processWhatsappOutboundMessages } from "@/lib/whatsapp-delivery";
+import { processInstagramOutboundMessages } from "@/lib/instagram-delivery";
+import { refreshDueInstagramTokens } from "@/lib/instagram";
 import { refreshDueUrlKnowledgeSources } from "@/lib/url-ingestion";
 import { runSlaEscalationSweep } from "@/lib/sla-routing";
 import { sendDailyDigestEmails } from "@/lib/notifications";
@@ -52,20 +54,33 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [ingestion, webhooks, whatsappOutbound, urlRefresh, slaRouting, notificationDigest, stalledLeadFollowUp] =
-      await Promise.all([
-        processIngestionQueue(),
-        processWebhookDeliveries(),
-        processWhatsappOutboundMessages(),
-        refreshDueUrlKnowledgeSources(),
-        runSlaEscalationSweep(),
-        sendDailyDigestEmails(),
-        runStalledLeadFollowUpSweep(),
-      ]);
+    const [
+      ingestion,
+      webhooks,
+      whatsappOutbound,
+      instagramOutbound,
+      instagramTokenRefresh,
+      urlRefresh,
+      slaRouting,
+      notificationDigest,
+      stalledLeadFollowUp,
+    ] = await Promise.all([
+      processIngestionQueue(),
+      processWebhookDeliveries(),
+      processWhatsappOutboundMessages(),
+      processInstagramOutboundMessages(),
+      refreshDueInstagramTokens(),
+      refreshDueUrlKnowledgeSources(),
+      runSlaEscalationSweep(),
+      sendDailyDigestEmails(),
+      runStalledLeadFollowUpSweep(),
+    ]);
     return jsonSuccess({
       ingestion,
       webhooks,
       whatsappOutbound,
+      instagramOutbound,
+      instagramTokenRefresh,
       urlRefresh,
       slaRouting,
       notificationDigest,

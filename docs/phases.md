@@ -207,3 +207,11 @@ Billing (Phase 17 — Razorpay) and WhatsApp (Phase 16) stay explicitly out of t
 Widget conversation restored from the database on page refresh instead of resetting; widget branding (accent color, logo, welcome text, CTA copy, placement, office-hours-aware greeting); language/localization support; funnel analytics (lead rate, qualified-lead rate, handoff response time, answer-failure rate, top unanswered questions, source/page attribution, CSV export); a full accessibility pass across dashboard and widget in both themes (keyboard nav, screen-reader labels, contrast); a responsive audit of the dashboard itself, not only the widget; slow-network/timeout UX with honest failure messaging; a consistent empty/error/loading pattern across every dashboard page; onboarding polish including a "test your AI before publishing" workspace; and handoff/lead notifications that reach the team outside the browser tab (email digest at minimum).
 
 **Exit:** a keyboard-only pass, a screen-reader pass, and a throttled-network pass each complete without a broken or silent state, on every page touched by this phase.
+
+## Phase 26 — Instagram DM
+
+Reuses Phase 16's WhatsApp architecture (conversation/AI/lead services, webhook shape, outbound delivery queue) with one genuine difference: Meta OAuth ("Instagram API with Instagram Login") through this app's own Meta App, not a business-pasted permanent token. Requires Meta App Review + Business Verification (Advanced Access) before any tenant other than the developer's own Instagram Tester account can connect in production; Development Mode plus an Instagram Tester account allows full end-to-end testing before that approval lands.
+
+When built, reuse the same conversation, AI, and lead services. Do not create a second AI system.
+
+**Exit:** a business connects an Instagram professional account via OAuth, a DM round-trips through the existing AI/escalation pipeline exactly as WhatsApp does, and a forged/expired OAuth state or token is proven to fail closed by a tenant-isolation test.

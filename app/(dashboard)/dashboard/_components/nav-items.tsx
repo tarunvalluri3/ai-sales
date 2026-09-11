@@ -4,6 +4,7 @@ import {
   BookOpen,
   Building2,
   CalendarCheck,
+  Camera,
   CircleHelp,
   Clock,
   LayoutDashboard,
@@ -51,6 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Widget Settings", href: "/dashboard/widget-settings", icon: MessageSquareText },
       { label: "WhatsApp", href: "/dashboard/whatsapp", icon: MessageCircle },
+      { label: "Instagram", href: "/dashboard/instagram", icon: Camera },
     ],
   },
   {

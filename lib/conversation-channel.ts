@@ -8,6 +8,7 @@
 const CHANNEL_LABEL: Record<string, string> = {
   chat_widget: "Website",
   whatsapp: "WhatsApp",
+  instagram: "Instagram",
 };
 
 export function channelLabel(source: string | null): string {

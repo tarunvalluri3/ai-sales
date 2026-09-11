@@ -311,6 +311,23 @@ export type WhatsappConnection = {
   updated_at: string | null;
 };
 
+export type InstagramConnectionStatus = "pending" | "connected" | "error" | "disconnected";
+
+export type InstagramConnection = {
+  id: string;
+  business_id: string;
+  instagram_business_account_id: string;
+  ig_username: string | null;
+  status: InstagramConnectionStatus;
+  token_expires_at: string | null;
+  access_token_last4: string | null;
+  last_verified_at: string | null;
+  last_error: string | null;
+  connected_at: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
 export type AuditLogAction =
   | "conversation.control_changed"
   | "conversation.attention_dismissed"
@@ -339,7 +356,9 @@ export type AuditLogAction =
   | "appointment.completed"
   | "appointment.no_show"
   | "appointment_slot_block.created"
-  | "appointment_slot_block.deleted";
+  | "appointment_slot_block.deleted"
+  | "instagram_connection.created"
+  | "instagram_connection.deleted";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 
