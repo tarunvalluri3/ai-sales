@@ -86,12 +86,16 @@ export async function countConversationsForBusiness(
 
 export type ConversationWithMessageCount = Conversation & { messageCount: number };
 
+/** Bounds the unpaginated conversations-list fetch (dashboard overview's "recent activity" widget, and the conversations inbox's chat-list pane both just need "most recent N", never every conversation a business has ever had) so this query's cost doesn't grow unboundedly with a business's history. */
+const LIST_LIMIT = 300;
+
 /**
- * Lists all conversations for a business, most recent first, with each
- * conversation's message count via PostgREST's embedded-relationship
- * count (messages.conversation_id is a real FK, unlike this project's
- * several app-enforced polymorphic references). `businessId` must come
- * from `requireBusinessContext()`.
+ * Lists the most recent conversations for a business (capped at
+ * `LIST_LIMIT`), most recent first, with each conversation's message
+ * count via PostgREST's embedded-relationship count
+ * (messages.conversation_id is a real FK, unlike this project's several
+ * app-enforced polymorphic references). `businessId` must come from
+ * `requireBusinessContext()`.
  */
 export async function listConversationsForBusiness(
   supabase: SupabaseClient,
@@ -102,7 +106,8 @@ export async function listConversationsForBusiness(
     .select("*, messages(count)")
     .eq("business_id", businessId)
     .or(EXCLUDE_SANDBOX_FILTER)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
 
   if (error) {
     throw new AppError(
