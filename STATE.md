@@ -2,7 +2,35 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-12 (Conversations page rebuilt as a 3-pane AiSensy-style inbox -- a safe redo of PR #59, which was fully reverted; see the entry directly below for why that matters before touching this page again.)
+Last updated: 2026-09-12 (Fixed a real production performance regression the 3-pane inbox redesign introduced -- opening a conversation and take-over/hand-back were both slow. See the entry immediately below; read it before touching conversations/layout.tsx or conversations/actions.ts's revalidatePath usage again.)
+
+---
+
+## Conversations page: fixed a production performance regression from the 3-pane inbox redesign -- implemented 2026-09-12
+
+User reported real production slowness right after the 3-pane inbox shipped (previous entry): opening a conversation was slow, and "take over"/"hand back to AI" were also slow. Root-caused with two Explore agents (one tracing actual query/polling cost in this codebase, one reading this exact Next.js 16.3.0 install's own docs under `node_modules/next/dist/docs/` to confirm real caching behavior rather than assume from training data) -- two confirmed, concrete causes, both introduced by that redesign, neither pre-existing:
+
+**Cause 1 -- doubled continuous polling.** Before the redesign, exactly one 1-second poll loop was ever active (the list's own poll while on the list page, or the detail page's scoped poll while viewing a conversation -- never both, since the list component fully unmounted on navigating away). Since `ChatListPane` now lives in the persistent `conversations/layout.tsx`, it never unmounts under `/dashboard/conversations/*` -- so viewing any conversation now runs `LiveConversationPanel`'s scoped poll *and* `ChatListPane`'s business-wide poll (`listConversationsForBusiness` + `listLeadsForBusiness` + `listLastMessagesForConversations`, unbounded) concurrently, every second, indefinitely.
+
+**Cause 2 -- `revalidatePath`'s documented over-invalidation (the specific "take over"/"hand back is slow" mechanism).** `setConversationControlAction`/`sendHumanReplyAction`/`dismissAttentionAction` each called `revalidatePath(\`/dashboard/conversations/${id}\`)`. This app is on Next 16.3.0's "Previous Model" (Cache Components off, confirmed in `next.config.ts`), whose own docs (`revalidatePath.md`) state: "Server Functions: ... it also causes all previously visited pages to refresh when navigated to again. This behavior is temporary." `how-revalidation-works.md` confirms this explicitly includes the ancestor layout's soft tag, not just the leaf page. Since `conversations/layout.tsx` is fully dynamic (cookie-based auth) with zero server-side cache backing it (Supabase calls aren't covered by Next's `fetch()` memoization -- confirmed in `fetch.md`), every take-over/reply/dismiss click was forcing the layout's three unbounded business-wide queries to re-run on the next navigation, on top of the action's own one-row update. (Confirmed for the record: plain `<Link>` navigation between conversations, with no action in between, does *not* re-run the layout on its own -- `layout.md`/`staleTimes.md`/`prefetching.md` all confirm shared layouts aren't refetched on ordinary sibling navigation. The regression is specifically `revalidatePath`'s documented broader cache-busting side effect.)
+
+**Fix (small, no caching-architecture change -- deliberately not adopting `unstable_cache`/`revalidateTag`/Cache Components, which Next's own docs flag `unstable_cache` as already being superseded by, an opt-in architectural shift this app hasn't made):**
+1. Removed the three `revalidatePath()` calls from `conversations/actions.ts`. Each action already had a client-side path to freshness that didn't depend on it -- `ControlToggle`'s `onChanged`/`ReplyComposer`'s `onSent`/`DismissAttentionButton`'s `onDismissed` all trigger `LiveConversationPanel`'s own immediate extra poll (this was already the real source of truth for the live UI update; `revalidatePath` only ever served "a fresh page on a hard reload," per the code's own prior comment). Removing it fully eliminates cause 2's trigger -- a hard refresh right after an action is at most ~1 poll tick stale.
+2. `ChatListPane`'s poll interval is now route-aware: `1000ms` at the index route, `4000ms` while a specific conversation is open (`_components/chat-list-pane.tsx`) -- cuts the previously-doubled continuous load during the common case of an open conversation, while keeping the list reasonably live rather than fully stopping it.
+3. `getBusinessForOrg` (`lib/business.ts`) wrapped in React's `cache()` -- the docs-recommended substitute for Next's `fetch()`-based Data Cache when the underlying calls aren't `fetch()` (Supabase isn't). Dedupes repeated `requireBusinessContext()` calls within a single request/render pass; purely a per-request optimization, never returns cross-request-stale data.
+4. `listConversationsForBusiness` (`lib/conversations.ts`) gained a generous `.limit(300)` -- both its callers (the dashboard overview's "recent activity" widget, and the chat list) only ever need "most recent N," never a business's full history, so this bounds the query's worst case with no behavior change for real usage.
+
+**Deliberately did NOT cap `listLeadsForBusiness`** despite the plan initially proposing it -- caught during implementation that it's also the primary data source for the full Leads CRM page (`leads/page.tsx`, with its own client-side pagination expecting the complete dataset) and for `analytics/actions.ts`'s stats. Capping it at the library level would have silently truncated/corrupted those two unrelated pages for any business over the cap -- exactly the kind of side effect to avoid. Left fully unbounded; it wasn't flagged as an N+1 problem, just uncapped, and isn't part of either confirmed root cause.
+
+**Checks:** `npm run lint` -- pass. `npm run typecheck` -- pass. `npm run build` -- pass, all 33 routes compile.
+
+**Not yet done:** no authenticated before/after production timing measurement by me (no access to this environment's production instance or its metrics). The user reported the original slowness from production directly; ask them to confirm the fix there too, not just via these local checks.
+
+**Files changed:** `app/(dashboard)/dashboard/conversations/actions.ts` (removed 3 `revalidatePath` calls + the now-unused import), `_components/chat-list-pane.tsx` (route-aware poll interval), `_components/live-conversation-panel.tsx` (updated a comment that referenced the removed `revalidatePath` calls), `lib/business.ts` (`getBusinessForOrg` wrapped in `cache()`), `lib/conversations.ts` (`listConversationsForBusiness` gained `.limit(300)`).
+
+**Packages added:** none. **Migrations:** none. **Environment variables:** none.
+
+**Next logical task:** none queued from this session. If production data grows enough that `listLeadsForBusiness`'s unbounded fetch becomes a real cost (unlike today), it needs a *scoped* fix (e.g. an optional limit parameter, not a blanket cap) since Leads/Analytics depend on its completeness -- flagged here, not fixed speculatively.
 
 ---
 

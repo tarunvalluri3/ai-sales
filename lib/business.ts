@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Business } from "@/lib/supabase/types";
 import type { BusinessProfileInput, WidgetBrandingInput } from "@/lib/schemas/business";
@@ -22,8 +23,17 @@ export class BusinessAlreadyExistsError extends Error {
  * Looks up the business row for a given Clerk org. `orgId` must come from
  * a validated session (`requireAuthContext()`), never from client input.
  * The explicit `clerk_org_id` filter is defense in depth alongside RLS.
+ *
+ * Wrapped in React's `cache()` so repeated calls with the same `orgId`
+ * within a single request/render pass (e.g. a layout and its page both
+ * calling `requireBusinessContext()`, or several Server Actions firing
+ * close together) are deduped to one DB round trip instead of one each
+ * -- this doesn't cover Next's `fetch()`-based Data Cache (Supabase
+ * calls aren't `fetch()`), so `cache()` is the correct, docs-recommended
+ * substitute. Memoization is per-request only; it never returns stale
+ * data across separate requests/actions.
  */
-export async function getBusinessForOrg(orgId: string): Promise<Business | null> {
+export const getBusinessForOrg = cache(async (orgId: string): Promise<Business | null> => {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
@@ -40,7 +50,7 @@ export async function getBusinessForOrg(orgId: string): Promise<Business | null>
   }
 
   return data;
-}
+});
 
 /** Full field set the onboarding wizard collects (2026-09-11). */
 export type CreateBusinessInput = {

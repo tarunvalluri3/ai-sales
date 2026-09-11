@@ -1,7 +1,6 @@
 "use server";
 
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -80,7 +79,6 @@ export async function setConversationControlAction(
     control: parsed.data.control,
   });
 
-  revalidatePath(`/dashboard/conversations/${parsed.data.id}`);
   return { success: true };
 }
 
@@ -164,7 +162,6 @@ export async function sendHumanReplyAction(
     }
   }
 
-  revalidatePath(`/dashboard/conversations/${parsed.data.conversationId}`);
   return { success: true, message };
 }
 
@@ -220,7 +217,6 @@ export async function dismissAttentionAction(
     parsed.data.conversationId,
   );
 
-  revalidatePath(`/dashboard/conversations/${parsed.data.conversationId}`);
   return { success: true };
 }
 

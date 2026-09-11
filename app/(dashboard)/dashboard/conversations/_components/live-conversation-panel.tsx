@@ -14,11 +14,13 @@ const POLL_INTERVAL_MS = 1000;
 /**
  * Owns polling state for one conversation detail page (Phase 15b).
  * Poll results are the single source of truth for `messages`/`control`
- * once mounted -- ControlToggle and ReplyComposer's own actions keep
- * their existing revalidatePath() calls (still correct for a fresh page
- * load), but this component treats them as feedback triggers for an
- * immediate extra poll, not as the source of truth for what's rendered
- * (prompts/phase-15b-staff-reply-and-live-polling.md's Decision 9).
+ * once mounted -- ControlToggle/ReplyComposer/DismissAttentionButton's
+ * actions no longer call `revalidatePath()` (removed -- it was forcing
+ * the shared conversations/layout.tsx's business-wide list query to
+ * re-run on every take-over/reply/dismiss click, a real production
+ * performance regression; see STATE.md). This component's own
+ * `onChanged`/`onSent`/`onDismissed`-triggered immediate poll is the
+ * only mechanism these actions rely on for a live UI update.
  */
 export function LiveConversationPanel({
   conversationId,

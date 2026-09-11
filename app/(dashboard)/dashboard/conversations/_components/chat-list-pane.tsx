@@ -11,7 +11,14 @@ import { channelLabel } from "@/lib/conversation-channel";
 import type { ConversationWithMessageCount } from "@/lib/conversations";
 import type { LastMessagePreview } from "@/lib/messages";
 
-const POLL_INTERVAL_MS = 1000;
+// Full speed while the list is the main view (nothing else to look at);
+// slower once a specific conversation is open, where LiveConversationPanel
+// runs its own concurrent 1s poll and this list becomes secondary --
+// keeping this at full speed too was doubling steady-state polling load
+// for the whole time any conversation is open, a real production
+// performance regression (see STATE.md).
+const POLL_INTERVAL_INDEX_MS = 1000;
+const POLL_INTERVAL_DETAIL_MS = 4000;
 const INDEX_PATH = "/dashboard/conversations";
 
 function toLeadMap(leads: ConversationLeadSummary[]): Map<string, string | null> {
@@ -53,6 +60,12 @@ export function ChatListPane({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
   const pollRef = useRef<() => Promise<void>>(async () => {});
+  // Depends on `pathname` so the *next* scheduled tick always uses the
+  // interval for whichever route is current -- switching between the
+  // index and a specific conversation re-runs the mount effect below
+  // (cleanup + immediate reschedule at the new interval), which is fine:
+  // it only resets a timer, it doesn't fire an extra poll.
+  const pollInterval = pathname === INDEX_PATH ? POLL_INTERVAL_INDEX_MS : POLL_INTERVAL_DETAIL_MS;
 
   const poll = useCallback(async () => {
     if (timeoutRef.current) {
@@ -73,9 +86,9 @@ export function ChatListPane({
 
     if (!isMountedRef.current) return;
     if (document.visibilityState === "visible") {
-      timeoutRef.current = setTimeout(() => pollRef.current(), POLL_INTERVAL_MS);
+      timeoutRef.current = setTimeout(() => pollRef.current(), pollInterval);
     }
-  }, []);
+  }, [pollInterval]);
 
   useEffect(() => {
     pollRef.current = poll;
@@ -93,7 +106,7 @@ export function ChatListPane({
       }
     }
 
-    timeoutRef.current = setTimeout(() => pollRef.current(), POLL_INTERVAL_MS);
+    timeoutRef.current = setTimeout(() => pollRef.current(), pollInterval);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
@@ -101,7 +114,7 @@ export function ChatListPane({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [poll]);
+  }, [poll, pollInterval]);
 
   // Flagged conversations first, then most recent; `id` is a pure
   // tiebreaker so two rows with an identical created_at never swap order
