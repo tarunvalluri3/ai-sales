@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import {
   confirmAppointmentAction,
   declineAppointmentAction,
@@ -11,8 +11,17 @@ import {
 } from "./actions";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { useToast } from "../_components/toast";
 
 const initialState: AppointmentActionState = {};
+
+const SUCCESS_MESSAGE: Record<"confirm" | "decline" | "cancel" | "complete" | "no_show", string> = {
+  confirm: "Appointment confirmed",
+  decline: "Appointment declined",
+  cancel: "Appointment cancelled",
+  complete: "Marked completed",
+  no_show: "Marked no-show",
+};
 
 const successStyle =
   "rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
@@ -37,6 +46,7 @@ export function AppointmentActions({
   isPastDue: boolean;
   canEdit?: boolean;
 }) {
+  const { toast } = useToast();
   const [confirmState, confirmFormAction, isConfirming] = useActionState(confirmAppointmentAction, initialState);
   const [declineState, declineFormAction, isDeclining] = useActionState(declineAppointmentAction, initialState);
   const [cancelState, cancelFormAction, isCancelling] = useActionState(cancelAppointmentAction, initialState);
@@ -45,6 +55,26 @@ export function AppointmentActions({
   const disabled = isConfirming || isDeclining || isCancelling || isCompleting || isMarkingNoShow || !canEdit;
   const disabledTitle = canEdit ? undefined : ROLE_DENIED_TITLE;
   const error = confirmState.error ?? declineState.error ?? cancelState.error ?? completeState.error ?? noShowState.error;
+
+  // Each useActionState's own state object is a fresh reference per
+  // dispatch, so an effect keyed on it fires exactly once per real
+  // action, not on every re-render -- no toast on initial mount, since
+  // `initialState` never carries `success: true`.
+  useEffect(() => {
+    if (confirmState.success) toast({ title: SUCCESS_MESSAGE.confirm, variant: "success" });
+  }, [confirmState, toast]);
+  useEffect(() => {
+    if (declineState.success) toast({ title: SUCCESS_MESSAGE.decline, variant: "success" });
+  }, [declineState, toast]);
+  useEffect(() => {
+    if (cancelState.success) toast({ title: SUCCESS_MESSAGE.cancel, variant: "success" });
+  }, [cancelState, toast]);
+  useEffect(() => {
+    if (completeState.success) toast({ title: SUCCESS_MESSAGE.complete, variant: "success" });
+  }, [completeState, toast]);
+  useEffect(() => {
+    if (noShowState.success) toast({ title: SUCCESS_MESSAGE.no_show, variant: "success" });
+  }, [noShowState, toast]);
 
   if (status === "declined" || status === "cancelled" || status === "completed" || status === "no_show") {
     return null;

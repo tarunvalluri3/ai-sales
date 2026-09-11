@@ -1,13 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { pollConversationsAction, type ConversationLeadSummary } from "../actions";
 import { EmptyState } from "../../_components/state-views";
+import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } from "../../_components/data-table";
 import { MESSAGE_ROLE_LABEL } from "./message-bubble";
 import type { ConversationWithMessageCount } from "@/lib/conversations";
 import type { LastMessagePreview } from "@/lib/messages";
+
+const COLUMNS: DataTableColumn[] = [
+  { key: "prospect", label: "Prospect", width: "1.6fr" },
+  { key: "last_message", label: "Last message", width: "2fr" },
+  { key: "status", label: "Status", width: "1fr" },
+  { key: "started", label: "Started", width: "170px", sortable: true, align: "right" },
+];
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -45,6 +52,7 @@ export function ConversationsList({
     toLastMessageMap(initialLastMessages),
   );
   const [tab, setTab] = useState<"attention" | "all">("all");
+  const [sort, setSort] = useState<SortState>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
   const pollRef = useRef<() => Promise<void>>(async () => {});
@@ -121,6 +129,19 @@ export function ConversationsList({
 
   const displayedConversations = tab === "attention" ? attentionConversations : sortedConversations;
   const totalLabel = `${conversations.length} conversation${conversations.length === 1 ? "" : "s"} total`;
+
+  // Default order is the existing flagged-first-then-recent priority sort
+  // above (`sort === null`); clicking the "Started" column header switches
+  // to a plain chronological sort in the chosen direction. Only "started"
+  // is sortable today (`created_at` is the only timestamp a conversation
+  // has), so no other key needs handling here.
+  const tableConversations = useMemo(() => {
+    if (!sort) return displayedConversations;
+    const direction = sort.direction === "asc" ? 1 : -1;
+    return [...displayedConversations].sort(
+      (a, b) => direction * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    );
+  }, [displayedConversations, sort]);
 
   // Arrow-key navigation for the two-tab tablist, per the WAI-ARIA tabs
   // pattern -- roving tabIndex alone (below) only removes the unselected
@@ -216,28 +237,30 @@ export function ConversationsList({
                 }
               />
             ) : (
-              <ul className="flex flex-col gap-2">
-                <AnimatePresence initial={false}>
-                  {displayedConversations.map((conversation) => (
-                    <motion.li
-                      key={conversation.id}
-                      layout={!shouldReduceMotion}
-                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                    >
-                      <ConversationRow
-                        conversation={conversation}
-                        contactName={leadByConversationId.get(conversation.id) ?? null}
-                        hasLead={leadByConversationId.has(conversation.id)}
-                        lastMessage={lastMessageByConversationId.get(conversation.id) ?? null}
-                        showAttentionBadge={tab !== "attention"}
-                      />
-                    </motion.li>
-                  ))}
-                </AnimatePresence>
-              </ul>
+              <motion.div
+                key={tab}
+                initial={shouldReduceMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
+              >
+                <DataTable
+                  items={tableConversations}
+                  columns={COLUMNS}
+                  getRowId={(conversation) => conversation.id}
+                  sort={sort}
+                  onSortChange={setSort}
+                  caption="Conversations"
+                  renderRow={(conversation) => (
+                    <ConversationRow
+                      conversation={conversation}
+                      contactName={leadByConversationId.get(conversation.id) ?? null}
+                      hasLead={leadByConversationId.has(conversation.id)}
+                      lastMessage={lastMessageByConversationId.get(conversation.id) ?? null}
+                      showAttentionBadge={tab !== "attention"}
+                    />
+                  )}
+                />
+              </motion.div>
             )}
           </div>
         </>
@@ -274,40 +297,50 @@ function ConversationRow({
   const showSourceInMeta = contactName !== null;
 
   return (
-    <Link
-      href={`/dashboard/conversations/${conversation.id}`}
-      className="group flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface px-4 py-3.5 transition-colors hover:border-ds-border-strong hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-    >
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="truncate text-sm font-medium text-ds-text-primary">{primaryLabel}</p>
+    <TableRow href={`/dashboard/conversations/${conversation.id}`}>
+      <TableCell className="min-w-0">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="truncate text-sm font-medium text-ds-text-primary">{primaryLabel}</p>
+          {showSourceInMeta ? <p className="truncate text-2xs text-ds-text-muted">{sourceLabel}</p> : null}
+        </div>
+      </TableCell>
+      <TableCell className="min-w-0">
         {lastMessage ? (
           <p className="truncate text-xs text-ds-text-secondary">
             {MESSAGE_ROLE_LABEL[lastMessage.role]}: {lastMessage.content}
           </p>
-        ) : null}
-        <p className="truncate text-2xs text-ds-text-muted">
-          {new Date(conversation.created_at).toLocaleString()} · {conversation.messageCount} message
-          {conversation.messageCount === 1 ? "" : "s"}
-          {showSourceInMeta ? ` · ${sourceLabel}` : ""}
-        </p>
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {conversation.needs_attention && showAttentionBadge ? (
-          <span className="rounded-ds-sm bg-ds-warning-bg px-2.5 py-1 text-2xs font-semibold tracking-wide-ds text-ds-warning uppercase">
-            Needs attention
-          </span>
-        ) : null}
-        {conversation.control === "human" ? (
-          <span className="rounded-ds-sm bg-ds-surface-soft px-2.5 py-1 text-2xs font-semibold tracking-wide-ds text-ds-text-secondary uppercase">
-            Human-controlled
-          </span>
-        ) : null}
-        {hasLead ? (
-          <span className="rounded-ds-sm bg-ds-accent-soft-bg px-2.5 py-1 text-2xs font-semibold tracking-wide-ds text-ds-accent-muted uppercase">
-            Lead
-          </span>
-        ) : null}
-      </div>
-    </Link>
+        ) : (
+          <span className="text-xs text-ds-text-muted">—</span>
+        )}
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {conversation.needs_attention && showAttentionBadge ? (
+            <span className="rounded-ds-sm bg-ds-warning-bg px-2 py-0.5 text-2xs font-semibold tracking-wide-ds text-ds-warning uppercase">
+              Needs attention
+            </span>
+          ) : null}
+          {conversation.control === "human" ? (
+            <span className="rounded-ds-sm bg-ds-surface-soft px-2 py-0.5 text-2xs font-semibold tracking-wide-ds text-ds-text-secondary uppercase">
+              Human
+            </span>
+          ) : null}
+          {hasLead ? (
+            <span className="rounded-ds-sm bg-ds-accent-soft-bg px-2 py-0.5 text-2xs font-semibold tracking-wide-ds text-ds-accent-muted uppercase">
+              Lead
+            </span>
+          ) : null}
+          {!conversation.needs_attention && conversation.control !== "human" && !hasLead ? (
+            <span className="text-xs text-ds-text-muted">—</span>
+          ) : null}
+        </div>
+      </TableCell>
+      <TableCell align="right" direction="col" className="gap-0">
+        <span className="text-xs text-ds-text-secondary">{new Date(conversation.created_at).toLocaleDateString()}</span>
+        <span className="text-2xs text-ds-text-muted">
+          {conversation.messageCount} message{conversation.messageCount === 1 ? "" : "s"}
+        </span>
+      </TableCell>
+    </TableRow>
   );
 }
