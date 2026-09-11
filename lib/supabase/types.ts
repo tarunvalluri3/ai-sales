@@ -182,6 +182,9 @@ export type Conversation = {
   assigned_to_user_id: string | null;
   attention_flagged_at: string | null;
   created_at: string;
+  ai_summary: string | null;
+  ai_summary_generated_at: string | null;
+  ai_summary_message_count: number | null;
 };
 
 export type MessageRole = "user" | "assistant" | "human_agent";

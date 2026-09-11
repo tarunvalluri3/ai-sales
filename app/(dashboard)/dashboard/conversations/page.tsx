@@ -1,29 +1,20 @@
-import { requireBusinessContext } from "@/lib/business-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { listConversationsForBusiness } from "@/lib/conversations";
-import { listLeadsForBusiness } from "@/lib/leads";
-import { listLastMessagesForConversations } from "@/lib/messages";
-import { ConversationsList } from "./_components/conversations-list";
+import { MessagesSquare } from "lucide-react";
 
-export default async function ConversationsPage() {
-  const { businessId } = await requireBusinessContext();
-  const supabase = createServerSupabaseClient();
-
-  const conversations = await listConversationsForBusiness(supabase, businessId);
-  const conversationIds = conversations.map((conversation) => conversation.id);
-
-  const [leads, lastMessages] = await Promise.all([
-    listLeadsForBusiness(businessId),
-    listLastMessagesForConversations(supabase, businessId, conversationIds),
-  ]);
-
+/**
+ * The conversations inbox's "no conversation selected" state -- the
+ * chat list itself now lives in `layout.tsx`/`ChatListPane`, always
+ * visible alongside this on desktop. On mobile, `ChatListPane` shows in
+ * full here instead (its own route-based visibility already handles
+ * that split), so this page renders nothing visible below `md:`.
+ */
+export default function ConversationsIndexPage() {
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <ConversationsList
-        initialConversations={conversations}
-        initialLeads={leads.map((lead) => ({ conversationId: lead.conversation_id, contactName: lead.contact_name }))}
-        initialLastMessages={lastMessages}
-      />
+    <div className="hidden h-full flex-1 flex-col items-center justify-center gap-2 bg-ds-bg p-6 text-center md:flex">
+      <MessagesSquare className="size-8 text-ds-text-muted" aria-hidden="true" />
+      <p className="text-sm font-medium text-ds-text-primary">Select a conversation</p>
+      <p className="max-w-sm text-xs text-ds-text-muted">
+        Pick a conversation from the list to see the transcript and prospect details.
+      </p>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import type { SetControlState } from "../actions";
 import { setConversationControlAction } from "../actions";
 import type { ConversationControl } from "@/lib/supabase/types";
 import { ROLE_DENIED_TITLE } from "../../_components/delete-button";
+import { Badge } from "../../_components/badge";
 
 const initialState: SetControlState = {};
 
@@ -36,15 +37,9 @@ export function ControlToggle({
   return (
     <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <span
-          className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
-            control === "human"
-              ? "bg-ds-warning-bg text-ds-warning"
-              : "bg-ds-surface-soft text-ds-text-secondary"
-          }`}
-        >
+        <Badge tone={control === "human" ? "warning" : "muted"}>
           {control === "human" ? "Human-controlled" : "AI-handled"}
-        </span>
+        </Badge>
 
         <form action={formAction} className="flex items-center gap-2">
           <input type="hidden" name="id" value={conversationId} />
