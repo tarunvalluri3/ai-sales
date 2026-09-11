@@ -469,6 +469,39 @@ export async function createAppointment(supabase: AnySupabaseClient, businessId:
   return data;
 }
 
+/**
+ * Loads the most recent appointment tied to one conversation, tenant-scoped
+ * (conversations detail page's info panel). `.limit(1)` on `starts_at desc`
+ * means an older appointment for the same conversation (e.g. a `cancelled`
+ * one later re-booked) is silently not shown -- an accepted v1 simplification,
+ * not a hidden bug: a conversation practically only ever has one live booking
+ * at a time.
+ */
+export async function getAppointmentForConversation(
+  supabase: AnySupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<Appointment | null> {
+  const { data, error } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("conversation_id", conversationId)
+    .order("starts_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading the appointment for this conversation. Please try again.",
+      "getAppointmentForConversation failed",
+      error,
+    );
+  }
+
+  return data;
+}
+
 /** Loads one appointment, tenant-scoped. Used to gather contact/timing details for the confirm/decline/cancel notification (lib/appointment-notifications.ts) after the status transition itself has already succeeded. */
 export async function getAppointmentForBusiness(supabase: ServerSupabaseClient, businessId: string, id: string): Promise<Appointment | null> {
   const { data, error } = await supabase.from("appointments").select("*").eq("business_id", businessId).eq("id", id).maybeSingle();

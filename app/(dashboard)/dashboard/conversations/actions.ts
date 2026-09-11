@@ -21,6 +21,7 @@ import {
   type LastMessagePreview,
 } from "@/lib/messages";
 import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
+import { generateConversationSummary } from "@/lib/conversation-summary";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
@@ -345,4 +346,52 @@ export async function getCitationDetailsAction(chunkIds: string[]): Promise<Cite
   }
 
   return getCitationDetails(businessId, parsed.data);
+}
+
+const generateSummarySchema = z.object({
+  conversationId: z.string().uuid(),
+});
+
+export type GenerateSummaryState = {
+  error?: string;
+  summary?: string;
+  messageCount?: number;
+  generatedAt?: string;
+};
+
+/**
+ * Generates (or regenerates) the on-demand AI conversation summary --
+ * `org:analyst_viewer` minimum, the lowest authenticated tier, since this
+ * is a read-oriented helper (it writes a cached summary, not a business
+ * configuration change) rather than a mutation that needs
+ * `org:sales_agent` like taking over a conversation or replying does.
+ */
+export async function generateConversationSummaryAction(
+  _prevState: GenerateSummaryState,
+  formData: FormData,
+): Promise<GenerateSummaryState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:analyst_viewer");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = generateSummarySchema.safeParse({
+    conversationId: formData.get("conversationId"),
+  });
+  if (!parsed.success) {
+    return { error: "Invalid request." };
+  }
+
+  const supabase = createServerSupabaseClient();
+
+  try {
+    const result = await generateConversationSummary(supabase, businessId, parsed.data.conversationId);
+    if (!result) {
+      return { error: "This conversation has no messages to summarize yet." };
+    }
+    return { summary: result.summary, messageCount: result.messageCount, generatedAt: result.generatedAt };
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
 }
