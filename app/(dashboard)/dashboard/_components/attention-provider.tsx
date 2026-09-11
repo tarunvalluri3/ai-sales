@@ -1,13 +1,15 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { pollAttentionCountAction } from "../actions";
+import { pollAttentionCountAction, type AttentionCounts } from "../actions";
 
 const POLL_INTERVAL_MS = 1000;
 
-const AttentionCountContext = createContext<number>(0);
+const INITIAL_COUNTS: AttentionCounts = { conversationsNeedingAttention: 0, pendingAppointments: 0 };
 
-export function useAttentionCount(): number {
+const AttentionCountContext = createContext<AttentionCounts>(INITIAL_COUNTS);
+
+export function useAttentionCounts(): AttentionCounts {
   return useContext(AttentionCountContext);
 }
 
@@ -37,20 +39,20 @@ function playAttentionChime(context: AudioContext) {
 }
 
 /**
- * Owns the single, shared poll for the count of conversations needing
- * attention across the whole dashboard (Phase 15c) -- mounted once in
- * dashboard/layout.tsx, not duplicated per nav surface. Same
- * self-rescheduling poll shape as LiveConversationPanel (Phase 15b,
- * interval tightened to 1s Phase 25e): pause on tab-hidden, immediate poll on resume, cleanup
- * on unmount (only ever unmounted by leaving /dashboard/* entirely).
+ * Owns the single, shared poll for the dashboard's two live nav badges --
+ * conversations needing attention (Phase 15c) and, since 2026-09-11,
+ * pending appointment requests -- one poll backing both, not two
+ * independent timers. Mounted once in dashboard/layout.tsx. Same
+ * self-rescheduling poll shape as LiveConversationPanel: pause on
+ * tab-hidden, immediate poll on resume, cleanup on unmount.
  *
- * The chime plays only when the count genuinely increases relative to
+ * The chime plays when *either* count genuinely increases relative to
  * what this tab already knew, and never on the first poll after mount
  * (which would alarm on every login if a backlog already exists).
  */
 export function AttentionProvider({ children }: { children: React.ReactNode }) {
-  const [count, setCount] = useState(0);
-  const previousCountRef = useRef<number | null>(null);
+  const [counts, setCounts] = useState<AttentionCounts>(INITIAL_COUNTS);
+  const previousCountsRef = useRef<AttentionCounts | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -66,14 +68,19 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
       const result = await pollAttentionCountAction();
       if (!isMountedRef.current) return;
 
-      if (previousCountRef.current !== null && result > previousCountRef.current && audioContextRef.current) {
+      const previous = previousCountsRef.current;
+      const increased =
+        previous !== null &&
+        (result.conversationsNeedingAttention > previous.conversationsNeedingAttention ||
+          result.pendingAppointments > previous.pendingAppointments);
+      if (increased && audioContextRef.current) {
         playAttentionChime(audioContextRef.current);
       }
-      previousCountRef.current = result;
-      setCount(result);
+      previousCountsRef.current = result;
+      setCounts(result);
     } catch {
       // A poll failure is invisible to the user -- keep the last-known
-      // count and try again on the next tick.
+      // counts and try again on the next tick.
     }
 
     if (!isMountedRef.current) return;
@@ -94,7 +101,7 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
         try {
           audioContextRef.current = new AudioContext();
         } catch {
-          // Web Audio not supported -- the badge still works without sound.
+          // Web Audio not supported -- the badges still work without sound.
         }
       }
       document.removeEventListener("click", handleFirstInteraction);
@@ -124,5 +131,5 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
     };
   }, [poll]);
 
-  return <AttentionCountContext.Provider value={count}>{children}</AttentionCountContext.Provider>;
+  return <AttentionCountContext.Provider value={counts}>{children}</AttentionCountContext.Provider>;
 }

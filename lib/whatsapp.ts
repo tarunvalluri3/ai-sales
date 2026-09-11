@@ -3,7 +3,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Conversation, WhatsappConnection } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
-import { createConversation } from "@/lib/conversations";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
@@ -236,12 +235,12 @@ export const WHATSAPP_CONVERSATION_SOURCE = "whatsapp";
  * trust blindly in every context, since the widget's own writes into it
  * remain unauthenticated.
  */
-export async function getOrCreateWhatsappConversation(
+async function findWhatsappConversation(
   supabase: ServiceSupabaseClient,
   businessId: string,
   waId: string,
-): Promise<Conversation> {
-  const { data: existing, error } = await supabase
+): Promise<Conversation | null> {
+  const { data, error } = await supabase
     .from("conversations")
     .select("*")
     .eq("business_id", businessId)
@@ -259,9 +258,48 @@ export async function getOrCreateWhatsappConversation(
     );
   }
 
+  return data;
+}
+
+export async function getOrCreateWhatsappConversation(
+  supabase: ServiceSupabaseClient,
+  businessId: string,
+  waId: string,
+): Promise<Conversation> {
+  const existing = await findWhatsappConversation(supabase, businessId, waId);
   if (existing) {
     return existing;
   }
 
-  return createConversation(supabase, businessId, WHATSAPP_CONVERSATION_SOURCE, null, waId);
+  // Race-safe insert (2026-09-11 follow-up): two near-simultaneous
+  // webhook deliveries for the same sender can both reach here after the
+  // lookup above found nothing. `conversations_whatsapp_active_visitor_idx`
+  // (a partial unique index, business_id+visitor_id where source =
+  // 'whatsapp') lets only one insert actually succeed -- the loser
+  // catches the resulting 23505 and fetches the winner's row instead of
+  // erroring or creating a second conversation. Same
+  // insert-then-catch-23505-then-select idiom this file's own caller
+  // already uses for whatsapp_inbound_messages dedup, not a new pattern.
+  const { data: created, error: insertError } = await supabase
+    .from("conversations")
+    .insert({ business_id: businessId, source: WHATSAPP_CONVERSATION_SOURCE, visitor_id: waId })
+    .select()
+    .single();
+
+  if (!insertError) {
+    return created;
+  }
+
+  if (insertError.code === "23505") {
+    const winner = await findWhatsappConversation(supabase, businessId, waId);
+    if (winner) {
+      return winner;
+    }
+  }
+
+  throw new AppError(
+    "Something went wrong starting this WhatsApp conversation. Please try again.",
+    "getOrCreateWhatsappConversation insert failed",
+    insertError,
+  );
 }
