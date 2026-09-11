@@ -2,6 +2,7 @@ export type Business = {
   id: string;
   clerk_org_id: string;
   name: string;
+  business_type: string;
   description: string | null;
   contact_email: string | null;
   contact_phone: string | null;

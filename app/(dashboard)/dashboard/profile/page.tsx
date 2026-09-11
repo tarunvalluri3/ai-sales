@@ -30,6 +30,7 @@ export default async function ProfilePage() {
       <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
         <ProfileForm
           initialName={business.name}
+          initialBusinessType={business.business_type}
           initialDescription={business.description ?? ""}
           initialContactEmail={business.contact_email ?? ""}
           initialContactPhone={business.contact_phone ?? ""}

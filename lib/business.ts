@@ -42,18 +42,38 @@ export async function getBusinessForOrg(orgId: string): Promise<Business | null>
   return data;
 }
 
+/** Full field set the onboarding wizard collects (2026-09-11). */
+export type CreateBusinessInput = {
+  name: string;
+  businessType: string;
+  description: string | null;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  website: string | null;
+  timezone: string;
+};
+
 /**
  * Creates the business row for a given Clerk org. `orgId` must come from
  * a validated session, never from client input.
  */
 export async function createBusinessForOrg(
   orgId: string,
-  name: string,
+  input: CreateBusinessInput,
 ): Promise<Business> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
-    .insert({ clerk_org_id: orgId, name })
+    .insert({
+      clerk_org_id: orgId,
+      name: input.name,
+      business_type: input.businessType,
+      description: input.description,
+      contact_email: input.contactEmail,
+      contact_phone: input.contactPhone,
+      website: input.website,
+      timezone: input.timezone,
+    })
     .select()
     .single();
 
@@ -89,6 +109,7 @@ export async function updateBusinessProfile(
     .from("businesses")
     .update({
       name: input.name,
+      business_type: input.businessType,
       description: input.description,
       contact_email: input.contactEmail,
       contact_phone: input.contactPhone,

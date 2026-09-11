@@ -9,7 +9,7 @@ import { businessProfileSchema } from "@/lib/schemas/business";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 export type ProfileFieldErrors = Partial<
-  Record<"name" | "description" | "contactEmail" | "contactPhone" | "website", string>
+  Record<"name" | "businessType" | "description" | "contactEmail" | "contactPhone" | "website", string>
 >;
 
 export type ProfileFormState = {
@@ -30,6 +30,7 @@ export async function updateBusinessProfileAction(
 
   const parsed = businessProfileSchema.safeParse({
     name: formData.get("name"),
+    businessType: formData.get("businessType"),
     description: formData.get("description"),
     contactEmail: formData.get("contactEmail"),
     contactPhone: formData.get("contactPhone"),
