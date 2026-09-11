@@ -117,3 +117,42 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
+
+/* Minimal, thin scrollbars everywhere (sidebar, tables' overflow-x-auto,
+   the page itself) instead of the OS default -- Firefox via scrollbar-*,
+   Chromium/WebKit via ::-webkit-scrollbar. A subtle neutral tone that
+   reads acceptably on both the light body and the dashboard's dark
+   surfaces, rather than two separate themed variants. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 113, 97, 0.35) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(120, 113, 97, 0.35);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(120, 113, 97, 0.55);
+}
+
+/* Opt out of even the minimal scrollbar above for a specific element (e.g.
+   the sidebar) -- still scrollable via wheel/touch/keyboard, the track/thumb
+   are just never drawn. */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}

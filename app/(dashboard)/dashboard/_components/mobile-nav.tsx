@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV_ITEMS, isNavItemActive, formatAttentionBadge } from "./nav-items";
+import { NAV_GROUPS, isNavItemActive, formatAttentionBadge } from "./nav-items";
 import { useAttentionCount } from "./attention-provider";
 import { useFocusTrap } from "./use-focus-trap";
 
@@ -86,34 +86,46 @@ export function MobileNav({ businessName }: { businessName: string }) {
             role="dialog"
             className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-1 overflow-y-auto border-r border-ds-border bg-ds-surface p-4 shadow-xl"
           >
-            {NAV_ITEMS.map((item) => {
-              const active = isNavItemActive(pathname, item.href);
-              const showBadge = item.href === "/dashboard/conversations" && attentionCount > 0;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsOpen(false)}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex items-center gap-3 rounded-ds-sm px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
-                    active
-                      ? "bg-dashboard-primary text-dashboard-on-primary"
-                      : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
-                  }`}
-                >
-                  <item.icon className="size-4 shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {showBadge ? (
-                    <span
-                      aria-label={`${attentionCount} conversation${attentionCount === 1 ? "" : "s"} need attention`}
-                      className="rounded-full bg-ds-warning px-1.5 py-0.5 text-2xs font-semibold text-ds-bg"
+            {NAV_GROUPS.map((group, groupIndex) => (
+              <div
+                key={group.label ?? `group-${groupIndex}`}
+                className={`flex flex-col gap-1 ${groupIndex === 0 ? "" : "mt-4"}`}
+              >
+                {group.label ? (
+                  <p className="mb-1 px-3 text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
+                    {group.label}
+                  </p>
+                ) : null}
+                {group.items.map((item) => {
+                  const active = isNavItemActive(pathname, item.href);
+                  const showBadge = item.href === "/dashboard/conversations" && attentionCount > 0;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setIsOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex items-center gap-3 rounded-ds-sm px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+                        active
+                          ? "bg-dashboard-primary text-dashboard-on-primary"
+                          : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
+                      }`}
                     >
-                      {formatAttentionBadge(attentionCount)}
-                    </span>
-                  ) : null}
-                </Link>
-              );
-            })}
+                      <item.icon className="size-3.5 shrink-0" aria-hidden="true" />
+                      <span className="flex-1">{item.label}</span>
+                      {showBadge ? (
+                        <span
+                          aria-label={`${attentionCount} conversation${attentionCount === 1 ? "" : "s"} need attention`}
+                          className="rounded-full bg-ds-warning px-1.5 py-0.5 text-2xs font-semibold text-ds-bg"
+                        >
+                          {formatAttentionBadge(attentionCount)}
+                        </span>
+                      ) : null}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
         </>
       ) : null}

@@ -10,11 +10,14 @@ import {
   type KeyboardEvent,
 } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
 import { StatusSelect } from "./status-select";
 import { bulkUpdateLeadStatusAction, type BulkUpdateStatusState } from "./actions";
 import { LEAD_STATUSES, LEAD_STATUS_LABEL } from "./lead-status";
 import { EmptyState } from "../_components/state-views";
+import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } from "../_components/data-table";
+import { useToast } from "../_components/toast";
 import type { PossibleDuplicateHint } from "@/lib/leads";
 import type { Lead, LeadFollowUpStatus, LeadQualification, LeadStatus } from "@/lib/supabase/types";
 
@@ -68,6 +71,8 @@ export function LeadsList({
 }) {
   const [tab, setTab] = useState<TabId>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<SortState>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const shouldReduceMotion = useReducedMotion();
 
@@ -85,6 +90,15 @@ export function LeadsList({
 
   function toggleSelected(id: string) {
     setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((previous) => {
       const next = new Set(previous);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -110,6 +124,15 @@ export function LeadsList({
   const displayedLeads = tab === "all" ? sortedLeads : sortedLeads.filter((lead) => lead.status === tab);
   const totalLabel = `${leads.length} lead${leads.length === 1 ? "" : "s"} total`;
 
+  // Default order is the qualification-then-recency priority sort above
+  // (`sort === null`); clicking "Created" overrides it with a plain
+  // chronological sort in the chosen direction.
+  const tableLeads = useMemo(() => {
+    if (!sort) return displayedLeads;
+    const direction = sort.direction === "asc" ? 1 : -1;
+    return [...displayedLeads].sort((a, b) => direction * (a.created_at > b.created_at ? 1 : a.created_at < b.created_at ? -1 : 0));
+  }, [displayedLeads, sort]);
+
   const visibleIds = useMemo(() => displayedLeads.map((lead) => lead.id), [displayedLeads]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
   const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
@@ -122,6 +145,19 @@ export function LeadsList({
       selectAllRef.current.indeterminate = someVisibleSelected && !allVisibleSelected;
     }
   }, [someVisibleSelected, allVisibleSelected]);
+
+  const columns = useMemo<DataTableColumn[]>(() => {
+    const base: DataTableColumn[] = [
+      { key: "prospect", label: "Prospect", width: "1.7fr" },
+      { key: "contact", label: "Contact", width: "1.5fr" },
+      { key: "interest", label: "Interest", width: "1.3fr" },
+      { key: "status", label: "Status", width: "190px" },
+      { key: "source", label: "Source", width: "130px" },
+      { key: "created", label: "Created", width: "110px", sortable: true },
+      { key: "actions", label: "", width: "70px", align: "right" },
+    ];
+    return canEdit ? [{ key: "select", label: "", width: "36px" }, ...base] : base;
+  }, [canEdit]);
 
   // Same WAI-ARIA tabs pattern as ConversationsList: roving tabIndex
   // handles the Tab-key stop, this handles Left/Right so a keyboard user
@@ -210,106 +246,34 @@ export function LeadsList({
                 ) : null}
               </div>
             ) : null}
-            <ul className="flex flex-col gap-3">
-              <AnimatePresence initial={false}>
-                {displayedLeads.map((lead) => (
-                  <motion.li
-                    key={lead.id}
-                    layout={!shouldReduceMotion}
-                    initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                    className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4 transition-colors hover:border-ds-border-strong"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {canEdit ? (
-                          <label className="pointer-coarse:flex pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:items-center pointer-coarse:justify-center pointer-coarse:-m-2">
-                            <input
-                              type="checkbox"
-                              aria-label={`Select ${lead.contact_name ?? "this lead"}`}
-                              checked={selectedIds.has(lead.id)}
-                              onChange={() => toggleSelected(lead.id)}
-                              className="h-4 w-4 rounded-ds-sm border-ds-border text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                            />
-                          </label>
-                        ) : null}
-                        <p className="font-medium text-ds-text-primary">{lead.contact_name ?? "Unnamed prospect"}</p>
-                        <span
-                          title="AI-assessed signal -- not verified"
-                          className={`rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase ${QUALIFICATION_STYLE[lead.qualification]}`}
-                        >
-                          {lead.qualification}
-                          <span className="sr-only"> lead — AI-assessed signal, not verified</span>
-                        </span>
-                      </div>
-                      <StatusSelect id={lead.id} status={lead.status} canEdit={canEdit} />
-                    </div>
-                    <p className="text-sm text-ds-text-secondary">
-                      {lead.contact_email ?? "—"} · {lead.contact_phone ?? "—"}
-                    </p>
-                    <p className="text-sm text-ds-text-secondary">
-                      Interest: {lead.interest_type ?? "—"}
-                      {lead.interest_id ? ` — ${interestNameById[lead.interest_id] ?? "no longer available"}` : ""}
-                    </p>
-                    <LeadTextBlock
-                      label="AI reasoning"
-                      text={lead.qualification_reason}
-                      textClassName="text-sm text-ds-text-muted"
-                    />
-                    {lead.notes ? (
-                      <LeadTextBlock label="Notes" text={lead.notes} textClassName="text-sm text-ds-text-secondary" />
-                    ) : null}
-                    {possibleDuplicatesByLeadId[lead.id]?.length ? (
-                      <p className="rounded-ds-sm bg-ds-accent-soft-bg px-2.5 py-1.5 text-xs text-ds-accent-muted">
-                        Possibly the same prospect as{" "}
-                        {possibleDuplicatesByLeadId[lead.id].map((hint, index) => (
-                          <span key={hint.leadId}>
-                            {index > 0 ? ", " : ""}
-                            <Link
-                              href={`/dashboard/conversations/${hint.conversationId}`}
-                              className="font-medium underline-offset-2 hover:underline"
-                            >
-                              a lead from {channelLabel(hint.channel)}
-                            </Link>
-                          </span>
-                        ))}
-                        . Shown as a hint only — nothing here is merged.
-                      </p>
-                    ) : null}
-                    {lead.follow_up_status ? (
-                      <div className="flex flex-col items-start gap-1 rounded-ds-sm bg-ds-surface-soft px-2.5 py-1.5">
-                        <p className="text-xs font-medium text-ds-text-secondary">
-                          {FOLLOW_UP_LABEL[lead.follow_up_status]}
-                        </p>
-                        {lead.follow_up_message ? (
-                          <LeadTextBlock label="Message" text={lead.follow_up_message} textClassName="text-xs text-ds-text-muted" />
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ds-border pt-3">
-                      <p className="flex items-center gap-1.5 text-xs text-ds-text-muted">
-                        Source:
-                        {lead.source ? (
-                          <span className="rounded-ds-sm bg-ds-surface-soft px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary">
-                            {lead.source}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </p>
-                      <Link
-                        href={`/dashboard/conversations/${lead.conversation_id}`}
-                        className="inline-flex items-center text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11"
-                      >
-                        View conversation
-                      </Link>
-                    </div>
-                  </motion.li>
-                ))}
-              </AnimatePresence>
-            </ul>
+
+            <motion.div
+              key={tab}
+              initial={shouldReduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+            >
+              <DataTable
+                items={tableLeads}
+                columns={columns}
+                getRowId={(lead) => lead.id}
+                sort={sort}
+                onSortChange={setSort}
+                caption="Leads"
+                renderRow={(lead) => (
+                  <LeadRow
+                    lead={lead}
+                    canEdit={canEdit}
+                    selected={selectedIds.has(lead.id)}
+                    onToggleSelected={() => toggleSelected(lead.id)}
+                    expanded={expandedIds.has(lead.id)}
+                    onToggleExpanded={() => toggleExpanded(lead.id)}
+                    interestNameById={interestNameById}
+                    duplicates={possibleDuplicatesByLeadId[lead.id] ?? []}
+                  />
+                )}
+              />
+            </motion.div>
           </div>
         )}
       </div>
@@ -358,8 +322,148 @@ function TabButton({
 }
 
 /**
- * Renders a labeled text field on a lead card ("AI reasoning" /
- * "Notes") -- the explicit label is the actual fix (/impeccable
+ * A lead's main table row plus, when expanded, a second full-width row
+ * beneath it carrying the content that doesn't fit fixed columns (AI
+ * reasoning, notes, cross-channel duplicate hint, follow-up status) --
+ * the standard "master row + expandable detail" pattern for a dense table,
+ * reusing every piece of that content's original JSX unchanged.
+ */
+function LeadRow({
+  lead,
+  canEdit,
+  selected,
+  onToggleSelected,
+  expanded,
+  onToggleExpanded,
+  interestNameById,
+  duplicates,
+}: {
+  lead: Lead;
+  canEdit: boolean;
+  selected: boolean;
+  onToggleSelected: () => void;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  interestNameById: Record<string, string>;
+  duplicates: PossibleDuplicateHint[];
+}) {
+  const detailId = `lead-detail-${lead.id}`;
+
+  return (
+    <>
+      <TableRow>
+        {canEdit ? (
+          <TableCell>
+            <label className="pointer-coarse:flex pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:items-center pointer-coarse:justify-center pointer-coarse:-m-2">
+              <input
+                type="checkbox"
+                aria-label={`Select ${lead.contact_name ?? "this lead"}`}
+                checked={selected}
+                onChange={onToggleSelected}
+                className="h-4 w-4 rounded-ds-sm border-ds-border text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              />
+            </label>
+          </TableCell>
+        ) : null}
+        <TableCell className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="truncate font-medium text-ds-text-primary">{lead.contact_name ?? "Unnamed prospect"}</span>
+            <span
+              title="AI-assessed signal -- not verified"
+              className={`shrink-0 rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase ${QUALIFICATION_STYLE[lead.qualification]}`}
+            >
+              {lead.qualification}
+              <span className="sr-only"> lead — AI-assessed signal, not verified</span>
+            </span>
+          </div>
+        </TableCell>
+        <TableCell direction="col" className="gap-0.5 text-xs">
+          <span className="text-ds-text-secondary">{lead.contact_email ?? "—"}</span>
+          <span className="text-ds-text-muted">{lead.contact_phone ?? "—"}</span>
+        </TableCell>
+        <TableCell className="min-w-0">
+          <span className="truncate">
+            {lead.interest_type ?? "—"}
+            {lead.interest_id ? ` — ${interestNameById[lead.interest_id] ?? "no longer available"}` : ""}
+          </span>
+        </TableCell>
+        <TableCell>
+          <StatusSelect id={lead.id} status={lead.status} canEdit={canEdit} />
+        </TableCell>
+        <TableCell>
+          {lead.source ? (
+            <span className="rounded-ds-sm bg-ds-surface-soft px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary">
+              {lead.source}
+            </span>
+          ) : (
+            <span className="text-ds-text-muted">—</span>
+          )}
+        </TableCell>
+        <TableCell className="text-xs text-ds-text-muted">{new Date(lead.created_at).toLocaleDateString()}</TableCell>
+        <TableCell align="right" className="gap-1">
+          <Link
+            href={`/dashboard/conversations/${lead.conversation_id}`}
+            aria-label="View conversation"
+            title="View conversation"
+            className="flex size-7 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+          >
+            <ArrowUpRight className="size-4" aria-hidden="true" />
+          </Link>
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            aria-expanded={expanded}
+            aria-controls={detailId}
+            aria-label={expanded ? "Hide details" : "Show details"}
+            title={expanded ? "Hide details" : "Show details"}
+            className="flex size-7 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+          >
+            {expanded ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
+          </button>
+        </TableCell>
+      </TableRow>
+      {expanded ? (
+        <TableRow>
+          <TableCell id={detailId} direction="col" className="col-span-full gap-2 bg-ds-surface-soft">
+            <LeadTextBlock label="AI reasoning" text={lead.qualification_reason} textClassName="text-sm text-ds-text-muted" />
+            {lead.notes ? (
+              <LeadTextBlock label="Notes" text={lead.notes} textClassName="text-sm text-ds-text-secondary" />
+            ) : null}
+            {duplicates.length ? (
+              <p className="rounded-ds-sm bg-ds-accent-soft-bg px-2.5 py-1.5 text-xs text-ds-accent-muted">
+                Possibly the same prospect as{" "}
+                {duplicates.map((hint, index) => (
+                  <span key={hint.leadId}>
+                    {index > 0 ? ", " : ""}
+                    <Link
+                      href={`/dashboard/conversations/${hint.conversationId}`}
+                      className="font-medium underline-offset-2 hover:underline"
+                    >
+                      a lead from {channelLabel(hint.channel)}
+                    </Link>
+                  </span>
+                ))}
+                . Shown as a hint only — nothing here is merged.
+              </p>
+            ) : null}
+            {lead.follow_up_status ? (
+              <div className="flex flex-col items-start gap-1 rounded-ds-sm bg-ds-surface-elevated px-2.5 py-1.5">
+                <p className="text-xs font-medium text-ds-text-secondary">{FOLLOW_UP_LABEL[lead.follow_up_status]}</p>
+                {lead.follow_up_message ? (
+                  <LeadTextBlock label="Message" text={lead.follow_up_message} textClassName="text-xs text-ds-text-muted" />
+                ) : null}
+              </div>
+            ) : null}
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Renders a labeled text field on a lead's expanded detail ("AI reasoning"
+ * / "Notes") -- the explicit label is the actual fix (/impeccable
  * clarify): the critique found the AI's qualification_reason sitting at
  * identical visual weight to human-written notes with nothing but
  * proximity separating them, undermining PRODUCT.md's "AI output is
@@ -411,34 +515,31 @@ const initialBulkState: BulkUpdateStatusState = {};
  * one-form-per-action convention (DeleteButton, StatusSelect) rather than
  * reading which of several submit buttons in one form was clicked.
  * "Lost" reuses StatusSelect's own confirm-before-apply gate: bulk-losing
- * N leads at once is higher-stakes than one, not lower.
+ * N leads at once is higher-stakes than one, not lower. Success feedback
+ * is a toast (dashboard-professionalization pass) instead of a hand-rolled
+ * inline confirmation/timer -- same information, less bespoke code.
  */
 function BulkActionsBar({ selectedIds, onCleared }: { selectedIds: string[]; onCleared: () => void }) {
   const [state, formAction, isPending] = useActionState(bulkUpdateLeadStatusAction, initialBulkState);
   const [confirmingLost, setConfirmingLost] = useState(false);
-  const [confirmation, setConfirmation] = useState<{ status: LeadStatus; count: number } | null>(null);
-  const confirmationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // What the just-completed dispatch represents -- same reasoning as
-  // StatusSelect's identical ref: `state.success` alone can repeat across
-  // two different dispatches with nothing to key an effect off of.
+  const { toast } = useToast();
+  // What the just-completed dispatch represents -- `state.success` alone
+  // can repeat across two different dispatches with nothing to key a
+  // toast's title off of.
   const lastChangeRef = useRef<{ status: LeadStatus; count: number } | null>(null);
 
   useEffect(() => {
     if (state.success && lastChangeRef.current) {
-      setConfirmation(lastChangeRef.current);
-      if (confirmationTimerRef.current) clearTimeout(confirmationTimerRef.current);
-      confirmationTimerRef.current = setTimeout(() => setConfirmation(null), 6000);
+      const { status, count } = lastChangeRef.current;
+      toast({
+        title: `${count} lead${count === 1 ? "" : "s"} changed to ${LEAD_STATUS_LABEL[status]}`,
+        variant: "success",
+      });
       setConfirmingLost(false);
       onCleared();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
-
-  useEffect(() => {
-    return () => {
-      if (confirmationTimerRef.current) clearTimeout(confirmationTimerRef.current);
-    };
-  }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>, targetStatus: LeadStatus) {
     if (targetStatus === "lost" && !confirmingLost) {
@@ -513,11 +614,7 @@ function BulkActionsBar({ selectedIds, onCleared }: { selectedIds: string[]; onC
           Clear
         </button>
       </div>
-      {confirmation ? (
-        <span aria-live="polite" className="text-xs text-ds-text-secondary">
-          {confirmation.count} lead{confirmation.count === 1 ? "" : "s"} changed to {LEAD_STATUS_LABEL[confirmation.status]}
-        </span>
-      ) : state.error ? (
+      {state.error ? (
         <span role="alert" className="text-xs text-ds-danger">
           {state.error}
         </span>
