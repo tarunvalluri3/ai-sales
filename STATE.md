@@ -20,7 +20,7 @@ Follow-up #2/#3 correctly diagnosed that the app needed to be switched to Live i
 
 **Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes including `/api/webhooks/instagram` compile clean.
 
-**Shipped via**: PR #65 (the diagnostic logging change only, merged first to unblock diagnosis) + a second direct commit to `main` for the actual ID fix (repo's branch protection requires the `build-and-test` CI check before merge -- direct push to `main` is rejected, confirmed this session).
+**Shipped via**: PR #65 (the diagnostic logging change only, merged first to unblock diagnosis) + PR #66 (the actual ID fix) -- repo's branch protection requires the `build-and-test` CI check before merge, direct push to `main` is rejected (confirmed this session).
 
 **Not yet verified end-to-end**: the user needs to Reconnect, send one more real DM, and confirm an actual AI reply arrives this time -- diagnosis is done and the fix is deployed, but no successful full round-trip has been observed yet as of this entry.
 
