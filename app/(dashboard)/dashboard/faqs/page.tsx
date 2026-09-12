@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { listFaqsForBusiness, listPendingReviewFaqs } from "@/lib/faqs";
 import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
-import { DeleteButton } from "../_components/delete-button";
 import { ReviewActions } from "../_components/review-actions";
 import { FaqForm } from "./faq-form";
+import { FaqsList } from "./faqs-list";
 import { createFaqAction, deleteFaqAction, approveFaqAction, rejectFaqAction } from "./actions";
 import { EmptyState, PermissionNotice } from "../_components/state-views";
 
@@ -66,30 +65,7 @@ export default async function FaqsPage() {
           description="Add your first FAQ below so your AI sales employee can answer it directly."
         />
       ) : (
-        <ul className="flex flex-col gap-3">
-          {faqs.map((faq) => (
-            <li
-              key={faq.id}
-              className="group flex items-center justify-between gap-4 rounded-ds-lg border border-ds-border bg-ds-surface px-4 py-3 transition-colors hover:border-ds-border-strong hover:bg-ds-surface-elevated focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ds-accent"
-            >
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <p className="truncate font-medium text-ds-text-primary">{faq.question}</p>
-                <p className="line-clamp-2 text-sm text-ds-text-secondary">{faq.answer}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-4">
-                {canEdit ? (
-                  <Link
-                    href={`/dashboard/faqs/${faq.id}/edit`}
-                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                  >
-                    Edit
-                  </Link>
-                ) : null}
-                <DeleteButton action={deleteFaqAction} id={faq.id} canEdit={canEdit} />
-              </div>
-            </li>
-          ))}
-        </ul>
+        <FaqsList faqs={faqs} canEdit={canEdit} deleteFaqAction={deleteFaqAction} />
       )}
 
       <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">

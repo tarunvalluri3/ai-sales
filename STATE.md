@@ -2,7 +2,21 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Codebase gap sweep, Phase D: UI/UX quick wins -- see the entry immediately below.)
+Last updated: 2026-09-13 (Codebase gap sweep, Phase E: DataTable retrofit -- see the entry immediately below.)
+
+---
+
+## Codebase gap sweep (Phase E — DataTable retrofit) — 2026-09-13
+
+Fifth phase of the sweep started in Phase A above -- the largest single item in the plan. Products, Services, FAQs, Webhooks, and Knowledge all moved from hand-rolled `<ul><li>` card lists to the shared, sortable/paginated `DataTable` (`_components/data-table.tsx`) already used by Leads/Appointments. Each got a new client component (`products-list.tsx`, `services-list.tsx`, `faqs-list.tsx`, `webhook-endpoint-list.tsx` rewritten in place, `knowledge-list.tsx` rewritten in place) following the exact split already established: `page.tsx` stays a server component fetching data, the new file owns sort/pagination chrome, same pattern as `AppointmentsTable`/`LeadsList`.
+
+**Products/Services**: name (sortable) + price + actions (Edit/Delete) columns. **FAQs**: question (sortable) + answer + actions. **Webhooks**: endpoint URL + secret-reveal + created date + delete, with each row keeping its own `useActionState` for delete exactly as before (`WebhookEndpointRow` is a real component, not a hook-in-a-loop) -- a row's delete error now renders as a second, full-width `TableRow` directly beneath it, the same "main row + detail row" `Fragment` shape `LeadRow` already established for its own expandable row. **Knowledge** was the most involved: preserved the live-status dot, `IngestionStatusPill`, the primary-action-varies-by-state logic (Retry/Publish/Edit), the `RowActionsMenu` overflow menu, bulk-select checkboxes, search/filter tabs, and bulk publish/delete -- none of that logic changed, only the row's markup moved from `<li>` to `TableRow`/`TableCell`s. Also swapped its ad-hoc published/draft status `<span>` onto the shared `Badge` component while already touching that line (same D2 pattern, found in passing).
+
+**Widget Keys deliberately NOT retrofitted** -- investigated, not just skipped. Unlike the other five, each widget-key entry embeds its own multi-field edit form (a nickname input, an origins textarea, save/revoke buttons) -- fundamentally card-shaped content, not tabular data that happens to be rendered as `<li>`s. Forcing it into `DataTable`'s fixed-column grid-cell model would have been a real UX regression, not an improvement -- left as its existing card layout.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass (hit and fixed one real TS quirk: a destructured prop named the same as an imported action, e.g. `deleteProductAction: typeof deleteProductAction`, self-shadows in its own type position -- fixed by aliasing the type-only import, e.g. `import type { deleteProductAction as DeleteProductAction }`, across all five new files). `npm run build` -- pass, all 40 routes compile. Visual verification still pending a manual click-through by the user, same as Phase D.
+
+**Next logical task**: Phase F (accessibility pass), per the approved plan -- the last phase queued this session.
 
 ---
 
