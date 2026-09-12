@@ -136,7 +136,7 @@ async function handleInboundMessage(
 
   const resolved = await resolveBusinessFromInstagramAccountId(supabase, instagramBusinessAccountId);
   if (!resolved) {
-    logEvent("instagram_unknown_account_id", "unknown", {}, "error");
+    logEvent("instagram_unknown_account_id", "unknown", { instagramBusinessAccountId }, "error");
     return;
   }
   const { businessId } = resolved;
