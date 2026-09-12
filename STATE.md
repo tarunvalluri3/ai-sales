@@ -2,9 +2,31 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Codebase gap sweep, Phase E: DataTable retrofit -- see the entry immediately below.)
+Last updated: 2026-09-13 (Codebase gap sweep, Phase F: accessibility pass -- see the entry immediately below. This closes the sweep's planned phases; see the summary note right after this entry.)
 
 ---
+
+## Codebase gap sweep (Phase F — accessibility pass) — 2026-09-13
+
+Sixth and final phase of the sweep started in Phase A above. Important caveat, stated plainly rather than glossed over: this environment has no browser, so this was a **code-level** review (markup, ARIA, focus-management logic) plus spot-checks against patterns already proven elsewhere in this codebase -- not an actual live keyboard-only or screen-reader pass. That still needs a human (or a real browser-driving tool) to execute; Phase 25's original exit criterion isn't fully closed by this entry.
+
+**Real bug found and fixed**: `row-actions-menu.tsx` (the Knowledge page's overflow menu, and the component every `variant="menuitem"` action button is designed for) opened with no focus management at all -- a keyboard user activating the trigger had no focus placed inside the menu, and Escape closed it but left focus dropped on the document body instead of returning to the trigger. Fixed by reusing `use-focus-trap.ts` -- the same shared hook `MobileNav` already established for "every dialog-like overlay in this app" (its own doc-comment's words) -- rather than writing a one-off reimplementation. Now: opening the menu moves focus to its first item and traps Tab/Shift+Tab inside it (matching `MobileNav`'s existing, working pattern exactly); Escape still closes it and now also returns focus to the trigger button.
+
+**Spot-checked and found already correct, not re-fixed**: `LeadRow`'s expand/collapse toggle (real `<button>`, `aria-expanded`/`aria-controls`/`aria-label`, keyboard-operable natively), `ControlToggle` (real `<button type="submit">` with descriptive text, no icon-only ambiguity), `StatusSelect` (native `<select>` with `aria-label="Lead status"`), `DataTable`'s sortable column headers (native `<button>`, `aria-sort` set correctly), `MobileNav` itself (already had the focus-trap treatment `RowActionsMenu` was missing). Confirms the earlier gap-sweep audit's own finding that this codebase's fundamentals here are generally solid -- the one real gap was the specific overlay that predated `use-focus-trap.ts`'s introduction and was never retrofitted onto it.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile.
+
+**Not done, honestly flagged rather than claimed**: an actual keyboard-only click-through and a real screen-reader pass, across the dashboard including the six pages Phase E just changed the markup of. This needs the user (or a tool with real browser control) to execute -- Phase 25's exit criterion stays open until that happens.
+
+---
+
+## Codebase gap sweep — summary, all six planned phases complete — 2026-09-13
+
+Started from the user asking for a systematic sweep after finding one real bug by hand (human-takeover replies never reaching Instagram). Three parallel Explore agents (channel parity, performance, UI/UX+code-quality) surfaced findings; every material one was independently verified against source before any fix, per the approved plan (`i-want-you-to-quirky-lobster.md` in this session's plan directory). Real bugs fixed: appointment notifications missing on Instagram (A1), sequential tool-call latency in the RAG loop (A2), a stale doc claim (A3), Instagram stalled-lead follow-up mislabeling (Phase C), staff-reply human-takeover missing on Instagram (fixed earlier this session, the bug that triggered the whole sweep), and a focus-management gap in the Knowledge overflow menu (Phase F). Performance: four unbounded list queries bounded, a real `min-w-max` horizontal-scroll bug fixed (Phase B). UI/UX: a silently-stale-forever poll-failure gap closed, Badge component adopted consistently, inline empty states added, five pages retrofitted onto the shared DataTable, one page (Widget Keys) deliberately left alone after investigation confirmed it's genuinely card-shaped content (Phases D/E). Investigated and correctly left alone, not fixed: the HNSW vector index (still premature at 137 rows), Instagram's `waFallbackPhone` non-gap, already-working response caching/operational-table cleanup.
+
+**All of it was implemented and committed locally during an extended GitHub outage this session** (`github.com` unreachable for over an hour, confirmed via direct `curl`, general internet unaffected) -- every phase still ran through the full local check gate (`lint`/`tsc`/`build`, migration applied live via `supabase db push --linked` for Phase C) before being committed, just not yet pushed/PR'd/merged through the usual CI-gated flow. **This is the one loose end**: once connectivity returns, every commit on the `gap-sweep/phase-a-bugs` branch needs to actually go through `git push` → PR → `build-and-test` CI → merge, the same gate every other change this session went through -- nothing here is actually live in production yet despite being fully implemented and locally verified.
+
+**Next logical task**: push the branch, open the PR(s), let CI run, merge -- then the manual UI click-through and accessibility pass Phases D/E/F both still need a human to actually perform.
 
 ## Codebase gap sweep (Phase E — DataTable retrofit) — 2026-09-13
 

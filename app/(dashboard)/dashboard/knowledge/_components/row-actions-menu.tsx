@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useFocusTrap } from "../../_components/use-focus-trap";
 
 /**
  * Overflow ("more actions") menu for a knowledge-document row. Distills
@@ -18,6 +19,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 export function RowActionsMenu({ label, children }: { label: string; children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Accessibility pass (codebase gap sweep, Phase F): reuses the same
+  // focus-trap hook MobileNav already established for this app's other
+  // dialog-like overlays -- moves focus into the menu on open and keeps
+  // Tab from escaping to content behind it, instead of a one-off
+  // reimplementation of the same behavior.
+  const panelRef = useFocusTrap(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -25,6 +33,7 @@ export function RowActionsMenu({ label, children }: { label: string; children: R
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       setIsOpen(false);
+      triggerRef.current?.focus();
     }
     function handlePointerDown(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -43,6 +52,7 @@ export function RowActionsMenu({ label, children }: { label: string; children: R
   return (
     <div ref={menuRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         aria-label={label}
         aria-haspopup="menu"
@@ -58,6 +68,7 @@ export function RowActionsMenu({ label, children }: { label: string; children: R
       </button>
       {isOpen ? (
         <div
+          ref={panelRef as React.RefObject<HTMLDivElement>}
           role="menu"
           className="absolute right-0 top-9 z-10 w-64 overflow-hidden rounded-ds-md border border-ds-border bg-ds-surface-elevated py-1 shadow-lg"
         >
