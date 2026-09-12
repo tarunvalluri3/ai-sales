@@ -22,7 +22,7 @@ Follow-up #2/#3 correctly diagnosed that the app needed to be switched to Live i
 
 **Shipped via**: PR #65 (the diagnostic logging change only, merged first to unblock diagnosis) + PR #66 (the actual ID fix) -- repo's branch protection requires the `build-and-test` CI check before merge, direct push to `main` is rejected (confirmed this session).
 
-**Not yet verified end-to-end**: the user needs to Reconnect, send one more real DM, and confirm an actual AI reply arrives this time -- diagnosis is done and the fix is deployed, but no successful full round-trip has been observed yet as of this entry.
+**Verified end-to-end 2026-09-13**: user reconnected `tarun.v_15` after the fix deployed (`connected_at` 22:04:19 UTC, `instagram_business_account_id` now correctly `17841480477232867`). Sent three real DMs ("Hi", a non-text attachment, "What are your service?"); confirmed directly via `instagram_inbound_messages`/`messages`/`instagram_outbound_messages`: all three got real, grounded AI replies (the non-text one correctly got the canned NON_TEXT_REPLY), and all three outbound sends show `status='sent'`, `last_error=null`. Phase 26's real-Meta end-to-end test items (1)-(3) from the original entry above are now done. Instagram DM is live and working in production. Remaining from the original Phase 26 list: (4) confirm human-takeover silences the AI on an Instagram conversation, (5) confirm Disconnect/Reconnect both still work cleanly -- neither tested yet, lower priority now that the core pipeline is confirmed working.
 
 ---
 
