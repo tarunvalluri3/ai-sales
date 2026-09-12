@@ -2,7 +2,21 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Codebase gap sweep, Phase B: performance fixes -- see the entry immediately below.)
+Last updated: 2026-09-13 (Codebase gap sweep, Phase C: Instagram stalled-lead follow-up status accuracy -- see the entry immediately below.)
+
+---
+
+## Codebase gap sweep (Phase C — Instagram stalled-lead status) — 2026-09-13
+
+Third phase of the sweep started in Phase A above. An Instagram-sourced stalled lead with no email was falling through to the generic `no_contact_channel` follow-up status -- functionally correct (no send is attempted either way) but less accurate than WhatsApp's specific `blocked_no_whatsapp_template` label, and for a reason that isn't the same shape as WhatsApp's: per Phase 26's own research (further up this file), Instagram has no pre-approved-template escape hatch at all, and no `HUMAN_AGENT` 7-day tag (its own, separately-deferred App Review track) -- so "no template" would misdescribe the real constraint, which is Instagram's 24-hour message window closing with no bypass this app has built.
+
+**Migration** `supabase/migrations/20260913000000_add_instagram_stalled_lead_status.sql`, applied live via `npx supabase db push --linked`: extends `leads.follow_up_status`'s closed-list check constraint (confirmed the actual constraint name first via `pg_get_constraintdef` rather than assuming Postgres's default naming) with `'blocked_no_instagram_window'`.
+
+**Code**: `lib/stalled-leads.ts`'s `processCandidate()` gets a matching `INSTAGRAM_CONVERSATION_SOURCE` branch next to the existing WhatsApp one; `StalledLeadSweepResult` gets a new `blockedInstagram` counter (the cron route just spreads this whole object into its JSON response, so the new field is additive/safe). `lib/supabase/types.ts`'s `LeadFollowUpStatus` and `leads-list.tsx`'s `FOLLOW_UP_LABEL` map both updated to match.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass. Migration verified live (constraint definition re-queried post-push, confirmed the new value is present). `npm test`'s pgTAP suite deliberately not run locally against secrets -- left to CI's existing staging-database run, same as every other schema change this session.
+
+**Next logical task**: Phase D (UI/UX quick wins) through Phase F (accessibility pass), per the approved plan.
 
 ---
 

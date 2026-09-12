@@ -239,6 +239,7 @@ export type LeadFollowUpStatus =
   | "sent_email"
   | "sent_whatsapp"
   | "blocked_no_whatsapp_template"
+  | "blocked_no_instagram_window"
   | "no_contact_channel"
   | "send_failed";
 

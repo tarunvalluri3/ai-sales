@@ -34,6 +34,7 @@ const FOLLOW_UP_LABEL: Record<LeadFollowUpStatus, string> = {
   sent_email: "Follow-up sent by email",
   sent_whatsapp: "Follow-up sent via WhatsApp",
   blocked_no_whatsapp_template: "Follow-up drafted, blocked: no approved WhatsApp template",
+  blocked_no_instagram_window: "Follow-up drafted, blocked: Instagram's message window has closed",
   no_contact_channel: "Follow-up drafted, no channel to send it on",
   send_failed: "Follow-up drafted, delivery failed — will retry",
 };
