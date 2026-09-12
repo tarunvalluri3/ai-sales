@@ -160,7 +160,6 @@ export async function completeInstagramOAuthCallback(
   }
 
   let shortLivedToken: string;
-  let instagramBusinessAccountId: string;
   try {
     const body = new URLSearchParams({
       client_id: appId,
@@ -173,12 +172,17 @@ export async function completeInstagramOAuthCallback(
     if (!response.ok) {
       return { success: false, error: "Meta rejected this connection attempt. Please try connecting again." };
     }
+    // This response's own `user_id` is the Instagram *app-scoped* user ID --
+    // NOT the same ID Meta later sends as `entry.id` in messaging webhook
+    // payloads. Deliberately not used below; the real ID is fetched
+    // separately from GET /me's `user_id` field further down. Confirmed
+    // live via developers.facebook.com after a real DM's webhook delivery
+    // showed a different ID than what this endpoint returns (STATE.md).
     const parsed = (await response.json()) as { access_token?: string; user_id?: number | string };
     if (!parsed.access_token || parsed.user_id == null) {
       return { success: false, error: "Meta returned an unexpected response. Please try connecting again." };
     }
     shortLivedToken = parsed.access_token;
-    instagramBusinessAccountId = String(parsed.user_id);
   } catch {
     return { success: false, error: "Couldn't reach Meta's API to complete this connection. Please try again." };
   }
@@ -230,18 +234,41 @@ export async function completeInstagramOAuthCallback(
     };
   }
 
+  // GET /me's own `id` field is the same app-scoped ID the token exchange
+  // above already returned -- still not what webhooks use. Its `user_id`
+  // field is the actual Instagram professional account ID (<IG_ID>) that
+  // matches messaging webhook `entry.id`, per Meta's User Profile API docs.
+  // Fetching this is mandatory, not best-effort: storing the wrong ID here
+  // doesn't fail loudly, it just means resolveBusinessFromInstagramAccountId()
+  // never matches and every inbound DM silently resolves to "unknown
+  // account" -- exactly the bug this fixes (STATE.md follow-up #4).
+  let instagramBusinessAccountId: string;
   let igUsername: string | null = null;
   try {
     const url = new URL(`${GRAPH_API_BASE}/me`);
-    url.searchParams.set("fields", "username");
+    url.searchParams.set("fields", "user_id,username");
     url.searchParams.set("access_token", longLivedToken);
     const response = await fetchWithTimeout(url.toString());
-    if (response.ok) {
-      const parsed = (await response.json()) as { username?: string };
-      igUsername = parsed.username ?? null;
+    if (!response.ok) {
+      return {
+        success: false,
+        error: "Meta accepted your credentials but didn't return this account's ID. Please try connecting again.",
+      };
     }
+    const parsed = (await response.json()) as { user_id?: number | string; username?: string };
+    if (parsed.user_id == null) {
+      return {
+        success: false,
+        error: "Meta accepted your credentials but didn't return this account's ID. Please try connecting again.",
+      };
+    }
+    instagramBusinessAccountId = String(parsed.user_id);
+    igUsername = parsed.username ?? null;
   } catch {
-    // Non-fatal -- the connection still works without a display username.
+    return {
+      success: false,
+      error: "Couldn't reach Meta's API to complete this connection. Please try again.",
+    };
   }
 
   const nowIso = new Date().toISOString();
