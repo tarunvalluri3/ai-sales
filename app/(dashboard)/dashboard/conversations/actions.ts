@@ -26,6 +26,8 @@ import { recordAuditLogEntry } from "@/lib/audit-log";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
 import { getWhatsappConnectionForBusiness, WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { createWhatsappOutboundMessage, sendWhatsappOutboundMessage } from "@/lib/whatsapp-delivery";
+import { getInstagramConnectionForBusiness, INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
+import { createInstagramOutboundMessage, sendInstagramOutboundMessage } from "@/lib/instagram-delivery";
 
 const setControlSchema = z.object({
   id: z.string().uuid(),
@@ -156,6 +158,31 @@ export async function sendHumanReplyAction(
           content: parsed.data.content,
         });
         await sendWhatsappOutboundMessage(outbound.id);
+      }
+    } catch (error) {
+      logAndGetUserMessage(error);
+    }
+  }
+
+  // Same reasoning as the WhatsApp branch above, mirrored for
+  // Instagram-sourced conversations -- this was missing entirely when
+  // Phase 26 shipped, so a staff reply during human takeover saved to the
+  // transcript but never reached the prospect on Instagram (found via the
+  // user's own live test, STATE.md Phase 26 follow-up #5).
+  if (conversation.source === INSTAGRAM_CONVERSATION_SOURCE && conversation.visitor_id) {
+    try {
+      const connection = await getInstagramConnectionForBusiness(businessId);
+      if (connection?.status === "connected") {
+        const serviceSupabase = createServiceSupabaseClient();
+        const outbound = await createInstagramOutboundMessage(serviceSupabase, {
+          businessId,
+          conversationId: parsed.data.conversationId,
+          messageId: message.id,
+          toIgId: conversation.visitor_id,
+          instagramBusinessAccountId: connection.instagram_business_account_id,
+          content: parsed.data.content,
+        });
+        await sendInstagramOutboundMessage(outbound.id);
       }
     } catch (error) {
       logAndGetUserMessage(error);

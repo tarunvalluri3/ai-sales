@@ -2,7 +2,23 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Phase 26 follow-up #4: found and fixed the real remaining bug -- completeInstagramOAuthCallback() was storing the wrong Instagram account ID, so every inbound webhook silently resolved to "unknown account." See the entry immediately below.)
+Last updated: 2026-09-13 (Phase 26 follow-up #5: fixed human-takeover staff replies never reaching Instagram -- see the entry immediately below.)
+
+---
+
+## Phase 26 follow-up #5: staff replies during human takeover never sent to Instagram -- fixed 2026-09-13
+
+Working through the two remaining Phase 26 exit-criteria items after follow-up #4's end-to-end verification: the user tested human takeover on an Instagram-sourced conversation (click takeover, send a reply from the dashboard) and the reply appeared in the dashboard transcript but never arrived on the prospect's actual Instagram thread.
+
+**Root cause**: `app/(dashboard)/dashboard/conversations/actions.ts`'s `sendHumanReplyAction()` always calls `createMessage()` (so the reply is saved and visible in the dashboard regardless), then has a channel-specific branch that also sends the message out over the real channel -- but that branch only ever checked `conversation.source === WHATSAPP_CONVERSATION_SOURCE`. When Phase 26 added Instagram, no matching `INSTAGRAM_CONVERSATION_SOURCE` branch was added here, so a staff reply on an Instagram conversation silently stayed dashboard-only. The AI-reply path (`app/api/webhooks/instagram/route.ts`) was unaffected and already worked correctly (confirmed in follow-up #4) since it has its own, separate send call -- this gap was specific to the human-takeover staff-reply path.
+
+**Fix**: added a second branch, mirroring the WhatsApp one exactly -- `getInstagramConnectionForBusiness()` + `createInstagramOutboundMessage()` + `sendInstagramOutboundMessage()` -- gated on `conversation.source === INSTAGRAM_CONVERSATION_SOURCE`. Same best-effort semantics as the WhatsApp branch: a send failure here doesn't fail the staff member's reply (already saved/visible), the shared daily cron sweep retries it.
+
+**Not a schema change, no new route, no dependency** -- trivial-change exemption, implemented directly per this user's standing no-prompt-files preference.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile.
+
+**Not yet verified end-to-end**: user needs to retest -- take over an Instagram conversation, send a reply, confirm it actually arrives in the real Instagram DM thread this time.
 
 ---
 
