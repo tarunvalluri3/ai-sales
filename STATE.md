@@ -2,7 +2,27 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-12 (Phase 26 follow-up #2: diagnosed a second, still-unresolved cause of "AI doesn't reply on Instagram" -- see the entry immediately below, above the follow-up #1 entry it builds on.)
+Last updated: 2026-09-13 (Phase 26 follow-up #4: found and fixed the real remaining bug -- completeInstagramOAuthCallback() was storing the wrong Instagram account ID, so every inbound webhook silently resolved to "unknown account." See the entry immediately below.)
+
+---
+
+## Phase 26 follow-up #4: wrong Instagram account ID stored during OAuth -- webhook could never match a connection -- fixed 2026-09-13
+
+Follow-up #2/#3 correctly diagnosed that the app needed to be switched to Live in Meta's console before any webhook would be delivered at all. The user did that (filled in the App icon/Category/Privacy Policy URL blockers on the Basic settings page, submitted, app now shows "Published" + a "switched to live mode" alert). Real DMs to `tarun.v_15` then started actually reaching `/api/webhooks/instagram` for the first time (`POST` requests visible in `vercel logs`, previously zero, ever) -- but the AI still never replied.
+
+**Root cause**: `resolveBusinessFromInstagramAccountId()` looks up `instagram_connections` by `instagram_business_account_id`, which `completeInstagramOAuthCallback()` was populating from the OAuth *token exchange* response's `user_id` field (`POST https://api.instagram.com/oauth/access_token`). That field is explicitly documented as the **Instagram *app-scoped* User ID** -- a different, per-app identifier, NOT the ID Meta sends as `entry.id` in real messaging webhook payloads. Diagnosed by adding `instagramBusinessAccountId` to the `instagram_unknown_account_id` error log (small logging-only change, committed/merged/deployed first via PR #65), then comparing the real value Meta sent (`17841480477232867` -- also visible in Meta's own App Dashboard "Add account" list, confirming it's the *correct* one) against what was stored (`28747265801525964` -- the app-scoped ID). Confirmed against Meta's current User Profile API docs (fetched live, not assumed): `GET /me` (Graph API, with the long-lived token) returns two different fields -- its own `id` is the same app-scoped ID as the token exchange, but its `user_id` field is the true Instagram professional account ID (`<IG_ID>`) that matches webhook `entry.id`.
+
+**Fix**: `lib/instagram.ts`'s `completeInstagramOAuthCallback()` no longer uses the token exchange's `user_id`. It now calls `GET /me?fields=user_id,username` (previously only fetched `username`, and only as a best-effort/non-fatal call) and stores *that* response's `user_id` as `instagram_business_account_id`. This fetch is now mandatory/fail-closed, matching the same "verify first, subscribe second, write third" invariant as the subscription-call fix in follow-up #1 -- getting the wrong ID here doesn't error loudly, it just means every future inbound DM would silently resolve to "unknown account" forever, so a failure here now fails the whole connect attempt rather than writing a connection that looks fine but can never receive messages.
+
+**User action required**: same as follow-up #1's pattern -- any connection made *before* this fix (including `tarun.v_15`'s current one) still has the wrong ID stored and needs one more **"Reconnect with Instagram"** on `/dashboard/instagram` to pick up the corrected value. A fresh first-time connect after this fix needs no extra step.
+
+**Not a schema change, no new route, no dependency** -- qualified for direct implementation without a prompt file (this user's standing preference, and `AGENTS.md`'s trivial-change exemption for the logging change specifically; this ID fix itself is ~20 lines in one file, no auth/tenancy/schema/dependency change).
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes including `/api/webhooks/instagram` compile clean.
+
+**Shipped via**: PR #65 (the diagnostic logging change only, merged first to unblock diagnosis) + a second direct commit to `main` for the actual ID fix (repo's branch protection requires the `build-and-test` CI check before merge -- direct push to `main` is rejected, confirmed this session).
+
+**Not yet verified end-to-end**: the user needs to Reconnect, send one more real DM, and confirm an actual AI reply arrives this time -- diagnosis is done and the fix is deployed, but no successful full round-trip has been observed yet as of this entry.
 
 ---
 
