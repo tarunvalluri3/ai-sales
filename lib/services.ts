@@ -93,6 +93,9 @@ export async function listServicesByIds(businessId: string, ids: string[]): Prom
   return data;
 }
 
+/** Bounds the unpaginated services-list fetch, same reasoning and value as lib/conversations.ts's LIST_LIMIT. */
+const LIST_LIMIT = 300;
+
 /** Lists all approved services for a business. `businessId` must come from `requireBusinessContext()`. Excludes unreviewed extractions -- see `listPendingReviewServices`. */
 export async function listServicesForBusiness(businessId: string): Promise<Service[]> {
   const supabase = createServerSupabaseClient();
@@ -101,7 +104,8 @@ export async function listServicesForBusiness(businessId: string): Promise<Servi
     .select("*")
     .eq("business_id", businessId)
     .eq("status", "approved")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(LIST_LIMIT);
 
   if (error) {
     throw new AppError(

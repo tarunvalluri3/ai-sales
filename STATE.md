@@ -2,7 +2,23 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Codebase gap sweep, Phase A: three real bugs found and fixed via a user-requested systematic audit -- see the entry immediately below.)
+Last updated: 2026-09-13 (Codebase gap sweep, Phase B: performance fixes -- see the entry immediately below.)
+
+---
+
+## Codebase gap sweep (Phase B — performance) — 2026-09-13
+
+Second phase of the sweep started in Phase A above (same session, same plan file). All small, mechanical, mirror an existing precedent already established elsewhere in this codebase.
+
+**`listLeadsForBusiness`/`listProductsForBusiness`/`listServicesForBusiness`/`listFaqsForBusiness`** (`lib/leads.ts`, `lib/products.ts`, `lib/services.ts`, `lib/faqs.ts`) were all unbounded -- fetched every row a business has ever had, no `.limit()`. `listLeadsForBusiness` was already flagged as open in an earlier STATE.md entry; the other three are lower severity today (small catalogs) but same shape. Fixed by mirroring `listConversationsForBusiness`'s existing `LIST_LIMIT = 300` + `.limit()` pattern (`lib/conversations.ts:90,110`) exactly -- same value, same "no pagination UI needed yet at this scale" reasoning already established for conversations.
+
+**`data-table.tsx`'s `min-w-max` bug** (`app/(dashboard)/dashboard/_components/data-table.tsx`): already root-caused in an earlier STATE.md entry -- `min-w-max` forces `min-width: max-content` on the grid, defeating its own `fr`-based column sizing and causing unnecessary horizontal scroll on Leads/Appointments (the two pages already using `DataTable`) even on viewports wide enough to fit. Removed; `overflow-x-auto` alone still covers genuinely-narrow viewports. Fixes every current and future `DataTable` consumer at once, including the pages Phase E will retrofit onto it.
+
+**Checked, not fixed (correctly left alone)**: the HNSW vector index remains deferred, per Phase A's entry above -- not re-litigated here.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile.
+
+**Next logical task**: Phase C (Instagram stalled-lead follow-up status accuracy -- needs a migration) through Phase F (accessibility pass), per the approved plan.
 
 ---
 
