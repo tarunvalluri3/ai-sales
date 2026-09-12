@@ -51,7 +51,7 @@ export default async function LeadsPage() {
   for (const service of interestServices) interestNameById[service.id] = service.name;
 
   return (
-    <div className="flex flex-1 flex-col bg-ds-bg p-6">
+    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <LeadsList
         leads={leads}
         interestNameById={interestNameById}

@@ -4,15 +4,16 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AppointmentActions } from "./appointment-actions";
 import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } from "../_components/data-table";
+import { Badge, type BadgeTone } from "../_components/badge";
 import type { Appointment, AppointmentStatus } from "@/lib/supabase/types";
 
-const STATUS_STYLE: Record<AppointmentStatus, string> = {
-  pending: "bg-ds-accent-soft-bg text-ds-accent-muted",
-  confirmed: "bg-ds-success-bg text-ds-success",
-  declined: "bg-ds-danger-bg text-ds-danger",
-  cancelled: "bg-ds-surface-soft text-ds-text-muted",
-  completed: "bg-ds-success-bg text-ds-success",
-  no_show: "bg-ds-danger-bg text-ds-danger",
+const STATUS_TONE: Record<AppointmentStatus, BadgeTone> = {
+  pending: "accent",
+  confirmed: "success",
+  declined: "danger",
+  cancelled: "muted",
+  completed: "success",
+  no_show: "danger",
 };
 
 const COLUMNS: DataTableColumn[] = [
@@ -94,11 +95,9 @@ export function AppointmentsTable({
             </span>
           </TableCell>
           <TableCell>
-            <span
-              className={`rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase ${STATUS_STYLE[appointment.status]}`}
-            >
+            <Badge tone={STATUS_TONE[appointment.status]} size="sm">
               {appointment.status.replace("_", "-")}
-            </span>
+            </Badge>
           </TableCell>
           <TableCell className="min-w-0">
             {appointment.notes ? (

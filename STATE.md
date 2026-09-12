@@ -2,7 +2,27 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Codebase gap sweep, Phase C: Instagram stalled-lead follow-up status accuracy -- see the entry immediately below.)
+Last updated: 2026-09-13 (Codebase gap sweep, Phase D: UI/UX quick wins -- see the entry immediately below.)
+
+---
+
+## Codebase gap sweep (Phase D — UI/UX quick wins) — 2026-09-13
+
+Fourth phase of the sweep started in Phase A above.
+
+**D1 — silently-stale conversation inbox**: `chat-list-pane.tsx` and `live-conversation-panel.tsx`'s poll loops already deliberately treat a single dropped poll as invisible (correct -- flashing an error for one blip that resolves next tick would be noisier than helpful), but had no ceiling: if the endpoint stayed down, the UI looked fine forever with zero indication. Both now track consecutive failures via a ref and, past `STALE_FAILURE_THRESHOLD` (3), show a small inline "Updates paused — retrying…" notice next to the pane/panel heading; cleared immediately on the next successful poll.
+
+**D2 — Badge component retrofit**: WhatsApp's connection-status pill, Leads' qualification pill, and Appointments' status pill all still used ad-hoc `<span className={...}>` instead of the shared `Badge` component already used by Instagram's equivalent view (the exact drift `badge.tsx`'s own doc-comment already flagged). All three swapped to `<Badge tone={...}>`, mapping each page's existing status→color logic onto `Badge`'s `tone` prop. Purely visual.
+
+**D3 — bare-text empty states**: Analytics' "top unanswered questions"/"top source pages", dashboard-home's "recent conversations"/"recent leads", and both chart components' (`QualificationDonut`, `BreakdownBarChart`) zero-data states all rendered plain `<p>No … yet.</p>`. Investigated before fixing: unlike the full-page list empty states (Leads/FAQs/etc.) that use the bordered `EmptyState` card, every one of these six lives *already inside* its own bordered card/section -- wrapping in `EmptyState` (which owns its own dashed-border card) would have double-bordered rather than improved anything. Added a new, lighter `InlineEmptyState` (icon + muted label, no border, sized to its slot) to `state-views.tsx` instead, and wired it into all six spots with a contextually appropriate icon each.
+
+**D4 — `leads/page.tsx`**: added the missing `gap-8` every sibling top-level page uses.
+
+**Also found and fixed while in this code** (not originally in the sweep's list, same shape of drift as D2): `leads-list.tsx` had its own inline `channelLabel()`/`CHANNEL_LABEL` duplicate of the shared `lib/conversation-channel.ts` helper -- and its local copy was missing the `instagram` entry entirely (would have shown the raw `"instagram"` string instead of "Instagram" in the duplicate-lead hint). Replaced with the shared import.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile. Visual verification is still pending a manual click-through by the user (this environment can't run a browser) -- flagged, not yet done.
+
+**Next logical task**: Phase E (DataTable retrofit for Products/Services/FAQs/Webhooks/Knowledge/Widget Keys) and Phase F (accessibility pass), per the approved plan.
 
 ---
 

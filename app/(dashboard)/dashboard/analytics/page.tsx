@@ -11,10 +11,12 @@ import {
   getTopSourcePages,
   getTopUnansweredQuestions,
 } from "@/lib/analytics";
+import { HelpCircle, Globe } from "lucide-react";
 import { KpiTile } from "../_components/kpi-tile";
 import { BreakdownBarChart } from "../_components/charts/breakdown-bar-chart";
 import { QualificationDonut } from "../_components/charts/qualification-donut";
 import { chartColors } from "../_components/charts/chart-colors";
+import { InlineEmptyState } from "../_components/state-views";
 import { ExportLeadsCsvButton } from "./export-leads-csv-button";
 
 export default async function AnalyticsPage() {
@@ -142,7 +144,7 @@ export default async function AnalyticsPage() {
             </p>
           </div>
           {topUnansweredQuestions.length === 0 ? (
-            <p className="text-sm text-ds-text-muted">No unanswered questions yet.</p>
+            <InlineEmptyState icon={HelpCircle} label="No unanswered questions yet." />
           ) : (
             <ol className="flex flex-col gap-2">
               {topUnansweredQuestions.map((item, index) => (
@@ -167,7 +169,7 @@ export default async function AnalyticsPage() {
             </p>
           </div>
           {topSourcePages.length === 0 ? (
-            <p className="text-sm text-ds-text-muted">No page attribution recorded yet.</p>
+            <InlineEmptyState icon={Globe} label="No page attribution recorded yet." />
           ) : (
             <ol className="flex flex-col gap-2">
               {topSourcePages.map((item, index) => (

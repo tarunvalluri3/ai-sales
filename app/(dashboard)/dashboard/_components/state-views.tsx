@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 
 /**
  * Shared empty-state card (Phase 25c) -- replaces the two near-duplicate
@@ -20,6 +20,22 @@ export function EmptyState({
       <p className="text-sm font-medium text-ds-text-primary">{title}</p>
       {description ? <p className="max-w-sm text-xs text-ds-text-muted">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Lighter empty-state treatment for a spot already living inside its own
+ * bordered card/section (a chart, a dashboard-home widget column) --
+ * `EmptyState` above owns its own dashed-border card, which would double
+ * up visually nested inside another card. No border here, just a muted
+ * icon + label, sized to sit naturally in a compact slot.
+ */
+export function InlineEmptyState({ icon: Icon, label }: { icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>; label: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
+      <Icon className="size-5 text-ds-text-muted" aria-hidden={true} />
+      <p className="text-sm text-ds-text-muted">{label}</p>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import type { WhatsappConnection } from "@/lib/supabase/types";
 import { disconnectWhatsappAction, type WhatsappActionState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { ConnectWhatsappForm } from "./connect-whatsapp-form";
+import { Badge, type BadgeTone } from "../_components/badge";
 
 const initialState: WhatsappActionState = {};
 
@@ -15,11 +16,11 @@ const STATUS_LABEL: Record<WhatsappConnection["status"], string> = {
   disconnected: "Disconnected",
 };
 
-const STATUS_CLASSES: Record<WhatsappConnection["status"], string> = {
-  connected: "bg-ds-success-bg text-ds-success",
-  pending: "bg-ds-surface-elevated text-ds-text-secondary",
-  error: "bg-ds-danger-bg text-ds-danger",
-  disconnected: "bg-ds-surface-elevated text-ds-text-muted",
+const STATUS_TONE: Record<WhatsappConnection["status"], BadgeTone> = {
+  connected: "success",
+  pending: "muted",
+  error: "danger",
+  disconnected: "muted",
 };
 
 /**
@@ -73,9 +74,9 @@ export function WhatsappConnectionStatus({
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-ds-text-primary">{connection.display_phone_number}</p>
-            <span className={`rounded-ds-sm px-2 py-0.5 text-xs font-medium ${STATUS_CLASSES[connection.status]}`}>
+            <Badge tone={STATUS_TONE[connection.status]} size="sm">
               {STATUS_LABEL[connection.status]}
-            </span>
+            </Badge>
           </div>
           {connection.verified_name ? (
             <p className="text-xs text-ds-text-muted">{connection.verified_name}</p>

@@ -17,18 +17,11 @@ import { bulkUpdateLeadStatusAction, type BulkUpdateStatusState } from "./action
 import { LEAD_STATUSES, LEAD_STATUS_LABEL } from "./lead-status";
 import { EmptyState } from "../_components/state-views";
 import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } from "../_components/data-table";
+import { Badge, type BadgeTone } from "../_components/badge";
 import { useToast } from "../_components/toast";
+import { channelLabel } from "@/lib/conversation-channel";
 import type { PossibleDuplicateHint } from "@/lib/leads";
 import type { Lead, LeadFollowUpStatus, LeadQualification, LeadStatus } from "@/lib/supabase/types";
-
-const CHANNEL_LABEL: Record<string, string> = {
-  chat_widget: "website chat",
-  whatsapp: "WhatsApp",
-};
-
-function channelLabel(channel: string | null): string {
-  return channel ? (CHANNEL_LABEL[channel] ?? channel) : "another conversation";
-}
 
 const FOLLOW_UP_LABEL: Record<LeadFollowUpStatus, string> = {
   sent_email: "Follow-up sent by email",
@@ -39,10 +32,10 @@ const FOLLOW_UP_LABEL: Record<LeadFollowUpStatus, string> = {
   send_failed: "Follow-up drafted, delivery failed — will retry",
 };
 
-const QUALIFICATION_STYLE: Record<LeadQualification, string> = {
-  hot: "bg-ds-accent-soft-bg text-ds-accent-muted",
-  warm: "bg-ds-success-bg text-ds-success",
-  cold: "bg-ds-surface-soft text-ds-text-muted",
+const QUALIFICATION_TONE: Record<LeadQualification, BadgeTone> = {
+  hot: "accent",
+  warm: "success",
+  cold: "muted",
 };
 
 // Past this length a 2-line clamp is likely to actually cut the text off
@@ -369,12 +362,11 @@ function LeadRow({
         <TableCell className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="truncate font-medium text-ds-text-primary">{lead.contact_name ?? "Unnamed prospect"}</span>
-            <span
-              title="AI-assessed signal -- not verified"
-              className={`shrink-0 rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase ${QUALIFICATION_STYLE[lead.qualification]}`}
-            >
-              {lead.qualification}
-              <span className="sr-only"> lead — AI-assessed signal, not verified</span>
+            <span className="shrink-0">
+              <Badge tone={QUALIFICATION_TONE[lead.qualification]} size="sm" title="AI-assessed signal -- not verified">
+                {lead.qualification}
+                <span className="sr-only"> lead — AI-assessed signal, not verified</span>
+              </Badge>
             </span>
           </div>
         </TableCell>

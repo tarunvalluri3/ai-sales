@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { RefreshCw } from "lucide-react";
 import { pollConversationAction } from "../actions";
 import { ControlToggle } from "./control-toggle";
 import { ReplyComposer } from "./reply-composer";
@@ -10,6 +11,10 @@ import { DismissAttentionButton } from "../../_components/dismiss-attention-butt
 import type { ConversationControl, Message } from "@/lib/supabase/types";
 
 const POLL_INTERVAL_MS = 1000;
+
+// Same reasoning as ChatListPane's own STALE_FAILURE_THRESHOLD -- a single
+// dropped poll stays invisible, only sustained failure surfaces a notice.
+const STALE_FAILURE_THRESHOLD = 3;
 
 /**
  * Owns polling state for one conversation detail page (Phase 15b).
@@ -40,10 +45,12 @@ export function LiveConversationPanel({
   const [control, setControl] = useState(initialControl);
   const [needsAttention, setNeedsAttention] = useState(initialNeedsAttention);
   const [messages, setMessages] = useState(initialMessages);
+  const [isStale, setIsStale] = useState(false);
   const asOfRef = useRef(initialAsOf);
   const knownIdsRef = useRef(new Set(initialMessages.map((message) => message.id)));
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+  const consecutiveFailuresRef = useRef(0);
   // Holds the latest `poll` so its own self-rescheduling setTimeout call
   // never has to reference the `poll` binding before it's assigned.
   const pollRef = useRef<() => Promise<void>>(async () => {});
@@ -65,13 +72,20 @@ export function LiveConversationPanel({
     try {
       const result = await pollConversationAction(conversationId, asOfRef.current);
       if (!isMountedRef.current) return;
+      consecutiveFailuresRef.current = 0;
+      setIsStale(false);
       mergeMessages(result.messages);
       asOfRef.current = result.asOf;
       setControl(result.control);
       setNeedsAttention(result.needsAttention);
     } catch {
-      // A poll failure is invisible to the user -- keep the last-known
-      // state and try again on the next tick.
+      // A single dropped poll is still invisible -- keep the last-known
+      // state and try again on the next tick. Only sustained failure
+      // surfaces the "Updates paused" notice below.
+      consecutiveFailuresRef.current += 1;
+      if (isMountedRef.current && consecutiveFailuresRef.current >= STALE_FAILURE_THRESHOLD) {
+        setIsStale(true);
+      }
     }
 
     if (!isMountedRef.current) return;
@@ -129,6 +143,12 @@ export function LiveConversationPanel({
             <span className="text-sm font-medium text-ds-warning">Needs attention</span>
             <DismissAttentionButton conversationId={conversationId} onDismissed={poll} canEdit={canEdit} />
           </div>
+        ) : null}
+        {isStale ? (
+          <p className="ml-auto flex items-center gap-1 text-2xs text-ds-warning" role="status">
+            <RefreshCw className="size-3 animate-spin" aria-hidden="true" />
+            Updates paused — retrying…
+          </p>
         ) : null}
       </div>
 
