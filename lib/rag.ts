@@ -458,49 +458,69 @@ export async function askSalesEmployee(
 
       messages.push(aiMessage);
       toolCallCount += aiMessage.tool_calls.length;
-      for (const toolCall of aiMessage.tool_calls) {
-        let toolResult: unknown;
-        if (toolCall.name === "check_product_details") {
-          toolResult = await executeCheckProductDetails(supabase, businessId, toolCall.args);
-        } else if (toolCall.name === "check_faq_topic") {
-          toolResult = await executeCheckFaqTopic(supabase, businessId, toolCall.args);
-        } else if (toolCall.name === "request_callback") {
-          calledSideEffectingTool = true;
-          toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
-        } else if (toolCall.name === "list_products_and_services") {
-          toolResult = await executeListOfferings(supabase, businessId);
-        } else if (toolCall.name === "search_knowledge_base") {
-          const searchResult = await executeSearchKnowledgeBase(supabase, businessId, toolCall.args);
-          if (searchResult.found) {
-            for (const passage of searchResult.passages) {
-              additionalSourceChunkIds.add(passage.chunkId);
+
+      // A single turn's tool calls never depend on each other's results --
+      // the model generates every call's args before seeing any result, by
+      // construction -- so running them concurrently is safe, not just
+      // likely safe. Outcomes are still applied in the original array
+      // order below (not completion order), preserving the exact same
+      // "last one wins" semantics `recommendedProducts` had under the old
+      // sequential loop.
+      const toolOutcomes = await Promise.all(
+        aiMessage.tool_calls.map(async (toolCall) => {
+          let toolResult: unknown;
+          let sideEffecting = false;
+          let chunkIds: string[] = [];
+          let recommended: RecommendedItem[] | null = null;
+
+          if (toolCall.name === "check_product_details") {
+            toolResult = await executeCheckProductDetails(supabase, businessId, toolCall.args);
+          } else if (toolCall.name === "check_faq_topic") {
+            toolResult = await executeCheckFaqTopic(supabase, businessId, toolCall.args);
+          } else if (toolCall.name === "request_callback") {
+            sideEffecting = true;
+            toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
+          } else if (toolCall.name === "list_products_and_services") {
+            toolResult = await executeListOfferings(supabase, businessId);
+          } else if (toolCall.name === "search_knowledge_base") {
+            const searchResult = await executeSearchKnowledgeBase(supabase, businessId, toolCall.args);
+            if (searchResult.found) {
+              chunkIds = searchResult.passages.map((passage) => passage.chunkId);
             }
+            toolResult = searchResult;
+          } else if (toolCall.name === "recommend_products") {
+            const recommendResult = await executeRecommendProducts(supabase, businessId, toolCall.args);
+            if (recommendResult.found) {
+              // Only items with a real photo become visual cards -- the
+              // model still sees every matched item (image or not) in
+              // toolResult below, and must describe an image-less item in
+              // its own text instead of relying on a card.
+              recommended = recommendResult.items.filter((item) => item.imageUrl !== null);
+            }
+            toolResult = recommendResult;
+          } else if (toolCall.name === "check_available_slots") {
+            toolResult = await executeCheckAvailableSlots(supabase, businessId, toolCall.args);
+          } else if (toolCall.name === "book_appointment") {
+            sideEffecting = true;
+            toolResult = await executeBookAppointment(supabase, businessId, conversationId, toolCall.args);
+          } else {
+            logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
+            toolResult = { found: false, reason: "invalid_input" };
           }
-          toolResult = searchResult;
-        } else if (toolCall.name === "recommend_products") {
-          const recommendResult = await executeRecommendProducts(supabase, businessId, toolCall.args);
-          if (recommendResult.found) {
-            // Only items with a real photo become visual cards -- the
-            // model still sees every matched item (image or not) in
-            // toolResult below, and must describe an image-less item in
-            // its own text instead of relying on a card.
-            recommendedProducts = recommendResult.items.filter((item) => item.imageUrl !== null);
-          }
-          toolResult = recommendResult;
-        } else if (toolCall.name === "check_available_slots") {
-          toolResult = await executeCheckAvailableSlots(supabase, businessId, toolCall.args);
-        } else if (toolCall.name === "book_appointment") {
-          calledSideEffectingTool = true;
-          toolResult = await executeBookAppointment(supabase, businessId, conversationId, toolCall.args);
-        } else {
-          logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
-          toolResult = { found: false, reason: "invalid_input" };
-        }
+
+          return { toolCall, toolResult, sideEffecting, chunkIds, recommended };
+        }),
+      );
+
+      for (const outcome of toolOutcomes) {
+        if (outcome.sideEffecting) calledSideEffectingTool = true;
+        for (const chunkId of outcome.chunkIds) additionalSourceChunkIds.add(chunkId);
+        if (outcome.recommended !== null) recommendedProducts = outcome.recommended;
         messages.push(
           new ToolMessage({
-            content: `<tool_result>${JSON.stringify(toolResult)}</tool_result>`,
-            tool_call_id: toolCall.id!,
-            name: toolCall.name,
+            content: `<tool_result>${JSON.stringify(outcome.toolResult)}</tool_result>`,
+            tool_call_id: outcome.toolCall.id!,
+            name: outcome.toolCall.name,
           }),
         );
       }

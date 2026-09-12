@@ -210,7 +210,7 @@ Widget conversation restored from the database on page refresh instead of resett
 
 ## Phase 26 — Instagram DM
 
-Reuses Phase 16's WhatsApp architecture (conversation/AI/lead services, webhook shape, outbound delivery queue) with one genuine difference: Meta OAuth ("Instagram API with Instagram Login") through this app's own Meta App, not a business-pasted permanent token. Requires Meta App Review + Business Verification (Advanced Access) before any tenant other than the developer's own Instagram Tester account can connect in production; Development Mode plus an Instagram Tester account allows full end-to-end testing before that approval lands.
+Reuses Phase 16's WhatsApp architecture (conversation/AI/lead services, webhook shape, outbound delivery queue) with one genuine difference: Meta OAuth ("Instagram API with Instagram Login") through this app's own Meta App, not a business-pasted permanent token. Two separate gates, confirmed live (STATE.md, Phase 26 follow-ups #2-#3): (1) the app's Development/Live mode -- Meta delivers zero webhooks in Development mode regardless of Tester status, so end-to-end testing requires switching to Live, which itself requires completing Meta's basic app checklist (icon, category, privacy policy); (2) Advanced Access for the messaging permissions -- required only once the app serves an Instagram account it doesn't own/manage (i.e. any real tenant beyond the developer's own Tester account), gated on Meta App Review + Business Verification.
 
 When built, reuse the same conversation, AI, and lead services. Do not create a second AI system.
 

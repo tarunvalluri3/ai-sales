@@ -2,7 +2,25 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Phase 26 follow-up #5: fixed human-takeover staff replies never reaching Instagram -- see the entry immediately below.)
+Last updated: 2026-09-13 (Codebase gap sweep, Phase A: three real bugs found and fixed via a user-requested systematic audit -- see the entry immediately below.)
+
+---
+
+## Codebase gap sweep (Phase A — real bugs) — 2026-09-13
+
+User asked for a systematic sweep of the whole codebase for gaps of the same shape as the human-takeover bug (follow-up #5), plus performance and UI/UX, through Phase 26. Three parallel Explore agents covered channel parity, performance, and UI/UX/code-quality; every material finding was then verified directly against source before any fix. Full findings and the phased plan live in the approved plan file from this session (`i-want-you-to-quirky-lobster.md`) -- this entry covers Phase A only, the three highest-confidence real bugs. Later phases (performance, Instagram stalled-lead label, UI/UX quick wins, DataTable retrofit, accessibility pass) will get their own STATE.md entries as they ship.
+
+**A1 -- `lib/appointment-notifications.ts`**: `notifyAppointmentStatusChange()` had the exact same shape of bug as follow-up #5 -- its outbound-reply branch only checked `WHATSAPP_CONVERSATION_SOURCE`, so an Instagram-sourced prospect with no email got zero notification when staff confirmed/declined/cancelled their appointment. Fixed by adding a matching Instagram branch, mirroring the WhatsApp one exactly (`getInstagramConnectionForBusiness` + `createInstagramOutboundMessage` + `sendInstagramOutboundMessage`).
+
+**A2 -- `lib/rag.ts`'s tool-call loop**: multiple tool calls within one Gemini turn were executed sequentially (`for` + `await`) even though a turn's tool calls can never depend on each other's results (the model generates all of a turn's args before seeing any result). Changed to `Promise.all`, with results applied back in original array order afterward (not completion order) to preserve identical `recommendedProducts`/`additionalSourceChunkIds`/`calledSideEffectingTool` semantics to the old sequential version. Reduces chat latency on any turn with 2+ tool calls -- exactly the pattern the system prompt's own "capability chaining" instruction encourages (recommend → check-slots → book).
+
+**A3 -- `docs/phases.md`**: corrected the stale Phase 26 claim that "Development Mode plus an Instagram Tester account allows full end-to-end testing before [App Review] lands" -- live-contradicted this session (follow-up #2/#3: zero webhook delivery in Development mode regardless of Tester status; Live mode itself requires App Review already approved for Advanced Access, or just the basic app checklist for Standard-Access-only self-testing). Rewritten to describe the two separate real gates (Development/Live mode vs. Standard/Advanced Access).
+
+**Not fixed, investigated and confirmed correctly deferred**: the HNSW vector index on `knowledge_chunks`/`products`/`services` is still commented out by original Phase 7 design ("create it when data volume justifies it, not reflexively"). Live-checked this session: 137 knowledge_chunks rows, 1 product, 15 services -- nowhere near ANN-index territory (sequential scan is sub-millisecond at this size). Left alone; revisit only once real production knowledge volume exists, not on a schedule.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile.
+
+**Next logical task**: Phase B (performance: unbounded `listLeadsForBusiness`/products/services/FAQs queries, `DataTable`'s `min-w-max` bug) through Phase F (accessibility pass), per the approved plan -- all still queued this session.
 
 ---
 

@@ -4,6 +4,8 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { getWhatsappConnectionForBusiness, WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { createWhatsappOutboundMessage, sendWhatsappOutboundMessage } from "@/lib/whatsapp-delivery";
+import { getInstagramConnectionForBusiness, INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
+import { createInstagramOutboundMessage, sendInstagramOutboundMessage } from "@/lib/instagram-delivery";
 import { createMessage } from "@/lib/messages";
 import { formatSlotLabel } from "@/lib/appointments";
 import { sendAppointmentStatusEmail, type AppointmentStatusForEmail } from "@/lib/notifications";
@@ -20,12 +22,12 @@ const STATUS_MESSAGE: Record<AppointmentStatusForEmail, (label: string) => strin
 /**
  * Best-effort reply to the prospect after the business confirms/declines/
  * cancels an appointment they booked -- email (if they gave one) and, for
- * a WhatsApp-sourced conversation with an active connection, a real
- * WhatsApp reply too. The WhatsApp half reuses the exact sequence
- * app/(dashboard)/dashboard/conversations/actions.ts's sendHumanReplyAction
- * already established for staff replies (createMessage, then
- * createWhatsappOutboundMessage + sendWhatsappOutboundMessage) -- no
- * parallel send mechanism. The message insert uses the service-role
+ * a WhatsApp- or Instagram-sourced conversation with an active connection,
+ * a real reply over that channel too. Each channel's half reuses the exact
+ * sequence app/(dashboard)/dashboard/conversations/actions.ts's
+ * sendHumanReplyAction already established for staff replies (createMessage,
+ * then create*OutboundMessage + send*OutboundMessage) -- no parallel send
+ * mechanism. The message insert uses the service-role
  * client deliberately: this is a system-generated notification, not a
  * staff-typed reply, so it must not depend on the conversation already
  * being in human control (the RLS policy gating an *authenticated*
@@ -56,23 +58,42 @@ export async function notifyAppointmentStatusChange(
   try {
     const supabase = createServerSupabaseClient();
     const conversation = await getConversationForBusiness(supabase, businessId, appointment.conversation_id);
-    if (!conversation || conversation.source !== WHATSAPP_CONVERSATION_SOURCE || !conversation.visitor_id) return;
-
-    const connection = await getWhatsappConnectionForBusiness(businessId);
-    if (connection?.status !== "connected") return;
+    if (!conversation || !conversation.visitor_id) return;
 
     const content = STATUS_MESSAGE[status](label);
-    const message = await createMessage(serviceSupabase, businessId, conversation.id, "human_agent", content);
-    const outbound = await createWhatsappOutboundMessage(serviceSupabase, {
-      businessId,
-      conversationId: conversation.id,
-      messageId: message.id,
-      toWaId: conversation.visitor_id,
-      phoneNumberId: connection.phone_number_id,
-      content,
-    });
-    await sendWhatsappOutboundMessage(outbound.id);
+
+    if (conversation.source === WHATSAPP_CONVERSATION_SOURCE) {
+      const connection = await getWhatsappConnectionForBusiness(businessId);
+      if (connection?.status !== "connected") return;
+      const message = await createMessage(serviceSupabase, businessId, conversation.id, "human_agent", content);
+      const outbound = await createWhatsappOutboundMessage(serviceSupabase, {
+        businessId,
+        conversationId: conversation.id,
+        messageId: message.id,
+        toWaId: conversation.visitor_id,
+        phoneNumberId: connection.phone_number_id,
+        content,
+      });
+      await sendWhatsappOutboundMessage(outbound.id);
+    } else if (conversation.source === INSTAGRAM_CONVERSATION_SOURCE) {
+      // Same reasoning as sendHumanReplyAction()'s Instagram branch -- this
+      // was missing entirely until now, so an Instagram-sourced prospect
+      // with no email got zero notification on appointment status changes
+      // (STATE.md Phase 26 follow-up).
+      const connection = await getInstagramConnectionForBusiness(businessId);
+      if (connection?.status !== "connected") return;
+      const message = await createMessage(serviceSupabase, businessId, conversation.id, "human_agent", content);
+      const outbound = await createInstagramOutboundMessage(serviceSupabase, {
+        businessId,
+        conversationId: conversation.id,
+        messageId: message.id,
+        toIgId: conversation.visitor_id,
+        instagramBusinessAccountId: connection.instagram_business_account_id,
+        content,
+      });
+      await sendInstagramOutboundMessage(outbound.id);
+    }
   } catch {
-    logEvent("appointment_status_whatsapp_reply_failed", businessId, { appointmentId: appointment.id, status }, "error");
+    logEvent("appointment_status_channel_reply_failed", businessId, { appointmentId: appointment.id, status }, "error");
   }
 }
