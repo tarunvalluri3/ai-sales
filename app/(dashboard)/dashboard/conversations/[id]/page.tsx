@@ -7,9 +7,12 @@ import { listMessagesForConversation } from "@/lib/messages";
 import { getLeadForConversation } from "@/lib/leads";
 import { getAppointmentForConversation } from "@/lib/appointments";
 import { getBusinessForOrg } from "@/lib/business";
+import { listTagsForBusiness, listTagsForConversation } from "@/lib/lead-tags";
 import { getProduct } from "@/lib/products";
 import { getService } from "@/lib/services";
 import { channelLabel } from "@/lib/conversation-channel";
+import { getCustomerSnapshotForWorkflow } from "@/lib/customers";
+import { computePriority } from "@/lib/copilot";
 import { LiveConversationPanel } from "../_components/live-conversation-panel";
 import { InfoPanel } from "../_components/info-panel";
 import { ConversationPanes } from "../_components/conversation-panes";
@@ -28,11 +31,13 @@ export default async function ConversationDetailPage({
     notFound();
   }
 
-  const [messages, lead, appointment, business] = await Promise.all([
+  const [messages, lead, appointment, business, conversationTags, catalogTags] = await Promise.all([
     listMessagesForConversation(supabase, businessId, conversation.id),
     getLeadForConversation(businessId, conversation.id),
     getAppointmentForConversation(supabase, businessId, conversation.id),
     getBusinessForOrg(orgId),
+    listTagsForConversation(businessId, conversation.id),
+    listTagsForBusiness(businessId),
   ]);
 
   // Resolved to a real name rather than shown as a raw id -- a lead's
@@ -47,6 +52,15 @@ export default async function ConversationDetailPage({
       interestName = (await getService(businessId, lead.interest_id))?.name ?? null;
     }
   }
+
+  // Phase 30 (Sales Copilot): a deterministic "recommended next action"
+  // hint, reusing the exact same priority function the Copilot's Today
+  // view uses -- not a second recommendation engine, and no AI call on
+  // this hot page-load path.
+  const customerSnapshot = conversation.customer_id
+    ? await getCustomerSnapshotForWorkflow(supabase, businessId, conversation.customer_id)
+    : null;
+  const recommendedAction = customerSnapshot ? computePriority(customerSnapshot).recommendedAction : null;
 
   return (
     <ConversationPanes
@@ -79,6 +93,10 @@ export default async function ConversationDetailPage({
           appointment={appointment}
           messageCount={messages.length}
           timezone={business?.timezone ?? "UTC"}
+          conversationTags={conversationTags}
+          catalogTags={catalogTags}
+          canEditTags={hasMinRole(orgRole, "org:sales_agent")}
+          recommendedAction={recommendedAction}
         />
       }
     />

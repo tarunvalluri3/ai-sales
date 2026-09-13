@@ -18,6 +18,8 @@ import { notifyAppointmentStatusChange } from "@/lib/appointment-notifications";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 import type { AppointmentStatusForEmail } from "@/lib/notifications";
+import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
+import type { AppointmentStatus } from "@/lib/supabase/types";
 
 export type AppointmentActionState = {
   error?: string;
@@ -79,6 +81,26 @@ function notifyStatusChange(businessId: string, id: string, status: AppointmentS
   });
 }
 
+/** Phase 29: `appointment_status_changed` workflow trigger, fired after every confirm/decline/cancel/complete/no-show transition. Re-fetches the appointment for its customer/conversation ids rather than threading them through `runTransition`'s generic signature, same reasoning as `notifyStatusChange` above. */
+async function dispatchAppointmentStatusWorkflow(businessId: string, id: string, status: AppointmentStatus): Promise<void> {
+  const supabase = createServerSupabaseClient();
+  const appointment = await getAppointmentForBusiness(supabase, businessId, id);
+  if (!appointment) return;
+  await dispatchWorkflowTrigger(
+    supabase,
+    businessId,
+    "appointment_status_changed",
+    {
+      type: "conversation",
+      id: appointment.conversation_id ?? appointment.id,
+      customerId: appointment.customer_id,
+      leadId: null,
+      conversationId: appointment.conversation_id,
+    },
+    { status },
+  );
+}
+
 /** Owner approves a pending, AI-booked appointment. */
 export async function confirmAppointmentAction(
   _prevState: AppointmentActionState,
@@ -89,6 +111,7 @@ export async function confirmAppointmentAction(
 
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.confirmed", "appointment", result.id);
   notifyStatusChange(result.businessId, result.id, "confirmed");
+  await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "confirmed");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -103,6 +126,7 @@ export async function declineAppointmentAction(
 
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.declined", "appointment", result.id);
   notifyStatusChange(result.businessId, result.id, "declined");
+  await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "declined");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -117,6 +141,7 @@ export async function cancelAppointmentAction(
 
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.cancelled", "appointment", result.id);
   notifyStatusChange(result.businessId, result.id, "cancelled");
+  await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "cancelled");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -135,6 +160,7 @@ export async function completeAppointmentAction(
   if (!result.ok) return { error: result.error };
 
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.completed", "appointment", result.id);
+  await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "completed");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -148,6 +174,7 @@ export async function noShowAppointmentAction(
   if (!result.ok) return { error: result.error };
 
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.no_show", "appointment", result.id);
+  await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "no_show");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }

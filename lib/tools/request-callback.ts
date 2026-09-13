@@ -9,6 +9,7 @@ import { logEvent } from "@/lib/logger";
 import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
+import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -160,6 +161,20 @@ export async function executeRequestCallback(
     businessId,
     { tool: "request_callback", conversationId, result: result.created ? "created" : "updated" },
   );
+
+  // Phase 29: workflow triggers -- lead_created only on the genuine
+  // create branch (same "not a new lead" reasoning the webhook below
+  // already uses), lead_score_threshold on every write (the dispatcher
+  // itself detects whether the new score actually crossed a workflow's
+  // configured threshold).
+  const workflowTarget = { type: "lead" as const, id: result.leadId, customerId: result.customerId, leadId: result.leadId, conversationId };
+  if (result.created) {
+    await dispatchWorkflowTrigger(supabase, businessId, "lead_created", workflowTarget);
+  }
+  await dispatchWorkflowTrigger(supabase, businessId, "lead_score_threshold", workflowTarget, {
+    previousScore: result.previousScore,
+    newScore: result.newScore,
+  });
 
   // Phase 24: outbound webhook on a new qualified lead. Never fired on
   // the update branch (an existing lead getting a repeat callback

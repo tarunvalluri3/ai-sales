@@ -11,6 +11,7 @@ import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 import { sendNewAppointmentRequestEmail } from "@/lib/notifications";
 import { logEvent } from "@/lib/logger";
 import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
+import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 
 const SOURCE = "book_appointment_tool";
 
@@ -205,6 +206,23 @@ export async function executeBookAppointment(
       { tool: "book_appointment", conversationId, result: leadResult.created ? "lead_created" : "lead_updated" },
     );
 
+    // Phase 29: workflow triggers, same reasoning/shape as
+    // lib/tools/request-callback.ts's own dispatch calls.
+    const leadWorkflowTarget = {
+      type: "lead" as const,
+      id: leadResult.leadId,
+      customerId: leadResult.customerId,
+      leadId: leadResult.leadId,
+      conversationId,
+    };
+    if (leadResult.created) {
+      await dispatchWorkflowTrigger(supabase, businessId, "lead_created", leadWorkflowTarget);
+    }
+    await dispatchWorkflowTrigger(supabase, businessId, "lead_score_threshold", leadWorkflowTarget, {
+      previousScore: leadResult.previousScore,
+      newScore: leadResult.newScore,
+    });
+
     if (leadResult.created) {
       await enqueueLeadQualifiedWebhooks(supabase, businessId, {
         event: "lead.qualified",
@@ -218,6 +236,23 @@ export async function executeBookAppointment(
       after(() => processWebhookDeliveries());
     }
   }
+
+  // Phase 29: appointment_status_changed (status "pending" -- every
+  // AI-booked appointment always starts pending, per the product's
+  // owner-approval-required rule).
+  await dispatchWorkflowTrigger(
+    supabase,
+    businessId,
+    "appointment_status_changed",
+    {
+      type: "conversation",
+      id: conversationId,
+      customerId: appointment.customer_id,
+      leadId: leadResult.success ? leadResult.leadId : null,
+      conversationId,
+    },
+    { status: "pending" },
+  );
 
   return { success: true, appointmentId: appointment.id, label };
 }

@@ -3,6 +3,7 @@ import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Appointment, AppointmentBlockedSlot, BusinessHours, BusinessHoursException } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
+import { linkConversationToCustomer, resolveOrCreateCustomer } from "@/lib/customers";
 
 type ServerSupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
@@ -443,6 +444,15 @@ export async function createAppointment(supabase: AnySupabaseClient, businessId:
   const startsAt = new Date(input.startsAt);
   const endsAt = new Date(startsAt.getTime() + input.slotMinutes * 60 * 1000);
 
+  // Phase 28: link this appointment (and its conversation, if any) to a
+  // conservatively matched customer identity. Never blocks booking on
+  // failure -- resolveOrCreateCustomer never throws.
+  const customerId = await resolveOrCreateCustomer(supabase, businessId, {
+    name: input.contactName,
+    email: input.contactEmail,
+    phone: input.contactPhone,
+  });
+
   const { data, error } = await supabase
     .from("appointments")
     .insert({
@@ -455,6 +465,7 @@ export async function createAppointment(supabase: AnySupabaseClient, businessId:
       starts_at: startsAt.toISOString(),
       ends_at: endsAt.toISOString(),
       status: "pending",
+      customer_id: customerId,
     })
     .select()
     .single();
@@ -464,6 +475,10 @@ export async function createAppointment(supabase: AnySupabaseClient, businessId:
     // request between isSlotAvailable's check and this insert.
     if (error.code === "23505") return null;
     throw new AppError("Something went wrong booking this appointment. Please try again.", "createAppointment failed", error);
+  }
+
+  if (customerId && input.conversationId) {
+    await linkConversationToCustomer(supabase, businessId, input.conversationId, customerId);
   }
 
   return data;

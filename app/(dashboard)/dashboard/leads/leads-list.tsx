@@ -1,27 +1,21 @@
 "use client";
 
-import {
-  useActionState,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
 import { StatusSelect } from "./status-select";
-import { bulkUpdateLeadStatusAction, type BulkUpdateStatusState } from "./actions";
+import { assignTagToLeadAction, removeTagFromLeadAction } from "./actions";
 import { LEAD_STATUSES, LEAD_STATUS_LABEL } from "./lead-status";
 import { EmptyState } from "../_components/state-views";
 import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } from "../_components/data-table";
 import { Badge, type BadgeTone } from "../_components/badge";
-import { useToast } from "../_components/toast";
+import { RemovableTagChip } from "../_components/tag-chip";
+import { TagPicker } from "../_components/tag-picker";
 import { channelLabel } from "@/lib/conversation-channel";
 import type { PossibleDuplicateHint } from "@/lib/leads";
-import type { Lead, LeadFollowUpStatus, LeadQualification, LeadStatus } from "@/lib/supabase/types";
+import { MAX_LEAD_SCORE } from "@/lib/lead-scoring";
+import type { Lead, LeadFollowUpStatus, LeadQualification, LeadStatus, LeadTag } from "@/lib/supabase/types";
 
 const FOLLOW_UP_LABEL: Record<LeadFollowUpStatus, string> = {
   sent_email: "Follow-up sent by email",
@@ -43,11 +37,12 @@ const QUALIFICATION_TONE: Record<LeadQualification, BadgeTone> = {
 // a "Show more" that reveals nothing new would just be noise.
 const LONG_TEXT_THRESHOLD = 160;
 
-// hot leads surface first regardless of when they came in; recency
-// breaks ties within a qualification tier so the newest hot lead still
-// leads the newest cold one (/impeccable layout -- same "priority first,
-// then recent" thesis as ConversationsList's flagged-first sort).
-const QUALIFICATION_RANK: Record<LeadQualification, number> = { hot: 0, warm: 1, cold: 2 };
+// Highest-scoring leads surface first regardless of when they came in;
+// recency breaks a tie (/impeccable layout -- same "priority first, then
+// recent" thesis as ConversationsList's flagged-first sort). Phase 27:
+// sorts by the actual numeric `score` now, not just the 3-tier
+// hot/warm/cold bucket -- a lead scoring 6 outranks one scoring 4 even
+// though both are "hot."
 
 type TabId = "all" | LeadStatus;
 const TAB_ORDER: TabId[] = ["all", ...LEAD_STATUSES];
@@ -57,36 +52,27 @@ export function LeadsList({
   interestNameById,
   canEdit,
   possibleDuplicatesByLeadId,
+  tags,
+  tagsByLeadId,
 }: {
   leads: Lead[];
   interestNameById: Record<string, string>;
   canEdit: boolean;
   possibleDuplicatesByLeadId: Record<string, PossibleDuplicateHint[]>;
+  tags: LeadTag[];
+  tagsByLeadId: Record<string, LeadTag[]>;
 }) {
   const [tab, setTab] = useState<TabId>("all");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortState>(null);
-  const selectAllRef = useRef<HTMLInputElement>(null);
+  const [activeTagIds, setActiveTagIds] = useState<Set<string>>(new Set());
   const shouldReduceMotion = useReducedMotion();
 
-  // A selection only ever makes sense against what's currently visible --
-  // clearing it whenever the tab changes means "select all" always means
-  // "all in this view," never a stale cross-tab mix the toolbar can't act
-  // on predictably. Reset during render (React's own pattern for this),
-  // not in an effect, so it takes effect before the first paint of the
-  // new tab instead of flashing the old selection for one frame.
-  const [selectionTab, setSelectionTab] = useState(tab);
-  if (selectionTab !== tab) {
-    setSelectionTab(tab);
-    setSelectedIds(new Set());
-  }
-
-  function toggleSelected(id: string) {
-    setSelectedIds((previous) => {
+  function toggleActiveTag(tagId: string) {
+    setActiveTagIds((previous) => {
       const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
       return next;
     });
   }
@@ -102,8 +88,8 @@ export function LeadsList({
 
   const sortedLeads = useMemo(() => {
     return [...leads].sort((a, b) => {
-      const rankDiff = QUALIFICATION_RANK[a.qualification] - QUALIFICATION_RANK[b.qualification];
-      if (rankDiff !== 0) return rankDiff;
+      const scoreDiff = b.score - a.score;
+      if (scoreDiff !== 0) return scoreDiff;
       if (a.created_at !== b.created_at) return a.created_at > b.created_at ? -1 : 1;
       return a.id > b.id ? -1 : 1;
     });
@@ -115,7 +101,17 @@ export function LeadsList({
     return counts;
   }, [sortedLeads]);
 
-  const displayedLeads = tab === "all" ? sortedLeads : sortedLeads.filter((lead) => lead.status === tab);
+  const statusFilteredLeads = tab === "all" ? sortedLeads : sortedLeads.filter((lead) => lead.status === tab);
+  // Tag filter is "any of" (OR), not "all of" -- matches how the status
+  // tabs and this filter compose: narrowing by status first, then by
+  // whichever active tag pills are toggled on, same "AND across filter
+  // groups, OR within one" convention most tag-filter UIs use.
+  const displayedLeads =
+    activeTagIds.size === 0
+      ? statusFilteredLeads
+      : statusFilteredLeads.filter((lead) =>
+          (tagsByLeadId[lead.id] ?? []).some((tag) => activeTagIds.has(tag.id)),
+        );
   const totalLabel = `${leads.length} lead${leads.length === 1 ? "" : "s"} total`;
 
   // Default order is the qualification-then-recency priority sort above
@@ -127,21 +123,8 @@ export function LeadsList({
     return [...displayedLeads].sort((a, b) => direction * (a.created_at > b.created_at ? 1 : a.created_at < b.created_at ? -1 : 0));
   }, [displayedLeads, sort]);
 
-  const visibleIds = useMemo(() => displayedLeads.map((lead) => lead.id), [displayedLeads]);
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
-  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
-
-  // `indeterminate` has no JSX prop -- it only exists as a live DOM
-  // property, so it has to be set imperatively on every render where the
-  // selection is a partial (neither empty nor complete) match.
-  useEffect(() => {
-    if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = someVisibleSelected && !allVisibleSelected;
-    }
-  }, [someVisibleSelected, allVisibleSelected]);
-
-  const columns = useMemo<DataTableColumn[]>(() => {
-    const base: DataTableColumn[] = [
+  const columns = useMemo<DataTableColumn[]>(
+    () => [
       { key: "prospect", label: "Prospect", width: "1.7fr" },
       { key: "contact", label: "Contact", width: "1.5fr" },
       { key: "interest", label: "Interest", width: "1.3fr" },
@@ -149,9 +132,9 @@ export function LeadsList({
       { key: "source", label: "Source", width: "130px" },
       { key: "created", label: "Created", width: "110px", sortable: true },
       { key: "actions", label: "", width: "70px", align: "right" },
-    ];
-    return canEdit ? [{ key: "select", label: "", width: "36px" }, ...base] : base;
-  }, [canEdit]);
+    ],
+    [],
+  );
 
   // Same WAI-ARIA tabs pattern as ConversationsList: roving tabIndex
   // handles the Tab-key stop, this handles Left/Right so a keyboard user
@@ -204,16 +187,49 @@ export function LeadsList({
         ))}
       </div>
 
+      {tags.length > 0 ? (
+        <div role="group" aria-label="Filter leads by tag" className="flex flex-wrap items-center gap-1.5">
+          {tags.map((tag) => {
+            const active = activeTagIds.has(tag.id);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleActiveTag(tag.id)}
+                className={`rounded-ds-sm transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${active ? "" : "opacity-50 hover:opacity-80"}`}
+              >
+                <Badge tone={tag.color} size="sm">
+                  {tag.name}
+                </Badge>
+              </button>
+            );
+          })}
+          {activeTagIds.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setActiveTagIds(new Set())}
+              className="text-2xs font-medium text-ds-text-muted underline-offset-2 transition-colors hover:text-ds-text-secondary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            >
+              Clear tag filter
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div id="leads-tabpanel" role="tabpanel" aria-labelledby={`leads-tab-${tab}`}>
         {displayedLeads.length === 0 ? (
           <EmptyState
             title={`No ${tab === "all" ? "" : LEAD_STATUS_LABEL[tab as LeadStatus].toLowerCase() + " "}leads`}
             description="Nothing matches this filter right now."
             action={
-              tab !== "all" ? (
+              tab !== "all" || activeTagIds.size > 0 ? (
                 <button
                   type="button"
-                  onClick={() => setTab("all")}
+                  onClick={() => {
+                    setTab("all");
+                    setActiveTagIds(new Set());
+                  }}
                   className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
                 >
                   View all leads
@@ -223,24 +239,6 @@ export function LeadsList({
           />
         ) : (
           <div className="flex flex-col gap-3">
-            {canEdit ? (
-              <div className="flex flex-col gap-2">
-                <label className="flex w-fit items-center gap-2 text-xs text-ds-text-secondary pointer-coarse:min-h-11">
-                  <input
-                    ref={selectAllRef}
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={() => setSelectedIds(allVisibleSelected ? new Set() : new Set(visibleIds))}
-                    className="h-4 w-4 rounded-ds-sm border-ds-border text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                  />
-                  {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select all"}
-                </label>
-                {selectedIds.size > 0 ? (
-                  <BulkActionsBar selectedIds={[...selectedIds]} onCleared={() => setSelectedIds(new Set())} />
-                ) : null}
-              </div>
-            ) : null}
-
             <motion.div
               key={tab}
               initial={shouldReduceMotion ? false : { opacity: 0 }}
@@ -258,12 +256,12 @@ export function LeadsList({
                   <LeadRow
                     lead={lead}
                     canEdit={canEdit}
-                    selected={selectedIds.has(lead.id)}
-                    onToggleSelected={() => toggleSelected(lead.id)}
                     expanded={expandedIds.has(lead.id)}
                     onToggleExpanded={() => toggleExpanded(lead.id)}
                     interestNameById={interestNameById}
                     duplicates={possibleDuplicatesByLeadId[lead.id] ?? []}
+                    allTags={tags}
+                    leadTags={tagsByLeadId[lead.id] ?? []}
                   />
                 )}
               />
@@ -325,49 +323,59 @@ function TabButton({
 function LeadRow({
   lead,
   canEdit,
-  selected,
-  onToggleSelected,
   expanded,
   onToggleExpanded,
   interestNameById,
   duplicates,
+  allTags,
+  leadTags,
 }: {
   lead: Lead;
   canEdit: boolean;
-  selected: boolean;
-  onToggleSelected: () => void;
   expanded: boolean;
   onToggleExpanded: () => void;
   interestNameById: Record<string, string>;
   duplicates: PossibleDuplicateHint[];
+  allTags: LeadTag[];
+  leadTags: LeadTag[];
 }) {
   const detailId = `lead-detail-${lead.id}`;
+  const appliedTagIds = new Set(leadTags.map((tag) => tag.id));
+  const availableTags = allTags.filter((tag) => !appliedTagIds.has(tag.id));
+  const VISIBLE_TAG_CAP = 2;
 
   return (
     <>
       <TableRow>
-        {canEdit ? (
-          <TableCell>
-            <label className="pointer-coarse:flex pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:items-center pointer-coarse:justify-center pointer-coarse:-m-2">
-              <input
-                type="checkbox"
-                aria-label={`Select ${lead.contact_name ?? "this lead"}`}
-                checked={selected}
-                onChange={onToggleSelected}
-                className="h-4 w-4 rounded-ds-sm border-ds-border text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-              />
-            </label>
-          </TableCell>
-        ) : null}
         <TableCell className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="truncate font-medium text-ds-text-primary">{lead.contact_name ?? "Unnamed prospect"}</span>
             <span className="shrink-0">
-              <Badge tone={QUALIFICATION_TONE[lead.qualification]} size="sm" title="AI-assessed signal -- not verified">
+              <Badge
+                tone={QUALIFICATION_TONE[lead.qualification]}
+                size="sm"
+                title={`Score ${lead.score} out of ${MAX_LEAD_SCORE} -- AI-assessed signal, not verified`}
+              >
                 {lead.qualification}
-                <span className="sr-only"> lead — AI-assessed signal, not verified</span>
+                <span className="sr-only">
+                  {" "}
+                  lead, score {lead.score} out of {MAX_LEAD_SCORE} — AI-assessed signal, not verified
+                </span>
               </Badge>
             </span>
+            <span className="shrink-0 text-2xs text-ds-text-muted" aria-hidden="true">
+              {lead.score}/{MAX_LEAD_SCORE}
+            </span>
+            {leadTags.slice(0, VISIBLE_TAG_CAP).map((tag) => (
+              <span key={tag.id} className="shrink-0">
+                <Badge tone={tag.color} size="sm">
+                  {tag.name}
+                </Badge>
+              </span>
+            ))}
+            {leadTags.length > VISIBLE_TAG_CAP ? (
+              <span className="shrink-0 text-2xs text-ds-text-muted">+{leadTags.length - VISIBLE_TAG_CAP}</span>
+            ) : null}
           </div>
         </TableCell>
         <TableCell direction="col" className="gap-0.5 text-xs">
@@ -383,9 +391,12 @@ function LeadRow({
         <TableCell>
           <StatusSelect id={lead.id} status={lead.status} canEdit={canEdit} />
         </TableCell>
-        <TableCell>
+        <TableCell className="min-w-0">
           {lead.source ? (
-            <span className="rounded-ds-sm bg-ds-surface-soft px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary">
+            <span
+              title={lead.source}
+              className="min-w-0 max-w-full truncate rounded-ds-sm bg-ds-surface-soft px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary"
+            >
               {lead.source}
             </span>
           ) : (
@@ -418,6 +429,26 @@ function LeadRow({
       {expanded ? (
         <TableRow>
           <TableCell id={detailId} direction="col" className="col-span-full gap-2 bg-ds-surface-soft">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-medium text-ds-text-secondary">Tags:</span>
+              {leadTags.length === 0 ? <span className="text-xs text-ds-text-muted">None yet</span> : null}
+              {leadTags.map((tag) => (
+                <RemovableTagChip
+                  key={tag.id}
+                  tag={tag}
+                  action={removeTagFromLeadAction}
+                  hiddenFields={{ leadId: lead.id, tagId: tag.id }}
+                  canEdit={canEdit}
+                />
+              ))}
+              {canEdit ? (
+                <TagPicker
+                  availableTags={availableTags}
+                  action={assignTagToLeadAction}
+                  hiddenFields={{ leadId: lead.id }}
+                />
+              ) : null}
+            </div>
             <LeadTextBlock label="AI reasoning" text={lead.qualification_reason} textClassName="text-sm text-ds-text-muted" />
             {lead.notes ? (
               <LeadTextBlock label="Notes" text={lead.notes} textClassName="text-sm text-ds-text-secondary" />
@@ -492,125 +523,6 @@ function LeadTextBlock({
         >
           {expanded ? "Show less" : "Show more"}
         </button>
-      ) : null}
-    </div>
-  );
-}
-
-const initialBulkState: BulkUpdateStatusState = {};
-
-/**
- * Bulk status toolbar for the leads a sales agent has checked (/impeccable
- * critique P2 -- repeating the same one-by-one status pick for many leads
- * felt like the missing piece next to how much StatusSelect had already
- * grown). Every status button is its own tiny `<form action={formAction}>`
- * carrying the same hidden `ids` inputs, matching this codebase's existing
- * one-form-per-action convention (DeleteButton, StatusSelect) rather than
- * reading which of several submit buttons in one form was clicked.
- * "Lost" reuses StatusSelect's own confirm-before-apply gate: bulk-losing
- * N leads at once is higher-stakes than one, not lower. Success feedback
- * is a toast (dashboard-professionalization pass) instead of a hand-rolled
- * inline confirmation/timer -- same information, less bespoke code.
- */
-function BulkActionsBar({ selectedIds, onCleared }: { selectedIds: string[]; onCleared: () => void }) {
-  const [state, formAction, isPending] = useActionState(bulkUpdateLeadStatusAction, initialBulkState);
-  const [confirmingLost, setConfirmingLost] = useState(false);
-  const { toast } = useToast();
-  // What the just-completed dispatch represents -- `state.success` alone
-  // can repeat across two different dispatches with nothing to key a
-  // toast's title off of.
-  const lastChangeRef = useRef<{ status: LeadStatus; count: number } | null>(null);
-
-  useEffect(() => {
-    if (state.success && lastChangeRef.current) {
-      const { status, count } = lastChangeRef.current;
-      toast({
-        title: `${count} lead${count === 1 ? "" : "s"} changed to ${LEAD_STATUS_LABEL[status]}`,
-        variant: "success",
-      });
-      setConfirmingLost(false);
-      onCleared();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>, targetStatus: LeadStatus) {
-    if (targetStatus === "lost" && !confirmingLost) {
-      event.preventDefault();
-      setConfirmingLost(true);
-      return;
-    }
-    lastChangeRef.current = { status: targetStatus, count: selectedIds.length };
-    setConfirmingLost(false);
-  }
-
-  const idInputs = selectedIds.map((id) => <input key={id} type="hidden" name="ids" value={id} />);
-
-  if (confirmingLost) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 rounded-ds-lg border border-ds-border bg-ds-surface-soft px-3 py-2">
-        <span className="text-xs text-ds-text-secondary">
-          Mark {selectedIds.length} lead{selectedIds.length === 1 ? "" : "s"} as lost?
-        </span>
-        <form action={formAction} onSubmit={(event) => handleSubmit(event, "lost")}>
-          {idInputs}
-          <input type="hidden" name="status" value="lost" />
-          <button
-            type="submit"
-            disabled={isPending}
-            autoFocus
-            className="inline-flex items-center rounded-ds-sm bg-ds-danger px-2.5 py-1.5 text-xs font-semibold text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger pointer-coarse:min-h-11 pointer-coarse:px-4"
-          >
-            {isPending ? "Saving…" : "Confirm lost"}
-          </button>
-        </form>
-        <button
-          type="button"
-          onClick={() => setConfirmingLost(false)}
-          disabled={isPending}
-          className="inline-flex items-center rounded-ds-sm px-2.5 py-1.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:px-4"
-        >
-          Cancel
-        </button>
-        {state.error ? (
-          <span role="alert" className="w-full text-xs text-ds-danger">
-            {state.error}
-          </span>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-ds-lg border border-ds-border bg-ds-surface-soft px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-ds-text-secondary">Mark as:</span>
-        {LEAD_STATUSES.map((targetStatus) => (
-          <form key={targetStatus} action={formAction} onSubmit={(event) => handleSubmit(event, targetStatus)}>
-            {idInputs}
-            <input type="hidden" name="status" value={targetStatus} />
-            <button
-              type="submit"
-              disabled={isPending}
-              className="inline-flex items-center rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1.5 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:px-4"
-            >
-              {LEAD_STATUS_LABEL[targetStatus]}
-            </button>
-          </form>
-        ))}
-        <button
-          type="button"
-          onClick={onCleared}
-          disabled={isPending}
-          className="inline-flex items-center rounded-ds-sm px-2.5 py-1.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:px-4"
-        >
-          Clear
-        </button>
-      </div>
-      {state.error ? (
-        <span role="alert" className="text-xs text-ds-danger">
-          {state.error}
-        </span>
       ) : null}
     </div>
   );

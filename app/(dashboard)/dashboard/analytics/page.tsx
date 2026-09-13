@@ -3,13 +3,17 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { countConversationsNeedingAttention } from "@/lib/conversations";
 import {
   getAiResponseMetricsStats,
+  getChannelPerformanceStats,
   getConversationVolumeStats,
   getFunnelRateStats,
+  getFunnelStats,
   getHandoffResponseTimeStats,
   getLeadStats,
   getMessageVolumeStats,
-  getTopSourcePages,
+  getPeriodComparisonStats,
+  getSourcePagePerformance,
   getTopUnansweredQuestions,
+  computeDropOffs,
 } from "@/lib/analytics";
 import { HelpCircle, Globe } from "lucide-react";
 import { KpiTile } from "../_components/kpi-tile";
@@ -18,6 +22,8 @@ import { QualificationDonut } from "../_components/charts/qualification-donut";
 import { chartColors } from "../_components/charts/chart-colors";
 import { InlineEmptyState } from "../_components/state-views";
 import { ExportLeadsCsvButton } from "./export-leads-csv-button";
+import { FunnelChart } from "./funnel-chart";
+import { ChannelPerformanceTable } from "./channel-performance-table";
 
 export default async function AnalyticsPage() {
   const { businessId, businessName } = await requireBusinessContext();
@@ -32,7 +38,11 @@ export default async function AnalyticsPage() {
     funnelRateStats,
     handoffResponseTimeStats,
     topUnansweredQuestions,
-    topSourcePages,
+    sourcePagePerformance,
+    funnelStages,
+    channelPerformance,
+    period7d,
+    period30d,
   ] = await Promise.all([
     getConversationVolumeStats(supabase, businessId),
     getMessageVolumeStats(supabase, businessId),
@@ -42,8 +52,20 @@ export default async function AnalyticsPage() {
     getFunnelRateStats(supabase, businessId),
     getHandoffResponseTimeStats(supabase, businessId),
     getTopUnansweredQuestions(supabase, businessId),
-    getTopSourcePages(supabase, businessId),
+    getSourcePagePerformance(supabase, businessId),
+    getFunnelStats(supabase, businessId),
+    getChannelPerformanceStats(supabase, businessId),
+    getPeriodComparisonStats(supabase, businessId, 7),
+    getPeriodComparisonStats(supabase, businessId, 30),
   ]);
+
+  const dropOffs = computeDropOffs(funnelStages);
+
+  function formatChange(change: number | null): string {
+    if (change === null) return "no prior period to compare";
+    if (change === 0) return "flat vs previous period";
+    return `${change > 0 ? "↑" : "↓"} ${Math.abs(change)}% vs previous period`;
+  }
 
   const conversionRate =
     conversationStats.total === 0 ? 0 : Math.round((leadStats.total / conversationStats.total) * 100);
@@ -134,6 +156,42 @@ export default async function AnalyticsPage() {
         </section>
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <KpiTile
+          label="7-day leads"
+          value={period7d.leads.current}
+          hint={formatChange(period7d.leads.percentChange)}
+          href="/dashboard/leads"
+        />
+        <KpiTile
+          label="30-day leads"
+          value={period30d.leads.current}
+          hint={formatChange(period30d.leads.percentChange)}
+          href="/dashboard/leads"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-medium text-ds-text-primary">Sales funnel</h2>
+            <p className="text-2xs text-ds-text-muted">
+              Conversations → leads → qualified → appointments → completed → converted. &ldquo;Converted&rdquo; is a
+              status your team sets on the Leads page — this app has no automated signal for a closed sale.
+            </p>
+          </div>
+          <FunnelChart stages={funnelStages} dropOffs={dropOffs} />
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-sm font-medium text-ds-text-primary">Channel performance</h2>
+            <p className="text-2xs text-ds-text-muted">Website, WhatsApp, and Instagram, side by side.</p>
+          </div>
+          <ChannelPerformanceTable channels={channelPerformance} />
+        </section>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
           <div className="flex flex-col gap-1">
@@ -165,20 +223,21 @@ export default async function AnalyticsPage() {
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-medium text-ds-text-primary">Top source pages</h2>
             <p className="text-2xs text-ds-text-muted">
-              The pages prospects most often started a chat from.
+              Which pages produce the best prospects, not just the most conversations.
             </p>
           </div>
-          {topSourcePages.length === 0 ? (
+          {sourcePagePerformance.length === 0 ? (
             <InlineEmptyState icon={Globe} label="No page attribution recorded yet." />
           ) : (
             <ol className="flex flex-col gap-2">
-              {topSourcePages.map((item, index) => (
+              {sourcePagePerformance.map((item, index) => (
                 <li key={item.sourceUrl} className="flex items-start justify-between gap-3 text-sm">
                   <span className="truncate text-ds-text-secondary">
                     <span className="text-ds-text-muted">{index + 1}.</span> {item.sourceUrl}
+                    <span className="ml-1 text-2xs text-ds-text-muted">({item.conversations} conversations)</span>
                   </span>
                   <span className="shrink-0 rounded-ds-sm bg-ds-surface-soft px-2 py-0.5 text-2xs font-medium text-ds-text-muted">
-                    {item.count}×
+                    {item.leadRate}% lead conversion
                   </span>
                 </li>
               ))}

@@ -129,6 +129,7 @@ Resolved decision D6 (`STATE.md`). This is the approved lead field specification
 | `interest_id` | optional, nullable | references the specific product/service row when `interest_type` is product/service; no FK constraint (app-enforced, matching Phase 6's precedent) |
 | `notes` | optional | free-text summary of what was discussed |
 | `qualification` | AI-generated | hot / warm / cold, plus a short AI-written reason — always shown as an AI signal, never hidden from or substituted for the human's own judgment; the human can always see the raw conversation and override this |
+| `score` | AI-generated, defaults `0` | the raw numeric point total `qualification`'s bucket is derived from (Phase 27 follow-up) — same untrusted, display-only signal as `qualification`, just finer-grained; used to sort the Leads page more precisely than three tiers allow |
 | `status` | required, defaults `new` | new → contacted → converted / lost |
 | `source` | optional | free text, where the conversation started (e.g. "chat widget", "pricing page") |
 | `requested_callback` | required, defaults `false` | set `true` by the `request_callback` AI tool (Phase 14c) once the prospect has clearly agreed to a callback and given contact info |
@@ -144,6 +145,8 @@ Resolved decision D6 (`STATE.md`). This is the approved lead field specification
 **Stalled-lead follow-up** (user-requested, 2026-09-10): a daily background sweep (`lib/stalled-leads.ts`) finds leads still `new`/`contacted` whose conversation has had no new message in 3 days, drafts one short AI follow-up grounded only in that lead's own captured name/notes/interest (never invents a fact, same discipline as §7's AI behavior contract), and sends it **at most once**. Delivery is email-only today (via the same Resend path as the lead/handoff digest, §Phase 25b) — WhatsApp delivery is deliberately not implemented, because Meta only allows a business-initiated message outside the 24-hour customer-service window through a template pre-approved in Meta Business Manager, which this app has no way to create on a business's behalf. A WhatsApp-only stalled lead is recorded as `blocked_no_whatsapp_template` and shown on the dashboard instead.
 
 **Cross-channel identity hint** (user-requested, 2026-09-10): the leads dashboard shows an informational "possibly the same prospect as…" note when two leads for the same business share a normalized phone or email across different conversations (e.g. a website-chat lead and a WhatsApp lead). This is a **display-only hint** — it links to the other lead's conversation, it never merges data, and `leads.conversation_id` stays required and unique (one lead per conversation) as resolved above.
+
+**Lead tagging / segmentation** (Phase 27, user-requested): a business can define its own free-form tag catalog (`lead_tags` — name + one of Badge's 5 existing tones, no new color system) and apply tags to a lead or to a conversation directly (before it necessarily becomes a lead), any authenticated business member at `org:sales_agent` or above — the same authorization tier as every other lead-mutating action, not the older any-member precedent D7 set before this app's RBAC tiers (Phase 24) existed. The Leads page filters by tag (any-of, composed with the existing status filter) alongside a "Manage tags" catalog editor. The AI can *suggest* tags on demand from a conversation's own transcript (`lib/tag-suggestions.ts`, mirroring the on-demand AI-summary pattern) — a suggestion is display-only and never applied without an explicit staff click, the same untrusted-AI-output discipline as `qualification` below.
 
 **`qualification` (hot/warm/cold + reason) is AI-generated, untrusted, UI/display-only** — the same trust category as Phase 9's `escalate`/`usedContext` fields (`docs/security.md` §8). It must never be the sole gate for whether a human reviews a lead, and the human must always be able to see the full conversation and override it.
 
@@ -216,3 +219,49 @@ Do not build the whole product in one phase. Do not silently implement a future 
 ## 12. What "working" means for v1
 
 The product is minimally viable when a business owner can: sign up, onboard, add products/services/FAQs and some approved knowledge, embed a chat widget, and watch a real prospect conversation produce a correctly-attributed lead in their dashboard — with the AI never answering a business question it has no grounding for, and never surfacing another business's information.
+
+---
+
+## 13. Customer Intelligence (Phase 28)
+
+The product is moving toward **Capture → Understand → Prioritize → Automate → Assist → Measure**. Customer Intelligence is the "Understand" layer, sitting on top of the existing conversations/leads/appointments data — not a second, disconnected CRM.
+
+**Customer identity.** A business-scoped `customers` record aggregates a prospect's conversations, leads, and appointments across channels (website/WhatsApp/Instagram). Matching is **deterministic and conservative only** — exact normalized email or phone equality, the same rule the dashboard's pre-existing "possibly the same prospect" hint already used. There is no fuzzy or AI-assisted identity merging: if a new lead or appointment's contact info doesn't exactly match an existing customer for that business, a new, separate customer profile is created rather than guessed at. A customer only ever gets a `display_name` correction from staff; its identity keys (email/phone) are never directly editable, to avoid staff accidentally merging two different people's data.
+
+**Tags** (Phase 27) are unchanged — a business-scoped catalog applied to leads and/or conversations. A customer's tags are simply the union of its own leads'/conversations' tags; there is no separate customer-level tag-assignment table.
+
+**Lead score** (`lib/lead-scoring.ts`) stays a deterministic function of real, already-captured signals (appointment booked, callback requested, both email and phone given, flagged for human follow-up, a specific product/service named) — never an AI-invented number. Every score now carries an itemized, timestamped breakdown (`lead_score_history`), so a business can see exactly why a lead's score is what it is and how it changed, not just the final number. This is a display-only, deterministic signal, distinct from `qualification_reason`'s free-text explanation.
+
+**Segments** are a business's own saved, declarative rules over customer attributes (score, status, qualification, channel, tag presence/absence, appointment status, contact-info presence, activity recency, needs-attention/human-controlled state) — one top-level AND/OR over a flat condition list, deliberately not a nested rule-builder. A segment is evaluated live against current data every time it's viewed; it does not store static membership.
+
+**Customer profile.** `/dashboard/customers/[id]` shows a customer's contact info, latest lead score/qualification/reasons and score history, tags, and every linked conversation/lead/appointment — each linking back into the existing Conversations/Leads/Appointments pages rather than duplicating them.
+
+Segments and customer identity are designed so a later Campaigns/Broadcasts feature (explicitly not built yet) can consume "segment + customer profile + tags" as its audience-definition layer, without requiring a schema change to this layer.
+
+---
+
+## 14. Automation & Workflow Engine (Phase 29)
+
+A business can define its own **trigger → conditions → steps** workflows over events this product already produces (a lead created, a lead's status or score changing, a tag added/removed, an appointment's status changing, a conversation needing attention or changing hands between AI and a human, or a customer going quiet for a configurable number of hours). Conditions reuse the exact same declarative rule shape as Customer Intelligence's segments — one condition language for the whole product, not two.
+
+A step is either a real action or a delay (wait N minutes/hours/days) — steps run in order, and a wait genuinely pauses the workflow (durably, surviving a restart or deployment) rather than blocking a request. Actions are limited to what this app can already, genuinely do: add/remove a tag, update a lead's status, flag a conversation for attention, assign it to a team member, create an internal sales task, draft (never send) an AI follow-up message, or send an internal or email notification. **Campaigns/Broadcasts sending is explicitly not an action here, and will not be added to this engine without a separate, explicit product decision.**
+
+Every workflow run is logged — which workflow, which trigger, which lead/conversation/customer, its current step, and its status (queued/running/completed/failed/skipped/cancelled) — so a business can always answer "why did (or didn't) this run."
+
+Workflow creation/editing is admin-only; any authenticated business member can view a workflow's definition and its execution history.
+
+---
+
+## 15. AI Sales Copilot (Phase 30)
+
+A "what should I do today?" view (`/dashboard/copilot`) that prioritizes leads/conversations using deterministic, stored signals — lead score, needs-attention state, a pending or imminent appointment, days of silence on an open lead — never an AI's own arbitrary ranking. Each prioritized item carries one recommended next action (never a list of options), and an on-demand, AI-generated sales brief: a short narrative grounded strictly in that customer's own conversation transcript and notes, prefixed by a deterministic (never AI-generated) header of real stored facts.
+
+The Copilot never sends a message, books an appointment, or changes a record on its own — every recommendation and every drafted message is something a staff member reviews and acts on elsewhere. This mirrors the same AI-drafts/human-sends boundary already established for `request_callback`/`book_appointment` and the stalled-lead follow-up draft.
+
+---
+
+## 16. Revenue & Conversion Intelligence (Phase 31)
+
+The Analytics page's funnel (conversations → leads → qualified → appointments → completed → converted) and channel-performance breakdown (website/WhatsApp/Instagram) are calculated entirely from data this app already reliably stores. "Converted" is the same staff-set `leads.status = 'converted'` field the Leads page has always had — a human judgment call, not an automatically inferred event, because no reliable automatic signal for "became a paying customer" exists in this schema. Source-page attribution shows each page's actual lead-conversion rate, not just how many chats it started. Drop-off between funnel stages and period-over-period comparisons (7-day/30-day vs. the prior equivalent period) are both computed only from these same real, stored counts.
+
+Sales-team performance (a leaderboard by team member) is explicitly not built: while conversations can be round-robin assigned to a team member, nothing in this schema links a lead's or appointment's eventual outcome back to whoever was assigned — building one now would imply an accuracy this data doesn't support. This is a recorded future dependency, not an oversight.

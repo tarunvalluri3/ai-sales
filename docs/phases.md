@@ -215,3 +215,39 @@ Reuses Phase 16's WhatsApp architecture (conversation/AI/lead services, webhook 
 When built, reuse the same conversation, AI, and lead services. Do not create a second AI system.
 
 **Exit:** a business connects an Instagram professional account via OAuth, a DM round-trips through the existing AI/escalation pipeline exactly as WhatsApp does, and a forged/expired OAuth state or token is proven to fail closed by a tenant-isolation test.
+
+## Phase 27 — Lead tagging / segmentation
+
+A business-scoped tag catalog (`lead_tags`) applicable to both leads and conversations via two typed join tables (`lead_tag_assignments`, `conversation_tag_assignments`), each with real foreign keys and cascade delete rather than the polymorphic `interest_type`/`interest_id` pattern leads already use elsewhere. A catalog manager (create/rename/delete, `org:sales_agent` minimum) and a tag filter on the Leads page; a tags card on the conversation detail page's info panel, including an on-demand AI tag-suggestion action (never auto-applied — a staff click is required to accept). Tag color reuses the dashboard's existing 5-tone `Badge` vocabulary rather than introducing a new decorative palette (`AGENTS.md` §10: no design system beyond what's already approved).
+
+Also in this phase (a small, separately-migrated follow-up, same session): `leads.score`, the raw numeric point total `lib/lead-scoring.ts`'s `scoreLead()` already computed internally but previously discarded, kept only as the 3-tier hot/warm/cold bucket. Backfilled for existing rows at migration time from already-stored columns; the Leads page now sorts by it directly instead of by the coarser 3-tier rank.
+
+Not in this phase: tag-based bulk actions, tag analytics, and the separate WhatsApp broadcast-messaging idea this was originally paired with (still unscheduled, `STATE.md`).
+
+**Exit:** a lead/conversation can be tagged and untagged from the dashboard, the Leads page filters correctly by tag, and a forged cross-tenant tag assignment (a caller's own `business_id` paired with another business's `lead_id`/`conversation_id`/`tag_id`) is proven to fail closed by a tenant-isolation test.
+
+## Phase 28 — Customer Intelligence foundation
+
+A business-scoped customer/prospect identity (`customers`) that aggregates conversations, leads, and appointments across channels — deterministic, conservative matching only (exact normalized email/phone equality), never fuzzy or AI-merged; if identity can't be confidently resolved, separate profiles are kept. Dynamic segments (`segments`): a declarative rule (one top-level AND/OR over a small allow-listed condition list), evaluated server-side, never a hard-coded switch statement. Itemized, timestamped lead-score reasons/history on top of the existing deterministic `scoreLead()` rubric. A customer profile page linking into the existing Conversations/Leads/Appointments surfaces rather than a disconnected CRM. Tags stay exactly as Phase 27 built them — no third tag-assignment surface.
+
+**Exit:** a customer profile aggregates its own conversations/leads/appointments/tags correctly, a segment's declared rule filters the customer list correctly, and cross-tenant isolation on every new table is proven by pgTAP, not by inspection. **Met 2026-09-14** — see `STATE.md`.
+
+## Phase 29 — Automation & Workflow Engine
+
+Trigger → condition → action workflows over the events this product already has (lead created/updated, score threshold crossed, tag added/removed, segment entered/exited, appointment booked/confirmed/completed/cancelled/no-show, conversation needs attention, human takeover/hand-back, no activity for X hours, status changed). Composable AND/OR conditions, kept intentionally small — no visual logic language. Actions limited to what this app can genuinely execute today (tag, status/score update, internal task, assignment, needs_attention, internal/email notification, AI follow-up draft, request human attention) — no outbound campaign sending. Delay/wait support (minutes/hours/days) reusing the existing `claim_x_for_update_skip_locked` + `next_attempt_at` cron-claim pattern already proven by `whatsapp_outbound_messages`, not a new scheduler. Full execution history (queued/running/completed/failed/skipped/cancelled) with a dashboard view answering "why did/didn't this run."
+
+Do NOT build campaign/broadcast sending in this phase — design the trigger/action API so Campaigns can consume it later.
+
+**Exit:** a trigger fires exactly once per real event (proven idempotent under a repeated cron pass), a delayed action survives a restart, and a forged cross-tenant workflow run is proven to fail closed by a tenant-isolation test. **Met 2026-09-14** — see `STATE.md`. `segment_entered`/`segment_exited` triggers explicitly deferred (recorded as a known limitation, not silently dropped).
+
+## Phase 30 — AI Sales Copilot
+
+A "what should I do today?" workspace: a deterministic priority layer (score, recency, intent, appointment/needs_attention/stalled state) computed before any AI summarization, prioritized next-best-actions, and an on-demand AI-generated sales brief per lead/customer — grounded only in real conversation/lead/appointment/product data, reusing the existing single-shot `getChatModel().invoke()` on-demand pattern (`lib/tag-suggestions.ts`/`lib/conversation-summary.ts`), never a second AI system. One primary recommended action at a time, always a draft the user explicitly sends — the Copilot never sends anything itself. Surfaced in-line on existing Leads/Conversations/Appointments pages, not a duplicated page.
+
+**Exit:** every fact in a generated brief traces to a real stored record, priority ordering is reproducible from the same deterministic inputs, and a lead containing no real budget/contact/objection data never produces a brief claiming one. **Met 2026-09-14** — see `STATE.md`. Leads-page per-row hint explicitly deferred (recorded as a known limitation).
+
+## Phase 31 — Revenue & Conversion Intelligence
+
+Extends the existing `/dashboard/analytics` page (not a replacement): a real sales funnel (conversations → leads → qualified → appointments → completed → converted), channel performance (website/WhatsApp/Instagram), source/page attribution (building on the existing `source_url` data), drop-off analysis between adjacent funnel stages, and period comparison (today/7d/30d/custom). "Converted" is `leads.status = 'converted'` as it already exists today — staff-asserted, not auto-inferred, since no more reliable signal exists in the schema. Sales-team performance only if the existing assignment/attribution data can support it accurately; otherwise explicitly deferred, not faked.
+
+**Exit:** every number is calculated from real stored data (no invented drop-off reasons, no fabricated conversion events), sandbox conversations stay excluded exactly as the existing analytics functions already exclude them, and a business with zero data renders a correct empty/zero state rather than an error. **Met 2026-09-14** — see `STATE.md`. Sales-team performance explicitly deferred (no reliable per-rep outcome attribution exists yet).

@@ -4,6 +4,9 @@ import type { Lead, LeadQualification, LeadStatus } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import type { LeadPersistInput } from "@/lib/schemas/lead";
 import { scoreLead } from "@/lib/lead-scoring";
+import { emailMatchKey, phoneMatchKey } from "@/lib/identity-keys";
+import { resolveOrCreateCustomer, linkConversationToCustomer } from "@/lib/customers";
+import { recordLeadScoreChange } from "@/lib/lead-score-history";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -130,21 +133,6 @@ export async function updateLeadStatus(
   return data.length > 0;
 }
 
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, "");
-}
-
-/** Last-10-digit match key, tolerant of country-code/formatting differences -- an exact match is too strict across a typed number vs. a WhatsApp wa_id. */
-function phoneMatchKey(phone: string): string | null {
-  const digits = digitsOnly(phone);
-  if (digits.length < 7) return null;
-  return digits.length > 10 ? digits.slice(-10) : digits;
-}
-
-function emailMatchKey(email: string): string {
-  return email.trim().toLowerCase();
-}
-
 export type PossibleDuplicateHint = { leadId: string; conversationId: string; channel: string | null };
 
 /**
@@ -202,38 +190,6 @@ export function computePossibleDuplicateLeads(
   return hintsByLeadId;
 }
 
-/**
- * Same contract as updateLeadStatus(), batched into one query for the
- * leads-list bulk toolbar instead of N sequential round-trips. Ids
- * belonging to another business are simply excluded by the `business_id`
- * filter -- the returned count only reflects rows actually updated, so a
- * caller can tell the difference between "everything applied" and
- * "some ids didn't match" without a separate lookup.
- */
-export async function updateLeadStatusBulk(
-  businessId: string,
-  ids: string[],
-  status: LeadStatus,
-): Promise<number> {
-  const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("leads")
-    .update({ status })
-    .eq("business_id", businessId)
-    .in("id", ids)
-    .select("id");
-
-  if (error) {
-    throw new AppError(
-      "Something went wrong updating these leads. Please try again.",
-      "updateLeadStatusBulk failed",
-      error,
-    );
-  }
-
-  return data.length;
-}
-
 const NOTES_MAX_LENGTH = 2000;
 
 /** Shared by `upsertLeadForConversation` below -- appends new notes to a lead's existing notes, truncating to stay within the column's length budget rather than silently dropping the newest note. */
@@ -260,7 +216,17 @@ export type LeadUpsertInput = {
 };
 
 export type LeadUpsertResult =
-  | { success: true; leadId: string; created: boolean; qualification: LeadQualification; qualificationReason: string }
+  | {
+      success: true;
+      leadId: string;
+      created: boolean;
+      qualification: LeadQualification;
+      qualificationReason: string;
+      /** Phase 29: the score just before this write (`null` for a brand-new lead) and just after -- lets a caller detect a threshold crossing for the `lead_score_threshold` workflow trigger without re-deriving it. */
+      previousScore: number | null;
+      newScore: number;
+      customerId: string | null;
+    }
   | { success: false };
 
 /**
@@ -294,7 +260,7 @@ export async function upsertLeadForConversation(
 ): Promise<LeadUpsertResult> {
   const { data: existing, error: lookupError } = await supabase
     .from("leads")
-    .select("id, contact_name, contact_email, contact_phone, notes, requested_callback, appointment_booked")
+    .select("id, contact_name, contact_email, contact_phone, notes, requested_callback, appointment_booked, score")
     .eq("business_id", businessId)
     .eq("conversation_id", conversationId)
     .maybeSingle();
@@ -305,10 +271,11 @@ export async function upsertLeadForConversation(
 
   const requestedCallback = (existing?.requested_callback ?? false) || input.requestedCallback;
   const appointmentBooked = (existing?.appointment_booked ?? false) || input.appointmentBooked;
+  const contactName = existing?.contact_name ?? input.contactName;
   const contactEmail = existing?.contact_email ?? input.contactEmail;
   const contactPhone = existing?.contact_phone ?? input.contactPhone;
 
-  const { qualification, reason: qualificationReason } = scoreLead({
+  const { qualification, reason: qualificationReason, score, reasons } = scoreLead({
     hasEmail: contactEmail !== null,
     hasPhone: contactPhone !== null,
     requestedCallback,
@@ -317,18 +284,30 @@ export async function upsertLeadForConversation(
     interestSpecified: input.interestSpecified,
   });
 
+  // Phase 28: link this lead (and its conversation) to a conservatively
+  // matched customer identity. Never blocks lead persistence on failure
+  // -- resolveOrCreateCustomer never throws, and a lead is strictly more
+  // important to save than its customer linkage.
+  const customerId = await resolveOrCreateCustomer(supabase, businessId, {
+    name: contactName,
+    email: contactEmail,
+    phone: contactPhone,
+  });
+
   if (existing) {
     const { data: updated, error: updateError } = await supabase
       .from("leads")
       .update({
         requested_callback: requestedCallback,
         appointment_booked: appointmentBooked,
-        contact_name: existing.contact_name ?? input.contactName,
+        contact_name: contactName,
         contact_email: contactEmail,
         contact_phone: contactPhone,
         notes: appendNotes(existing.notes, input.notes),
         qualification,
         qualification_reason: qualificationReason,
+        score,
+        customer_id: customerId,
       })
       .eq("id", existing.id)
       .eq("business_id", businessId)
@@ -338,7 +317,23 @@ export async function upsertLeadForConversation(
       return { success: false };
     }
 
-    return { success: true, leadId: existing.id, created: false, qualification, qualificationReason };
+    if (score !== existing.score) {
+      await recordLeadScoreChange(supabase, businessId, existing.id, { score, qualification, reasons });
+    }
+    if (customerId) {
+      await linkConversationToCustomer(supabase, businessId, conversationId, customerId);
+    }
+
+    return {
+      success: true,
+      leadId: existing.id,
+      created: false,
+      qualification,
+      qualificationReason,
+      previousScore: existing.score,
+      newScore: score,
+      customerId,
+    };
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -354,9 +349,11 @@ export async function upsertLeadForConversation(
       notes: input.notes,
       qualification,
       qualification_reason: qualificationReason,
+      score,
       source: input.source,
       requested_callback: requestedCallback,
       appointment_booked: appointmentBooked,
+      customer_id: customerId,
     })
     .select("id")
     .single();
@@ -365,5 +362,19 @@ export async function upsertLeadForConversation(
     return { success: false };
   }
 
-  return { success: true, leadId: inserted.id, created: true, qualification, qualificationReason };
+  await recordLeadScoreChange(supabase, businessId, inserted.id, { score, qualification, reasons });
+  if (customerId) {
+    await linkConversationToCustomer(supabase, businessId, conversationId, customerId);
+  }
+
+  return {
+    success: true,
+    leadId: inserted.id,
+    created: true,
+    qualification,
+    qualificationReason,
+    previousScore: null,
+    newScore: score,
+    customerId,
+  };
 }
