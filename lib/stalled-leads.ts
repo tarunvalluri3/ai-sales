@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getChatModel } from "@/lib/rag";
 import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
+import { INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
 import { SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { logEvent } from "@/lib/logger";
 import type { LeadFollowUpStatus, LeadInterestType } from "@/lib/supabase/types";
@@ -24,6 +25,7 @@ export type StalledLeadSweepResult = {
   checked: number;
   sentEmail: number;
   blockedWhatsapp: number;
+  blockedInstagram: number;
   noChannel: number;
   failed: number;
 };
@@ -70,7 +72,14 @@ type Outcome = "not_stalled" | "skipped" | LeadFollowUpStatus | "failed";
  */
 export async function runStalledLeadFollowUpSweep(): Promise<StalledLeadSweepResult> {
   const supabase = createServiceSupabaseClient();
-  const result: StalledLeadSweepResult = { checked: 0, sentEmail: 0, blockedWhatsapp: 0, noChannel: 0, failed: 0 };
+  const result: StalledLeadSweepResult = {
+    checked: 0,
+    sentEmail: 0,
+    blockedWhatsapp: 0,
+    blockedInstagram: 0,
+    noChannel: 0,
+    failed: 0,
+  };
 
   const { data: candidates, error } = await supabase
     .from("leads")
@@ -95,6 +104,7 @@ export async function runStalledLeadFollowUpSweep(): Promise<StalledLeadSweepRes
       const outcome = await processCandidate(supabase, lead, cutoffMs);
       if (outcome === "sent_email") result.sentEmail++;
       else if (outcome === "blocked_no_whatsapp_template") result.blockedWhatsapp++;
+      else if (outcome === "blocked_no_instagram_window") result.blockedInstagram++;
       else if (outcome === "no_contact_channel") result.noChannel++;
       else if (outcome === "failed") result.failed++;
       // "not_stalled" / "skipped" (sandbox conversation) / "send_failed"
@@ -158,6 +168,17 @@ async function processCandidate(
     await supabase.from("leads").update({ follow_up_status: "blocked_no_whatsapp_template" }).eq("id", lead.id);
     logEvent("stalled_lead_follow_up_blocked", lead.business_id, { leadId: lead.id, reason: "no_whatsapp_template" });
     return "blocked_no_whatsapp_template";
+  }
+
+  // Instagram's constraint isn't the same shape as WhatsApp's -- there is
+  // no pre-approved-template escape hatch at all for Instagram DMs (and
+  // the HUMAN_AGENT 7-day tag is its own, deferred App Review track, per
+  // STATE.md's Phase 26 research), so the accurate framing is the
+  // 24-hour message window closing, not a missing template.
+  if (conversation.source === INSTAGRAM_CONVERSATION_SOURCE) {
+    await supabase.from("leads").update({ follow_up_status: "blocked_no_instagram_window" }).eq("id", lead.id);
+    logEvent("stalled_lead_follow_up_blocked", lead.business_id, { leadId: lead.id, reason: "instagram_window_closed" });
+    return "blocked_no_instagram_window";
   }
 
   await supabase.from("leads").update({ follow_up_status: "no_contact_channel" }).eq("id", lead.id);

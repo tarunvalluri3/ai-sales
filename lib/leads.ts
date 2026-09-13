@@ -7,6 +7,9 @@ import { scoreLead } from "@/lib/lead-scoring";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
+/** Bounds the unpaginated leads-list fetch (dashboard's leads page and the conversations layout both just need "most recent N", never every lead a business has ever had), same reasoning and value as lib/conversations.ts's LIST_LIMIT. */
+const LIST_LIMIT = 300;
+
 /** Creates a lead for a business. `businessId` must come from `requireBusinessContext()`. Input must already be validated (`leadPersistSchema`). */
 export async function createLead(
   businessId: string,
@@ -50,7 +53,8 @@ export async function listLeadsForBusiness(businessId: string): Promise<Lead[]> 
     .from("leads")
     .select("*")
     .eq("business_id", businessId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
 
   if (error) {
     throw new AppError(

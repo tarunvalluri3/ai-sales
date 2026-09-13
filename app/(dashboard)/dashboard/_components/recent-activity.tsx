@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { MessageSquare, Users } from "lucide-react";
 import type { Lead } from "@/lib/supabase/types";
 import type { ConversationWithMessageCount } from "@/lib/conversations";
+import { InlineEmptyState } from "./state-views";
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -34,7 +36,7 @@ export function RecentActivity({
             </Link>
           </div>
           {conversations.length === 0 ? (
-            <p className="text-sm text-ds-text-muted">No conversations yet.</p>
+            <InlineEmptyState icon={MessageSquare} label="No conversations yet." />
           ) : (
             <ul className="flex flex-col gap-1">
               {conversations.map((conversation) => (
@@ -68,7 +70,7 @@ export function RecentActivity({
             </Link>
           </div>
           {leads.length === 0 ? (
-            <p className="text-sm text-ds-text-muted">No leads yet.</p>
+            <InlineEmptyState icon={Users} label="No leads yet." />
           ) : (
             <ul className="flex flex-col gap-1">
               {leads.map((lead) => (

@@ -1,7 +1,9 @@
 "use client";
 
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { BarChart3 } from "lucide-react";
 import { chartColors } from "./chart-colors";
+import { InlineEmptyState } from "../state-views";
 
 const DEFAULT_COLORS = [chartColors.accent, chartColors.success, chartColors.warning, chartColors.danger];
 
@@ -35,7 +37,11 @@ export function BreakdownBarChart({
 }) {
   const total = items.reduce((sum, item) => sum + item.count, 0);
   if (total === 0) {
-    return <p className="text-sm text-ds-text-muted">No data yet.</p>;
+    return (
+      <div className="flex h-40 w-full flex-col">
+        <InlineEmptyState icon={BarChart3} label="No data yet." />
+      </div>
+    );
   }
 
   const data = items.map((item) => ({ name: item.label, value: item.count }));

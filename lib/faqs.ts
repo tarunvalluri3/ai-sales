@@ -34,6 +34,9 @@ export async function getFaq(businessId: string, id: string): Promise<Faq | null
   return data;
 }
 
+/** Bounds the unpaginated FAQs-list fetch, same reasoning and value as lib/conversations.ts's LIST_LIMIT. */
+const LIST_LIMIT = 300;
+
 /** Lists all approved FAQs for a business. `businessId` must come from `requireBusinessContext()`. Excludes unreviewed extractions -- see `listPendingReviewFaqs`. */
 export async function listFaqsForBusiness(businessId: string): Promise<Faq[]> {
   const supabase = createServerSupabaseClient();
@@ -42,7 +45,8 @@ export async function listFaqsForBusiness(businessId: string): Promise<Faq[]> {
     .select("*")
     .eq("business_id", businessId)
     .eq("status", "approved")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(LIST_LIMIT);
 
   if (error) {
     throw new AppError(

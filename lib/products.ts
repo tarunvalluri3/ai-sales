@@ -93,6 +93,9 @@ export async function listProductsByIds(businessId: string, ids: string[]): Prom
   return data;
 }
 
+/** Bounds the unpaginated products-list fetch, same reasoning and value as lib/conversations.ts's LIST_LIMIT. */
+const LIST_LIMIT = 300;
+
 /** Lists all approved products for a business. `businessId` must come from `requireBusinessContext()`. Excludes unreviewed extractions -- see `listPendingReviewProducts`. */
 export async function listProductsForBusiness(businessId: string): Promise<Product[]> {
   const supabase = createServerSupabaseClient();
@@ -101,7 +104,8 @@ export async function listProductsForBusiness(businessId: string): Promise<Produ
     .select("*")
     .eq("business_id", businessId)
     .eq("status", "approved")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(LIST_LIMIT);
 
   if (error) {
     throw new AppError(

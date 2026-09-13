@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { KnowledgeDocument } from "@/lib/supabase/types";
 import { DeleteButton } from "../../_components/delete-button";
 import { EmptyState } from "../../_components/state-views";
+import { Badge } from "../../_components/badge";
+import { DataTable, TableCell, TableRow, type DataTableColumn } from "../../_components/data-table";
 import { IngestionStatusPill, IngestionErrorMessage } from "./ingestion-status-pill";
 import { RetryIngestionButton } from "./retry-ingestion-button";
 import { PublishToggleButton } from "./publish-toggle-button";
@@ -124,6 +126,15 @@ export function KnowledgeList({ documents, canEdit }: { documents: KnowledgeDocu
   }
 
   const selectedCount = selectedIds.size;
+
+  const columns = useMemo<DataTableColumn[]>(() => {
+    const base: DataTableColumn[] = [
+      { key: "document", label: "Document", width: "2.4fr" },
+      { key: "source", label: "Source", width: "100px" },
+      { key: "actions", label: "Actions", width: "170px", align: "right" },
+    ];
+    return canEdit ? [{ key: "select", label: "", width: "36px" }, ...base] : base;
+  }, [canEdit]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -271,17 +282,20 @@ export function KnowledgeList({ documents, canEdit }: { documents: KnowledgeDocu
                 description="Try a different search term or clear the status filter."
               />
             ) : (
-              <ul className="flex flex-col gap-3">
-                {filtered.map((document) => (
+              <DataTable
+                items={filtered}
+                columns={columns}
+                getRowId={(document) => document.id}
+                caption="Knowledge documents"
+                renderRow={(document) => (
                   <KnowledgeRow
-                    key={document.id}
                     document={document}
                     canEdit={canEdit}
                     selected={selectedIds.has(document.id)}
                     onToggleSelected={() => toggleSelected(document.id)}
                   />
-                ))}
-              </ul>
+                )}
+              />
             )}
           </div>
         </>
@@ -315,17 +329,19 @@ function KnowledgeRow({
   const primaryIsEdit = !isFailed && isPublished;
 
   return (
-    <li className="group flex items-center justify-between gap-4 rounded-ds-lg border border-ds-border bg-ds-surface px-4 py-3 transition-colors hover:border-ds-border-strong hover:bg-ds-surface-elevated focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ds-accent">
+    <TableRow>
       {canEdit ? (
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggleSelected}
-          aria-label={`Select ${document.title}`}
-          className="h-4 w-4 shrink-0 rounded-ds-sm border-ds-border accent-ds-accent"
-        />
+        <TableCell>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelected}
+            aria-label={`Select ${document.title}`}
+            className="h-4 w-4 shrink-0 rounded-ds-sm border-ds-border accent-ds-accent"
+          />
+        </TableCell>
       ) : null}
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <TableCell direction="col" className="gap-1">
         <div className="flex items-center gap-2">
           {isLive ? (
             <span
@@ -334,29 +350,28 @@ function KnowledgeRow({
               className="h-2 w-2 shrink-0 rounded-full bg-ds-success"
             />
           ) : null}
-          <p className="truncate font-medium text-ds-text-primary">{document.title}</p>
+          <span className="truncate font-medium text-ds-text-primary">{document.title}</span>
           <IngestionStatusPill status={document.ingestion_status} />
-          <span
-            className={`rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase transition-colors ${
-              isPublished ? "bg-ds-success-bg text-ds-success" : "bg-ds-surface-soft text-ds-text-muted"
-            }`}
-          >
+          <Badge tone={isPublished ? "success" : "muted"} size="sm">
             {document.status}
-          </span>
-          <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-            {SOURCE_LABEL[document.source_type] ?? document.source_type}
-          </span>
+          </Badge>
         </div>
-        <p className="line-clamp-2 text-sm text-ds-text-secondary">{document.content}</p>
+        <span className="line-clamp-2 text-sm text-ds-text-secondary">{document.content}</span>
         {isFailed ? <IngestionErrorMessage lastError={document.ingestion_last_error} /> : null}
         {document.source_type === "url" && document.source_url ? (
-          <p className="truncate text-xs text-ds-text-muted">
+          <span className="truncate text-xs text-ds-text-muted">
             {document.source_url}
             {document.refresh_interval_hours ? ` · Auto-refreshes every ${document.refresh_interval_hours}h` : ""}
-          </p>
+          </span>
         ) : null}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
+      </TableCell>
+      <TableCell>
+        <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
+          {SOURCE_LABEL[document.source_type] ?? document.source_type}
+        </span>
+      </TableCell>
+      <TableCell align="right">
+        <div className="flex shrink-0 items-center gap-2">
         {primaryIsRetry ? (
           <RetryIngestionButton action={retryIngestionAction} id={document.id} canEdit={canEdit} />
         ) : primaryIsPublish ? (
@@ -419,7 +434,8 @@ function KnowledgeRow({
             }
           />
         </RowActionsMenu>
-      </div>
-    </li>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }

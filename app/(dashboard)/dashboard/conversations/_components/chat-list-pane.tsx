@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { RefreshCw } from "lucide-react";
 import { pollConversationsAction, type ConversationLeadSummary } from "../actions";
 import { EmptyState } from "../../_components/state-views";
 import { Badge } from "../../_components/badge";
@@ -20,6 +21,14 @@ import type { LastMessagePreview } from "@/lib/messages";
 const POLL_INTERVAL_INDEX_MS = 1000;
 const POLL_INTERVAL_DETAIL_MS = 4000;
 const INDEX_PATH = "/dashboard/conversations";
+
+// A single dropped poll is deliberately invisible (see the catch block
+// below) -- flashing an error for one blip that resolves itself on the
+// very next tick would be noisier than helpful. This threshold instead
+// catches the case a single-poll tolerance can't: the endpoint staying
+// down, where the list would otherwise look fine forever with zero
+// indication anything's wrong.
+const STALE_FAILURE_THRESHOLD = 3;
 
 function toLeadMap(leads: ConversationLeadSummary[]): Map<string, string | null> {
   return new Map(leads.map((lead) => [lead.conversationId, lead.contactName]));
@@ -56,10 +65,12 @@ export function ChatListPane({
   );
   const [attentionOnly, setAttentionOnly] = useState(false);
   const [channelFilter, setChannelFilter] = useState<string>("all");
+  const [isStale, setIsStale] = useState(false);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
   const pollRef = useRef<() => Promise<void>>(async () => {});
+  const consecutiveFailuresRef = useRef(0);
   // Depends on `pathname` so the *next* scheduled tick always uses the
   // interval for whichever route is current -- switching between the
   // index and a specific conversation re-runs the mount effect below
@@ -76,12 +87,20 @@ export function ChatListPane({
     try {
       const result = await pollConversationsAction();
       if (!isMountedRef.current) return;
+      consecutiveFailuresRef.current = 0;
+      setIsStale(false);
       setConversations(result.conversations);
       setLeadByConversationId(toLeadMap(result.leads));
       setLastMessageByConversationId(toLastMessageMap(result.lastMessages));
     } catch {
-      // A poll failure is invisible to the user -- keep the last-known
-      // list and try again on the next tick.
+      // A single dropped poll is still invisible -- keep the last-known
+      // list and try again on the next tick, no flash for one blip. Only
+      // STALE_FAILURE_THRESHOLD consecutive failures surface the
+      // "Updates paused" notice below.
+      consecutiveFailuresRef.current += 1;
+      if (isMountedRef.current && consecutiveFailuresRef.current >= STALE_FAILURE_THRESHOLD) {
+        setIsStale(true);
+      }
     }
 
     if (!isMountedRef.current) return;
@@ -156,7 +175,15 @@ export function ChatListPane({
       className={`${showOnMobile ? "flex" : "hidden"} sticky top-0 h-screen w-full shrink-0 flex-col self-start overflow-hidden border-r border-ds-border bg-ds-surface md:flex md:w-80`}
     >
       <div className="flex shrink-0 flex-col gap-2 border-b border-ds-border p-3">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Conversations</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-ds-text-primary">Conversations</h2>
+          {isStale ? (
+            <p className="flex items-center gap-1 text-2xs text-ds-warning" role="status">
+              <RefreshCw className="size-3 animate-spin" aria-hidden="true" />
+              Updates paused — retrying…
+            </p>
+          ) : null}
+        </div>
         {conversations.length > 0 ? (
           <>
             <div className="flex flex-wrap gap-1.5">

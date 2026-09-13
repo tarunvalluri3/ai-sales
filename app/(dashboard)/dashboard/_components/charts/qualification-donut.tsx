@@ -1,7 +1,9 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart as PieChartIcon } from "lucide-react";
 import { chartColors } from "./chart-colors";
+import { InlineEmptyState } from "../state-views";
 
 const SEGMENT_COLOR: Record<"hot" | "warm" | "cold", string> = {
   hot: chartColors.danger,
@@ -38,7 +40,11 @@ export function QualificationDonut({
   const total = byQualification.hot + byQualification.warm + byQualification.cold;
 
   if (total === 0) {
-    return <p className="text-sm text-ds-text-muted">No leads yet.</p>;
+    return (
+      <div className="flex h-40 w-full flex-col">
+        <InlineEmptyState icon={PieChartIcon} label="No leads yet." />
+      </div>
+    );
   }
 
   const data = (["hot", "warm", "cold"] as const)

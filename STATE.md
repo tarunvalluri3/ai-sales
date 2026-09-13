@@ -2,7 +2,111 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-09-13 (Phase 26 follow-up #5: fixed human-takeover staff replies never reaching Instagram -- see the entry immediately below.)
+Last updated: 2026-09-13 (Codebase gap sweep, Phase F: accessibility pass -- see the entry immediately below. This closes the sweep's planned phases; see the summary note right after this entry.)
+
+---
+
+## Codebase gap sweep (Phase F — accessibility pass) — 2026-09-13
+
+Sixth and final phase of the sweep started in Phase A above. Important caveat, stated plainly rather than glossed over: this environment has no browser, so this was a **code-level** review (markup, ARIA, focus-management logic) plus spot-checks against patterns already proven elsewhere in this codebase -- not an actual live keyboard-only or screen-reader pass. That still needs a human (or a real browser-driving tool) to execute; Phase 25's original exit criterion isn't fully closed by this entry.
+
+**Real bug found and fixed**: `row-actions-menu.tsx` (the Knowledge page's overflow menu, and the component every `variant="menuitem"` action button is designed for) opened with no focus management at all -- a keyboard user activating the trigger had no focus placed inside the menu, and Escape closed it but left focus dropped on the document body instead of returning to the trigger. Fixed by reusing `use-focus-trap.ts` -- the same shared hook `MobileNav` already established for "every dialog-like overlay in this app" (its own doc-comment's words) -- rather than writing a one-off reimplementation. Now: opening the menu moves focus to its first item and traps Tab/Shift+Tab inside it (matching `MobileNav`'s existing, working pattern exactly); Escape still closes it and now also returns focus to the trigger button.
+
+**Spot-checked and found already correct, not re-fixed**: `LeadRow`'s expand/collapse toggle (real `<button>`, `aria-expanded`/`aria-controls`/`aria-label`, keyboard-operable natively), `ControlToggle` (real `<button type="submit">` with descriptive text, no icon-only ambiguity), `StatusSelect` (native `<select>` with `aria-label="Lead status"`), `DataTable`'s sortable column headers (native `<button>`, `aria-sort` set correctly), `MobileNav` itself (already had the focus-trap treatment `RowActionsMenu` was missing). Confirms the earlier gap-sweep audit's own finding that this codebase's fundamentals here are generally solid -- the one real gap was the specific overlay that predated `use-focus-trap.ts`'s introduction and was never retrofitted onto it.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile.
+
+**Not done, honestly flagged rather than claimed**: an actual keyboard-only click-through and a real screen-reader pass, across the dashboard including the six pages Phase E just changed the markup of. This needs the user (or a tool with real browser control) to execute -- Phase 25's exit criterion stays open until that happens.
+
+---
+
+## Codebase gap sweep — summary, all six planned phases complete — 2026-09-13
+
+Started from the user asking for a systematic sweep after finding one real bug by hand (human-takeover replies never reaching Instagram). Three parallel Explore agents (channel parity, performance, UI/UX+code-quality) surfaced findings; every material one was independently verified against source before any fix, per the approved plan (`i-want-you-to-quirky-lobster.md` in this session's plan directory). Real bugs fixed: appointment notifications missing on Instagram (A1), sequential tool-call latency in the RAG loop (A2), a stale doc claim (A3), Instagram stalled-lead follow-up mislabeling (Phase C), staff-reply human-takeover missing on Instagram (fixed earlier this session, the bug that triggered the whole sweep), and a focus-management gap in the Knowledge overflow menu (Phase F). Performance: four unbounded list queries bounded, a real `min-w-max` horizontal-scroll bug fixed (Phase B). UI/UX: a silently-stale-forever poll-failure gap closed, Badge component adopted consistently, inline empty states added, five pages retrofitted onto the shared DataTable, one page (Widget Keys) deliberately left alone after investigation confirmed it's genuinely card-shaped content (Phases D/E). Investigated and correctly left alone, not fixed: the HNSW vector index (still premature at 137 rows), Instagram's `waFallbackPhone` non-gap, already-working response caching/operational-table cleanup.
+
+**All of it was implemented and committed locally during an extended GitHub outage this session** (`github.com` unreachable for over an hour, confirmed via direct `curl`, general internet unaffected) -- every phase still ran through the full local check gate (`lint`/`tsc`/`build`, migration applied live via `supabase db push --linked` for Phase C) before being committed, just not yet pushed/PR'd/merged through the usual CI-gated flow. **This is the one loose end**: once connectivity returns, every commit on the `gap-sweep/phase-a-bugs` branch needs to actually go through `git push` → PR → `build-and-test` CI → merge, the same gate every other change this session went through -- nothing here is actually live in production yet despite being fully implemented and locally verified.
+
+**Next logical task**: push the branch, open the PR(s), let CI run, merge -- then the manual UI click-through and accessibility pass Phases D/E/F both still need a human to actually perform.
+
+## Codebase gap sweep (Phase E — DataTable retrofit) — 2026-09-13
+
+Fifth phase of the sweep started in Phase A above -- the largest single item in the plan. Products, Services, FAQs, Webhooks, and Knowledge all moved from hand-rolled `<ul><li>` card lists to the shared, sortable/paginated `DataTable` (`_components/data-table.tsx`) already used by Leads/Appointments. Each got a new client component (`products-list.tsx`, `services-list.tsx`, `faqs-list.tsx`, `webhook-endpoint-list.tsx` rewritten in place, `knowledge-list.tsx` rewritten in place) following the exact split already established: `page.tsx` stays a server component fetching data, the new file owns sort/pagination chrome, same pattern as `AppointmentsTable`/`LeadsList`.
+
+**Products/Services**: name (sortable) + price + actions (Edit/Delete) columns. **FAQs**: question (sortable) + answer + actions. **Webhooks**: endpoint URL + secret-reveal + created date + delete, with each row keeping its own `useActionState` for delete exactly as before (`WebhookEndpointRow` is a real component, not a hook-in-a-loop) -- a row's delete error now renders as a second, full-width `TableRow` directly beneath it, the same "main row + detail row" `Fragment` shape `LeadRow` already established for its own expandable row. **Knowledge** was the most involved: preserved the live-status dot, `IngestionStatusPill`, the primary-action-varies-by-state logic (Retry/Publish/Edit), the `RowActionsMenu` overflow menu, bulk-select checkboxes, search/filter tabs, and bulk publish/delete -- none of that logic changed, only the row's markup moved from `<li>` to `TableRow`/`TableCell`s. Also swapped its ad-hoc published/draft status `<span>` onto the shared `Badge` component while already touching that line (same D2 pattern, found in passing).
+
+**Widget Keys deliberately NOT retrofitted** -- investigated, not just skipped. Unlike the other five, each widget-key entry embeds its own multi-field edit form (a nickname input, an origins textarea, save/revoke buttons) -- fundamentally card-shaped content, not tabular data that happens to be rendered as `<li>`s. Forcing it into `DataTable`'s fixed-column grid-cell model would have been a real UX regression, not an improvement -- left as its existing card layout.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass (hit and fixed one real TS quirk: a destructured prop named the same as an imported action, e.g. `deleteProductAction: typeof deleteProductAction`, self-shadows in its own type position -- fixed by aliasing the type-only import, e.g. `import type { deleteProductAction as DeleteProductAction }`, across all five new files). `npm run build` -- pass, all 40 routes compile. Visual verification still pending a manual click-through by the user, same as Phase D.
+
+**Next logical task**: Phase F (accessibility pass), per the approved plan -- the last phase queued this session.
+
+---
+
+## Codebase gap sweep (Phase D — UI/UX quick wins) — 2026-09-13
+
+Fourth phase of the sweep started in Phase A above.
+
+**D1 — silently-stale conversation inbox**: `chat-list-pane.tsx` and `live-conversation-panel.tsx`'s poll loops already deliberately treat a single dropped poll as invisible (correct -- flashing an error for one blip that resolves next tick would be noisier than helpful), but had no ceiling: if the endpoint stayed down, the UI looked fine forever with zero indication. Both now track consecutive failures via a ref and, past `STALE_FAILURE_THRESHOLD` (3), show a small inline "Updates paused — retrying…" notice next to the pane/panel heading; cleared immediately on the next successful poll.
+
+**D2 — Badge component retrofit**: WhatsApp's connection-status pill, Leads' qualification pill, and Appointments' status pill all still used ad-hoc `<span className={...}>` instead of the shared `Badge` component already used by Instagram's equivalent view (the exact drift `badge.tsx`'s own doc-comment already flagged). All three swapped to `<Badge tone={...}>`, mapping each page's existing status→color logic onto `Badge`'s `tone` prop. Purely visual.
+
+**D3 — bare-text empty states**: Analytics' "top unanswered questions"/"top source pages", dashboard-home's "recent conversations"/"recent leads", and both chart components' (`QualificationDonut`, `BreakdownBarChart`) zero-data states all rendered plain `<p>No … yet.</p>`. Investigated before fixing: unlike the full-page list empty states (Leads/FAQs/etc.) that use the bordered `EmptyState` card, every one of these six lives *already inside* its own bordered card/section -- wrapping in `EmptyState` (which owns its own dashed-border card) would have double-bordered rather than improved anything. Added a new, lighter `InlineEmptyState` (icon + muted label, no border, sized to its slot) to `state-views.tsx` instead, and wired it into all six spots with a contextually appropriate icon each.
+
+**D4 — `leads/page.tsx`**: added the missing `gap-8` every sibling top-level page uses.
+
+**Also found and fixed while in this code** (not originally in the sweep's list, same shape of drift as D2): `leads-list.tsx` had its own inline `channelLabel()`/`CHANNEL_LABEL` duplicate of the shared `lib/conversation-channel.ts` helper -- and its local copy was missing the `instagram` entry entirely (would have shown the raw `"instagram"` string instead of "Instagram" in the duplicate-lead hint). Replaced with the shared import.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile. Visual verification is still pending a manual click-through by the user (this environment can't run a browser) -- flagged, not yet done.
+
+**Next logical task**: Phase E (DataTable retrofit for Products/Services/FAQs/Webhooks/Knowledge/Widget Keys) and Phase F (accessibility pass), per the approved plan.
+
+---
+
+## Codebase gap sweep (Phase C — Instagram stalled-lead status) — 2026-09-13
+
+Third phase of the sweep started in Phase A above. An Instagram-sourced stalled lead with no email was falling through to the generic `no_contact_channel` follow-up status -- functionally correct (no send is attempted either way) but less accurate than WhatsApp's specific `blocked_no_whatsapp_template` label, and for a reason that isn't the same shape as WhatsApp's: per Phase 26's own research (further up this file), Instagram has no pre-approved-template escape hatch at all, and no `HUMAN_AGENT` 7-day tag (its own, separately-deferred App Review track) -- so "no template" would misdescribe the real constraint, which is Instagram's 24-hour message window closing with no bypass this app has built.
+
+**Migration** `supabase/migrations/20260913000000_add_instagram_stalled_lead_status.sql`, applied live via `npx supabase db push --linked`: extends `leads.follow_up_status`'s closed-list check constraint (confirmed the actual constraint name first via `pg_get_constraintdef` rather than assuming Postgres's default naming) with `'blocked_no_instagram_window'`.
+
+**Code**: `lib/stalled-leads.ts`'s `processCandidate()` gets a matching `INSTAGRAM_CONVERSATION_SOURCE` branch next to the existing WhatsApp one; `StalledLeadSweepResult` gets a new `blockedInstagram` counter (the cron route just spreads this whole object into its JSON response, so the new field is additive/safe). `lib/supabase/types.ts`'s `LeadFollowUpStatus` and `leads-list.tsx`'s `FOLLOW_UP_LABEL` map both updated to match.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass. Migration verified live (constraint definition re-queried post-push, confirmed the new value is present). `npm test`'s pgTAP suite deliberately not run locally against secrets -- left to CI's existing staging-database run, same as every other schema change this session.
+
+**Next logical task**: Phase D (UI/UX quick wins) through Phase F (accessibility pass), per the approved plan.
+
+---
+
+## Codebase gap sweep (Phase B — performance) — 2026-09-13
+
+Second phase of the sweep started in Phase A above (same session, same plan file). All small, mechanical, mirror an existing precedent already established elsewhere in this codebase.
+
+**`listLeadsForBusiness`/`listProductsForBusiness`/`listServicesForBusiness`/`listFaqsForBusiness`** (`lib/leads.ts`, `lib/products.ts`, `lib/services.ts`, `lib/faqs.ts`) were all unbounded -- fetched every row a business has ever had, no `.limit()`. `listLeadsForBusiness` was already flagged as open in an earlier STATE.md entry; the other three are lower severity today (small catalogs) but same shape. Fixed by mirroring `listConversationsForBusiness`'s existing `LIST_LIMIT = 300` + `.limit()` pattern (`lib/conversations.ts:90,110`) exactly -- same value, same "no pagination UI needed yet at this scale" reasoning already established for conversations.
+
+**`data-table.tsx`'s `min-w-max` bug** (`app/(dashboard)/dashboard/_components/data-table.tsx`): already root-caused in an earlier STATE.md entry -- `min-w-max` forces `min-width: max-content` on the grid, defeating its own `fr`-based column sizing and causing unnecessary horizontal scroll on Leads/Appointments (the two pages already using `DataTable`) even on viewports wide enough to fit. Removed; `overflow-x-auto` alone still covers genuinely-narrow viewports. Fixes every current and future `DataTable` consumer at once, including the pages Phase E will retrofit onto it.
+
+**Checked, not fixed (correctly left alone)**: the HNSW vector index remains deferred, per Phase A's entry above -- not re-litigated here.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile.
+
+**Next logical task**: Phase C (Instagram stalled-lead follow-up status accuracy -- needs a migration) through Phase F (accessibility pass), per the approved plan.
+
+---
+
+## Codebase gap sweep (Phase A — real bugs) — 2026-09-13
+
+User asked for a systematic sweep of the whole codebase for gaps of the same shape as the human-takeover bug (follow-up #5), plus performance and UI/UX, through Phase 26. Three parallel Explore agents covered channel parity, performance, and UI/UX/code-quality; every material finding was then verified directly against source before any fix. Full findings and the phased plan live in the approved plan file from this session (`i-want-you-to-quirky-lobster.md`) -- this entry covers Phase A only, the three highest-confidence real bugs. Later phases (performance, Instagram stalled-lead label, UI/UX quick wins, DataTable retrofit, accessibility pass) will get their own STATE.md entries as they ship.
+
+**A1 -- `lib/appointment-notifications.ts`**: `notifyAppointmentStatusChange()` had the exact same shape of bug as follow-up #5 -- its outbound-reply branch only checked `WHATSAPP_CONVERSATION_SOURCE`, so an Instagram-sourced prospect with no email got zero notification when staff confirmed/declined/cancelled their appointment. Fixed by adding a matching Instagram branch, mirroring the WhatsApp one exactly (`getInstagramConnectionForBusiness` + `createInstagramOutboundMessage` + `sendInstagramOutboundMessage`).
+
+**A2 -- `lib/rag.ts`'s tool-call loop**: multiple tool calls within one Gemini turn were executed sequentially (`for` + `await`) even though a turn's tool calls can never depend on each other's results (the model generates all of a turn's args before seeing any result). Changed to `Promise.all`, with results applied back in original array order afterward (not completion order) to preserve identical `recommendedProducts`/`additionalSourceChunkIds`/`calledSideEffectingTool` semantics to the old sequential version. Reduces chat latency on any turn with 2+ tool calls -- exactly the pattern the system prompt's own "capability chaining" instruction encourages (recommend → check-slots → book).
+
+**A3 -- `docs/phases.md`**: corrected the stale Phase 26 claim that "Development Mode plus an Instagram Tester account allows full end-to-end testing before [App Review] lands" -- live-contradicted this session (follow-up #2/#3: zero webhook delivery in Development mode regardless of Tester status; Live mode itself requires App Review already approved for Advanced Access, or just the basic app checklist for Standard-Access-only self-testing). Rewritten to describe the two separate real gates (Development/Live mode vs. Standard/Advanced Access).
+
+**Not fixed, investigated and confirmed correctly deferred**: the HNSW vector index on `knowledge_chunks`/`products`/`services` is still commented out by original Phase 7 design ("create it when data volume justifies it, not reflexively"). Live-checked this session: 137 knowledge_chunks rows, 1 product, 15 services -- nowhere near ANN-index territory (sequential scan is sub-millisecond at this size). Left alone; revisit only once real production knowledge volume exists, not on a schedule.
+
+**Checks**: `npm run lint` -- pass. `npx tsc --noEmit` -- pass. `npm run build` -- pass, all 40 routes compile.
+
+**Next logical task**: Phase B (performance: unbounded `listLeadsForBusiness`/products/services/FAQs queries, `DataTable`'s `min-w-max` bug) through Phase F (accessibility pass), per the approved plan -- all still queued this session.
 
 ---
 

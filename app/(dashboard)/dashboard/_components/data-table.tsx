@@ -79,7 +79,12 @@ export function DataTable<T>({
   return (
     <div className="flex flex-col gap-2">
       <div className="overflow-x-auto rounded-ds-lg border border-ds-border">
-        <div role="table" aria-label={caption} className="grid min-w-max" style={{ gridTemplateColumns }}>
+        {/* No min-w-max here: it forces min-width:max-content, which
+            defeats the fr-based column sizing above and forces horizontal
+            scroll even on a viewport wide enough for the grid to shrink to
+            fit. overflow-x-auto alone still covers genuinely-too-narrow
+            viewports. */}
+        <div role="table" aria-label={caption} className="grid" style={{ gridTemplateColumns }}>
           <div role="row" className="contents">
             {columns.map((column) => {
               const isSortable = Boolean(column.sortable && onSortChange);
