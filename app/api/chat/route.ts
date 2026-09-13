@@ -15,6 +15,7 @@ import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 import { logEvent } from "@/lib/logger";
+import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -245,6 +246,14 @@ export async function POST(request: NextRequest) {
       // silence the AI before a human is actually watching.
       await flagConversationNeedsAttention(supabase, business.businessId, conversation.id, business.clerkOrgId);
       logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
+
+      await dispatchWorkflowTrigger(supabase, business.businessId, "conversation_needs_attention", {
+        type: "conversation",
+        id: conversation.id,
+        customerId: conversation.customer_id,
+        leadId: null,
+        conversationId: conversation.id,
+      });
     }
 
     return withCors(

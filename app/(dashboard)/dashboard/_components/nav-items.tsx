@@ -7,14 +7,17 @@ import {
   Camera,
   CircleHelp,
   Clock,
+  Contact,
   LayoutDashboard,
   MessageCircle,
   MessageSquareText,
   MessagesSquare,
   Package,
   ScrollText,
+  Sparkles,
   Users,
   Webhook,
+  Workflow,
   Wrench,
 } from "lucide-react";
 
@@ -45,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Conversations", href: "/dashboard/conversations", icon: MessagesSquare },
       { label: "Leads", href: "/dashboard/leads", icon: Users },
       { label: "Appointments", href: "/dashboard/appointments", icon: CalendarCheck },
+      { label: "Customers", href: "/dashboard/customers", icon: Contact },
     ],
   },
   {
@@ -54,6 +58,10 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "WhatsApp", href: "/dashboard/whatsapp", icon: MessageCircle },
       { label: "Instagram", href: "/dashboard/instagram", icon: Camera },
     ],
+  },
+  {
+    label: "Automate",
+    items: [{ label: "Workflows", href: "/dashboard/workflows", icon: Workflow }],
   },
   {
     label: "Knowledge Base",
@@ -66,7 +74,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Insights",
-    items: [{ label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 }],
+    items: [
+      { label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+      { label: "Sales Copilot", href: "/dashboard/copilot", icon: Sparkles },
+    ],
   },
   {
     label: "Settings",

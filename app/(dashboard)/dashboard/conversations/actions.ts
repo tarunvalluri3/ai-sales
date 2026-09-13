@@ -21,13 +21,18 @@ import {
 } from "@/lib/messages";
 import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
 import { generateConversationSummary } from "@/lib/conversation-summary";
+import { suggestTagsForConversation } from "@/lib/tag-suggestions";
+import { assignTagToConversation, removeTagFromConversation, getOrCreateTagByName } from "@/lib/lead-tags";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
-import type { ConversationControl, Message } from "@/lib/supabase/types";
+import type { TagState } from "../leads/actions";
+import type { RemoveTagState } from "../_components/tag-chip";
+import type { ConversationControl, LeadTag, Message } from "@/lib/supabase/types";
 import { getWhatsappConnectionForBusiness, WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { createWhatsappOutboundMessage, sendWhatsappOutboundMessage } from "@/lib/whatsapp-delivery";
 import { getInstagramConnectionForBusiness, INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
 import { createInstagramOutboundMessage, sendInstagramOutboundMessage } from "@/lib/instagram-delivery";
+import { dispatchWorkflowTrigger, resolveWorkflowTargetFromConversation } from "@/lib/workflow-engine";
 
 const setControlSchema = z.object({
   id: z.string().uuid(),
@@ -80,6 +85,11 @@ export async function setConversationControlAction(
   await recordAuditLogEntry(businessId, userId, "conversation.control_changed", "conversation", parsed.data.id, {
     control: parsed.data.control,
   });
+
+  const target = await resolveWorkflowTargetFromConversation(supabase, businessId, parsed.data.id);
+  if (target) {
+    await dispatchWorkflowTrigger(supabase, businessId, parsed.data.control === "human" ? "human_takeover" : "ai_handback", target);
+  }
 
   return { success: true };
 }
@@ -414,6 +424,176 @@ export async function generateConversationSummaryAction(
       return { error: "This conversation has no messages to summarize yet." };
     }
     return { summary: result.summary, messageCount: result.messageCount, generatedAt: result.generatedAt };
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+}
+
+// --- Phase 27: lead tagging / segmentation (conversation side) ---
+
+const conversationTagAssignmentSchema = z.object({
+  conversationId: z.string().uuid(),
+  tagId: z.string().uuid(),
+});
+
+/** org:sales_agent minimum -- same tier as every other conversation mutation on this page (control toggle, staff reply, dismiss attention). */
+export async function assignTagToConversationAction(_prevState: TagState, formData: FormData): Promise<TagState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:sales_agent");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = conversationTagAssignmentSchema.safeParse({
+    conversationId: formData.get("conversationId"),
+    tagId: formData.get("tagId"),
+  });
+  if (!parsed.success) {
+    return { error: "Invalid request." };
+  }
+
+  try {
+    await assignTagToConversation(businessId, parsed.data.conversationId, parsed.data.tagId);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const target = await resolveWorkflowTargetFromConversation(supabase, businessId, parsed.data.conversationId);
+  if (target) {
+    await dispatchWorkflowTrigger(supabase, businessId, "tag_added", target, { tagId: parsed.data.tagId });
+  }
+
+  return { success: true };
+}
+
+export async function removeTagFromConversationAction(
+  _prevState: RemoveTagState,
+  formData: FormData,
+): Promise<RemoveTagState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:sales_agent");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = conversationTagAssignmentSchema.safeParse({
+    conversationId: formData.get("conversationId"),
+    tagId: formData.get("tagId"),
+  });
+  if (!parsed.success) {
+    return { error: "Invalid request." };
+  }
+
+  try {
+    await removeTagFromConversation(businessId, parsed.data.conversationId, parsed.data.tagId);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const target = await resolveWorkflowTargetFromConversation(supabase, businessId, parsed.data.conversationId);
+  if (target) {
+    await dispatchWorkflowTrigger(supabase, businessId, "tag_removed", target, { tagId: parsed.data.tagId });
+  }
+
+  return { success: true };
+}
+
+const acceptSuggestionSchema = z.object({
+  conversationId: z.string().uuid(),
+  name: z.string().trim().min(1).max(40),
+});
+
+export type AcceptTagSuggestionState = {
+  error?: string;
+  tag?: LeadTag;
+};
+
+/**
+ * Accepts one AI-suggested tag chip: resolves the suggested name to an
+ * existing catalog tag or creates a new one (`getOrCreateTagByName`),
+ * then assigns it to the conversation -- the one place a tag-mutating
+ * action needs two lib calls instead of one, since a suggestion by
+ * definition might not exist in the catalog yet. Still never happens
+ * without this explicit click; `suggestTagsForConversation` itself never
+ * writes anything. Returns the resolved tag (not just success/error) --
+ * `TagsCard` has no `revalidatePath` to refresh from (see
+ * `RemovableTagChip`'s doc comment) and needs the real id/color to add
+ * it to local state.
+ */
+export async function acceptTagSuggestionForConversationAction(
+  _prevState: AcceptTagSuggestionState,
+  formData: FormData,
+): Promise<AcceptTagSuggestionState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:sales_agent");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = acceptSuggestionSchema.safeParse({
+    conversationId: formData.get("conversationId"),
+    name: formData.get("name"),
+  });
+  if (!parsed.success) {
+    return { error: "Invalid request." };
+  }
+
+  try {
+    const tag = await getOrCreateTagByName(businessId, parsed.data.name);
+    await assignTagToConversation(businessId, parsed.data.conversationId, tag.id);
+
+    const supabase = createServerSupabaseClient();
+    const target = await resolveWorkflowTargetFromConversation(supabase, businessId, parsed.data.conversationId);
+    if (target) {
+      await dispatchWorkflowTrigger(supabase, businessId, "tag_added", target, { tagId: tag.id });
+    }
+
+    return { tag };
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+}
+
+const suggestTagsSchema = z.object({ conversationId: z.string().uuid() });
+
+export type SuggestTagsState = {
+  error?: string;
+  suggestions?: string[];
+};
+
+/**
+ * Suggests tags for a staff member to accept or dismiss -- never writes
+ * anything itself (`lib/tag-suggestions.ts`). `org:analyst_viewer`
+ * minimum, same tier as `generateConversationSummaryAction`: this
+ * generates a display-only suggestion, it doesn't mutate the lead/
+ * conversation the way accepting one (assignTagToConversationAction/
+ * assignTagToLeadAction) does.
+ */
+export async function suggestTagsForConversationAction(
+  _prevState: SuggestTagsState,
+  formData: FormData,
+): Promise<SuggestTagsState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:analyst_viewer");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = suggestTagsSchema.safeParse({ conversationId: formData.get("conversationId") });
+  if (!parsed.success) {
+    return { error: "Invalid request." };
+  }
+
+  const supabase = createServerSupabaseClient();
+
+  try {
+    const suggestions = await suggestTagsForConversation(supabase, businessId, parsed.data.conversationId);
+    if (suggestions.length === 0) {
+      return { error: "This conversation has no messages to suggest tags from yet." };
+    }
+    return { suggestions };
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }

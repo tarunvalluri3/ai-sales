@@ -29,48 +29,64 @@ export type LeadScoringSignals = {
   interestSpecified: boolean;
 };
 
+/** One itemized point in the deterministic breakdown below -- e.g. `{ label: "booked an appointment", points: 4 }`. Never an AI-invented reason: every entry maps directly to one of this rubric's own `if` branches. */
+export type LeadScoreReasonItem = { label: string; points: number };
+
 export type LeadScore = {
   qualification: "hot" | "warm" | "cold";
   reason: string;
+  /** The raw point total the hot/warm/cold bucket is derived from -- exposed as `leads.score` for finer-grained sorting than three tiers give. Same AI-generated, display-only trust category as `qualification` itself. */
+  score: number;
+  /** Phase 28: the itemized breakdown `reason`'s combined sentence is built from -- persisted to `lead_score_history` so the dashboard can show *why* a score is what it is, point by point, not just the final sentence. */
+  reasons: LeadScoreReasonItem[];
 };
 
 const HOT_THRESHOLD = 4;
 const WARM_THRESHOLD = 2;
 
+/** The highest `score` this rubric can ever produce (4+2+1+1+1) -- the single source of truth for any "N out of MAX" display, so it can never drift from the point values above. */
+export const MAX_LEAD_SCORE = 9;
+
 export function scoreLead(signals: LeadScoringSignals): LeadScore {
-  const reasons: string[] = [];
+  const sentenceFragments: string[] = [];
+  const reasonItems: LeadScoreReasonItem[] = [];
   let points = 0;
 
   if (signals.appointmentBooked) {
     points += 4;
-    reasons.push("booked an appointment");
+    sentenceFragments.push("booked an appointment");
+    reasonItems.push({ label: "Appointment booked", points: 4 });
   }
   if (signals.requestedCallback) {
     points += 2;
-    reasons.push("requested a callback");
+    sentenceFragments.push("requested a callback");
+    reasonItems.push({ label: "Requested a callback", points: 2 });
   }
   if (signals.hasEmail && signals.hasPhone) {
     points += 1;
-    reasons.push("provided both email and phone");
+    sentenceFragments.push("provided both email and phone");
+    reasonItems.push({ label: "Provided both email and phone", points: 1 });
   }
   if (signals.needsAttention) {
     points += 1;
-    reasons.push("conversation flagged for human follow-up");
+    sentenceFragments.push("conversation flagged for human follow-up");
+    reasonItems.push({ label: "Conversation flagged for human follow-up", points: 1 });
   }
   if (signals.interestSpecified) {
     points += 1;
-    reasons.push("named a specific product or service");
+    sentenceFragments.push("named a specific product or service");
+    reasonItems.push({ label: "Named a specific product or service", points: 1 });
   }
 
   const qualification: LeadScore["qualification"] =
     points >= HOT_THRESHOLD ? "hot" : points >= WARM_THRESHOLD ? "warm" : "cold";
 
   const reason =
-    reasons.length > 0
-      ? `Prospect ${formatReasonList(reasons)}.`
+    sentenceFragments.length > 0
+      ? `Prospect ${formatReasonList(sentenceFragments)}.`
       : "Prospect left contact info without a specific ask.";
 
-  return { qualification, reason };
+  return { qualification, reason, score: points, reasons: reasonItems };
 }
 
 function formatReasonList(reasons: string[]): string {

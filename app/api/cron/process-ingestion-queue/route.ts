@@ -9,6 +9,7 @@ import { refreshDueUrlKnowledgeSources } from "@/lib/url-ingestion";
 import { runSlaEscalationSweep } from "@/lib/sla-routing";
 import { sendDailyDigestEmails } from "@/lib/notifications";
 import { runStalledLeadFollowUpSweep } from "@/lib/stalled-leads";
+import { processWorkflowRuns, runNoActivityWorkflowSweep } from "@/lib/workflow-engine";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -64,6 +65,8 @@ export async function GET(request: NextRequest) {
       slaRouting,
       notificationDigest,
       stalledLeadFollowUp,
+      workflowRuns,
+      workflowNoActivitySweep,
     ] = await Promise.all([
       processIngestionQueue(),
       processWebhookDeliveries(),
@@ -74,6 +77,8 @@ export async function GET(request: NextRequest) {
       runSlaEscalationSweep(),
       sendDailyDigestEmails(),
       runStalledLeadFollowUpSweep(),
+      processWorkflowRuns(),
+      runNoActivityWorkflowSweep(),
     ]);
     return jsonSuccess({
       ingestion,
@@ -85,6 +90,8 @@ export async function GET(request: NextRequest) {
       slaRouting,
       notificationDigest,
       stalledLeadFollowUp,
+      workflowRuns,
+      workflowNoActivitySweep,
     });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);

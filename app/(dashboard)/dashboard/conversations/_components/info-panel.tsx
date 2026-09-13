@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { AiSummaryCard } from "./ai-summary-card";
+import { TagsCard } from "./tags-card";
 import { Badge } from "../../_components/badge";
 import { channelLabel } from "@/lib/conversation-channel";
-import type { Appointment, AppointmentStatus, Conversation, Lead, LeadQualification } from "@/lib/supabase/types";
+import type {
+  Appointment,
+  AppointmentStatus,
+  Conversation,
+  Lead,
+  LeadQualification,
+  LeadTag,
+} from "@/lib/supabase/types";
 
 const QUALIFICATION_TONE: Record<LeadQualification, "accent" | "success" | "muted"> = {
   hot: "accent",
@@ -33,6 +41,10 @@ export function InfoPanel({
   appointment,
   messageCount,
   timezone,
+  conversationTags,
+  catalogTags,
+  canEditTags,
+  recommendedAction,
 }: {
   conversation: Conversation;
   lead: Lead | null;
@@ -40,15 +52,34 @@ export function InfoPanel({
   appointment: Appointment | null;
   messageCount: number;
   timezone: string;
+  conversationTags: LeadTag[];
+  catalogTags: LeadTag[];
+  canEditTags: boolean;
+  /** Phase 30: a deterministic Sales Copilot hint -- untrusted only in the sense that priority weighting is a product judgment call, never fabricated (every input is a real stored field). Null when this conversation has no linked customer yet. */
+  recommendedAction: string | null;
 }) {
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+      {recommendedAction ? (
+        <div className="flex items-center justify-between gap-2 rounded-ds-lg border border-ds-border bg-ds-accent-soft-bg p-3">
+          <span className="text-xs font-semibold tracking-wide-ds text-ds-accent-muted uppercase">Next best action</span>
+          <span className="text-sm font-medium text-ds-text-primary">{recommendedAction}</span>
+        </div>
+      ) : null}
+
       <AiSummaryCard
         conversationId={conversation.id}
         initialSummary={conversation.ai_summary}
         initialGeneratedAt={conversation.ai_summary_generated_at}
         initialMessageCount={conversation.ai_summary_message_count}
         currentMessageCount={messageCount}
+      />
+
+      <TagsCard
+        conversationId={conversation.id}
+        initialTags={conversationTags}
+        catalogTags={catalogTags}
+        canEdit={canEditTags}
       />
 
       {lead ? (
@@ -70,6 +101,14 @@ export function InfoPanel({
           <p className="text-sm text-ds-text-muted">AI-written reason: {lead.qualification_reason}</p>
           {lead.notes ? <p className="text-sm text-ds-text-secondary">Notes: {lead.notes}</p> : null}
           <p className="text-xs text-ds-text-muted">Status: {lead.status}</p>
+          {conversation.customer_id ? (
+            <Link
+              href={`/dashboard/customers/${conversation.customer_id}`}
+              className="text-xs font-medium text-ds-accent-muted transition-colors hover:text-ds-accent"
+            >
+              View customer profile
+            </Link>
+          ) : null}
         </div>
       ) : (
         <div className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-4 py-6 text-center text-xs text-ds-text-muted">

@@ -20,6 +20,52 @@ const EXCLUDE_SANDBOX_FILTER = `source.is.null,source.neq.${SANDBOX_CONVERSATION
 export type NotificationDigestResult = { sent: number; skipped: number; failed: number };
 
 /**
+ * Phase 29: the workflow engine's `email_notification` action -- reuses
+ * this file's existing Resend/`DEFAULT_FROM`/silent-no-op-if-unconfigured
+ * contract exactly, rather than a second email-sending path. Recipient is
+ * the business's own `contact_email`, same known limitation as the daily
+ * digest above (no dedicated staff-notification-recipients list exists
+ * yet). Client-injected since the workflow engine itself is
+ * client-injected (runs under either the service-role or the
+ * Clerk-authenticated client, depending on what triggered the workflow).
+ * Never throws -- a failed notification must not fail the workflow run
+ * that's sending it; the run still completes, this is best-effort.
+ */
+export async function sendWorkflowNotificationEmail(
+  supabase: ReturnType<typeof createServiceSupabaseClient>,
+  businessId: string,
+  subject: string,
+  message: string,
+): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    logEvent("workflow_notification_email_skipped_no_api_key", businessId);
+    return false;
+  }
+
+  const { data: business } = await supabase.from("businesses").select("contact_email").eq("id", businessId).maybeSingle();
+  if (!business?.contact_email) {
+    logEvent("workflow_notification_email_skipped_no_contact_email", businessId);
+    return false;
+  }
+
+  try {
+    const resend = new Resend(apiKey);
+    const from = process.env.NOTIFICATION_EMAIL_FROM || DEFAULT_FROM;
+    await resend.emails.send({
+      from,
+      to: business.contact_email,
+      subject,
+      text: message,
+    });
+    return true;
+  } catch {
+    logEvent("workflow_notification_email_failed", businessId, {}, "error");
+    return false;
+  }
+}
+
+/**
  * Daily handoff/lead email digest (Phase 25b) -- part of the shared
  * daily cron backstop (app/api/cron/process-ingestion-queue/route.ts),
  * same "no dedicated worker, no notification-specific trigger" reasoning

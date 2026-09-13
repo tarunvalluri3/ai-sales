@@ -35,6 +35,16 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "appointment_slot_block.deleted": "Slot unblocked",
   "instagram_connection.created": "Instagram connected",
   "instagram_connection.deleted": "Instagram disconnected",
+  "customer.renamed": "Customer renamed",
+  "segment.created": "Segment created",
+  "segment.updated": "Segment updated",
+  "segment.deleted": "Segment deleted",
+  "workflow.created": "Workflow created",
+  "workflow.updated": "Workflow updated",
+  "workflow.deleted": "Workflow deleted",
+  "workflow.enabled": "Workflow enabled",
+  "workflow.disabled": "Workflow disabled",
+  "workflow_run.cancelled": "Workflow run cancelled",
 };
 
 export default async function AuditLogPage() {

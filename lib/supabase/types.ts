@@ -185,6 +185,7 @@ export type Conversation = {
   ai_summary: string | null;
   ai_summary_generated_at: string | null;
   ai_summary_message_count: number | null;
+  customer_id: string | null;
 };
 
 export type MessageRole = "user" | "assistant" | "human_agent";
@@ -224,6 +225,7 @@ export type Lead = {
   notes: string | null;
   qualification: LeadQualification;
   qualification_reason: string;
+  score: number;
   status: LeadStatus;
   source: string | null;
   requested_callback: boolean;
@@ -231,8 +233,23 @@ export type Lead = {
   follow_up_message: string | null;
   follow_up_status: LeadFollowUpStatus | null;
   follow_up_sent_at: string | null;
+  customer_id: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** Phase 28: one itemized point in a lead's deterministic score breakdown -- see lib/lead-scoring.ts's scoreLead(). */
+export type LeadScoreReasonItem = { label: string; points: number };
+
+/** Phase 28: a persisted snapshot of a lead's score at the moment it changed -- lib/lead-score-history.ts. Read-only from the dashboard; only the service role writes it, alongside every scoreLead() call. */
+export type LeadScoreHistoryEntry = {
+  id: string;
+  business_id: string;
+  lead_id: string;
+  score: number;
+  qualification: LeadQualification;
+  reasons: LeadScoreReasonItem[];
+  created_at: string;
 };
 
 export type LeadFollowUpStatus =
@@ -242,6 +259,17 @@ export type LeadFollowUpStatus =
   | "blocked_no_instagram_window"
   | "no_contact_channel"
   | "send_failed";
+
+/** Phase 27: a business-scoped tag catalog entry. Reuses Badge's own 5-tone vocabulary (`BadgeTone`) as a rendering choice -- see the migration's own comment for why. */
+export type TagColor = "warning" | "success" | "danger" | "muted" | "accent";
+
+export type LeadTag = {
+  id: string;
+  business_id: string;
+  name: string;
+  color: TagColor;
+  created_at: string;
+};
 
 /**
  * Phase C: booking always starts 'pending' (the user's confirmed choice --
@@ -264,6 +292,70 @@ export type Appointment = {
   ends_at: string;
   status: AppointmentStatus;
   notes: string | null;
+  customer_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Phase 28 (Customer Intelligence foundation): a business-scoped
+ * customer/prospect identity aggregating conversations, leads, and
+ * appointments across channels. Created and matched only by
+ * lib/customers.ts's resolveOrCreateCustomer() -- conservative,
+ * deterministic (exact normalized email/phone equality), never fuzzy or
+ * AI-merged. `email_key`/`phone_key` are DB-generated columns, not
+ * writable directly.
+ */
+export type Customer = {
+  id: string;
+  business_id: string;
+  display_name: string | null;
+  email: string | null;
+  phone: string | null;
+  email_key: string | null;
+  phone_key: string | null;
+  first_seen_at: string;
+  last_activity_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Phase 28: a segment's structured rule -- one top-level AND/OR over a flat, allow-listed condition list. Validated server-side by lib/schemas/segment.ts; never interpolated into raw SQL. */
+export type SegmentMatchType = "all" | "any";
+
+export type SegmentConditionField =
+  | "score"
+  | "status"
+  | "qualification"
+  | "channel"
+  | "has_email"
+  | "has_phone"
+  | "has_conversation"
+  | "has_appointment"
+  | "appointment_status"
+  | "needs_attention"
+  | "human_controlled"
+  | "tag"
+  | "no_tag"
+  | "interest_type"
+  | "last_activity_hours"
+  | "conversation_age_hours";
+
+export type SegmentConditionOperator = "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "exists" | "not_exists";
+
+export type SegmentCondition = {
+  field: SegmentConditionField;
+  operator: SegmentConditionOperator;
+  value: string | number | boolean | null;
+};
+
+export type Segment = {
+  id: string;
+  business_id: string;
+  name: string;
+  description: string | null;
+  match_type: SegmentMatchType;
+  conditions: SegmentCondition[];
   created_at: string;
   updated_at: string;
 };
@@ -329,6 +421,112 @@ export type InstagramConnection = {
   updated_at: string | null;
 };
 
+/** Phase 29 (Automation & Workflow Engine): which real event a workflow listens for. `trigger_config` carries any event-specific filter (which status, which tag, which threshold), checked by the dispatcher before `conditions` are even evaluated. */
+export type WorkflowTriggerType =
+  | "lead_created"
+  | "lead_status_changed"
+  | "lead_score_threshold"
+  | "tag_added"
+  | "tag_removed"
+  | "appointment_status_changed"
+  | "conversation_needs_attention"
+  | "human_takeover"
+  | "ai_handback"
+  | "no_activity_hours";
+
+export type WorkflowTriggerConfig = {
+  status?: string;
+  threshold?: number;
+  tagId?: string | null;
+  hours?: number;
+};
+
+/** A workflow's ordered step list -- a "wait" step pauses the run (persisted, durable across restarts via `workflow_runs.resume_at`); every other step is a real action executed immediately. */
+export type WorkflowWaitStep = { type: "wait"; unit: "minutes" | "hours" | "days"; amount: number };
+
+export type WorkflowActionStep =
+  | { type: "add_tag"; tagId: string }
+  | { type: "remove_tag"; tagId: string }
+  | { type: "update_lead_status"; status: LeadStatus }
+  | { type: "flag_attention" }
+  | { type: "assign_owner" }
+  | { type: "create_task"; title: string; description: string | null }
+  | { type: "generate_followup_draft" }
+  | { type: "internal_notification"; message: string }
+  | { type: "email_notification"; subject: string; message: string };
+
+export type WorkflowStep = WorkflowWaitStep | WorkflowActionStep;
+
+export type Workflow = {
+  id: string;
+  business_id: string;
+  name: string;
+  description: string | null;
+  trigger_type: WorkflowTriggerType;
+  trigger_config: WorkflowTriggerConfig;
+  match_type: SegmentMatchType;
+  conditions: SegmentCondition[];
+  steps: WorkflowStep[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WorkflowRunStatus = "queued" | "running" | "completed" | "failed" | "skipped" | "cancelled";
+export type WorkflowRunTargetType = "lead" | "conversation" | "customer";
+
+export type WorkflowRun = {
+  id: string;
+  business_id: string;
+  workflow_id: string;
+  trigger_event: string;
+  target_type: WorkflowRunTargetType;
+  target_id: string;
+  customer_id: string | null;
+  lead_id: string | null;
+  conversation_id: string | null;
+  status: WorkflowRunStatus;
+  steps: WorkflowStep[];
+  next_step_index: number;
+  resume_at: string;
+  attempts: number;
+  failure_reason: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SalesTaskStatus = "open" | "done" | "dismissed";
+
+export type SalesTask = {
+  id: string;
+  business_id: string;
+  title: string;
+  description: string | null;
+  status: SalesTaskStatus;
+  assigned_to_user_id: string | null;
+  customer_id: string | null;
+  lead_id: string | null;
+  conversation_id: string | null;
+  workflow_run_id: string | null;
+  step_index: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InternalNotification = {
+  id: string;
+  business_id: string;
+  target_user_id: string | null;
+  message: string;
+  link: string | null;
+  workflow_run_id: string | null;
+  step_index: number | null;
+  read_at: string | null;
+  created_at: string;
+};
+
 export type AuditLogAction =
   | "conversation.control_changed"
   | "conversation.attention_dismissed"
@@ -359,7 +557,17 @@ export type AuditLogAction =
   | "appointment_slot_block.created"
   | "appointment_slot_block.deleted"
   | "instagram_connection.created"
-  | "instagram_connection.deleted";
+  | "instagram_connection.deleted"
+  | "customer.renamed"
+  | "segment.created"
+  | "segment.updated"
+  | "segment.deleted"
+  | "workflow.created"
+  | "workflow.updated"
+  | "workflow.deleted"
+  | "workflow.enabled"
+  | "workflow.disabled"
+  | "workflow_run.cancelled";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

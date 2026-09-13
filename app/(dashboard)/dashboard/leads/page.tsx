@@ -3,13 +3,19 @@ import { hasMinRole } from "@/lib/auth";
 import { listLeadsForBusiness, computePossibleDuplicateLeads } from "@/lib/leads";
 import { listProductsByIds } from "@/lib/products";
 import { listServicesByIds } from "@/lib/services";
+import { listTagsForBusiness, listTagsForLeads } from "@/lib/lead-tags";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeadsList } from "./leads-list";
+import { TagManager } from "./tag-manager";
 
 export default async function LeadsPage() {
   const { businessId, orgRole } = await requireBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:sales_agent");
-  const leads = await listLeadsForBusiness(businessId);
+  const [leads, tags] = await Promise.all([listLeadsForBusiness(businessId), listTagsForBusiness(businessId)]);
+  const tagsByLeadId = await listTagsForLeads(
+    businessId,
+    leads.map((lead) => lead.id),
+  );
 
   // Cross-channel identity hint (dashboard-only, no data merge -- see
   // lib/leads.ts's computePossibleDuplicateLeads doc comment): resolve
@@ -52,11 +58,14 @@ export default async function LeadsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
+      <TagManager tags={tags} canEdit={canEdit} />
       <LeadsList
         leads={leads}
         interestNameById={interestNameById}
         canEdit={canEdit}
         possibleDuplicatesByLeadId={possibleDuplicatesByLeadId}
+        tags={tags}
+        tagsByLeadId={tagsByLeadId}
       />
     </div>
   );
