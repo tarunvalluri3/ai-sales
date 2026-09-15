@@ -6,6 +6,13 @@ import { AppError } from "@/lib/errors";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
+/** The business's own IANA timezone (same `businesses.timezone` column `isWithinBusinessHours`/`updateBusinessTimezone` use), defaulting to UTC when unset -- shared by any feature that needs to render or compute a time in "the business's own" local time (e.g. the Copilot snooze presets and Upcoming view). */
+export async function getBusinessTimezone(businessId: string): Promise<string> {
+  const supabase = createServerSupabaseClient();
+  const { data } = await supabase.from("businesses").select("timezone").eq("id", businessId).maybeSingle();
+  return data?.timezone ?? "UTC";
+}
+
 /** Lists the configured hours for a business, one row per day of week it has an entry for. A business with no rows yet is treated as always-open (see `isWithinBusinessHours`) -- this returning `[]` is a valid, unconfigured state, not an error. */
 export async function listBusinessHours(businessId: string): Promise<BusinessHours[]> {
   const supabase = createServerSupabaseClient();

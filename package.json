@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node scripts/run-pgtap-tests.mjs",
+    "test:copilot-lifecycle": "node --test scripts/run-copilot-lifecycle-tests.mjs",
     "eval": "node --env-file=.env.local scripts/run-evals.mjs",
     "loadtest": "node --env-file=.env.local scripts/run-load-test.mjs"
   },

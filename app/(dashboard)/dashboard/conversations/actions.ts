@@ -33,6 +33,7 @@ import { createWhatsappOutboundMessage, sendWhatsappOutboundMessage } from "@/li
 import { getInstagramConnectionForBusiness, INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
 import { createInstagramOutboundMessage, sendInstagramOutboundMessage } from "@/lib/instagram-delivery";
 import { dispatchWorkflowTrigger, resolveWorkflowTargetFromConversation } from "@/lib/workflow-engine";
+import { completeCopilotActionsForEvent } from "@/lib/copilot-actions";
 
 const setControlSchema = z.object({
   id: z.string().uuid(),
@@ -118,7 +119,7 @@ export async function sendHumanReplyAction(
   _prevState: SendReplyState,
   formData: FormData,
 ): Promise<SendReplyState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, userId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:sales_agent");
   if (authError) {
     return { error: authError };
@@ -144,6 +145,22 @@ export async function sendHumanReplyAction(
     message = await createMessage(supabase, businessId, parsed.data.conversationId, "human_agent", parsed.data.content);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
+  }
+
+  // Phase 30 v2: a real staff reply just went out -- the unambiguous
+  // domain event that proves a `reply_to_prospect`/`follow_up` Copilot
+  // recommendation was actually acted on. Auto-complete only, never
+  // inferred from opening the conversation or taking it over.
+  const completedActionTypes = await completeCopilotActionsForEvent(
+    businessId,
+    conversation.customer_id,
+    ["reply_to_prospect", "follow_up"],
+    userId,
+  );
+  if (completedActionTypes.length > 0) {
+    await recordAuditLogEntry(businessId, userId, "copilot.action_completed", "customer", conversation.customer_id as string, {
+      actionTypes: completedActionTypes.join(","),
+    });
   }
 
   // Phase 16: a staff reply on a WhatsApp-sourced conversation must also
