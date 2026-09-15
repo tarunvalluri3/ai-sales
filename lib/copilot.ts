@@ -9,7 +9,20 @@ import { listServicesByIds } from "@/lib/services";
 import { channelLabel } from "@/lib/conversation-channel";
 import { MAX_LEAD_SCORE } from "@/lib/lead-scoring";
 import { AppError } from "@/lib/errors";
-import type { Message } from "@/lib/supabase/types";
+import type { Message, CopilotDismissal } from "@/lib/supabase/types";
+import {
+  computePriority,
+  isSuppressedByDismissal,
+  DISMISSAL_EXPIRY_DAYS,
+  PRIORITY_REASON_KEY_LABELS,
+  type PriorityReasonKey,
+  type PriorityReason,
+} from "@/lib/copilot-lifecycle";
+
+export { computePriority, isSuppressedByDismissal, DISMISSAL_EXPIRY_DAYS, PRIORITY_REASON_KEY_LABELS };
+export type { PriorityReasonKey, PriorityReason };
+
+type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
 /**
  * The AI Sales Copilot (Phase 30). Two halves, deliberately kept
@@ -28,8 +41,6 @@ import type { Message } from "@/lib/supabase/types";
  *    AI system, not the RAG/tool-calling agent loop.
  */
 
-export type PriorityReason = { label: string; weight: number };
-
 export type PriorityItem = {
   customer: CustomerSummary;
   priority: number;
@@ -37,70 +48,42 @@ export type PriorityItem = {
   recommendedAction: string;
 };
 
-const STALLED_HOURS = 48;
 const MAX_PRIORITY_ITEMS = 50;
 
 /**
- * Deterministic priority score + one recommended action for a customer
- * snapshot. Pure function, no I/O -- every input is a real stored field,
- * every weight is a fixed constant declared here, nothing is invented.
+ * Batched dismissal lookup for a set of customers -- one `.in(...)` query,
+ * never one query per customer. Callers should only pass customer ids
+ * that already scored `priority > 0`, not the full customer list.
  */
-export function computePriority(customer: CustomerSummary, nowMs: number = Date.now()): { priority: number; reasons: PriorityReason[]; recommendedAction: string } {
-  const reasons: PriorityReason[] = [];
-  let priority = 0;
+export async function listDismissalsForCustomers(
+  supabase: SupabaseClient,
+  businessId: string,
+  customerIds: string[],
+): Promise<Map<string, CopilotDismissal>> {
+  if (customerIds.length === 0) return new Map();
 
-  if (customer.needsAttention) {
-    priority += 50;
-    reasons.push({ label: "Conversation needs attention", weight: 50 });
+  const { data, error } = await supabase
+    .from("copilot_dismissals")
+    .select("*")
+    .eq("business_id", businessId)
+    .in("customer_id", customerIds);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading dismissed items. Please try again.",
+      "listDismissalsForCustomers failed",
+      error,
+    );
   }
 
-  if (customer.latestAppointmentStatus === "pending") {
-    priority += 40;
-    reasons.push({ label: "Appointment awaiting confirmation", weight: 40 });
-  } else if (customer.latestAppointmentStatus === "confirmed" && customer.latestAppointmentStartsAt) {
-    const hoursUntil = (new Date(customer.latestAppointmentStartsAt).getTime() - nowMs) / (60 * 60 * 1000);
-    if (hoursUntil >= 0 && hoursUntil <= 24) {
-      priority += 25;
-      reasons.push({ label: "Appointment within 24 hours", weight: 25 });
-    }
-  }
-
-  if (customer.latestLead) {
-    const scoreWeight = customer.latestLead.score * 5;
-    priority += scoreWeight;
-    if (scoreWeight > 0) {
-      reasons.push({ label: `Lead score ${customer.latestLead.score}/${MAX_LEAD_SCORE}`, weight: scoreWeight });
-    }
-  }
-
-  const hoursSinceActivity = (nowMs - new Date(customer.lastActivityAt).getTime()) / (60 * 60 * 1000);
-  const isOpenLead = customer.latestLead && customer.latestLead.status !== "converted" && customer.latestLead.status !== "lost";
-  const isStalled = isOpenLead && hoursSinceActivity > STALLED_HOURS;
-  if (isStalled) {
-    priority += 20;
-    reasons.push({ label: `No activity for ${Math.round(hoursSinceActivity)}h`, weight: 20 });
-  }
-
-  if (customer.humanControlled) {
-    priority += 10;
-    reasons.push({ label: "Currently human-controlled", weight: 10 });
-  }
-
-  let recommendedAction = "Review";
-  if (customer.needsAttention) recommendedAction = "Review and respond";
-  else if (customer.latestAppointmentStatus === "pending") recommendedAction = "Confirm or decline the appointment";
-  else if (customer.latestAppointmentStatus === "confirmed" && reasons.some((r) => r.label === "Appointment within 24 hours")) recommendedAction = "Confirm attendance";
-  else if (isStalled) recommendedAction = "Follow up";
-  else if (customer.latestLead?.qualification === "hot") recommendedAction = "Follow up and offer a consultation";
-  else if (customer.latestLead && !customer.latestAppointmentStatus) recommendedAction = "Invite to book";
-
-  return { priority, reasons, recommendedAction };
+  return new Map(data.map((row) => [row.customer_id, row]));
 }
 
 /**
  * "What should I do today" -- every customer with a nonzero deterministic
- * priority, highest first, capped at MAX_PRIORITY_ITEMS. `businessId`
- * must come from `requireBusinessContext()`. Reuses `listCustomersForBusiness()`'s
+ * priority that isn't currently suppressed by a still-valid dismissal,
+ * highest first, capped at MAX_PRIORITY_ITEMS. `businessId` must come
+ * from `requireBusinessContext()`. Reuses `listCustomersForBusiness()`'s
  * existing bounded aggregation -- same known performance ceiling
  * documented there.
  */
@@ -108,14 +91,141 @@ export async function getTodayPriorityList(businessId: string): Promise<Priority
   const customers = await listCustomersForBusiness(businessId);
   const nowMs = Date.now();
 
-  return customers
+  const scored = customers
     .map((customer) => {
       const { priority, reasons, recommendedAction } = computePriority(customer, nowMs);
       return { customer, priority, reasons, recommendedAction };
     })
-    .filter((item) => item.priority > 0)
+    .filter((item) => item.priority > 0);
+
+  if (scored.length === 0) return [];
+
+  const supabase = createServerSupabaseClient();
+  const dismissals = await listDismissalsForCustomers(
+    supabase,
+    businessId,
+    scored.map((item) => item.customer.id),
+  );
+
+  return scored
+    .filter((item) => !isSuppressedByDismissal(item.reasons, dismissals.get(item.customer.id), nowMs))
     .sort((a, b) => b.priority - a.priority)
     .slice(0, MAX_PRIORITY_ITEMS);
+}
+
+/**
+ * Marks a Copilot item handled -- upserts on `(business_id, customer_id)`,
+ * storing which reason keys were true right now so a later read can tell
+ * a genuinely new reason from one already accounted for.
+ */
+export async function dismissPriorityItem(
+  businessId: string,
+  dismissedBy: string,
+  customerId: string,
+  reasonKeys: PriorityReasonKey[],
+): Promise<void> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase.from("copilot_dismissals").upsert(
+    {
+      business_id: businessId,
+      customer_id: customerId,
+      reason_keys: reasonKeys,
+      dismissed_by: dismissedBy,
+      dismissed_at: new Date().toISOString(),
+    },
+    { onConflict: "business_id,customer_id" },
+  );
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong marking this as handled. Please try again.",
+      "dismissPriorityItem failed",
+      error,
+    );
+  }
+}
+
+/**
+ * Undoes a dismissal. Scoped delete, boolean return (not-found => false),
+ * matching `setSalesTaskStatus`'s convention.
+ */
+export async function undismissPriorityItem(businessId: string, customerId: string): Promise<boolean> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("copilot_dismissals")
+    .delete()
+    .eq("business_id", businessId)
+    .eq("customer_id", customerId)
+    .select("id");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong undoing this. Please try again.",
+      "undismissPriorityItem failed",
+      error,
+    );
+  }
+
+  return data.length > 0;
+}
+
+export type RecentlyHandledItem = {
+  customerId: string;
+  customerName: string | null;
+  reasonKeys: PriorityReasonKey[];
+  dismissedAt: string;
+  dismissedBy: string;
+};
+
+/**
+ * Dismissals ordered by most recently handled first, for the "Recently
+ * handled" section -- one batched follow-up query for customer display
+ * names, not one query per row.
+ */
+export async function listRecentlyHandled(businessId: string, limit = 20): Promise<RecentlyHandledItem[]> {
+  const supabase = createServerSupabaseClient();
+
+  const { data: dismissals, error } = await supabase
+    .from("copilot_dismissals")
+    .select("*")
+    .eq("business_id", businessId)
+    .order("dismissed_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong loading recently handled items. Please try again.",
+      "listRecentlyHandled failed",
+      error,
+    );
+  }
+
+  if (dismissals.length === 0) return [];
+
+  const customerIds = dismissals.map((row) => row.customer_id);
+  const { data: customers, error: customersError } = await supabase
+    .from("customers")
+    .select("id, display_name")
+    .eq("business_id", businessId)
+    .in("id", customerIds);
+
+  if (customersError) {
+    throw new AppError(
+      "Something went wrong loading recently handled items. Please try again.",
+      "listRecentlyHandled customer lookup failed",
+      customersError,
+    );
+  }
+
+  const nameById = new Map(customers.map((row) => [row.id, row.display_name]));
+
+  return dismissals.map((row) => ({
+    customerId: row.customer_id,
+    customerName: nameById.get(row.customer_id) ?? null,
+    reasonKeys: row.reason_keys as PriorityReasonKey[],
+    dismissedAt: row.dismissed_at,
+    dismissedBy: row.dismissed_by,
+  }));
 }
 
 const MAX_TRANSCRIPT_CHARS = 6000;

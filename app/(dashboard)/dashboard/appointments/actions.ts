@@ -19,6 +19,7 @@ import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 import type { AppointmentStatusForEmail } from "@/lib/notifications";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
+import { completeCopilotActionsForEvent, supersedeCopilotActionsForEvent } from "@/lib/copilot-actions";
 import type { AppointmentStatus } from "@/lib/supabase/types";
 
 export type AppointmentActionState = {
@@ -101,6 +102,43 @@ async function dispatchAppointmentStatusWorkflow(businessId: string, id: string,
   );
 }
 
+/**
+ * Phase 30 v2: auto-completes/supersedes any open `confirm_appointment`
+ * Copilot action for this appointment's customer, following the actual
+ * appointment-status transition that just succeeded -- never inferred,
+ * always tied to a real staff action. Confirming genuinely finishes the
+ * "confirm or decline" job (completed); declining/cancelling/completing/
+ * no-showing all make that same recommendation moot (superseded) -- there
+ * is nothing left to confirm once the appointment is off or already
+ * happened. Re-fetches the appointment for its customer id, same
+ * reasoning as `notifyStatusChange`/`dispatchAppointmentStatusWorkflow`
+ * above. Best-effort: `completeCopilotActionsForEvent`/
+ * `supersedeCopilotActionsForEvent` never throw.
+ */
+async function dispatchCopilotAppointmentEvent(businessId: string, userId: string, id: string, status: AppointmentStatus): Promise<void> {
+  const supabase = createServerSupabaseClient();
+  const appointment = await getAppointmentForBusiness(supabase, businessId, id);
+  if (!appointment?.customer_id) return;
+
+  if (status === "confirmed") {
+    const completed = await completeCopilotActionsForEvent(businessId, appointment.customer_id, ["confirm_appointment"], userId);
+    if (completed.length > 0) {
+      await recordAuditLogEntry(businessId, userId, "copilot.action_completed", "customer", appointment.customer_id, {
+        actionTypes: completed.join(","),
+      });
+    }
+    return;
+  }
+
+  const superseded = await supersedeCopilotActionsForEvent(businessId, appointment.customer_id, ["confirm_appointment"]);
+  if (superseded.length > 0) {
+    await recordAuditLogEntry(businessId, userId, "copilot.action_superseded", "customer", appointment.customer_id, {
+      actionTypes: superseded.join(","),
+      reason: status,
+    });
+  }
+}
+
 /** Owner approves a pending, AI-booked appointment. */
 export async function confirmAppointmentAction(
   _prevState: AppointmentActionState,
@@ -112,6 +150,7 @@ export async function confirmAppointmentAction(
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.confirmed", "appointment", result.id);
   notifyStatusChange(result.businessId, result.id, "confirmed");
   await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "confirmed");
+  await dispatchCopilotAppointmentEvent(result.businessId, result.userId, result.id, "confirmed");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -127,6 +166,7 @@ export async function declineAppointmentAction(
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.declined", "appointment", result.id);
   notifyStatusChange(result.businessId, result.id, "declined");
   await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "declined");
+  await dispatchCopilotAppointmentEvent(result.businessId, result.userId, result.id, "declined");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -142,6 +182,7 @@ export async function cancelAppointmentAction(
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.cancelled", "appointment", result.id);
   notifyStatusChange(result.businessId, result.id, "cancelled");
   await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "cancelled");
+  await dispatchCopilotAppointmentEvent(result.businessId, result.userId, result.id, "cancelled");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -161,6 +202,7 @@ export async function completeAppointmentAction(
 
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.completed", "appointment", result.id);
   await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "completed");
+  await dispatchCopilotAppointmentEvent(result.businessId, result.userId, result.id, "completed");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }
@@ -175,6 +217,7 @@ export async function noShowAppointmentAction(
 
   await recordAuditLogEntry(result.businessId, result.userId, "appointment.no_show", "appointment", result.id);
   await dispatchAppointmentStatusWorkflow(result.businessId, result.id, "no_show");
+  await dispatchCopilotAppointmentEvent(result.businessId, result.userId, result.id, "no_show");
   revalidatePath("/dashboard/appointments");
   return { success: true };
 }

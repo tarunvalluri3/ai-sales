@@ -45,6 +45,11 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "workflow.enabled": "Workflow enabled",
   "workflow.disabled": "Workflow disabled",
   "workflow_run.cancelled": "Workflow run cancelled",
+  "copilot.item_dismissed": "Copilot item marked handled",
+  "copilot.item_undismissed": "Copilot item restored",
+  "copilot.action_snoozed": "Copilot action snoozed",
+  "copilot.action_completed": "Copilot action completed",
+  "copilot.action_superseded": "Copilot action superseded",
 };
 
 export default async function AuditLogPage() {

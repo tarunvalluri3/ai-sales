@@ -527,6 +527,43 @@ export type InternalNotification = {
   created_at: string;
 };
 
+export type CopilotDismissal = {
+  id: string;
+  business_id: string;
+  customer_id: string;
+  reason_keys: string[];
+  dismissed_at: string;
+  dismissed_by: string;
+  created_at: string;
+};
+
+export type CopilotActionType = "reply_to_prospect" | "confirm_appointment" | "follow_up" | "review_stalled_conversation" | "handle_attention";
+
+export type CopilotActionStatus = "open" | "snoozed" | "completed" | "dismissed" | "superseded" | "expired";
+
+export type CopilotAction = {
+  id: string;
+  business_id: string;
+  customer_id: string;
+  action_type: CopilotActionType;
+  status: CopilotActionStatus;
+  priority: number;
+  reason_keys: string[];
+  title: string;
+  recommended_action: string;
+  snoozed_until: string | null;
+  due_at: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  dismissed_at: string | null;
+  dismissed_by: string | null;
+  superseded_at: string | null;
+  superseded_by_action_id: string | null;
+  expired_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AuditLogAction =
   | "conversation.control_changed"
   | "conversation.attention_dismissed"
@@ -567,7 +604,12 @@ export type AuditLogAction =
   | "workflow.deleted"
   | "workflow.enabled"
   | "workflow.disabled"
-  | "workflow_run.cancelled";
+  | "workflow_run.cancelled"
+  | "copilot.item_dismissed"
+  | "copilot.item_undismissed"
+  | "copilot.action_snoozed"
+  | "copilot.action_completed"
+  | "copilot.action_superseded";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 
