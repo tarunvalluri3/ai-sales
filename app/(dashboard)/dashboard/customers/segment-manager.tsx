@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { createSegmentAction, updateSegmentAction, deleteSegmentAction, type ActionState } from "./actions";
 import { DeleteButton } from "../_components/delete-button";
@@ -92,11 +92,14 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
   const [matchType, setMatchType] = useState<SegmentMatchType>(segment?.match_type ?? "all");
   const [conditions, setConditions] = useState<SegmentCondition[]>(segment?.conditions ?? [defaultCondition()]);
 
-  const [processedState, setProcessedState] = useState(state);
-  if (processedState !== state) {
-    setProcessedState(state);
+  // Calling onDone() here must happen in an effect, not during render: it
+  // updates a *different* component's state (the parent's `creating`/
+  // `editing` flag), and React forbids updating another component's state
+  // while this one is still rendering ("Cannot update a component while
+  // rendering a different component").
+  useEffect(() => {
     if (state.success) onDone?.();
-  }
+  }, [state, onDone]);
 
   function updateCondition(index: number, next: SegmentCondition) {
     setConditions((current) => current.map((condition, i) => (i === index ? next : condition)));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { createWorkflowAction, updateWorkflowAction, type ActionState } from "./actions";
 import { FIELD_LABEL, OPERATOR_LABEL, OPERATORS_FOR_FIELD, EXISTENCE_ONLY_FIELDS, SEGMENT_CONDITION_FIELDS } from "../customers/segment-condition-fields";
@@ -334,11 +334,15 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
   const [steps, setSteps] = useState<WorkflowStep[]>(workflow?.steps ?? [defaultStepOfType("internal_notification", tags)]);
   const [enabled, setEnabled] = useState(workflow?.enabled ?? true);
 
-  const [processedState, setProcessedState] = useState(state);
-  if (processedState !== state) {
-    setProcessedState(state);
+  // Calling onDone() here must happen in an effect, not during render: it
+  // updates a *different* component's state (the parent's `creating`/
+  // `editing` flag), and React forbids updating another component's state
+  // while this one is still rendering ("Cannot update a component while
+  // rendering a different component") -- same fix as SegmentForm's
+  // identical bug (app/(dashboard)/dashboard/customers/segment-manager.tsx).
+  useEffect(() => {
     if (state.success) onDone?.();
-  }
+  }, [state, onDone]);
 
   const definition = JSON.stringify({ triggerType, triggerConfig, matchType, conditions, steps, enabled });
 

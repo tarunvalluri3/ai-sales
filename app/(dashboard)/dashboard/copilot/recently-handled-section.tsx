@@ -40,18 +40,16 @@ export function RecentlyHandledSection({
             key={item.customerId}
             className="flex flex-wrap items-center justify-between gap-3 rounded-ds-sm border border-ds-border bg-ds-surface-soft p-3"
           >
-            <div className="flex flex-col gap-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={`/dashboard/customers/${item.customerId}`}
-                  className="text-sm font-medium text-ds-text-primary hover:underline"
-                >
-                  {item.customerName ?? "Unnamed prospect"}
-                </Link>
-                <span className="text-xs text-ds-text-muted">
-                  Handled by {item.dismissedBy} · {timeAgo(item.dismissedAt)}
-                </span>
-              </div>
+            <div className="flex flex-col gap-1">
+              <Link
+                href={`/dashboard/customers/${item.customerId}`}
+                className="text-sm font-medium text-ds-text-primary hover:underline"
+              >
+                {item.customerName ?? "Unnamed prospect"}
+              </Link>
+              <span className="text-xs text-ds-text-muted">
+                By {item.dismissedBy} · {timeAgo(item.dismissedAt)}
+              </span>
               <div className="flex flex-wrap gap-1">
                 {item.reasonKeys.map((key) => (
                   <Badge key={key} tone="muted" size="sm">

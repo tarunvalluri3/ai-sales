@@ -24,7 +24,7 @@ export default async function CopilotPage({ searchParams }: { searchParams: Prom
       <div className="flex flex-col gap-1">
         <h1 className="text-lg font-semibold text-ds-text-primary">Sales Copilot</h1>
         <p className="text-sm text-ds-text-muted">
-          A real work queue, not a static list -- ranked by real signals, snoozeable, and cleared automatically once the app can prove the work is done.
+          What deserves your attention, kept current automatically as things change.
         </p>
       </div>
 
@@ -83,14 +83,7 @@ async function CompletedTab({ businessId, canManage }: { businessId: string; can
     <div className="mt-2 flex flex-col gap-6">
       <CompletedList items={completed} />
 
-      {recentlyHandled.length > 0 ? (
-        <div>
-          <p className="mb-2 text-xs font-medium text-ds-text-muted">
-            Recently handled (v1 history, kept for compatibility -- reflects &ldquo;Mark as handled&rdquo; clicks directly)
-          </p>
-          <RecentlyHandledSection items={recentlyHandled} canDismiss={canManage} />
-        </div>
-      ) : null}
+      {recentlyHandled.length > 0 ? <RecentlyHandledSection items={recentlyHandled} canDismiss={canManage} /> : null}
     </div>
   );
 }

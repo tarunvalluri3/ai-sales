@@ -12,7 +12,7 @@
 -- month coexisting with a fresh one this month).
 
 begin;
-select plan(10);
+select plan(12);
 create temporary table _tap_results (line text);
 grant insert on _tap_results to authenticated;
 
@@ -126,6 +126,30 @@ insert into _tap_results select lives_ok(
   $$ update public.copilot_actions set status = 'dismissed', dismissed_at = now(), dismissed_by = 'user_test_a'
      where id = 'd0000000-0000-0000-0000-00000000000c' $$,
   'resolving the newer active row (dismissing it) succeeds, coexisting with the earlier completed row for the same key as real history'
+);
+
+-- Regression coverage for a real bug this exact scenario caught live:
+-- lib/copilot-actions.ts's supersedeCopilotActionRow/completeCopilotActionsForEvent/
+-- supersedeCopilotActionsForEvent/syncCopilotActionOnDismiss all originally
+-- resolved a `snoozed` row (which always carries a non-null snoozed_until)
+-- to a terminal status without also clearing snoozed_until, tripping the
+-- snoozed_until-matches-status check constraint and failing the whole
+-- Today-tab reconciliation pass whenever a snoozed item's signal vanished.
+insert into public.copilot_actions (id, business_id, customer_id, action_type, status, reason_keys, title, recommended_action, snoozed_until)
+values ('d0000000-0000-0000-0000-00000000000d', '00000000-0000-0000-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000a', 'confirm_appointment', 'snoozed', array['appointment_pending'], 'Confirm appointment', 'Confirm or decline the appointment', now() + interval '1 day');
+
+insert into _tap_results select throws_ok(
+  $$ update public.copilot_actions set status = 'superseded', superseded_at = now()
+     where id = 'd0000000-0000-0000-0000-00000000000d' $$,
+  '23514',
+  null,
+  'resolving a snoozed row to a terminal status WITHOUT clearing snoozed_until is rejected -- reproduces the exact bug that broke reconciliation live'
+);
+
+insert into _tap_results select lives_ok(
+  $$ update public.copilot_actions set status = 'superseded', superseded_at = now(), snoozed_until = null
+     where id = 'd0000000-0000-0000-0000-00000000000d' $$,
+  'the fixed pattern -- clearing snoozed_until alongside the status change -- succeeds'
 );
 
 insert into _tap_results select * from finish();
