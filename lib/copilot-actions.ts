@@ -180,7 +180,14 @@ async function expireCopilotActionRow(supabase: SupabaseClient, row: CopilotActi
 async function supersedeCopilotActionRow(supabase: SupabaseClient, row: CopilotAction): Promise<void> {
   const { error } = await supabase
     .from("copilot_actions")
-    .update({ status: "superseded", superseded_at: new Date().toISOString() })
+    // `row` here can be `open` OR `snoozed` (this runs on whatever's left
+    // in activeByKey after the desired-action loop). `snoozed_until` must
+    // be cleared alongside the status change -- the table's own check
+    // constraint (`copilot_actions_snoozed_until_matches_status`) requires
+    // status='snoozed' to be the only case with a non-null snoozed_until,
+    // so leaving a snoozed row's timestamp in place while superseding it
+    // violates that constraint and fails the whole reconciliation pass.
+    .update({ status: "superseded", superseded_at: new Date().toISOString(), snoozed_until: null })
     .eq("id", row.id);
 
   if (error) {
@@ -494,7 +501,11 @@ export async function syncCopilotActionOnDismiss(businessId: string, customerId:
     const supabase = createServerSupabaseClient();
     const { error } = await supabase
       .from("copilot_actions")
-      .update({ status: "dismissed", dismissed_at: new Date().toISOString(), dismissed_by: dismissedBy })
+      // Clears snoozed_until alongside the status change -- required by
+      // the table's own check constraint when the matched row was
+      // `snoozed` (see supersedeCopilotActionRow's comment for the full
+      // explanation).
+      .update({ status: "dismissed", dismissed_at: new Date().toISOString(), dismissed_by: dismissedBy, snoozed_until: null })
       .eq("business_id", businessId)
       .eq("customer_id", customerId)
       .in("status", ["open", "snoozed"]);
@@ -562,7 +573,9 @@ export async function completeCopilotActionsForEvent(
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from("copilot_actions")
-      .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: completedBy })
+      // snoozed_until cleared alongside the status change -- see
+      // supersedeCopilotActionRow's comment for why this is required.
+      .update({ status: "completed", completed_at: new Date().toISOString(), completed_by: completedBy, snoozed_until: null })
       .eq("business_id", businessId)
       .eq("customer_id", customerId)
       .in("action_type", actionTypes)
@@ -595,7 +608,9 @@ export async function supersedeCopilotActionsForEvent(
     const supabase = createServerSupabaseClient();
     const { data, error } = await supabase
       .from("copilot_actions")
-      .update({ status: "superseded", superseded_at: new Date().toISOString() })
+      // snoozed_until cleared alongside the status change -- see
+      // supersedeCopilotActionRow's comment for why this is required.
+      .update({ status: "superseded", superseded_at: new Date().toISOString(), snoozed_until: null })
       .eq("business_id", businessId)
       .eq("customer_id", customerId)
       .in("action_type", actionTypes)

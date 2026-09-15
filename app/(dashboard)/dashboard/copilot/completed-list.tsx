@@ -26,7 +26,7 @@ function timeAgo(iso: string): string {
  */
 export function CompletedList({ items }: { items: CompletedActionItem[] }) {
   if (items.length === 0) {
-    return <EmptyState title="Nothing completed yet" description="Actions you complete or mark as handled will show up here." />;
+    return <EmptyState title="Nothing completed yet" description="Actions you complete or mark as handled will appear here." />;
   }
 
   return (
@@ -36,14 +36,18 @@ export function CompletedList({ items }: { items: CompletedActionItem[] }) {
         const by = item.completedBy ?? item.dismissedBy;
         return (
           <li key={item.id} className="flex flex-col gap-1.5 rounded-ds-sm border border-ds-border bg-ds-surface-soft p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <Link href={`/dashboard/customers/${item.customerId}`} className="text-sm font-medium text-ds-text-primary hover:underline">
-                {item.customerName ?? "Unnamed prospect"}
-              </Link>
-              <span className="text-xs text-ds-text-muted">{at ? timeAgo(at) : ""}</span>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex flex-col">
+                <Link href={`/dashboard/customers/${item.customerId}`} className="text-sm font-medium text-ds-text-primary hover:underline">
+                  {item.customerName ?? "Unnamed prospect"}
+                </Link>
+                <span className="text-xs text-ds-text-secondary">{item.title}</span>
+              </div>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-xs text-ds-text-muted">{at ? timeAgo(at) : ""}</span>
+                <span className="text-2xs text-ds-text-muted">{by ? `By ${by}` : "Automatic"}</span>
+              </div>
             </div>
-            <p className="text-sm text-ds-text-secondary">{item.title}</p>
-            <p className="text-xs text-ds-text-muted">{by ? `By ${by}` : "Automatically completed"}</p>
             <div className="flex flex-wrap gap-1">
               {item.reasonKeys.map((key) => (
                 <Badge key={key} tone="muted" size="sm">

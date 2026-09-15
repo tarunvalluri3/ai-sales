@@ -54,7 +54,7 @@ export function UpcomingList({ items, canManage, timezone }: { items: UpcomingAc
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/customers/${item.customerId}`}
-              className="w-fit rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong"
+              className="w-fit rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
             >
               Open conversation
             </Link>
