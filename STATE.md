@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-10-19 (Widget consent link now points at the customer's own privacy policy -- new businesses.privacy_policy_url column; see the entry immediately below. Migration NOT yet applied to staging or production, and the npm checks were NOT run that session.)
+Last updated: 2026-10-19 (Widget consent link now points at the customer's own privacy policy -- new businesses.privacy_policy_url column; see the entry immediately below. Migration applied to staging by CI and all checks verified green on PR #73 -- see the "Checks (verified 2026-10-19)" paragraph below; NOT yet promoted to production.)
 
 ---
 
@@ -28,13 +28,15 @@ Two deliberate choices recorded rather than left to be rediscovered:
 
 **New pgTAP file `042_business_privacy_policy_url.sql`** (7 tests), modeled on `024_widget_suggested_questions_shape.sql` -- the right precedent, since this is a new `businesses` column plus a column-level grant rather than a new table, so no new RLS policy is under test. Covers: the column defaults to null for every pre-existing business (i.e. they all keep the fallback), null allowed, an https URL allowed, `http://` rejected with 23514, `javascript:` rejected with 23514, an `org_a` session can update its own row, and an `org_a` session cannot update `org_b`'s (no rows affected, not an error).
 
-**Checks: NOT RUN.** Same constraint as the legal-pages entry below -- this session had no shell on the user's machine (no `device_bash`) and no project `node_modules`, so `npm run lint`, `npm run typecheck`, `npm run build`, and `npm test` were **not** executed. Stated plainly per `CLAUDE.md`. What *was* actually run: all 12 changed TS/TSX files parsed clean through `esbuild` with the `ts`/`tsx` loaders, and a grep pass confirmed every raw apostrophe in the changed files sits inside a comment or a pre-existing string literal, never in JSX text (`react/no-unescaped-entities`). Every edit was applied by an exact-match script that asserted a single match before replacing, so no pattern was applied to the wrong place or twice.
+**Checks (verified 2026-10-19; supersedes both "NOT RUN" paragraphs for this change and the legal pages).** CI caught one real defect, now fixed: `app/(dashboard)/onboarding/test/page.tsx` did not pass the newly required `hasPrivacyPolicyUrl` prop to `PublishButton` (TS2741). Locally: `npm run typecheck` -- pass; `npm run lint` -- pass. CI on PR #73 (`build-and-test`): lint, typecheck, build, staging `db push` (migration `20261019000000` applied cleanly) and the full pgTAP suite including `042` -- all pass. A local `npm test` run against the *production-linked* CLI session failed `042` only because the column does not exist in production yet; that is expected, and no migration was applied to production. **Still to do:** promote `20261019000000` to production via `docs/deployment.md` §3, then re-link the local CLI to staging (it is currently linked to production, ref `bykeztxvejpwfcxgsubm`); then the live browser click-through.
+
+**Original note (superseded above) -- Checks: NOT RUN.** Same constraint as the legal-pages entry below -- this session had no shell on the user's machine (no `device_bash`) and no project `node_modules`, so `npm run lint`, `npm run typecheck`, `npm run build`, and `npm test` were **not** executed. Stated plainly per `CLAUDE.md`. What *was* actually run: all 12 changed TS/TSX files parsed clean through `esbuild` with the `ts`/`tsx` loaders, and a grep pass confirmed every raw apostrophe in the changed files sits inside a comment or a pre-existing string literal, never in JSX text (`react/no-unescaped-entities`). Every edit was applied by an exact-match script that asserted a single match before replacing, so no pattern was applied to the wrong place or twice.
 
 **Next steps for whoever picks this up**, in order: run `npm run lint && npm run typecheck && npm run build`; open a PR so CI applies the migration to staging and runs the pgTAP suite including `042`; then promote `20261019000000` to production via the §3 procedure in `docs/deployment.md` (purely additive, so the rollback is a `DROP COLUMN`/`DROP CONSTRAINT` migration -- no backup needed before this one). After that, a live click-through: set a real https URL on a test business, open its widget, and confirm the consent link opens that URL in a new tab; then clear the field and confirm it falls back to `/privacy`.
 
 **Not yet done.** No live browser click-through (see above). The widget consent notice still shows only one link -- the customer's policy, or ours as fallback -- rather than both; showing this app's own policy alongside it as the named processor was considered and deliberately deferred as clutter in a 380px panel until a customer actually asks for it.
 
-**Packages added:** none. **Migrations:** `20261019000000` -- written, **not yet applied to staging or production**. **Environment variables:** none.
+**Packages added:** none. **Migrations:** `20261019000000` -- applied to staging by CI (2026-10-19), **not yet applied to production**. **Environment variables:** none.
 
 ---
 
