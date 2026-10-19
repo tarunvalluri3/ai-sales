@@ -108,6 +108,34 @@ export const widgetLogoUrlSchema = optionalTrimmedNullable.pipe(
     }),
 );
 
+/**
+ * The business's OWN privacy policy, linked from the widget's consent
+ * checkbox (app/(widget)/widget/embed/_components/composer.tsx). Lives in
+ * the widget-branding schema because that is the form it is edited in, but
+ * it is a business-level legal fact rather than widget chrome -- see the
+ * 20261019000000 migration's header.
+ *
+ * https:// is required rather than any URL (unlike widgetLogoUrlSchema
+ * above): this value is rendered straight into an href inside a consent
+ * notice served over https, so a plaintext link would be both a
+ * mixed-content warning and a trust problem. The same rule is enforced
+ * again by the businesses_privacy_policy_url_format DB constraint.
+ */
+export const businessPrivacyPolicyUrlSchema = optionalTrimmedNullable.pipe(
+  z
+    .string()
+    .nullable()
+    .refine(
+      (value) =>
+        value === null ||
+        (z.string().url().safeParse(value).success && value.toLowerCase().startsWith("https://")),
+      {
+        message:
+          "Enter your privacy policy's full URL starting with https://, e.g. https://example.com/privacy.",
+      },
+    ),
+);
+
 export const widgetWelcomeTextSchema = optionalTrimmedNullable.pipe(
   z.string().max(280, "Welcome text must be 280 characters or fewer.").nullable(),
 );
@@ -140,6 +168,7 @@ export const widgetBrandingSchema = z.object({
   ctaText: widgetCtaTextSchema,
   position: widgetPositionSchema,
   language: widgetLanguageSchema,
+  privacyPolicyUrl: businessPrivacyPolicyUrlSchema,
 });
 
 export type WidgetBrandingInput = z.infer<typeof widgetBrandingSchema>;

@@ -7,6 +7,7 @@ export type Business = {
   contact_email: string | null;
   contact_phone: string | null;
   website: string | null;
+  privacy_policy_url: string | null;
   timezone: string;
   sla_minutes: number | null;
   next_assignment_cursor: number;

@@ -66,7 +66,12 @@ export default async function WidgetSettingsPage() {
 
       <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
         <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">2. Go live</h2>
-        <PublishButton isPublished={business?.published_at != null} hasActiveKey={hasActiveKey} canEdit={canEdit} />
+        <PublishButton
+          isPublished={business?.published_at != null}
+          hasActiveKey={hasActiveKey}
+          hasPrivacyPolicyUrl={Boolean(business?.privacy_policy_url)}
+          canEdit={canEdit}
+        />
         <SandboxChatPanel />
       </section>
 
@@ -80,6 +85,7 @@ export default async function WidgetSettingsPage() {
           initialCtaText={business?.widget_cta_text ?? ""}
           initialPosition={business?.widget_position ?? "bottom-right"}
           initialLanguage={business?.widget_language ?? "en"}
+          initialPrivacyPolicyUrl={business?.privacy_policy_url ?? ""}
           canEdit={canEdit}
         />
 

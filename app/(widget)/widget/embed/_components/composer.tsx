@@ -13,6 +13,7 @@ export function Composer({
   autoFocus,
   consentGiven,
   onConsentChange,
+  privacyPolicyUrl,
 }: {
   strings: WidgetStrings;
   onSend: (text: string) => void;
@@ -20,6 +21,16 @@ export function Composer({
   autoFocus: boolean;
   consentGiven: boolean;
   onConsentChange: (value: boolean) => void;
+  /**
+   * The business's own privacy policy URL. Null falls back to this app's
+   * `/privacy` -- a relative href, which (because this widget is framed
+   * from this app's origin) resolves to Waves AI Pilot's own policy. That
+   * fallback is the pre-2026-10-19 behavior for every business, kept so no
+   * live embed loses its consent link; it is not the correct page to show,
+   * because the customer business -- not this app -- is the Data Fiduciary
+   * for the contact details this checkbox consents to storing.
+   */
+  privacyPolicyUrl: string | null;
 }) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -57,7 +68,12 @@ export function Composer({
         />
         <span>
           {strings.consentText}{" "}
-          <a href="/privacy" target="_blank" rel="noreferrer" className="underline hover:text-widget-foreground">
+          <a
+            href={privacyPolicyUrl ?? "/privacy"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-widget-foreground"
+          >
             {strings.consentLinkLabel}
           </a>
         </span>

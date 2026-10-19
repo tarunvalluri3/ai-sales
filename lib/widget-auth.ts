@@ -40,7 +40,7 @@ export type WidgetBusinessContext = {
 };
 
 const BUSINESS_COLUMNS =
-  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, recommend_products_enabled, published_at, appointments_enabled";
+  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, recommend_products_enabled, published_at, appointments_enabled, privacy_policy_url";
 
 type WidgetBusinessRow = {
   id: string;
@@ -61,6 +61,7 @@ type WidgetBusinessRow = {
   recommend_products_enabled: boolean;
   published_at: string | null;
   appointments_enabled: boolean;
+  privacy_policy_url: string | null;
 };
 
 type WidgetKeyRow = {
@@ -137,6 +138,8 @@ export type WidgetBranding = {
   ctaText: string | null;
   position: WidgetPosition;
   suggestedQuestions: string[];
+  /** The business's own privacy policy, linked from the widget's consent checkbox. Null means the widget falls back to this app's own /privacy -- see the 20261019000000 migration. */
+  privacyPolicyUrl: string | null;
 };
 
 /**
@@ -175,5 +178,6 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
     ctaText: data.businesses.widget_cta_text,
     position: data.businesses.widget_position,
     suggestedQuestions: data.businesses.widget_suggested_questions ?? [],
+    privacyPolicyUrl: data.businesses.privacy_policy_url,
   };
 }

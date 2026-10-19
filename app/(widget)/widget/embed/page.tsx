@@ -47,6 +47,7 @@ export default async function WidgetEmbedPage({
       logoUrl={branding.logoUrl}
       ctaText={branding.ctaText ?? strings.defaultCta}
       suggestedQuestions={branding.suggestedQuestions}
+      privacyPolicyUrl={branding.privacyPolicyUrl}
     />
   );
 }

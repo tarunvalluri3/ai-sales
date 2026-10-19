@@ -162,20 +162,40 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-ds-border px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row">
-          <div className="flex items-center gap-2 text-sm font-semibold text-ds-text-primary">
-            <span className="size-2 rounded-full bg-ds-accent" aria-hidden="true" />
-            Waves AI Pilot
+        <div className="mx-auto flex max-w-6xl flex-col gap-4">
+          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+            <div className="flex items-center gap-2 text-sm font-semibold text-ds-text-primary">
+              <span className="size-2 rounded-full bg-ds-accent" aria-hidden="true" />
+              Waves AI Pilot
+            </div>
+            <p className="text-2xs text-ds-text-muted">An AI sales employee, grounded in your own business.</p>
           </div>
-          <p className="text-2xs text-ds-text-muted">An AI sales employee, grounded in your own business.</p>
-          <div className="flex items-center gap-4 text-2xs text-ds-text-muted">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-2xs text-ds-text-muted">
+            <Link href="/pricing" className="transition-colors hover:text-ds-text-primary">
+              Pricing
+            </Link>
+            <Link href="/about" className="transition-colors hover:text-ds-text-primary">
+              About Us
+            </Link>
+            <Link href="/contact" className="transition-colors hover:text-ds-text-primary">
+              Contact Us
+            </Link>
             <Link href="/privacy" className="transition-colors hover:text-ds-text-primary">
               Privacy Policy
             </Link>
             <Link href="/terms" className="transition-colors hover:text-ds-text-primary">
               Terms of Service
             </Link>
+            <Link href="/refunds" className="transition-colors hover:text-ds-text-primary">
+              Cancellation &amp; Refunds
+            </Link>
+            <Link href="/shipping" className="transition-colors hover:text-ds-text-primary">
+              Service Delivery
+            </Link>
           </div>
+          <p className="text-center text-2xs text-ds-text-muted">
+            Waves AI Pilot is a product of Waves Web Studio, Hyderabad, India · GSTIN 36BYQPT2686E1ZR
+          </p>
         </div>
       </footer>
     </div>
