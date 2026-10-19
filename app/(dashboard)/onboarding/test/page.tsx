@@ -34,7 +34,11 @@ export default async function OnboardingTestPage() {
 
       <div className="flex w-full max-w-xl flex-col gap-4">
         <SandboxChatPanel />
-        <PublishButton isPublished={business?.published_at != null} hasActiveKey={hasActiveKey} />
+        <PublishButton
+          isPublished={business?.published_at != null}
+          hasActiveKey={hasActiveKey}
+          hasPrivacyPolicyUrl={Boolean(business?.privacy_policy_url)}
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <Link
