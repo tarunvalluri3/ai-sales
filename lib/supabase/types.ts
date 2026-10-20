@@ -7,6 +7,7 @@ export type Business = {
   contact_email: string | null;
   contact_phone: string | null;
   website: string | null;
+  privacy_policy_url: string | null;
   timezone: string;
   sla_minutes: number | null;
   next_assignment_cursor: number;
@@ -257,6 +258,7 @@ export type LeadFollowUpStatus =
   | "sent_whatsapp"
   | "blocked_no_whatsapp_template"
   | "blocked_no_instagram_window"
+  | "blocked_email_suppressed"
   | "no_contact_channel"
   | "send_failed";
 

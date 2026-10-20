@@ -159,6 +159,7 @@ export async function updateWidgetBrandingAction(
     ctaText: formData.get("ctaText"),
     position: formData.get("position"),
     language: formData.get("language"),
+    privacyPolicyUrl: formData.get("privacyPolicyUrl"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Enter valid widget settings." };

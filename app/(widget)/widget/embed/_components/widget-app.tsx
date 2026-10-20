@@ -25,6 +25,7 @@ export function WidgetApp({
   logoUrl,
   ctaText,
   suggestedQuestions,
+  privacyPolicyUrl,
 }: {
   businessName: string;
   language: WidgetLanguage;
@@ -34,6 +35,7 @@ export function WidgetApp({
   logoUrl: string | null;
   ctaText: string;
   suggestedQuestions: string[];
+  privacyPolicyUrl: string | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewport, setViewport] = useState({ width: 1280, height: 800 });
@@ -113,6 +115,7 @@ export function WidgetApp({
               greeting={greeting}
               logoUrl={logoUrl}
               suggestedQuestions={suggestedQuestions}
+              privacyPolicyUrl={privacyPolicyUrl}
               messages={chat.messages}
               isAwaitingResponse={chat.isAwaitingResponse}
               isCoolingDown={chat.isCoolingDown}

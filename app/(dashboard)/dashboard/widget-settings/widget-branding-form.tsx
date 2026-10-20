@@ -18,6 +18,7 @@ export function WidgetBrandingForm({
   initialCtaText,
   initialPosition,
   initialLanguage,
+  initialPrivacyPolicyUrl,
   canEdit = true,
 }: {
   initialAccentColor: string;
@@ -27,6 +28,7 @@ export function WidgetBrandingForm({
   initialCtaText: string;
   initialPosition: WidgetPosition;
   initialLanguage: WidgetLanguage;
+  initialPrivacyPolicyUrl: string;
   canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updateWidgetBrandingAction, initialState);
@@ -35,7 +37,12 @@ export function WidgetBrandingForm({
   // business has set even one of these, the card recedes behind "Show"
   // instead of re-presenting the full form every visit.
   const hasCustomization = Boolean(
-    initialAccentColor || initialLogoUrl || initialWelcomeText || initialWelcomeTextClosed || initialCtaText,
+    initialAccentColor ||
+      initialLogoUrl ||
+      initialWelcomeText ||
+      initialWelcomeTextClosed ||
+      initialCtaText ||
+      initialPrivacyPolicyUrl,
   );
   const [open, setOpen] = useState(!hasCustomization);
   const [accentColor, setAccentColor] = useState(initialAccentColor);
@@ -136,6 +143,28 @@ export function WidgetBrandingForm({
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="privacyPolicyUrl" className="text-sm font-medium text-ds-text-secondary">
+              Your privacy policy URL <span className="text-ds-text-muted">(optional)</span>
+            </label>
+            <input
+              id="privacyPolicyUrl"
+              name="privacyPolicyUrl"
+              type="url"
+              placeholder="https://example.com/privacy"
+              defaultValue={initialPrivacyPolicyUrl}
+              aria-describedby="privacyPolicyUrl-hint"
+              disabled={isPending || !canEdit}
+              className={inputClasses}
+            />
+            <p id="privacyPolicyUrl-hint" className="text-xs text-ds-text-muted">
+              Linked from the consent checkbox a prospect ticks before the chat saves their contact
+              details. You decide why those details are collected, so this should be your own policy.
+              Must start with https://. Left blank, that checkbox links to Waves AI Pilot&apos;s policy
+              instead, which describes our data handling rather than yours.
+            </p>
           </div>
 
           <div className="flex flex-col gap-1">

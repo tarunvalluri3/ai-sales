@@ -157,6 +157,7 @@ export async function updateWidgetBranding(orgId: string, input: WidgetBrandingI
       widget_cta_text: input.ctaText,
       widget_position: input.position,
       widget_language: input.language,
+      privacy_policy_url: input.privacyPolicyUrl,
     })
     .eq("clerk_org_id", orgId)
     .select()

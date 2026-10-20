@@ -9,10 +9,12 @@ const initialState: PublishBusinessState = {};
 export function PublishButton({
   isPublished,
   hasActiveKey,
+  hasPrivacyPolicyUrl,
   canEdit = true,
 }: {
   isPublished: boolean;
   hasActiveKey: boolean;
+  hasPrivacyPolicyUrl: boolean;
   canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(publishBusinessAction, initialState);
@@ -44,6 +46,18 @@ export function PublishButton({
         <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
           You haven&rsquo;t created a widget key yet — publish is safe to click, but nothing will happen until you
           add one.
+        </p>
+      ) : null}
+
+      {/* Deliberately a warning, not a block: a business can legitimately
+         publish before its own policy page exists, and the widget still
+         falls back to this app's /privacy. Same non-blocking shape as the
+         missing-widget-key notice above. */}
+      {!hasPrivacyPolicyUrl ? (
+        <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+          You haven&rsquo;t set your own privacy policy URL yet (Customize &rarr; Branding &amp; language,
+          below). Until you do, the consent checkbox in your widget links to Waves AI Pilot&rsquo;s privacy
+          policy instead of yours. Publishing still works.
         </p>
       ) : null}
 

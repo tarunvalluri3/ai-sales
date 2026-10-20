@@ -16,6 +16,7 @@ export function Panel({
   greeting,
   logoUrl,
   suggestedQuestions,
+  privacyPolicyUrl,
   messages,
   isAwaitingResponse,
   isCoolingDown,
@@ -36,6 +37,7 @@ export function Panel({
   greeting: string;
   logoUrl: string | null;
   suggestedQuestions: string[];
+  privacyPolicyUrl: string | null;
   messages: ChatMessage[];
   isAwaitingResponse: boolean;
   isCoolingDown: boolean;
@@ -128,6 +130,7 @@ export function Panel({
             autoFocus
             consentGiven={consentGiven}
             onConsentChange={onConsentChange}
+            privacyPolicyUrl={privacyPolicyUrl}
           />
         </>
       )}
