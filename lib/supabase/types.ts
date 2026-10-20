@@ -234,6 +234,8 @@ export type Lead = {
   follow_up_message: string | null;
   follow_up_status: LeadFollowUpStatus | null;
   follow_up_sent_at: string | null;
+  /** Last time the stalled-lead sweep examined this lead, whatever the outcome (20261020000000). Distinct from follow_up_sent_at, which is set only on a real send. */
+  follow_up_attempted_at: string | null;
   customer_id: string | null;
   created_at: string;
   updated_at: string;
