@@ -20,6 +20,13 @@ const STALLED_DAYS = 3;
 const MAX_LEADS_CHECKED_PER_RUN = 25;
 const MAX_DRAFT_LENGTH = 1000;
 
+// A lead the sweep has already examined is left alone for this long before
+// it is eligible again. Deliberately under 24h: the Vercel cron fires daily
+// but not to the second, so a run can land a few minutes later than
+// yesterday's. With a 24h window, a lead stamped at the end of yesterday's
+// run would still be inside the window at the start of today's slightly
+// earlier-by-the-clock run and get skipped for a whole extra day.
+const FOLLOW_UP_RETRY_COOLDOWN_MS = 20 * 60 * 60 * 1000;
 
 export type StalledLeadSweepResult = {
   checked: number;
@@ -30,6 +37,8 @@ export type StalledLeadSweepResult = {
   blockedSuppressed: number;
   noChannel: number;
   failed: number;
+  /** Open, unsent leads left out of this run because they were attempted inside the retry cooldown. */
+  skippedCooldown: number;
 };
 
 type CandidateLead = {
@@ -59,7 +68,11 @@ type Outcome = "not_stalled" | "skipped" | LeadFollowUpStatus | "failed";
  * SYSTEM_TEMPLATE), and sends it at most once per lead
  * (`leads.follow_up_sent_at` is the gate -- see the migration's
  * comment for why a blocked/failed attempt leaves it null instead of
- * giving up).
+ * giving up). Because those leads stay eligible, `follow_up_attempted_at`
+ * (20261020000000) records every examination whatever its outcome, and the
+ * query skips recently attempted leads and takes the least recently
+ * attempted first -- otherwise the oldest 25 blocked leads would fill every
+ * run forever and starve every newer lead.
  *
  * Email send degrades safely exactly like sendDailyDigestEmails() when
  * `RESEND_API_KEY` is unset. WhatsApp send is deliberately NOT
@@ -82,27 +95,56 @@ export async function runStalledLeadFollowUpSweep(): Promise<StalledLeadSweepRes
     blockedSuppressed: 0,
     noChannel: 0,
     failed: 0,
+    skippedCooldown: 0,
   };
 
-  const { data: candidates, error } = await supabase
-    .from("leads")
-    .select(
-      "id, business_id, conversation_id, contact_name, contact_email, contact_phone, interest_type, interest_id, notes, follow_up_message, created_at",
-    )
-    .in("status", ["new", "contacted"])
-    .is("follow_up_sent_at", null)
-    .order("created_at", { ascending: true })
-    .limit(MAX_LEADS_CHECKED_PER_RUN);
+  const nowMs = Date.now();
+  const attemptCutoffIso = new Date(nowMs - FOLLOW_UP_RETRY_COOLDOWN_MS).toISOString();
+
+  // Counted before any lead is stamped, so it reports what the cooldown
+  // excluded at selection time rather than including this run's own stamps.
+  const [{ data: candidates, error }, { count: cooldownCount, error: cooldownCountError }] = await Promise.all([
+    supabase
+      .from("leads")
+      .select(
+        "id, business_id, conversation_id, contact_name, contact_email, contact_phone, interest_type, interest_id, notes, follow_up_message, created_at",
+      )
+      .in("status", ["new", "contacted"])
+      .is("follow_up_sent_at", null)
+      .or(`follow_up_attempted_at.is.null,follow_up_attempted_at.lt.${attemptCutoffIso}`)
+      .order("follow_up_attempted_at", { ascending: true, nullsFirst: true })
+      .order("created_at", { ascending: true })
+      .limit(MAX_LEADS_CHECKED_PER_RUN),
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["new", "contacted"])
+      .is("follow_up_sent_at", null)
+      .gte("follow_up_attempted_at", attemptCutoffIso),
+  ]);
 
   if (error || !candidates) {
     logEvent("stalled_lead_sweep_query_failed", "unknown", {}, "error");
     return result;
   }
 
-  const cutoffMs = Date.now() - STALLED_DAYS * DAY_MS;
+  if (cooldownCountError) {
+    // Reporting only -- the sweep itself is unaffected, so not worth a Sentry alert.
+    logEvent("stalled_lead_sweep_cooldown_count_failed", "unknown");
+  } else {
+    result.skippedCooldown = cooldownCount ?? 0;
+  }
+
+  const cutoffMs = nowMs - STALLED_DAYS * DAY_MS;
 
   for (const lead of candidates as CandidateLead[]) {
     result.checked++;
+    // Stamped before processing, not after, so that no outcome can escape it:
+    // not the early returns inside processCandidate (not stalled yet, sandbox
+    // conversation, no API key, each blocked_* state), not a thrown error, and
+    // not a run killed mid-lead by the function timeout -- that lead is then
+    // not first in line again tomorrow.
+    await recordAttempt(supabase, lead);
     try {
       const outcome = await processCandidate(supabase, lead, cutoffMs);
       if (outcome === "sent_email") result.sentEmail++;
@@ -121,6 +163,21 @@ export async function runStalledLeadFollowUpSweep(): Promise<StalledLeadSweepRes
   }
 
   return result;
+}
+
+async function recordAttempt(supabase: ServiceSupabaseClient, lead: CandidateLead): Promise<void> {
+  const { error } = await supabase
+    .from("leads")
+    .update({ follow_up_attempted_at: new Date().toISOString() })
+    .eq("id", lead.id)
+    .eq("business_id", lead.business_id);
+
+  // Not fatal to this lead's follow-up, but an unstamped lead can be picked
+  // again tomorrow ahead of newer ones -- the starvation this column exists to
+  // prevent -- so it is worth an alert.
+  if (error) {
+    logEvent("stalled_lead_attempt_stamp_failed", lead.business_id, { leadId: lead.id }, "error");
+  }
 }
 
 async function processCandidate(
