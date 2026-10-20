@@ -1,11 +1,12 @@
 import "server-only";
-import { Resend } from "resend";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getChatModel } from "@/lib/rag";
 import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
 import { SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { logEvent } from "@/lib/logger";
+import { renderBrandedEmail } from "@/lib/email-template";
+import { sendEmail } from "@/lib/email-sender";
 import type { LeadFollowUpStatus, LeadInterestType } from "@/lib/supabase/types";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
@@ -19,13 +20,14 @@ const STALLED_DAYS = 3;
 const MAX_LEADS_CHECKED_PER_RUN = 25;
 const MAX_DRAFT_LENGTH = 1000;
 
-const DEFAULT_FROM = "Waves AI Pilot <onboarding@resend.dev>";
 
 export type StalledLeadSweepResult = {
   checked: number;
   sentEmail: number;
   blockedWhatsapp: number;
   blockedInstagram: number;
+  /** The lead's email previously hard-bounced or reported spam (lib/email-suppression.ts). */
+  blockedSuppressed: number;
   noChannel: number;
   failed: number;
 };
@@ -77,6 +79,7 @@ export async function runStalledLeadFollowUpSweep(): Promise<StalledLeadSweepRes
     sentEmail: 0,
     blockedWhatsapp: 0,
     blockedInstagram: 0,
+    blockedSuppressed: 0,
     noChannel: 0,
     failed: 0,
   };
@@ -105,6 +108,7 @@ export async function runStalledLeadFollowUpSweep(): Promise<StalledLeadSweepRes
       if (outcome === "sent_email") result.sentEmail++;
       else if (outcome === "blocked_no_whatsapp_template") result.blockedWhatsapp++;
       else if (outcome === "blocked_no_instagram_window") result.blockedInstagram++;
+      else if (outcome === "blocked_email_suppressed") result.blockedSuppressed++;
       else if (outcome === "no_contact_channel") result.noChannel++;
       else if (outcome === "failed") result.failed++;
       // "not_stalled" / "skipped" (sandbox conversation) / "send_failed"
@@ -149,10 +153,11 @@ async function processCandidate(
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("name")
+    .select("name, contact_email")
     .eq("id", lead.business_id)
     .maybeSingle();
   const businessName = business?.name ?? "our team";
+  const businessReplyTo: string | null = business?.contact_email ?? null;
 
   let message = lead.follow_up_message;
   if (!message) {
@@ -161,7 +166,7 @@ async function processCandidate(
   }
 
   if (lead.contact_email) {
-    return sendFollowUpEmail(supabase, lead, businessName, message);
+    return sendFollowUpEmail(supabase, lead, businessName, businessReplyTo, message);
   }
 
   if (conversation.source === WHATSAPP_CONVERSATION_SOURCE) {
@@ -190,10 +195,31 @@ async function sendFollowUpEmail(
   supabase: ServiceSupabaseClient,
   lead: CandidateLead,
   businessName: string,
+  businessReplyTo: string | null,
   message: string,
 ): Promise<Outcome> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  // 2026-10-19: this email speaks *for* the business to its own prospect,
+  // and its whole purpose is to get a reply. It previously came from
+  // "Waves AI Pilot" with no reply-to, so a prospect who answered was
+  // writing to the notifications inbox and the business never saw it. Now:
+  // "<Business> via Waves AI Pilot", replyTo the business's contact_email.
+  // The AI-drafted message itself is unchanged, still the paragraph body.
+  const outcome = await sendEmail({
+    to: lead.contact_email!,
+    subject: `Following up — ${businessName}`,
+    onBehalfOf: businessName,
+    replyTo: businessReplyTo,
+    email: renderBrandedEmail({
+      senderName: businessName,
+      heading: `Following up from ${businessName}`,
+      paragraphs: [...message.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean), `— The ${businessName} team`],
+      footnote: businessReplyTo
+        ? `Sent on behalf of ${businessName} by Waves AI Pilot. Replies go straight to ${businessName}.`
+        : `Sent on behalf of ${businessName} by Waves AI Pilot.`,
+    }),
+  });
+
+  if (outcome === "skipped_no_api_key") {
     // Left un-set (no follow_up_status write): retried tomorrow once a
     // sending domain exists, same degrade-safe contract as
     // lib/notifications.ts's own digest.
@@ -201,34 +227,28 @@ async function sendFollowUpEmail(
     return "skipped";
   }
 
-  const resend = new Resend(apiKey);
-  const from = process.env.NOTIFICATION_EMAIL_FROM || DEFAULT_FROM;
+  if (outcome === "suppressed") {
+    // Previously Resend accepted this call and dropped the mail itself, so
+    // the lead was recorded 'sent_email' with follow_up_sent_at set -- a
+    // follow-up the dashboard reported as delivered that reached nobody.
+    // Like the other blocked_* states, follow_up_sent_at stays null.
+    await supabase.from("leads").update({ follow_up_status: "blocked_email_suppressed" }).eq("id", lead.id);
+    logEvent("stalled_lead_follow_up_blocked", lead.business_id, { leadId: lead.id, reason: "email_suppressed" });
+    return "blocked_email_suppressed";
+  }
 
-  try {
-    const { error } = await resend.emails.send({
-      from,
-      to: lead.contact_email!,
-      subject: `Following up — ${businessName}`,
-      text: `${message}\n\n— The ${businessName} team`,
-    });
-
-    if (error) {
-      await supabase.from("leads").update({ follow_up_status: "send_failed" }).eq("id", lead.id);
-      logEvent("stalled_lead_follow_up_send_failed", lead.business_id, { leadId: lead.id }, "error");
-      return "send_failed";
-    }
-
-    await supabase
-      .from("leads")
-      .update({ follow_up_status: "sent_email", follow_up_sent_at: new Date().toISOString() })
-      .eq("id", lead.id);
-    logEvent("stalled_lead_follow_up_sent", lead.business_id, { leadId: lead.id, channel: "email" });
-    return "sent_email";
-  } catch {
+  if (outcome === "failed") {
     await supabase.from("leads").update({ follow_up_status: "send_failed" }).eq("id", lead.id);
     logEvent("stalled_lead_follow_up_send_failed", lead.business_id, { leadId: lead.id }, "error");
     return "send_failed";
   }
+
+  await supabase
+    .from("leads")
+    .update({ follow_up_status: "sent_email", follow_up_sent_at: new Date().toISOString() })
+    .eq("id", lead.id);
+  logEvent("stalled_lead_follow_up_sent", lead.business_id, { leadId: lead.id, channel: "email" });
+  return "sent_email";
 }
 
 async function resolveInterestName(

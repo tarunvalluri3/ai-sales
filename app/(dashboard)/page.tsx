@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ConversationMockup } from "./_components/homepage/conversation-mockup";
 import { Reveal } from "./_components/homepage/reveal";
+import { WavesLogo } from "./_components/waves-logo";
 
 const WORKFLOW_STEPS = [
   { label: "Configure your business", detail: "Identity, products, services, and FAQs." },
@@ -164,10 +165,7 @@ export default function HomePage() {
       <footer className="border-t border-ds-border px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
           <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <div className="flex items-center gap-2 text-sm font-semibold text-ds-text-primary">
-              <span className="size-2 rounded-full bg-ds-accent" aria-hidden="true" />
-              Waves AI Pilot
-            </div>
+            <WavesLogo />
             <p className="text-2xs text-ds-text-muted">An AI sales employee, grounded in your own business.</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-2xs text-ds-text-muted">

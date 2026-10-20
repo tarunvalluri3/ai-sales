@@ -24,6 +24,8 @@ const envSchema = z.object({
   CRON_SECRET: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   NOTIFICATION_EMAIL_FROM: z.string().min(1).optional(),
+  RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
+  NEXT_PUBLIC_APP_URL: z.url().optional(),
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),

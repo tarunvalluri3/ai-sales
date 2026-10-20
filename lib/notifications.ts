@@ -1,13 +1,13 @@
 import "server-only";
-import { Resend } from "resend";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
 import { SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
+import { getAppUrl } from "@/lib/app-url";
+import { renderBrandedEmail } from "@/lib/email-template";
+import { sendEmail } from "@/lib/email-sender";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_BUSINESSES_PER_RUN = 200;
-
-const DEFAULT_FROM = "Waves AI Pilot <onboarding@resend.dev>";
 
 /**
  * Same null-safe sandbox exclusion as lib/conversations.ts's own
@@ -17,19 +17,34 @@ const DEFAULT_FROM = "Waves AI Pilot <onboarding@resend.dev>";
  */
 const EXCLUDE_SANDBOX_FILTER = `source.is.null,source.neq.${SANDBOX_CONVERSATION_SOURCE}`;
 
+/**
+ * 2026-10-19: every sender here now renders through lib/email-template.ts
+ * (branded HTML with a plain-text part) and leaves through
+ * lib/email-sender.ts, which owns the API-key check, the suppression check,
+ * the from-address and reply routing. Each function below keeps its own
+ * signature, return shape and log event names unchanged, so none of its
+ * callers had to move.
+ *
+ * Two kinds of recipient, and the difference matters:
+ * - **The business itself** (digest, new-appointment alert, workflow
+ *   email): mail comes from Waves AI Pilot, which is accurate.
+ * - **A prospect** (appointment status): mail speaks *for* the business, so
+ *   it is sent "Acme Dental via Waves AI Pilot" with `replyTo` set to the
+ *   business's own address. Previously it came from "Waves AI Pilot" with
+ *   no reply-to at all, so a prospect answering "can we do Thursday
+ *   instead?" was writing to an inbox nobody reads.
+ */
+
 export type NotificationDigestResult = { sent: number; skipped: number; failed: number };
 
 /**
- * Phase 29: the workflow engine's `email_notification` action -- reuses
- * this file's existing Resend/`DEFAULT_FROM`/silent-no-op-if-unconfigured
- * contract exactly, rather than a second email-sending path. Recipient is
+ * Phase 29: the workflow engine's `email_notification` action. Recipient is
  * the business's own `contact_email`, same known limitation as the daily
- * digest above (no dedicated staff-notification-recipients list exists
- * yet). Client-injected since the workflow engine itself is
- * client-injected (runs under either the service-role or the
- * Clerk-authenticated client, depending on what triggered the workflow).
- * Never throws -- a failed notification must not fail the workflow run
- * that's sending it; the run still completes, this is best-effort.
+ * digest below (no dedicated staff-notification-recipients list exists
+ * yet). Client-injected since the workflow engine itself is client-injected
+ * (runs under either the service-role or the Clerk-authenticated client,
+ * depending on what triggered the workflow). Never throws -- a failed
+ * notification must not fail the workflow run that's sending it.
  */
 export async function sendWorkflowNotificationEmail(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
@@ -37,8 +52,7 @@ export async function sendWorkflowNotificationEmail(
   subject: string,
   message: string,
 ): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!process.env.RESEND_API_KEY) {
     logEvent("workflow_notification_email_skipped_no_api_key", businessId);
     return false;
   }
@@ -49,55 +63,54 @@ export async function sendWorkflowNotificationEmail(
     return false;
   }
 
-  try {
-    const resend = new Resend(apiKey);
-    const from = process.env.NOTIFICATION_EMAIL_FROM || DEFAULT_FROM;
-    await resend.emails.send({
-      from,
-      to: business.contact_email,
-      subject,
-      text: message,
-    });
-    return true;
-  } catch {
-    logEvent("workflow_notification_email_failed", businessId, {}, "error");
-    return false;
-  }
+  const outcome = await sendEmail({
+    to: business.contact_email,
+    subject,
+    email: renderBrandedEmail({
+      heading: subject,
+      // Admin-authored workflow text; blank lines become paragraph breaks.
+      paragraphs: message.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean),
+      cta: { label: "Open your dashboard", url: `${getAppUrl()}/dashboard` },
+      footnote: "Sent by a workflow you set up in Waves AI Pilot.",
+    }),
+  });
+
+  if (outcome === "sent") return true;
+  logEvent(
+    outcome === "suppressed" ? "workflow_notification_email_suppressed" : "workflow_notification_email_failed",
+    businessId,
+    {},
+    outcome === "failed" ? "error" : "info",
+  );
+  return false;
 }
 
 /**
- * Daily handoff/lead email digest (Phase 25b) -- part of the shared
- * daily cron backstop (app/api/cron/process-ingestion-queue/route.ts),
- * same "no dedicated worker, no notification-specific trigger" reasoning
- * as lib/sla-routing.ts's own sweep. For every business with a
- * `contact_email` set, sends one email summarizing new leads in the
- * last 24h and conversations currently needing attention -- skipped
- * entirely (not sent) when both are zero, so a quiet business never
+ * Daily handoff/lead email digest (Phase 25b) -- part of the shared daily
+ * cron backstop (app/api/cron/process-ingestion-queue/route.ts). For every
+ * business with a `contact_email` set, sends one email summarizing new
+ * leads in the last 24h and conversations currently needing attention --
+ * skipped entirely (not sent) when both are zero, so a quiet business never
  * gets an empty digest.
  *
- * Recipient is `businesses.contact_email` -- the only business-level
- * email address this app collects (Phase 13b), not a dedicated
- * "notify these staff" list. **Known limitation**: this conflates "how
- * a prospect reaches the business" with "who gets operational alerts."
- * A dedicated staff-notification-recipients field is a reasonable
- * follow-up, not built here to keep this sub-phase's scope bounded.
+ * Recipient is `businesses.contact_email` -- the only business-level email
+ * address this app collects (Phase 13b). **Known limitation**: this
+ * conflates "how a prospect reaches the business" with "who gets
+ * operational alerts."
  *
  * A silent no-op (one log line, not an error) when `RESEND_API_KEY` is
- * unset -- matches `lib/env.ts`'s optional-variable convention (docs/security.md
- * §5): email delivery is additive on top of the in-app "needs
- * attention" badge and audit trail, not a path anything else depends
- * on. A single business's send failure never blocks another's.
+ * unset. A single business's send failure never blocks another's. A
+ * suppressed (previously bounced) contact address counts as `skipped`, not
+ * `failed` -- nothing went wrong in this run, the address is known-dead.
  */
 export async function sendDailyDigestEmails(): Promise<NotificationDigestResult> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!process.env.RESEND_API_KEY) {
     logEvent("notification_digest_skipped_no_api_key", "unknown");
     return { sent: 0, skipped: 0, failed: 0 };
   }
 
-  const resend = new Resend(apiKey);
-  const from = process.env.NOTIFICATION_EMAIL_FROM || DEFAULT_FROM;
   const supabase = createServiceSupabaseClient();
+  const dashboardUrl = `${getAppUrl()}/dashboard`;
 
   const { data: businesses, error } = await supabase
     .from("businesses")
@@ -147,29 +160,29 @@ export async function sendDailyDigestEmails(): Promise<NotificationDigestResult>
           ? `${needsAttention} conversation(s) need attention — ${business.name}`
           : `${leads} new lead(s) in the last 24 hours — ${business.name}`;
 
-      const lines = [
-        `Here's your daily Waves AI Pilot summary for ${business.name}:`,
-        "",
-        `- New leads in the last 24 hours: ${leads}`,
-        `- Conversations needing attention right now: ${needsAttention}`,
-        "",
-        "Open your dashboard to review: https://ai-sales.vercel.app/dashboard",
-      ];
-
-      const { error: sendError } = await resend.emails.send({
-        from,
+      const outcome = await sendEmail({
         to: business.contact_email,
         subject,
-        text: lines.join("\n"),
+        email: renderBrandedEmail({
+          heading: `Your daily summary for ${business.name}`,
+          facts: [
+            { label: "New leads, last 24 hours", value: String(leads) },
+            { label: "Conversations needing attention now", value: String(needsAttention) },
+          ],
+          cta: { label: "Review in your dashboard", url: dashboardUrl },
+          footnote: "You get this once a day, and only on days something happened.",
+        }),
       });
 
-      if (sendError) {
+      if (outcome === "sent") {
+        sent++;
+      } else if (outcome === "suppressed") {
+        skipped++;
+        logEvent("notification_digest_suppressed", business.id);
+      } else {
         failed++;
         logEvent("notification_digest_send_failed", business.id, {}, "error");
-        continue;
       }
-
-      sent++;
     } catch {
       failed++;
       logEvent("notification_digest_send_failed", business.id, {}, "error");
@@ -180,21 +193,17 @@ export async function sendDailyDigestEmails(): Promise<NotificationDigestResult>
 }
 
 /**
- * Immediate admin alert for a brand-new pending appointment request
- * (2026-09-10 follow-up to Phase C) -- unlike the daily digest above,
- * this fires right when the AI's book_appointment tool creates the row,
- * so a business doesn't have to wait until the next day to learn a
- * prospect is waiting on a confirmation. Same recipient
- * (`businesses.contact_email`), same silent-no-op-if-unconfigured
- * contract, same never-throws shape -- a failed send here must never
- * turn a successful booking into an error response.
+ * Immediate admin alert for a brand-new pending appointment request -- fires
+ * right when the AI's book_appointment tool creates the row, so a business
+ * doesn't have to wait until the next day to learn a prospect is waiting on
+ * a confirmation. Never throws -- a failed send here must never turn a
+ * successful booking into an error response.
  */
 export async function sendNewAppointmentRequestEmail(
   businessId: string,
   appointment: { contactName: string | null; contactEmail: string | null; contactPhone: string | null; label: string },
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!process.env.RESEND_API_KEY) {
     logEvent("appointment_request_email_skipped_no_api_key", businessId);
     return;
   }
@@ -206,34 +215,30 @@ export async function sendNewAppointmentRequestEmail(
     return;
   }
 
-  const resend = new Resend(apiKey);
-  const from = process.env.NOTIFICATION_EMAIL_FROM || DEFAULT_FROM;
+  const outcome = await sendEmail({
+    to: business.contact_email,
+    subject: `New appointment request — ${business.name}`,
+    // Reply-to the prospect when they gave an address: replying to this
+    // alert is the fastest way for the business to reach them.
+    replyTo: appointment.contactEmail,
+    email: renderBrandedEmail({
+      heading: "A new appointment request just came in",
+      paragraphs: [`Someone asked to book a time with ${business.name}. It's waiting for you to confirm or decline.`],
+      facts: [
+        { label: "When", value: appointment.label },
+        { label: "Name", value: appointment.contactName ?? "Not given" },
+        { label: "Email", value: appointment.contactEmail ?? "Not given" },
+        { label: "Phone", value: appointment.contactPhone ?? "Not given" },
+      ],
+      cta: { label: "Confirm or decline", url: `${getAppUrl()}/dashboard/appointments` },
+    }),
+  });
 
-  const lines = [
-    `A new appointment request just came in for ${business.name}:`,
-    "",
-    `- When: ${appointment.label}`,
-    `- Name: ${appointment.contactName ?? "Not given"}`,
-    `- Email: ${appointment.contactEmail ?? "Not given"}`,
-    `- Phone: ${appointment.contactPhone ?? "Not given"}`,
-    "",
-    "Confirm or decline it here: https://ai-sales.vercel.app/dashboard/appointments",
-  ];
-
-  try {
-    const { error } = await resend.emails.send({
-      from,
-      to: business.contact_email,
-      subject: `New appointment request — ${business.name}`,
-      text: lines.join("\n"),
-    });
-
-    if (error) {
-      logEvent("appointment_request_email_send_failed", businessId, {}, "error");
-      return;
-    }
+  if (outcome === "sent") {
     logEvent("appointment_request_email_sent", businessId);
-  } catch {
+  } else if (outcome === "suppressed") {
+    logEvent("appointment_request_email_suppressed", businessId);
+  } else if (outcome === "failed") {
     logEvent("appointment_request_email_send_failed", businessId, {}, "error");
   }
 }
@@ -246,22 +251,41 @@ const STATUS_EMAIL_SUBJECT: Record<AppointmentStatusForEmail, (businessName: str
   cancelled: (businessName) => `Your appointment with ${businessName} was cancelled`,
 };
 
-const STATUS_EMAIL_BODY: Record<AppointmentStatusForEmail, (label: string) => string> = {
-  confirmed: (label) => `Your appointment for ${label} is confirmed. We look forward to speaking with you.`,
-  declined: (label) =>
-    `Unfortunately we couldn't confirm your requested appointment for ${label}. Please get back in touch to find another time.`,
-  cancelled: (label) => `Your appointment for ${label} has been cancelled. Please get back in touch if you'd like to reschedule.`,
+const STATUS_EMAIL_HEADING: Record<AppointmentStatusForEmail, string> = {
+  confirmed: "Your appointment is confirmed",
+  declined: "We couldn't confirm that time",
+  cancelled: "Your appointment was cancelled",
+};
+
+// Two variants of each body: the "reply to this email" wording is only used
+// when a reply will actually reach the business (it has a contact_email to
+// route replyTo at). Otherwise the copy falls back to the original neutral
+// "get back in touch" -- promising a reply path that doesn't exist would be
+// worse than the old behaviour.
+const STATUS_EMAIL_BODY: Record<AppointmentStatusForEmail, { canReply: string; cannotReply: string }> = {
+  confirmed: {
+    canReply: "We look forward to speaking with you. If anything changes, just reply to this email.",
+    cannotReply: "We look forward to speaking with you.",
+  },
+  declined: {
+    canReply: "Unfortunately we couldn't confirm your requested time. Reply to this email to find another one.",
+    cannotReply: "Unfortunately we couldn't confirm your requested time. Please get back in touch to find another one.",
+  },
+  cancelled: {
+    canReply: "If you'd like to reschedule, just reply to this email.",
+    cannotReply: "Please get back in touch if you'd like to reschedule.",
+  },
 };
 
 /**
  * Reply to the prospect once the business confirms/declines/cancels an
- * appointment they booked (2026-09-10 follow-up to Phase C) -- until now
- * `app/(dashboard)/dashboard/appointments/actions.ts` only ever flipped
- * the row's status with no reply of any kind. `to` is the appointment's
- * own `contact_email`, passed by the caller rather than looked up here
- * since it's already tenant-validated at that point. Same silent-no-op-
- * if-unconfigured and never-throws contract as every other sender in
- * this file.
+ * appointment they booked. `to` is the appointment's own `contact_email`,
+ * passed by the caller since it's already tenant-validated at that point.
+ *
+ * **Prospect-facing**: sent "<Business> via Waves AI Pilot" with `replyTo`
+ * set to the business's `contact_email`. The declined and cancelled bodies
+ * explicitly ask the prospect to reply, so without `replyTo` the one
+ * response this email exists to prompt went nowhere.
  */
 export async function sendAppointmentStatusEmail(
   businessId: string,
@@ -269,33 +293,40 @@ export async function sendAppointmentStatusEmail(
   status: AppointmentStatusForEmail,
   label: string,
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
+  if (!process.env.RESEND_API_KEY) {
     logEvent("appointment_status_email_skipped_no_api_key", businessId, { status });
     return;
   }
 
   const supabase = createServiceSupabaseClient();
-  const { data: business } = await supabase.from("businesses").select("name").eq("id", businessId).maybeSingle();
+  const { data: business } = await supabase.from("businesses").select("name, contact_email").eq("id", businessId).maybeSingle();
   const businessName = business?.name ?? "the business";
+  const replyTo = business?.contact_email ?? null;
 
-  const resend = new Resend(apiKey);
-  const from = process.env.NOTIFICATION_EMAIL_FROM || DEFAULT_FROM;
+  const outcome = await sendEmail({
+    to,
+    subject: STATUS_EMAIL_SUBJECT[status](businessName),
+    onBehalfOf: businessName,
+    replyTo,
+    email: renderBrandedEmail({
+      senderName: businessName,
+      heading: STATUS_EMAIL_HEADING[status],
+      paragraphs: [replyTo ? STATUS_EMAIL_BODY[status].canReply : STATUS_EMAIL_BODY[status].cannotReply],
+      facts: [
+        { label: "With", value: businessName },
+        { label: "When", value: label },
+      ],
+      footnote: replyTo
+        ? `Sent on behalf of ${businessName} by Waves AI Pilot. Replies go straight to ${businessName}.`
+        : `Sent on behalf of ${businessName} by Waves AI Pilot.`,
+    }),
+  });
 
-  try {
-    const { error } = await resend.emails.send({
-      from,
-      to,
-      subject: STATUS_EMAIL_SUBJECT[status](businessName),
-      text: STATUS_EMAIL_BODY[status](label),
-    });
-
-    if (error) {
-      logEvent("appointment_status_email_send_failed", businessId, { status }, "error");
-      return;
-    }
+  if (outcome === "sent") {
     logEvent("appointment_status_email_sent", businessId, { status });
-  } catch {
+  } else if (outcome === "suppressed") {
+    logEvent("appointment_status_email_suppressed", businessId, { status });
+  } else if (outcome === "failed") {
     logEvent("appointment_status_email_send_failed", businessId, { status }, "error");
   }
 }

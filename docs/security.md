@@ -117,6 +117,8 @@ Core set:
 | `CRON_SECRET` | **no** |
 | `RESEND_API_KEY` | **no** |
 | `NOTIFICATION_EMAIL_FROM` | config |
+| `RESEND_WEBHOOK_SECRET` | **no** |
+| `NEXT_PUBLIC_APP_URL` | yes -- a public URL, not a secret |
 | `LOCAL_CHROMIUM_PATH` | config, local dev only |
 | `WHATSAPP_APP_SECRET` | **no** |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | **no** |
@@ -138,6 +140,14 @@ Add a variable only when a feature actually requires it. Razorpay variables rema
 `CRON_SECRET` (Phase 23) is also optional in `lib/env.ts`'s schema, but for the opposite reason: its absence should degrade safely (the cron route refuses every request, 404, rather than either failing startup or accepting unauthenticated calls) since local dev has no Vercel Cron and ingestion still works there via the immediate `after()` trigger.
 
 `RESEND_API_KEY`/`NOTIFICATION_EMAIL_FROM` (Phase 25b) are optional -- `lib/notifications.ts`'s daily digest silently no-ops (one log line) rather than failing startup or the cron route when unset, since email delivery is a nice-to-have on top of the in-app "needs attention" badge/audit trail, not a path anything else depends on.
+
+`RESEND_WEBHOOK_SECRET` (2026-10-19) verifies `app/api/webhooks/resend/route.ts`, Resend's bounce/complaint webhook, which Resend delivers through Svix. It is optional in `lib/env.ts`'s schema and fails closed exactly like the WhatsApp and Instagram webhook secrets -- unset means every request is refused (401). That posture matters more here than it might look: an unauthenticated version of this endpoint would let anyone write arbitrary addresses into `email_suppressions` and so silently switch off a business's email to its own prospects. Verification is done by hand with `node:crypto` (`lib/resend-webhook.ts`) rather than the `svix` package, matching the WhatsApp webhook's own manual HMAC check.
+
+`email_suppressions` is the one table in this app that is deliberately **not** tenant-scoped -- a hard bounce is a fact about an address, true for every business holding it, and the sending domain it protects is shared by all tenants. It follows `rate_limit_counters`' access model instead: RLS enabled and forced, zero policies, zero grants to `anon`/`authenticated`, service-role only. Tenant access would itself be a leak, since its rows are other businesses' prospect addresses.
+
+`NEXT_PUBLIC_APP_URL` (2026-10-19) is the second base-URL-shaped variable in this codebase, after `INSTAGRAM_OAUTH_REDIRECT_URI`, and exists for the same underlying reason: a URL the app must know with no incoming request to derive it from. Email is sent from the cron and from `after()` continuations. It stays optional because `lib/app-url.ts` falls back to Vercel's automatic `VERCEL_PROJECT_PRODUCTION_URL`. Request-scoped code should keep deriving its origin from the request, as `/dashboard/widget-settings` does.
+
+**Prospect-facing email identity.** Mail that speaks for a customer business to that business's prospect (appointment status, stalled-lead follow-up) is sent with the display name `"<Business> via Waves AI Pilot"` and `replyTo` set to the business's `contact_email`, keeping this app's own verified address in `From`. The business name is tenant-supplied and lands in a mail header, so `lib/email-sender.ts` strips CR/LF (header injection) and always emits it as an escaped RFC 5322 quoted-string, so no name can change which address the mail claims to come from. All interpolated values in email bodies are HTML-escaped by `lib/email-template.ts`.
 
 Supabase key names above reflect the current `publishable`/`secret` key system (Phase 3), not the legacy `anon`/`service_role` naming, which Supabase is deprecating by end of 2026.
 
