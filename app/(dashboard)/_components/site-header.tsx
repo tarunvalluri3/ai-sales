@@ -30,7 +30,10 @@ const PUBLIC_NAV: { label: string; href: string }[] = [
  */
 export function SiteHeader() {
   const pathname = usePathname();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // The menu is open only for the path it was opened on, so navigating
+  // closes it without an effect that resets state.
+  const [menuOpenedAt, setMenuOpenedAt] = useState<string | null>(null);
+  const isMenuOpen = menuOpenedAt !== null && menuOpenedAt === pathname;
 
   const isDashboard = pathname?.startsWith("/dashboard");
   const isAuthFlow =
@@ -39,17 +42,12 @@ export function SiteHeader() {
     pathname?.startsWith("/onboarding") ||
     pathname?.startsWith("/session-tasks");
 
-  // Navigating with the menu open would otherwise leave it hanging over the
-  // new page. Runs before the early returns below, as hooks must.
-  useEffect(() => {
-    setIsMenuOpen(false);
-  }, [pathname]);
-
+  // Hooks run before the early returns below, as they must.
   useEffect(() => {
     if (!isMenuOpen) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setIsMenuOpen(false);
+      if (event.key === "Escape") setMenuOpenedAt(null);
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -118,7 +116,7 @@ export function SiteHeader() {
             an overlay -- so it needs no focus trap and tabs naturally. */}
         <button
           type="button"
-          onClick={() => setIsMenuOpen((open) => !open)}
+          onClick={() => setMenuOpenedAt(isMenuOpen ? null : pathname)}
           aria-expanded={isMenuOpen}
           aria-controls={MENU_ID}
           aria-label={isMenuOpen ? "Close menu" : "Open menu"}
