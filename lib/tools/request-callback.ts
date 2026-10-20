@@ -10,6 +10,7 @@ import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
+import { dispatchNotification } from "@/lib/notification-dispatch";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -170,6 +171,17 @@ export async function executeRequestCallback(
   const workflowTarget = { type: "lead" as const, id: result.leadId, customerId: result.customerId, leadId: result.leadId, conversationId };
   if (result.created) {
     await dispatchWorkflowTrigger(supabase, businessId, "lead_created", workflowTarget);
+    // In-app only by default (digest tier) -- see the matching call in
+    // lib/tools/book-appointment.ts for why this carries no email payload.
+    after(() =>
+      dispatchNotification({
+        businessId,
+        category: "lead_created",
+        message: `New lead: ${contactName || contactEmail || contactPhone || "contact details captured"}`,
+        link: "/dashboard/leads",
+        supabase,
+      }),
+    );
   }
   await dispatchWorkflowTrigger(supabase, businessId, "lead_score_threshold", workflowTarget, {
     previousScore: result.previousScore,

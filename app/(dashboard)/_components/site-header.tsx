@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { OrganizationSwitcher, Show, UserButton } from "@clerk/nextjs";
+import { Show, UserButton } from "@clerk/nextjs";
 import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
 import { WavesLogo } from "./waves-logo";
 
@@ -53,18 +53,13 @@ export function SiteHeader() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isMenuOpen]);
 
+  // The dashboard renders its own header from dashboard/layout.tsx
+  // (dashboard-header.tsx), so that the notification bell sits inside
+  // AttentionProvider and can read the unread count from the existing poll.
+  // This layout is shared with the marketing and auth pages, which must not
+  // mount that business-scoped provider -- see dashboard-header.tsx's comment.
   if (isDashboard) {
-    return (
-      <header className="flex items-center justify-end gap-3 border-b border-ds-border bg-ds-surface px-4 py-2.5">
-        <OrganizationSwitcher
-          hidePersonal
-          afterSelectOrganizationUrl="/dashboard"
-          afterCreateOrganizationUrl="/dashboard"
-          appearance={clerkDarkCompactAppearance}
-        />
-        <UserButton appearance={clerkDarkCompactAppearance} />
-      </header>
-    );
+    return null;
   }
 
   if (isAuthFlow) {

@@ -14,7 +14,9 @@ import {
   markAppointmentNoShow,
   getAppointmentForBusiness,
 } from "@/lib/appointments";
-import { notifyAppointmentStatusChange } from "@/lib/appointment-notifications";
+import { notifyAppointmentStatusChange, type AppointmentStatusNotifyResult } from "@/lib/appointment-notifications";
+import { dispatchNotification } from "@/lib/notification-dispatch";
+import { getAppUrl } from "@/lib/app-url";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 import type { AppointmentStatusForEmail } from "@/lib/notifications";
@@ -73,12 +75,65 @@ async function runTransition(
  * threading it through runTransition's generic signature, since only
  * this notification step needs the contact/timing fields.
  */
+const STATUS_VERB: Record<AppointmentStatusForEmail, string> = {
+  confirmed: "confirmed",
+  declined: "declined",
+  cancelled: "cancelled",
+};
+
+/**
+ * What the business is told about whether its prospect actually heard.
+ *
+ * This is the sentence the whole notification rework exists for. A booking was
+ * confirmed in the dashboard, no email reached anyone, and nothing anywhere
+ * said so -- the business had no way to know it needed to pick up the phone.
+ */
+function reachabilitySentence(result: AppointmentStatusNotifyResult, contactPhone: string | null): string {
+  const channel = result.channelReply === "sent" ? " We did reply in the chat instead." : "";
+  const phone = contactPhone ? ` You can reach them on ${contactPhone}.` : "";
+
+  switch (result.prospectEmail) {
+    case "sent":
+      return "We emailed them to let them know.";
+    case "no_address":
+      return `We could NOT email them -- they never gave an email address.${channel}${phone}`;
+    case "suppressed":
+      return `We could NOT email them: their address previously bounced or reported spam.${channel}${phone}`;
+    case "failed":
+      return `We tried to email them and the send failed. You may want to reach out yourself.${channel}${phone}`;
+    case "skipped_no_api_key":
+      return "Email sending isn't configured, so they were not emailed.";
+  }
+}
+
 function notifyStatusChange(businessId: string, id: string, status: AppointmentStatusForEmail): void {
   after(async () => {
     const supabase = createServerSupabaseClient();
     const appointment = await getAppointmentForBusiness(supabase, businessId, id);
     if (!appointment) return;
-    await notifyAppointmentStatusChange(businessId, appointment, status);
+    const result = await notifyAppointmentStatusChange(businessId, appointment, status);
+
+    // Receipt to the business, carrying the one fact it cannot see anywhere
+    // else: whether the prospect was actually reachable.
+    const reachability = reachabilitySentence(result, appointment.contact_phone);
+    await dispatchNotification({
+      businessId,
+      category: "appointment_status",
+      message: `You ${STATUS_VERB[status]} an appointment. ${reachability}`,
+      link: "/dashboard/appointments",
+      supabase,
+      email: {
+        subject: `Appointment ${STATUS_VERB[status]} — ${appointment.contact_name ?? "your prospect"}`,
+        heading: `You ${STATUS_VERB[status]} this appointment`,
+        paragraphs: [reachability],
+        facts: [
+          { label: "Name", value: appointment.contact_name ?? "Not given" },
+          { label: "Email", value: appointment.contact_email ?? "Not given" },
+          { label: "Phone", value: appointment.contact_phone ?? "Not given" },
+        ],
+        cta: { label: "Open your appointments", url: `${getAppUrl()}/dashboard/appointments` },
+      },
+    });
   });
 }
 

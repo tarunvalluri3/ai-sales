@@ -9,6 +9,7 @@ import { createInstagramOutboundMessage, sendInstagramOutboundMessage } from "@/
 import { createMessage } from "@/lib/messages";
 import { formatSlotLabel } from "@/lib/appointments";
 import { sendAppointmentStatusEmail, type AppointmentStatusForEmail } from "@/lib/notifications";
+import type { SendEmailOutcome } from "@/lib/email-sender";
 import { logEvent } from "@/lib/logger";
 import type { Appointment } from "@/lib/supabase/types";
 
@@ -39,32 +40,46 @@ const STATUS_MESSAGE: Record<AppointmentStatusForEmail, (label: string) => strin
  * succeeded -- every failure here is logged and swallowed, never thrown,
  * so a notification-delivery problem can't turn an already-successful
  * admin action into an error.
+ *
+ * **Reports what actually reached the prospect** (2026-10-21) instead of
+ * returning void. The caller sends the business a receipt, and the one thing
+ * that receipt must say is whether the prospect was reachable at all -- the
+ * `!contact_email` branch below is exactly where that is known, and it used to
+ * be thrown away.
  */
+export type AppointmentStatusNotifyResult = {
+  /** `no_address` is the prospect never having given an email at all. */
+  prospectEmail: SendEmailOutcome | "no_address";
+  channelReply: "sent" | "not_applicable" | "no_connection" | "failed";
+};
+
 export async function notifyAppointmentStatusChange(
   businessId: string,
   appointment: Pick<Appointment, "id" | "conversation_id" | "contact_email" | "starts_at">,
   status: AppointmentStatusForEmail,
-): Promise<void> {
+): Promise<AppointmentStatusNotifyResult> {
   const serviceSupabase = createServiceSupabaseClient();
   const { data: business } = await serviceSupabase.from("businesses").select("timezone").eq("id", businessId).maybeSingle();
   const label = formatSlotLabel(new Date(appointment.starts_at), business?.timezone ?? "UTC");
 
-  if (appointment.contact_email) {
-    await sendAppointmentStatusEmail(businessId, appointment.contact_email, status, label);
-  }
+  const prospectEmail: AppointmentStatusNotifyResult["prospectEmail"] = appointment.contact_email
+    ? await sendAppointmentStatusEmail(businessId, appointment.contact_email, status, label)
+    : "no_address";
 
-  if (!appointment.conversation_id) return;
+  if (!appointment.conversation_id) return { prospectEmail, channelReply: "not_applicable" };
+
+  let channelReply: AppointmentStatusNotifyResult["channelReply"] = "not_applicable";
 
   try {
     const supabase = createServerSupabaseClient();
     const conversation = await getConversationForBusiness(supabase, businessId, appointment.conversation_id);
-    if (!conversation || !conversation.visitor_id) return;
+    if (!conversation || !conversation.visitor_id) return { prospectEmail, channelReply };
 
     const content = STATUS_MESSAGE[status](label);
 
     if (conversation.source === WHATSAPP_CONVERSATION_SOURCE) {
       const connection = await getWhatsappConnectionForBusiness(businessId);
-      if (connection?.status !== "connected") return;
+      if (connection?.status !== "connected") return { prospectEmail, channelReply: "no_connection" };
       const message = await createMessage(serviceSupabase, businessId, conversation.id, "human_agent", content);
       const outbound = await createWhatsappOutboundMessage(serviceSupabase, {
         businessId,
@@ -75,13 +90,14 @@ export async function notifyAppointmentStatusChange(
         content,
       });
       await sendWhatsappOutboundMessage(outbound.id);
+      channelReply = "sent";
     } else if (conversation.source === INSTAGRAM_CONVERSATION_SOURCE) {
       // Same reasoning as sendHumanReplyAction()'s Instagram branch -- this
       // was missing entirely until now, so an Instagram-sourced prospect
       // with no email got zero notification on appointment status changes
       // (STATE.md Phase 26 follow-up).
       const connection = await getInstagramConnectionForBusiness(businessId);
-      if (connection?.status !== "connected") return;
+      if (connection?.status !== "connected") return { prospectEmail, channelReply: "no_connection" };
       const message = await createMessage(serviceSupabase, businessId, conversation.id, "human_agent", content);
       const outbound = await createInstagramOutboundMessage(serviceSupabase, {
         businessId,
@@ -92,8 +108,12 @@ export async function notifyAppointmentStatusChange(
         content,
       });
       await sendInstagramOutboundMessage(outbound.id);
+      channelReply = "sent";
     }
   } catch {
     logEvent("appointment_status_channel_reply_failed", businessId, { appointmentId: appointment.id, status }, "error");
+    channelReply = "failed";
   }
+
+  return { prospectEmail, channelReply };
 }

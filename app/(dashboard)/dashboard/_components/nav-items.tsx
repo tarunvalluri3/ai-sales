@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from "react";
 import {
   BarChart3,
+  Bell,
   BookOpen,
   Building2,
   CalendarCheck,
@@ -84,6 +85,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Business Profile", href: "/dashboard/profile", icon: Building2 },
       { label: "Business Hours", href: "/dashboard/business-hours", icon: Clock },
+      { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
       { label: "Webhooks", href: "/dashboard/webhooks", icon: Webhook },
       { label: "Audit Log", href: "/dashboard/audit-log", icon: ScrollText },
     ],

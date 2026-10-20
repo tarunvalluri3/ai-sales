@@ -30,6 +30,26 @@ export const businessContactEmailSchema = optionalTrimmed
   })
   .transform((value) => (value === "" ? null : value));
 
+/**
+ * The same field, but mandatory. Used by onboarding and the business profile
+ * form, because every business-facing email this product sends -- appointment
+ * alerts, handover alerts, the daily digest, workflow emails -- goes to this
+ * one address, and a business without it silently receives nothing.
+ *
+ * The optional variant above is kept, not repurposed: other callers import it
+ * by name, and the database column stays nullable on purpose (making it NOT
+ * NULL would mean inventing an address for every existing row, which is both a
+ * fabricated business fact and a live misdelivery risk).
+ */
+export const businessContactEmailRequiredSchema = optionalTrimmed
+  .refine((value) => value !== "", {
+    message: "Enter the email address that should receive lead, handover and appointment alerts.",
+  })
+  .refine((value) => value === "" || z.string().email().safeParse(value).success, {
+    message: "Enter a valid email address.",
+  })
+  .transform((value) => (value === "" ? null : value));
+
 export const businessContactPhoneSchema = optionalTrimmed
   .refine((value) => value === "" || /^[+()\-.\s\d]{7,20}$/.test(value), {
     message: "Enter a valid phone number.",
@@ -69,7 +89,10 @@ export const businessProfileSchema = z.object({
   name: businessNameSchema,
   businessType: businessTypeSchema,
   description: businessDescriptionSchema,
-  contactEmail: businessContactEmailSchema,
+  // Required here as well as at onboarding, so an existing business that
+  // predates the rule is asked for one the next time it saves its profile --
+  // which is exactly where the dashboard's gate sends it.
+  contactEmail: businessContactEmailRequiredSchema,
   contactPhone: businessContactPhoneSchema,
   website: businessWebsiteSchema,
 });
