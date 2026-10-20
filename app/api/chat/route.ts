@@ -16,6 +16,9 @@ import { askSalesEmployee } from "@/lib/rag";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 import { logEvent } from "@/lib/logger";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
+import { dispatchNotification } from "@/lib/notification-dispatch";
+import { getAppUrl } from "@/lib/app-url";
+import { after } from "next/server";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -244,8 +247,38 @@ export async function POST(request: NextRequest) {
       // does not change `control`. See prompts/phase-15a-handoff-state-and-ai-pause.md's
       // "Decisions and assumptions" #1 for why escalation alone must not
       // silence the AI before a human is actually watching.
-      await flagConversationNeedsAttention(supabase, business.businessId, conversation.id, business.clerkOrgId);
+      const flagResult = await flagConversationNeedsAttention(supabase, business.businessId, conversation.id, business.clerkOrgId);
       logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
+
+      // The most urgent event in the product, and until 2026-10-21 it produced
+      // no notification at all -- only a sidebar badge nobody was watching.
+      //
+      // Gated on the transition into needing attention, not on every escalated
+      // turn: without that gate a prospect going back and forth with a stuck AI
+      // would email the business once per turn. The workflow trigger below
+      // deliberately keeps firing every turn, as it always has.
+      //
+      // after() so the prospect never waits on an outbound email, and
+      // dispatchNotification never throws, so no .catch() is needed.
+      if (!flagResult.wasAlreadyFlagged) {
+        const conversationLink = `/dashboard/conversations/${conversation.id}`;
+        after(() =>
+          dispatchNotification({
+            businessId: business.businessId,
+            category: "human_handover",
+            message: `A conversation needs a human: "${message}"`,
+            link: conversationLink,
+            supabase,
+            email: {
+              subject: `A conversation needs a human — ${business.businessName}`,
+              heading: "Your AI handed a conversation to a human",
+              paragraphs: ["The AI couldn't answer this one and flagged it for someone on your team."],
+              facts: [{ label: "What they asked", value: message.slice(0, 200) }],
+              cta: { label: "Take over the conversation", url: `${getAppUrl()}${conversationLink}` },
+            },
+          }),
+        );
+      }
 
       await dispatchWorkflowTrigger(supabase, business.businessId, "conversation_needs_attention", {
         type: "conversation",

@@ -9,6 +9,8 @@ export type BusinessContext = {
   orgRole: string | undefined;
   businessId: string;
   businessName: string;
+  /** Where every business-facing email goes. Null means the business receives none -- the dashboard gates on this. Free to expose: `getBusinessForOrg` already fetches the whole row. */
+  contactEmail: string | null;
 };
 
 /**
@@ -37,5 +39,6 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
     orgRole: context.orgRole,
     businessId: business.id,
     businessName: business.name,
+    contactEmail: business.contact_email,
   };
 }

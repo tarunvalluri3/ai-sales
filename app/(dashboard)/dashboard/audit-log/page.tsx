@@ -50,6 +50,7 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "copilot.action_snoozed": "Copilot action snoozed",
   "copilot.action_completed": "Copilot action completed",
   "copilot.action_superseded": "Copilot action superseded",
+  "notification_preferences.updated": "Notification settings updated",
 };
 
 export default async function AuditLogPage() {

@@ -519,16 +519,39 @@ export type SalesTask = {
   updated_at: string;
 };
 
+/** What kind of event produced a notification (migration 20261021000000). `workflow` is the pre-existing Phase 29 engine action and is the column's default, so every row written before that migration carries it. */
+export type NotificationCategory =
+  | "workflow"
+  | "lead_created"
+  | "human_handover"
+  | "appointment_request"
+  | "appointment_status"
+  | "sla_breach"
+  | "assignment";
+
+/** `digest` means the event is represented in the existing daily digest only -- it is not a synonym for `off`. */
+export type NotificationEmailMode = "immediate" | "digest" | "off";
+
 export type InternalNotification = {
   id: string;
   business_id: string;
   target_user_id: string | null;
+  category: NotificationCategory;
   message: string;
   link: string | null;
   workflow_run_id: string | null;
   step_index: number | null;
   read_at: string | null;
   created_at: string;
+};
+
+/** Per-business notification routing (migration 20261022000000). An ABSENT row means "use the coded default" in lib/notification-preferences.ts -- nothing is seeded. */
+export type NotificationPreference = {
+  business_id: string;
+  category: NotificationCategory;
+  email_mode: NotificationEmailMode;
+  in_app_enabled: boolean;
+  updated_at: string;
 };
 
 export type CopilotDismissal = {
@@ -613,7 +636,9 @@ export type AuditLogAction =
   | "copilot.item_undismissed"
   | "copilot.action_snoozed"
   | "copilot.action_completed"
-  | "copilot.action_superseded";
+  | "copilot.action_superseded"
+  // Must stay in lockstep with audit_log_action_check, extended by 20261022000000.
+  | "notification_preferences.updated";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

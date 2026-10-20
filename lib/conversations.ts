@@ -343,12 +343,19 @@ export async function recordConversationConsent(
  * fetches the conversation first since Postgres has no
  * "set to now() only if null" via a plain update.
  */
+/**
+ * `wasAlreadyFlagged` is what stops a long, repeatedly-escalating conversation
+ * emailing the business once per AI turn -- the caller notifies only on the
+ * transition into needing attention, not on every turn while it still does.
+ */
+export type FlagAttentionResult = { wasAlreadyFlagged: boolean; assignedToUserId: string | null };
+
 export async function flagConversationNeedsAttention(
   supabase: SupabaseClient,
   businessId: string,
   conversationId: string,
   clerkOrgId: string,
-): Promise<void> {
+): Promise<FlagAttentionResult> {
   const { data: existing } = await supabase
     .from("conversations")
     .select("attention_flagged_at, assigned_to_user_id")
@@ -356,12 +363,16 @@ export async function flagConversationNeedsAttention(
     .eq("id", conversationId)
     .maybeSingle();
 
+  const wasAlreadyFlagged = Boolean(existing?.attention_flagged_at);
+
   const update: Record<string, unknown> = { needs_attention: true };
-  if (!existing?.attention_flagged_at) {
+  if (!wasAlreadyFlagged) {
     update.attention_flagged_at = new Date().toISOString();
   }
-  if (!existing?.assigned_to_user_id) {
-    update.assigned_to_user_id = await assignNextTeamMember(businessId, clerkOrgId);
+  let assignedToUserId = existing?.assigned_to_user_id ?? null;
+  if (!assignedToUserId) {
+    assignedToUserId = await assignNextTeamMember(businessId, clerkOrgId);
+    update.assigned_to_user_id = assignedToUserId;
   }
 
   const { error } = await supabase
@@ -379,4 +390,6 @@ export async function flagConversationNeedsAttention(
       ),
     );
   }
+
+  return { wasAlreadyFlagged, assignedToUserId };
 }

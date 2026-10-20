@@ -5,10 +5,22 @@ import { pollAttentionCountAction } from "../actions";
 
 const POLL_INTERVAL_MS = 1000;
 
+/**
+ * TWO separate primitive contexts, deliberately, not one object-valued
+ * context. A `{ attention, unread }` object literal would be a new reference
+ * on every tick, so every consumer -- Sidebar, MobileNav, the header bell --
+ * would re-render once per second forever. With primitives React bails out
+ * when the value is unchanged, which is almost every tick.
+ */
 const AttentionCountContext = createContext<number>(0);
+const UnreadNotificationCountContext = createContext<number>(0);
 
 export function useAttentionCount(): number {
   return useContext(AttentionCountContext);
+}
+
+export function useUnreadNotificationCount(): number {
+  return useContext(UnreadNotificationCountContext);
 }
 
 /**
@@ -44,13 +56,20 @@ function playAttentionChime(context: AudioContext) {
  * interval tightened to 1s Phase 25e): pause on tab-hidden, immediate poll on resume, cleanup
  * on unmount (only ever unmounted by leaving /dashboard/* entirely).
  *
- * The chime plays only when the count genuinely increases relative to
+ * The chime plays only when a count genuinely increases relative to
  * what this tab already knew, and never on the first poll after mount
  * (which would alarm on every login if a backlog already exists).
+ *
+ * As of 2026-10-21 this one tick also carries the unread-notification count
+ * for the header bell. That was a deliberate choice over a second poll loop:
+ * the project's standing rule is no new aggressive polling, and the extra
+ * COUNT rides an existing partial index.
  */
 export function AttentionProvider({ children }: { children: React.ReactNode }) {
   const [count, setCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(0);
   const previousCountRef = useRef<number | null>(null);
+  const previousUnreadRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -66,11 +85,21 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
       const result = await pollAttentionCountAction();
       if (!isMountedRef.current) return;
 
-      if (previousCountRef.current !== null && result > previousCountRef.current && audioContextRef.current) {
+      const attentionRose = previousCountRef.current !== null && result.attentionCount > previousCountRef.current;
+      const unreadRose = previousUnreadRef.current !== null && result.unreadNotificationCount > previousUnreadRef.current;
+
+      // One chime per tick at most. An AI escalation raises BOTH counts in the
+      // same tick -- it flags the conversation and dispatches a notification --
+      // so chiming per-counter would double-ring on the single most important
+      // event there is.
+      if ((attentionRose || unreadRose) && audioContextRef.current) {
         playAttentionChime(audioContextRef.current);
       }
-      previousCountRef.current = result;
-      setCount(result);
+
+      previousCountRef.current = result.attentionCount;
+      previousUnreadRef.current = result.unreadNotificationCount;
+      setCount(result.attentionCount);
+      setUnreadCount(result.unreadNotificationCount);
     } catch {
       // A poll failure is invisible to the user -- keep the last-known
       // count and try again on the next tick.
@@ -124,5 +153,9 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
     };
   }, [poll]);
 
-  return <AttentionCountContext.Provider value={count}>{children}</AttentionCountContext.Provider>;
+  return (
+    <AttentionCountContext.Provider value={count}>
+      <UnreadNotificationCountContext.Provider value={unreadCount}>{children}</UnreadNotificationCountContext.Provider>
+    </AttentionCountContext.Provider>
+  );
 }

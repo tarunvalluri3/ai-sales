@@ -8,7 +8,9 @@ import { isSlotAvailable, createAppointment, formatSlotLabel } from "@/lib/appoi
 import { upsertLeadForConversation } from "@/lib/leads";
 import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
-import { sendNewAppointmentRequestEmail } from "@/lib/notifications";
+import { sendAppointmentReceivedEmail } from "@/lib/notifications";
+import { dispatchNotification } from "@/lib/notification-dispatch";
+import { getAppUrl } from "@/lib/app-url";
 import { logEvent } from "@/lib/logger";
 import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
@@ -132,7 +134,7 @@ export async function executeBookAppointment(
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("appointment_slot_minutes, timezone")
+    .select("name, appointment_slot_minutes, timezone")
     .eq("id", businessId)
     .maybeSingle();
   if (!business) {
@@ -141,6 +143,7 @@ export async function executeBookAppointment(
   }
 
   const label = formatSlotLabel(new Date(parsed.data.startsAt), business.timezone);
+  const businessName = business.name;
 
   // A sandbox test conversation (dashboard/_components/sandbox-chat) must
   // never write a real appointment -- the slot-availability check above
@@ -177,13 +180,38 @@ export async function executeBookAppointment(
   // digest-email contract), so no .catch() is needed here, but the
   // booking itself is already durable by this point regardless.
   after(() =>
-    sendNewAppointmentRequestEmail(businessId, {
-      contactName: parsed.data.contactName?.trim() || null,
-      contactEmail,
-      contactPhone,
-      label,
+    dispatchNotification({
+      businessId,
+      category: "appointment_request",
+      message: `New appointment request for ${label} from ${parsed.data.contactName?.trim() || contactEmail || contactPhone || "a prospect"}`,
+      link: "/dashboard/appointments",
+      supabase,
+      email: {
+        subject: `New appointment request — ${businessName}`,
+        heading: "A new appointment request just came in",
+        paragraphs: [`Someone asked to book a time with ${businessName}. It's waiting for you to confirm or decline.`],
+        facts: [
+          { label: "When", value: label },
+          { label: "Name", value: parsed.data.contactName?.trim() || "Not given" },
+          { label: "Email", value: contactEmail ?? "Not given" },
+          { label: "Phone", value: contactPhone ?? "Not given" },
+        ],
+        // Reply-to the prospect when they gave an address: replying to this
+        // alert is the fastest way for the business to reach them.
+        replyTo: contactEmail,
+        cta: { label: "Confirm or decline", url: `${getAppUrl()}/dashboard/appointments` },
+      },
     }),
   );
+
+  // Acknowledge to the PROSPECT immediately. Until now they were told in chat
+  // that someone would confirm, then heard nothing by email until the business
+  // acted. Routed straight to the sender, NOT through dispatchNotification:
+  // notification preferences govern what the business receives, and a business
+  // muting its own alerts must never silence mail to its customers.
+  if (contactEmail) {
+    after(() => sendAppointmentReceivedEmail(businessId, contactEmail, label));
+  }
 
   const leadResult = await upsertLeadForConversation(supabase, businessId, conversationId, {
     contactName: parsed.data.contactName?.trim() || null,
@@ -217,6 +245,18 @@ export async function executeBookAppointment(
     };
     if (leadResult.created) {
       await dispatchWorkflowTrigger(supabase, businessId, "lead_created", leadWorkflowTarget);
+      // In-app only by default (digest tier): the lead is captured and on the
+      // leads page, so it doesn't warrant interrupting anyone. No email payload
+      // at all here -- the daily digest already counts new leads.
+      after(() =>
+        dispatchNotification({
+          businessId,
+          category: "lead_created",
+          message: `New lead: ${parsed.data.contactName?.trim() || contactEmail || contactPhone || "contact details captured"}`,
+          link: "/dashboard/leads",
+          supabase,
+        }),
+      );
     }
     await dispatchWorkflowTrigger(supabase, businessId, "lead_score_threshold", leadWorkflowTarget, {
       previousScore: leadResult.previousScore,

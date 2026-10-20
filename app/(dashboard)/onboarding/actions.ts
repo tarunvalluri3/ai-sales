@@ -11,7 +11,7 @@ import {
   businessNameSchema,
   businessTypeSchema,
   businessDescriptionSchema,
-  businessContactEmailSchema,
+  businessContactEmailRequiredSchema,
   businessContactPhoneSchema,
   businessWebsiteSchema,
 } from "@/lib/schemas/business";
@@ -21,7 +21,7 @@ const createBusinessSchema = z.object({
   name: businessNameSchema,
   businessType: businessTypeSchema,
   description: businessDescriptionSchema,
-  contactEmail: businessContactEmailSchema,
+  contactEmail: businessContactEmailRequiredSchema,
   contactPhone: businessContactPhoneSchema,
   website: businessWebsiteSchema,
   timezone: z.string().trim().min(1),
