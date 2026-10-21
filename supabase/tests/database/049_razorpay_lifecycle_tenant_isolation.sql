@@ -22,7 +22,7 @@
 -- without changing the migration fails here rather than quietly giving new
 -- customers a different trial from the one /pricing advertises.
 --
--- Includes positive controls (assertions 3, 11, 16). An isolation test that
+-- Includes positive controls (assertions 3, 10, 15). An isolation test that
 -- only ever proves denial will also pass against a table nobody can use at
 -- all, which would hide a broken grant rather than reveal it.
 --
@@ -32,7 +32,7 @@
 -- a temporary results table. Same session-simulation technique.
 
 begin;
-select plan(22);
+select plan(21);
 create temporary table _tap_results (line text);
 grant insert on _tap_results to authenticated;
 
@@ -150,7 +150,7 @@ insert into _tap_results select throws_ok(
   'scheduled_plan_key cannot equal the current plan_key (subscriptions_scheduled_plan_differs)'
 );
 
--- 11. Positive control: a real downgrade schedules fine, and the identity
+-- 10. Positive control: a real downgrade schedules fine, and the identity
 -- columns a 17c invoice needs really are writable.
 insert into _tap_results select lives_ok(
   $$ update public.subscriptions
@@ -160,7 +160,7 @@ insert into _tap_results select lives_ok(
 );
 
 -- ===================================================================
--- 12-14. razorpay_webhook_events -- idempotency as a key
+-- 11-13. razorpay_webhook_events -- idempotency as a key
 -- ===================================================================
 --
 -- This is the assertion that stops a replayed charge handing out a free
@@ -197,7 +197,7 @@ insert into _tap_results select ok(
 );
 
 -- ===================================================================
--- 15-16. billing_notice_sends -- at-most-once per period
+-- 14-15. billing_notice_sends -- at-most-once per period
 -- ===================================================================
 insert into public.billing_notice_sends (business_id, notice_key, period_end)
 values ('00000000-0000-0000-0000-00000000000b', 'payment_failed', '2026-11-06T10:00:00Z');
@@ -210,7 +210,7 @@ insert into _tap_results select throws_ok(
   'the same billing notice cannot be claimed twice for the same period (one email per failure, not one per retry)'
 );
 
--- 16. Positive control: the next period is new key space, so the ledger
+-- 15. Positive control: the next period is new key space, so the ledger
 -- resets itself with no sweeper job.
 insert into _tap_results select lives_ok(
   $$ insert into public.billing_notice_sends (business_id, notice_key, period_end)
@@ -219,7 +219,7 @@ insert into _tap_results select lives_ok(
 );
 
 -- ===================================================================
--- 17-18. Zero grants on both ledgers
+-- 16-17. Zero grants on both ledgers
 -- ===================================================================
 insert into _tap_results select ok(
   not has_table_privilege('authenticated', 'public.razorpay_webhook_events', 'select')
@@ -238,7 +238,7 @@ insert into _tap_results select ok(
 );
 
 -- ===================================================================
--- 19. The audit action list the lifecycle writes
+-- 18. The audit action list the lifecycle writes
 -- ===================================================================
 --
 -- Pinned as an exact count, the same technique 048 uses for plan keys: a
@@ -266,7 +266,7 @@ select set_config(
 );
 
 -- ===================================================================
--- 20-22. Tenant isolation over the new columns
+-- 19-21. Tenant isolation over the new columns
 -- ===================================================================
 --
 -- Phase 17a already asserted that a tenant cannot read another's
