@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseFromParentMessage, postToParent, type WidgetErrorKind, type WidgetRecommendedProduct } from "./post-message";
 import type { WidgetStrings } from "@/lib/widget-i18n";
+import { CHAT_CLIENT_TIMEOUT_MS } from "@/lib/chat-timeouts";
 
 export type ChatMessage = {
   id: string;
@@ -21,7 +22,19 @@ export type RecentChatSummary = {
 };
 
 const MAX_MESSAGE_LENGTH = 2000;
-const RESPONSE_TIMEOUT_MS = 30_000;
+/**
+ * Derived from the server's own deadline, never written independently --
+ * see `lib/chat-timeouts.ts` for the ordering and why it matters. This was
+ * a hardcoded 30s while the server allowed 60s, so a slow-but-successful
+ * turn showed the prospect an error for an answer that did arrive: 5 of
+ * 220 production turns on 2026-10-21.
+ *
+ * This timer is the *only* client-side deadline on a chat turn. The
+ * loader's own fetch (public/widget-loader.js handleSend) deliberately
+ * passes no AbortSignal and sets no timeout of its own, so there is no
+ * second, shorter clock hiding there -- checked 2026-10-21.
+ */
+const RESPONSE_TIMEOUT_MS = CHAT_CLIENT_TIMEOUT_MS;
 const RATE_LIMIT_COOLDOWN_MS = 5_000;
 
 function newId(): string {

@@ -381,6 +381,15 @@
     // be, and this avoids two competing requests updating state at once.
     isSendInFlight = true;
     try {
+      // No AbortSignal and no timeout here, on purpose. The one
+      // client-side deadline for a chat turn lives in the widget panel
+      // (use-widget-chat.ts's RESPONSE_TIMEOUT_MS, derived from the
+      // server's own maxDuration in lib/chat-timeouts.ts). A second,
+      // independent timeout here would be exactly the bug that file
+      // documents -- two unrelated clocks, the shorter one silently
+      // winning and showing the prospect an error for a turn the server
+      // completed. If this request ever needs to be abortable, derive its
+      // deadline from lib/chat-timeouts.ts too.
       var response = await fetch(appOrigin + "/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

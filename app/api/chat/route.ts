@@ -19,6 +19,9 @@ import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 import { dispatchNotification } from "@/lib/notification-dispatch";
 import { getAppUrl } from "@/lib/app-url";
 import { after } from "next/server";
+import { CHAT_SERVER_MAX_DURATION_SECONDS } from "@/lib/chat-timeouts";
+import { TurnTimer } from "@/lib/turn-timings";
+import { finalizeTurnMetrics } from "@/lib/ai-response-metrics";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -29,13 +32,28 @@ import { after } from "next/server";
  */
 
 /**
- * A single request can make up to ~3-4 sequential Gemini calls (the
- * bounded tool-calling loop in askSalesEmployee(), MAX_TOOL_ITERATIONS
- * iterations, plus the final structured-output call) -- comfortably
- * within this limit but well above a default serverless function
- * timeout (Phase 19b, docs/phase-19-audit-findings.md §10).
+ * A single request can make up to ~4 sequential Gemini calls (the bounded
+ * tool-calling loop in askSalesEmployee(), MAX_TOOL_ITERATIONS iterations,
+ * the last of which is normally the send_reply call, plus the fallback
+ * structured-output call) -- comfortably within this limit but well above
+ * a default serverless function timeout (Phase 19b,
+ * docs/phase-19-audit-findings.md §10).
+ *
+ * This literal is the server end of the deadline ordering documented in
+ * `lib/chat-timeouts.ts`, which is the source of truth: the widget's abort
+ * is derived from it and must always be the later of the two, so that a
+ * prospect can never be shown an error for a turn the server completed.
+ * It has to be a literal here because Next.js reads this export
+ * statically out of the built route, so the assertion below -- not an
+ * import -- is what keeps the two from drifting: if either value changes
+ * without the other, `npm run typecheck` fails.
  */
 export const maxDuration = 60;
+
+const _maxDurationMatchesSharedContract: typeof maxDuration extends typeof CHAT_SERVER_MAX_DURATION_SECONDS
+  ? true
+  : "app/api/chat/route.ts maxDuration must equal CHAT_SERVER_MAX_DURATION_SECONDS in lib/chat-timeouts.ts" = true;
+void _maxDurationMatchesSharedContract;
 
 const RATE_LIMIT_WINDOW_SECONDS = 300;
 const IP_LIMIT = 30;
@@ -93,6 +111,13 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  // The real start of the turn, on the handler's first line. Everything
+  // below records into this one clock, so the persisted total is the
+  // prospect's actual wait rather than a window that opens partway
+  // through it -- the flaw the 2026-10-21 measurement pass found in
+  // `latency_ms`, whose clock started after the quota check, the cache
+  // read, the embedding call and the vector search had already run.
+  const timer = new TurnTimer();
   let body: unknown;
   try {
     body = await request.json();
@@ -109,7 +134,9 @@ export async function POST(request: NextRequest) {
   const origin = extractOrigin(request);
   const ip = extractIp(request);
 
-  const ipAllowed = await checkAndIncrementRateLimit("ip", ip, IP_LIMIT, RATE_LIMIT_WINDOW_SECONDS);
+  const ipAllowed = await timer.time("rate_limit_ip", () =>
+    checkAndIncrementRateLimit("ip", ip, IP_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+  );
   if (!ipAllowed) {
     logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }, "error");
     return withCors(jsonError("Too many requests.", 429));
@@ -117,7 +144,7 @@ export async function POST(request: NextRequest) {
 
   let business: WidgetBusinessContext;
   try {
-    business = await resolveBusinessFromWidgetKey(widgetKey, origin);
+    business = await timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin));
   } catch (error) {
     if (error instanceof WidgetAuthError) {
       return withCors(jsonError("Invalid request.", 401));
@@ -126,7 +153,9 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError(userMessage, 500));
   }
 
-  const keyAllowed = await checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS);
+  const keyAllowed = await timer.time("rate_limit_key", () =>
+    checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+  );
   if (!keyAllowed) {
     logEvent("rate_limit_exceeded", business.businessId, { scope: "key" }, "error");
     return withCors(jsonError("Too many requests.", 429));
@@ -136,7 +165,9 @@ export async function POST(request: NextRequest) {
 
   try {
     let conversation = conversationId
-      ? await getConversationForBusiness(supabase, business.businessId, conversationId)
+      ? await timer.time("conversation_lookup", () =>
+          getConversationForBusiness(supabase, business.businessId, conversationId),
+        )
       : null;
 
     if (conversationId && !conversation) {
@@ -144,20 +175,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (!conversation) {
-      conversation = await createConversation(
-        supabase,
-        business.businessId,
-        "chat_widget",
-        sanitizeSourceUrl(pageUrl),
-        visitorId ?? null,
+      conversation = await timer.time("conversation_create", () =>
+        createConversation(
+          supabase,
+          business.businessId,
+          "chat_widget",
+          sanitizeSourceUrl(pageUrl),
+          visitorId ?? null,
+        ),
       );
     }
 
-    const conversationAllowed = await checkAndIncrementRateLimit(
-      "conversation",
-      conversation.id,
-      CONVERSATION_LIMIT,
-      RATE_LIMIT_WINDOW_SECONDS,
+    // Read out before the closure below, which would otherwise widen
+    // `conversation` back to possibly-null and need an assertion.
+    const conversationRowId = conversation.id;
+    const conversationAllowed = await timer.time("rate_limit_conversation", () =>
+      checkAndIncrementRateLimit("conversation", conversationRowId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
     );
     if (!conversationAllowed) {
       logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }, "error");
@@ -169,13 +202,17 @@ export async function POST(request: NextRequest) {
     // free-text reply. Recorded before the message is processed so a
     // tool call triggered by this very message already sees it.
     if (consentGiven) {
-      await recordConversationConsent(supabase, business.businessId, conversation.id);
+      await timer.time("consent_write", () =>
+        recordConversationConsent(supabase, business.businessId, conversationRowId),
+      );
     }
 
     // Persisted unconditionally, regardless of control state, so a human
     // reviewing the conversation sees every prospect message even while
     // it's human-controlled and the AI is not being called.
-    const userMessageRow = await createMessage(supabase, business.businessId, conversation.id, "user", message);
+    const userMessageRow = await timer.time("user_message_write", () =>
+      createMessage(supabase, business.businessId, conversationRowId, "user", message),
+    );
 
     // Phase 15a's AI-pause guard: once a human has taken over (a
     // deliberate dashboard action, never set by AI output -- see
@@ -198,7 +235,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const history = await listRecentMessages(supabase, business.businessId, conversation.id, HISTORY_LIMIT);
+    const history = await timer.time("history_fetch", () =>
+      listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT),
+    );
 
     let response;
     try {
@@ -212,20 +251,23 @@ export async function POST(request: NextRequest) {
         history,
         business.language,
         { recommendProductsEnabled: business.recommendProductsEnabled, appointmentsEnabled: business.appointmentsEnabled },
+        timer,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);
       return withCors(jsonError(userMessage, 500));
     }
 
-    const assistantMessageRow = await createMessage(
-      supabase,
-      business.businessId,
-      conversation.id,
-      "assistant",
-      response.answer,
-      response.sourceChunkIds,
-      response.grounded,
+    const assistantMessageRow = await timer.time("assistant_message_write", () =>
+      createMessage(
+        supabase,
+        business.businessId,
+        conversationRowId,
+        "assistant",
+        response.answer,
+        response.sourceChunkIds,
+        response.grounded,
+      ),
     );
 
     // Phase 25b "top unanswered questions": only a genuine knowledge gap
@@ -234,9 +276,14 @@ export async function POST(request: NextRequest) {
     // just double-count the same gap under a different metric). A
     // failure here must never fail the prospect's real response.
     if (!response.grounded && !response.escalate) {
-      const { error: unansweredError } = await supabase
-        .from("unanswered_questions")
-        .insert({ business_id: business.businessId, conversation_id: conversation.id, question: message });
+      const { error: unansweredError } = await timer.time("unanswered_question_write", async () =>
+        // Awaited inside the callback: a PostgrestFilterBuilder is
+        // thenable but not a Promise, so returning it unawaited would not
+        // satisfy TurnTimer.time()'s signature.
+        await supabase
+          .from("unanswered_questions")
+          .insert({ business_id: business.businessId, conversation_id: conversationRowId, question: message }),
+      );
       if (unansweredError) {
         logEvent("unanswered_question_log_failed", business.businessId, { conversationId: conversation.id }, "error");
       }
@@ -247,7 +294,9 @@ export async function POST(request: NextRequest) {
       // does not change `control`. See prompts/phase-15a-handoff-state-and-ai-pause.md's
       // "Decisions and assumptions" #1 for why escalation alone must not
       // silence the AI before a human is actually watching.
-      const flagResult = await flagConversationNeedsAttention(supabase, business.businessId, conversation.id, business.clerkOrgId);
+      const flagResult = await timer.time("escalation_flag", () =>
+        flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
+      );
       logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
 
       // The most urgent event in the product, and until 2026-10-21 it produced
@@ -280,14 +329,24 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      await dispatchWorkflowTrigger(supabase, business.businessId, "conversation_needs_attention", {
-        type: "conversation",
-        id: conversation.id,
-        customerId: conversation.customer_id,
-        leadId: null,
-        conversationId: conversation.id,
-      });
+      await timer.time("workflow_trigger", () =>
+        dispatchWorkflowTrigger(supabase, business.businessId, "conversation_needs_attention", {
+          type: "conversation",
+          id: conversationRowId,
+          customerId: conversation.customer_id,
+          leadId: null,
+          conversationId: conversationRowId,
+        }),
+      );
     }
+
+    // Appends the stages that only exist after askSalesEmployee() has
+    // already written its row -- the assistant message write, the
+    // escalation handling -- and restamps the total, so the persisted
+    // figure covers the turn right up to serializing this response rather
+    // than stopping at the metrics insert. In after(), so it costs the
+    // prospect nothing, and best-effort, so it cannot break the reply.
+    after(() => finalizeTurnMetrics(supabase, response.metricsRowId, business.businessId, timer));
 
     return withCors(
       jsonSuccess({
