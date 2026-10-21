@@ -113,7 +113,6 @@ Core set:
 | `SENTRY_DSN` | yes (not a secret in the traditional sense, but not marked `NEXT_PUBLIC_*`) |
 | `NEXT_PUBLIC_SENTRY_DSN` | yes |
 | `SENTRY_AUTH_TOKEN` | **no — build-time only, org:ci scope** |
-| `AI_MONTHLY_TOKEN_LIMIT` | config |
 | `CRON_SECRET` | **no** |
 | `RESEND_API_KEY` | **no** |
 | `NOTIFICATION_EMAIL_FROM` | config |
@@ -135,7 +134,7 @@ Add a variable only when a feature actually requires it. Razorpay variables rema
 
 `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` are deliberately not in `lib/env.ts`'s required schema (Phase 21) — a missing DSN degrades observability (Sentry silently no-ops), not the app's ability to serve requests, so it does not belong in the fail-fast startup check the way a missing Clerk/Supabase/Gemini variable does.
 
-`AI_MONTHLY_TOKEN_LIMIT` (Phase 22h) is optional in `lib/env.ts`'s schema (present, but `.optional()`) — a missing value falls back to a built-in default in `lib/usage-limit.ts` rather than failing startup, since this is a tunable operational knob, not a variable whose absence should ever break the app.
+`AI_MONTHLY_TOKEN_LIMIT` (Phase 22h) **was removed in Phase 17a** and is no longer read anywhere. The AI usage quota is now per-plan, counted in AI replies over the business's own billing period, and defined in `lib/plans.ts` — the same registry the public `/pricing` page renders from, with compile-time assertions tying the two together. It is deliberately not an environment variable any more: a per-tenant entitlement is not an operational knob, and one global value that silently overrode every plan's published quota was exactly the gap this phase closed. Per-business plan state lives in `public.subscriptions`, whose only writer is the service-role client (`authenticated` has SELECT and nothing else — see that table's migration comment).
 
 `CRON_SECRET` (Phase 23) is also optional in `lib/env.ts`'s schema, but for the opposite reason: its absence should degrade safely (the cron route refuses every request, 404, rather than either failing startup or accepting unauthenticated calls) since local dev has no Vercel Cron and ingestion still works there via the immediate `after()` trigger.
 

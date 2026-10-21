@@ -22,6 +22,7 @@ import { after } from "next/server";
 import { CHAT_SERVER_MAX_DURATION_SECONDS } from "@/lib/chat-timeouts";
 import { TurnTimer } from "@/lib/turn-timings";
 import { finalizeTurnMetrics } from "@/lib/ai-response-metrics";
+import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -347,6 +348,25 @@ export async function POST(request: NextRequest) {
     // than stopping at the metrics insert. In after(), so it costs the
     // prospect nothing, and best-effort, so it cannot break the reply.
     after(() => finalizeTurnMetrics(supabase, response.metricsRowId, business.businessId, timer));
+
+    // Phase 17a: the quota reminder emails (50%, then every 10%, then the
+    // upgrade prompt at 100%). In after(), so the prospect waits on no
+    // outbound email, and derived from the count the quota check at the
+    // top of this turn already made -- never a second query.
+    //
+    // `+ 1` only when this turn actually wrote an ai_response_metrics row,
+    // because that row *is* the unit the quota counts: a cache hit, a
+    // no-knowledge fallback and an over-quota turn each write none and so
+    // move nothing. Each threshold is claimed in the database before its
+    // email is sent, so a burst of concurrent turns still sends one.
+    after(() =>
+      sendUsageReminderIfDue(
+        supabase,
+        business.businessId,
+        response.quotaSnapshot,
+        response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
+      ),
+    );
 
     return withCors(
       jsonSuccess({

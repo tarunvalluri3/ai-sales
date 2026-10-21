@@ -1,4 +1,10 @@
 import Link from "next/link";
+import {
+  GST_RATE_PERCENT,
+  ORDERED_PLANS,
+  formatPaiseAsInr,
+  formatReplyQuota,
+} from "@/lib/plans";
 
 export const metadata = {
   title: "Pricing | Waves AI Pilot",
@@ -8,101 +14,43 @@ export const metadata = {
  * Required by Razorpay's merchant-activation website check ("Pricing
  * details"), and referenced by the fee clause in /terms.
  *
- * PRICE POINTS AND QUOTAS ARE A FIRST PROPOSAL, 2026-10-19 -- the user
- * asked for "standard pricing and plans ... industry standards" rather
- * than supplying figures. They are deliberately all defined in the
- * PLANS array below so changing one is a single-line edit.
+ * PRICE POINTS AND QUOTAS WERE CONFIRMED BY THE USER 2026-10-21 (Phase
+ * 17a) -- Starter ₹1,499 / 1,000 replies, Growth ₹3,999 / 3,000, Scale
+ * ₹9,999 / 10,000. They were a proposal from 2026-10-19 until then.
  *
- * The quotas are anchored to this app's own measured token usage, not
- * guessed: STATE.md's Phase 21 live verification recorded a real chat
- * turn at input_tokens 3741 + output_tokens 275, i.e. ~4,000 tokens per
- * AI reply. So 1,000 replies ~= 4M tokens, 3,000 ~= 12M, 10,000 ~= 40M.
- * Those token figures are what AI_MONTHLY_TOKEN_LIMIT would be set to
- * per plan once Phase 17 (billing) introduces per-plan entitlements --
- * today that env var is a single global value for every tenant, so the
- * quota column here is a commitment the code cannot yet enforce
- * per-plan. Do not treat this page as evidence that it can.
+ * **Every price on this page is GST-INCLUSIVE** (decided 2026-10-21): the
+ * figure shown is the total charged, with 18% GST contained in it, and the
+ * annual figures (ten months' gross, "two months free") are inclusive too.
+ * This is a legal-accuracy matter -- the page must not promise a tax
+ * treatment we do not apply. If this ever flips back to exclusive, every
+ * "inclusive" sentence below, /terms and lib/usage-reminders.ts change
+ * together.
+ *
+ * **This page no longer holds its own numbers.** Every figure rendered
+ * below comes from `lib/plans.ts`, which is also what `lib/usage-limit.ts`
+ * enforces against -- so the advertised quota and the enforced quota are
+ * now literally the same value, and that file's compile-time assertions
+ * make changing one without the other a `npm run typecheck` failure. The
+ * old warning here ("the quota column is a commitment the code cannot yet
+ * enforce per-plan") is resolved: quotas are counted in AI replies, per
+ * plan, over the business's own billing period.
+ *
+ * The quotas themselves are still anchored to this app's measured usage
+ * rather than guessed: Phase 21's live verification recorded a real chat
+ * turn at input_tokens 3741 + output_tokens 275, i.e. ~4,000 tokens per AI
+ * reply, so the three plans correspond to roughly 4M / 12M / 40M tokens a
+ * month.
  *
  * Channel honesty (Consumer Protection Act, 2019 -- advertising a
  * capability that cannot be delivered is an unfair trade practice):
  * WhatsApp genuinely works but requires the customer's own Meta
  * credentials, so it carries a footnote rather than a bare tick.
  * Instagram cannot work for a customer's account until Meta App Review
- * and Business Verification clear, so it is listed as limited release
- * and is NOT included in any paid plan's feature list.
+ * and Business Verification clear, so it is listed as limited release and
+ * is NOT included in any paid plan's feature list. Both statements are now
+ * enforced as data, in the registry's per-plan `channels` map, which is
+ * also what gates the connect flows.
  */
-
-type Plan = {
-  name: string;
-  tagline: string;
-  monthly: number;
-  annual: number;
-  featured: boolean;
-  quota: string;
-  seats: string;
-  features: string[];
-};
-
-const PLANS: Plan[] = [
-  {
-    name: "Starter",
-    tagline: "For a single website, getting your first AI-qualified leads.",
-    monthly: 1499,
-    annual: 14990,
-    featured: false,
-    quota: "1,000 AI replies / month",
-    seats: "1 team member",
-    features: [
-      "AI sales employee on your website",
-      "Products, services and FAQs",
-      "Knowledge from pasted text (up to 25 documents)",
-      "Lead capture, scoring and qualification",
-      "Human handoff and live takeover",
-      "Consent notice and 24-month data retention",
-      "Email support",
-    ],
-  },
-  {
-    name: "Growth",
-    tagline: "For a team that wants recommendations, bookings and WhatsApp.",
-    monthly: 3999,
-    annual: 39990,
-    featured: true,
-    quota: "3,000 AI replies / month",
-    seats: "3 team members",
-    features: [
-      "Everything in Starter",
-      "WhatsApp Business messaging *",
-      "Product and service recommendations with photos",
-      "Appointment booking with availability rules",
-      "Knowledge from file upload and website import (up to 200 documents)",
-      "Full funnel analytics with CSV export",
-      "Customer profiles, tags and segments",
-      "Business hours, team assignment and SLA routing",
-    ],
-  },
-  {
-    name: "Scale",
-    tagline: "For a sales team running automation at volume.",
-    monthly: 9999,
-    annual: 99990,
-    featured: false,
-    quota: "10,000 AI replies / month",
-    seats: "10 team members",
-    features: [
-      "Everything in Growth",
-      "Automation workflows with delays and conditions",
-      "AI Sales Copilot daily priorities and briefs",
-      "Outbound webhooks on qualified leads",
-      "Unlimited knowledge documents",
-      "Role-based access across four permission tiers",
-      "Audit log of sensitive actions",
-      "Priority email and phone support",
-    ],
-  },
-];
-
-const inr = (value: number) => `₹${value.toLocaleString("en-IN")}`;
 
 export default function PricingPage() {
   return (
@@ -115,15 +63,15 @@ export default function PricingPage() {
             card required. Cancel any time.
           </p>
           <p className="text-2xs text-ds-text-muted">
-            All prices are in Indian Rupees and exclusive of GST, charged additionally at 18%. Annual
-            billing gives you two months free.
+            All prices are in Indian Rupees and inclusive of {GST_RATE_PERCENT}% GST — the price you
+            see is the total you pay. Annual billing gives you two months free.
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {PLANS.map((plan) => (
+          {ORDERED_PLANS.map((plan) => (
             <div
-              key={plan.name}
+              key={plan.key}
               className={`flex flex-col gap-5 rounded-ds-lg border p-6 ${
                 plan.featured
                   ? "border-ds-accent bg-ds-surface-elevated"
@@ -144,17 +92,22 @@ export default function PricingPage() {
 
               <div className="flex flex-col gap-1">
                 <p className="text-3xl font-semibold text-ds-text-primary">
-                  {inr(plan.monthly)}
-                  <span className="text-sm font-normal text-ds-text-muted"> / month</span>
+                  {formatPaiseAsInr(plan.monthlyPricePaise)}
+                  <span className="text-sm font-normal text-ds-text-muted">
+                    {" "}
+                    / month, incl. GST
+                  </span>
                 </p>
                 <p className="text-2xs text-ds-text-muted">
-                  or {inr(plan.annual)} / year — two months free
+                  or {formatPaiseAsInr(plan.annualPricePaise)} / year, incl. GST — two months free
                 </p>
               </div>
 
               <div className="flex flex-col gap-1 border-y border-ds-border py-3 text-sm">
-                <p className="font-medium text-ds-text-primary">{plan.quota}</p>
-                <p className="text-ds-text-secondary">{plan.seats}</p>
+                <p className="font-medium text-ds-text-primary">
+                  {formatReplyQuota(plan.monthlyReplyQuota)}
+                </p>
+                <p className="text-ds-text-secondary">{plan.seatsLabel}</p>
               </div>
 
               <ul className="flex flex-1 flex-col gap-2 text-sm text-ds-text-secondary">
@@ -209,17 +162,20 @@ export default function PricingPage() {
             <p>
               If you reach your monthly quota, your widget does not break and it never invents an
               answer: the visitor is told that a person will follow up, and the conversation is
-              flagged for your team. We will email you before you get there so you can upgrade if you
-              want to. Quotas reset at the start of each calendar month.
+              flagged for your team. We email you when you have used half of your replies, and again
+              as you get closer, so you can upgrade if you want to. Quotas reset at the start of each
+              billing period.
             </p>
           </Section>
 
           <Section title="Billing">
             <p>
-              Plans are billed monthly or annually in advance, in Indian Rupees, plus 18% GST. We
-              issue a GST invoice for every payment to the email address on your account. You can
-              upgrade at any time and we charge only the difference for the rest of your period;
-              downgrades take effect at your next renewal.
+              Plans are billed monthly or annually in advance, in Indian Rupees. The price you see
+              includes {GST_RATE_PERCENT}% GST, so that is the total you are charged. We issue a GST
+              invoice for every payment to the email address on your account, showing the taxable
+              value and the GST contained in the price. You can upgrade at any time and we charge
+              only the difference for the rest of your period; downgrades take effect at your next
+              renewal.
             </p>
             <p>
               You can cancel any time from your dashboard and keep access until the end of the period

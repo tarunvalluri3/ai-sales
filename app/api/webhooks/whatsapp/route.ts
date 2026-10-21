@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { loadBusinessAiContext } from "@/lib/business-ai-context";
@@ -16,6 +16,7 @@ import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { logEvent } from "@/lib/logger";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
 
 /**
  * Phase 16's inbound WhatsApp receiver -- the WhatsApp analog of
@@ -231,6 +232,21 @@ async function handleInboundMessage(
   }
 
   await sendReply(supabase, businessId, conversation.id, assistantMessageRow.id, phoneNumberId, message.from, response.answer);
+
+  // Phase 17a: the same quota reminder dispatch the website widget's chat
+  // route does. This reply was counted against the same plan quota, so the
+  // same 50/60/70/80/90/100% thresholds have to fire for it -- a business
+  // selling mostly over WhatsApp must not be the one that never hears it
+  // is running out. In after() so Meta's webhook acknowledgement is never
+  // held up by an outbound email.
+  after(() =>
+    sendUsageReminderIfDue(
+      supabase,
+      businessId,
+      response.quotaSnapshot,
+      response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
+    ),
+  );
 }
 
 async function sendCannedReply(

@@ -18,7 +18,7 @@ import { recommendProductsTool, executeRecommendProducts, type RecommendedItem }
 import { checkAvailableSlotsTool, executeCheckAvailableSlots } from "@/lib/tools/check-available-slots";
 import { bookAppointmentTool, executeBookAppointment } from "@/lib/tools/book-appointment";
 import { logEvent } from "@/lib/logger";
-import { isWithinUsageQuota } from "@/lib/usage-limit";
+import { checkReplyQuota, type ReplyQuotaStatus } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
 import { isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
@@ -213,6 +213,15 @@ export type SalesEmployeeResponse = {
    * lib/ai-response-metrics.ts's finalizeTurnMetrics().
    */
   metricsRowId: string | null;
+  /**
+   * This turn's plan quota verdict, as the check at the top of
+   * `askSalesEmployee()` measured it -- the plan, the period, the replies
+   * already used *before* this turn, and whether the turn was allowed.
+   * Plumbing, like `metricsRowId`: it exists so the request handler can
+   * decide about the 50/60/70/80/90/100% quota reminder emails in
+   * `after()` without running a second count (lib/usage-reminders.ts).
+   */
+  quotaSnapshot: ReplyQuotaStatus;
 };
 
 type KnowledgeChunkMetadata = {
@@ -448,24 +457,45 @@ export async function askSalesEmployee(
   // through it.
   timer: TurnTimer = new TurnTimer(),
 ): Promise<SalesEmployeeResponse> {
-  // Phase 22h: checked before any Gemini call this turn would make,
-  // including the embedding call retrieval itself makes -- a business
-  // over quota must not spend another token, not just stop short of a
-  // full response. escalate: true so app/api/chat/route.ts's existing
-  // escalation handling (flagConversationNeedsAttention + logEvent)
-  // picks this up with no new call site needed there.
-  const withinQuota = await timer.time("quota_check", () => isWithinUsageQuota(supabase, businessId));
-  if (!withinQuota) {
-    logEvent("ai_usage_quota_exceeded", businessId, { conversationId }, "error");
+  // Phase 22h, rewritten in Phase 17a: checked before any Gemini call
+  // this turn would make, including the embedding call retrieval itself
+  // makes -- a business over quota must not spend another token, not just
+  // stop short of a full response. escalate: true so
+  // app/api/chat/route.ts's existing escalation handling
+  // (flagConversationNeedsAttention + logEvent) picks this up with no new
+  // call site needed there.
+  //
+  // The verdict is now the business's own **plan** quota in AI replies for
+  // its current billing period, not one global token budget, and it also
+  // covers "not serving at all" (an expired trial, a lapsed 5-day grace
+  // period) -- the prospect-facing behaviour is deliberately identical for
+  // both, because the visitor's situation is identical: a person will
+  // follow up, the conversation is flagged, nothing is invented and the
+  // widget still works.
+  const quota = await timer.time("quota_check", () => checkReplyQuota(supabase, businessId));
+  if (!quota.allowed) {
+    logEvent(
+      "ai_usage_quota_exceeded",
+      businessId,
+      {
+        conversationId,
+        planKey: quota.entitlement.planKey,
+        repliesUsed: quota.repliesUsed,
+        replyQuota: quota.replyQuota,
+        notServingReason: quota.entitlement.notServingReason,
+      },
+      "error",
+    );
     return {
       answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
       grounded: false,
       usedContext: false,
       sourceChunkIds: [],
       escalate: true,
-      escalationReason: "usage_quota_exceeded",
+      escalationReason: quota.entitlement.serving ? "usage_quota_exceeded" : "subscription_not_serving",
       recommendedProducts: [],
       metricsRowId: null,
+      quotaSnapshot: quota,
     };
   }
 
@@ -490,6 +520,7 @@ export async function askSalesEmployee(
         escalationReason: null,
         recommendedProducts: [],
         metricsRowId: null,
+        quotaSnapshot: quota,
       };
     }
   }
@@ -519,6 +550,7 @@ export async function askSalesEmployee(
         escalationReason: "embedding_rate_limited",
         recommendedProducts: [],
         metricsRowId: null,
+        quotaSnapshot: quota,
       };
     }
     throw error;
@@ -534,6 +566,7 @@ export async function askSalesEmployee(
       escalationReason: null,
       recommendedProducts: [],
       metricsRowId: null,
+      quotaSnapshot: quota,
     };
   }
 
@@ -861,6 +894,7 @@ export async function askSalesEmployee(
       escalationReason: result.escalationReason,
       recommendedProducts,
       metricsRowId,
+      quotaSnapshot: quota,
     };
 
     if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {

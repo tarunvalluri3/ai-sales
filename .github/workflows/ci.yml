@@ -55,6 +55,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Plan pricing / GST arithmetic tests
+        # Phase 17a: prices are GST-inclusive and the taxable/CGST/SGST/IGST
+        # split is derived from them (lib/plans.ts). Money-and-tax arithmetic
+        # that appears on invoices must not be breakable without CI failing.
+        # Pure functions, no database or secrets, so it runs ahead of the
+        # build. Deliberately its own step: `npm test` stays the pgTAP suite.
+        run: npm run test:plan-tax
+
       - name: Build
         run: npm run build
 
