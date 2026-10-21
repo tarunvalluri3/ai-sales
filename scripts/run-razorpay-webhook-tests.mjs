@@ -61,6 +61,11 @@ function makeDeps(row, { failUpdates = false } = {}) {
     notices: [],
     audits: [],
     logs: [],
+    // Phase 17c: what the state machine asked the invoice service to issue.
+    // The invoice service itself is tested in run-invoice-tests.mjs; here only
+    // the contract with it matters (one request per payment, the amount paid).
+    invoiceRequests: [],
+    creditNoteRequests: [],
   };
 
   const deps = {
@@ -91,6 +96,14 @@ function makeDeps(row, { failUpdates = false } = {}) {
     },
     async recordAudit(businessId, action, metadata) {
       state.audits.push({ businessId, action, metadata });
+    },
+    async issueInvoice(payment) {
+      state.invoiceRequests.push(payment);
+      return { status: "skipped", reason: "stubbed" };
+    },
+    async issueCreditNote(refund) {
+      state.creditNoteRequests.push(refund);
+      return { status: "no_invoice" };
     },
     log(event, businessId, metadata, level) {
       state.logs.push({ event, businessId, metadata, level });
@@ -137,6 +150,9 @@ test("the same subscription.charged delivered twice extends the period once", as
   assert.equal(state.row.current_period_end, "2026-12-01T00:00:00.000Z");
   assert.equal(state.row.current_period_start, "2026-11-01T00:00:00.000Z");
   assert.equal(state.audits.filter((a) => a.action === "subscription.charged").length, 1);
+  assert.equal(state.invoiceRequests.length, 1, "the ledger also stops a duplicate invoice request");
+  assert.equal(state.invoiceRequests[0].paymentId, "pay_1");
+  assert.equal(state.invoiceRequests[0].amountPaise, PLANS.growth.monthlyPricePaise, "the amount comes from the payment entity");
 });
 
 test("even without the ledger, a replayed charge assigns the same period rather than adding one", async () => {

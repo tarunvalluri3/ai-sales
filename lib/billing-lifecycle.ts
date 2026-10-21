@@ -6,6 +6,7 @@ import { PAST_DUE_GRACE_DAYS } from "@/lib/plans";
 import { readBillingSubscription, sendBillingNotice, updateBillingSubscription } from "@/lib/billing-store";
 import type { BillingSubscriptionRow } from "@/lib/razorpay-webhook";
 import { SUBSCRIPTION_STATUSES } from "@/lib/subscription";
+import { resolveInvoiceHolds, type HoldResolution } from "@/lib/invoice-store";
 
 /**
  * The once-a-day billing sweep. Phase 17b (STATE.md).
@@ -34,6 +35,15 @@ import { SUBSCRIPTION_STATUSES } from "@/lib/subscription";
  *    the stored status to `expired` so the dashboard, the audit trail and
  *    the row itself agree with what the customer is actually getting.
  *
+ * 5. **(Phase 17c) Payments still waiting for an invoice.** A payment is
+ *    parked in `invoice_holds` when its GST invoice could not be issued yet
+ *    -- the customer's state or address was missing, or the supplier details
+ *    in lib/invoice-config.ts were not filled in. Each day they are retried,
+ *    which is what issues the invoices parked for an unfinished supplier
+ *    config once it has been corrected and deployed, and what raises an
+ *    error-level alert when one has been waiting for 20 days (a service
+ *    invoice is due within 30 days of supply).
+ *
  * Every email goes through `sendBillingNotice`, which claims a row in
  * `public.billing_notice_sends` before sending -- so this running twice in
  * a day, or running again after a partial failure, sends nothing twice.
@@ -50,6 +60,8 @@ export type BillingSweepResult = {
   renewalRemindersSent: number;
   trialRemindersSent: number;
   failed: number;
+  /** Phase 17c: the daily retry of payments waiting for an invoice. */
+  invoiceHolds: HoldResolution;
 };
 
 /** 14 and 3 days out, matching the two annual_renewal_* notice kinds. */
@@ -89,9 +101,15 @@ export async function runBillingLifecycleSweep(now: Date = new Date()): Promise<
     renewalRemindersSent: 0,
     trialRemindersSent: 0,
     failed: 0,
+    invoiceHolds: { attempted: 0, issued: 0, stillHeld: 0, failed: 0 },
   };
 
   const supabase = createServiceSupabaseClient();
+
+  // First, and independent of everything below: a failure reading
+  // subscriptions must not leave a paying customer's invoice un-retried.
+  // Never throws.
+  result.invoiceHolds = await resolveInvoiceHolds(supabase, { now });
 
   // One row per business, and `expired` rows are terminal with nothing left
   // to do, so this reads only the live ones. No pagination: the row count
@@ -123,7 +141,14 @@ export async function runBillingLifecycleSweep(now: Date = new Date()): Promise<
     }
   }
 
-  logEvent("billing_sweep_complete", "unknown", { ...result });
+  const { invoiceHolds, ...counts } = result;
+  logEvent("billing_sweep_complete", "unknown", {
+    ...counts,
+    holdsAttempted: invoiceHolds.attempted,
+    holdsIssued: invoiceHolds.issued,
+    holdsStillHeld: invoiceHolds.stillHeld,
+    holdsFailed: invoiceHolds.failed,
+  });
   return result;
 }
 

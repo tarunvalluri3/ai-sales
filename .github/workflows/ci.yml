@@ -74,6 +74,19 @@ jobs:
         # alongside the GST tests rather than with the pgTAP suite.
         run: npm run test:razorpay
 
+      - name: GST invoice, credit note and PDF tests
+        # Phase 17c: invoices are legal records. This covers the IST
+        # financial-year boundary (31 March / 1 April, both sides), GSTIN
+        # check digits, taxable + tax = gross to the paisa for every plan in
+        # both tax layouts, idempotent issuing (a payment replayed is one
+        # invoice), credit notes that may never exceed their invoice, the
+        # supplier-config refusal, and the PDF itself -- the rupee glyph,
+        # Indian digit grouping, long names -- extracted back out of the
+        # rendered file. Pure modules, no database and no secrets. (The
+        # database half -- the counter lock, immutability, the cannot-exceed
+        # trigger -- is pgTAP files 050 and 051, run against staging below.)
+        run: npm run test:invoices
+
       - name: Build
         run: npm run build
 

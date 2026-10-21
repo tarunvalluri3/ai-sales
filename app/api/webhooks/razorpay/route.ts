@@ -19,7 +19,9 @@ import { logEvent } from "@/lib/logger";
  * Add New Webhook) at `https://<your-domain>/api/webhooks/razorpay`,
  * subscribed to: `subscription.activated`, `subscription.charged`,
  * `subscription.pending`, `subscription.halted`, `subscription.cancelled`,
- * `subscription.completed`, `payment.failed` and `order.paid`. Put the
+ * `subscription.completed`, `payment.failed`, `order.paid` and (Phase 17c)
+ * `refund.processed`, which is what issues the GST credit note for a
+ * refund -- including one made by hand in the Razorpay dashboard. Put the
  * secret it shows you in `RAZORPAY_WEBHOOK_SECRET`.
  *
  * **Fails closed, exactly like app/api/webhooks/resend/route.ts**: with no

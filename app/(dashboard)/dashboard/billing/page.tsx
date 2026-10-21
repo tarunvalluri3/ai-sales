@@ -5,33 +5,40 @@ import { hasMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getBillingIdentityForBusiness, getEntitlementForBusiness } from "@/lib/subscription";
 import { checkReplyQuota } from "@/lib/usage-limit";
-import { isRazorpayConfigured } from "@/lib/razorpay";
+import { isRazorpayConfigured, razorpayKeyMode } from "@/lib/razorpay";
+import { listBillingDocuments } from "@/lib/invoice-queries";
+import { SUPPLIER } from "@/lib/invoice-config";
 import { GST_RATE_PERCENT, ORDERED_PLANS, PLANS, formatPaiseAsInr } from "@/lib/plans";
 import { PermissionNotice } from "../_components/state-views";
 import { BillingPanel } from "./billing-panel";
+import { BillingDetailsCard } from "./billing-details";
+import { PaymentHistory } from "./payment-history";
 
 export const metadata = { title: "Billing | Waves AI Pilot" };
 
 /**
- * The minimal billing entry point (Phase 17b, STATE.md): enough to
- * subscribe, change plan and cancel, and nothing more. **The full billing
- * page is Phase 17c** -- invoices, payment history, downloadable GST
- * documents -- and is deliberately not started here.
+ * The billing page: plan and usage (Phase 17b), plus -- Phase 17c -- the
+ * customer's billing details and their payment history with downloadable
+ * GST tax invoices and credit notes.
  *
- * `org:admin` only. Spending a business's money and cancelling its service
- * are not things a sales agent or an analyst should be able to do. The
- * Server Actions each re-check the role for themselves
- * (`requireAuthContext({ role: "org:admin" })`), because a page that
- * declines to render a form is an explanation, not an authorization
- * boundary.
+ * **`org:admin` only, for everything on it, invoices included.** Spending
+ * a business's money and cancelling its service are not things a sales
+ * agent or an analyst should be able to do, and an invoice carries the
+ * business's GSTIN, address and spend, so whoever may see Billing may see
+ * its invoices and nobody else may. The Server Actions and the PDF download
+ * routes each re-check the role for themselves
+ * (`requireAuthContext({ role: "org:admin" })`,
+ * lib/billing-download.ts), because a page that declines to render a link
+ * is an explanation, not an authorization boundary. (The database lets any
+ * member of the business SELECT its own invoices through RLS; this app
+ * deliberately narrows that to admins.)
  *
- * **Nothing here is live.** The Razorpay keys in use are test keys, and
- * going live is blocked on 17c issuing GST invoices -- charging an Indian
- * customer without a tax invoice is not lawful. The banner below says so
- * to the customer rather than leaving it only in STATE.md.
+ * **Test mode is stated while it is true.** The banner shows only while the
+ * configured Razorpay keys are TEST keys, and disappears by itself the day
+ * live keys are set -- there is no flag to forget to flip.
  */
 export default async function BillingPage() {
-  const { businessId, orgRole, contactEmail } = await requireBusinessContext();
+  const { businessId, businessName, orgRole, contactEmail } = await requireBusinessContext();
 
   if (!hasMinRole(orgRole, "org:admin")) {
     return (
@@ -48,15 +55,27 @@ export default async function BillingPage() {
   }
 
   const supabase = createServerSupabaseClient();
-  const [entitlement, quota, identity] = await Promise.all([
+  const [entitlement, quota, identity, documents] = await Promise.all([
     getEntitlementForBusiness(businessId),
     // The same count the chat path enforces on, so the number shown here
     // and the number that stops the AI are the same number.
     checkReplyQuota(supabase, businessId),
     getBillingIdentityForBusiness(businessId),
+    listBillingDocuments(businessId),
   ]);
 
   const configured = isRazorpayConfigured();
+  const testMode = razorpayKeyMode() !== "live";
+  // What the forms start from: what is saved, else the business's own name.
+  const identityDefaults = {
+    name: identity?.name ?? businessName,
+    address: identity?.address ?? "",
+    stateCode: identity?.stateCode ?? "",
+    gstin: identity?.gstin ?? "",
+  };
+  const hasHeldInvoice = documents.holds.some(
+    (hold) => hold.reason === "missing_customer_details" || hold.reason === "invalid_customer_details",
+  );
   const plan = PLANS[entitlement.planKey];
 
   return (
@@ -64,27 +83,30 @@ export default async function BillingPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold text-ds-text-primary">Billing</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
-          Your plan, what you have used this period, and when you are next charged. Invoices arrive by
-          email.
+          Your plan, what you have used this period, when you are next charged, and every invoice
+          we have issued you.
         </p>
       </header>
 
-      {/* Stated to the customer, not just recorded internally: a payment
-          form that cannot take a real payment must say so, or it is
-          misleading. */}
-      <div
-        role="status"
-        className="flex items-start gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
-      >
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-ds-text-primary">Payments are in test mode</p>
-          <p className="text-sm text-ds-text-secondary">
-            Nothing on this page charges a real card yet. We turn payments on once GST invoicing is
-            finished — we will not take money from you without issuing a tax invoice for it.
-          </p>
+      {/* Stated to the customer while it is true: a payment form that
+          cannot take a real payment must say so, or it is misleading. Keyed
+          on the configured keys, so it goes away on its own with live keys. */}
+      {testMode ? (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-medium text-ds-text-primary">Payments are in test mode</p>
+            <p className="text-sm text-ds-text-secondary">
+              Nothing on this page charges a real card yet. Invoices issued for test payments are
+              marked TEST: they are not tax documents and use a separate number series. We turn real
+              payments on only after invoicing has been checked end to end.
+            </p>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {!configured ? (
         <div
@@ -139,7 +161,7 @@ export default async function BillingPage() {
           replyQuota: quota.replyQuota,
           degraded: quota.degraded,
         }}
-        identity={{ stateCode: identity?.stateCode ?? null, gstin: identity?.gstin ?? null }}
+        identity={identityDefaults}
         plans={ORDERED_PLANS.map((p) => ({
           key: p.key,
           name: p.name,
@@ -149,6 +171,21 @@ export default async function BillingPage() {
           seatsLabel: p.seatsLabel,
         }))}
         gstRatePercent={GST_RATE_PERCENT}
+        supplierStateName={SUPPLIER.stateName}
+      />
+
+      <PaymentHistory
+        invoices={documents.invoices}
+        creditNotes={documents.creditNotes}
+        holds={documents.holds}
+        isTrial={entitlement.isTrial}
+      />
+
+      <BillingDetailsCard
+        defaults={identityDefaults}
+        gstRatePercent={GST_RATE_PERCENT}
+        supplierStateName={SUPPLIER.stateName}
+        hasHeldInvoice={hasHeldInvoice}
       />
 
       <p className="max-w-2xl text-sm text-ds-text-muted">

@@ -8,11 +8,12 @@ import { cancelSubscription, updateSubscriptionPlanAtCycleEnd } from "@/lib/razo
 import { readBillingSubscription, sendBillingNotice, updateBillingSubscription } from "@/lib/billing-store";
 import { isUpgrade, proRataUpgradeQuote, type ProRataQuote } from "@/lib/billing-prorata";
 import {
+  saveBillingIdentity,
   startMonthlyCheckout,
   startProRataUpgradeCheckout,
-  type BillingIdentity,
   type CheckoutSession,
 } from "@/lib/billing-checkout";
+import type { BillingIdentity } from "@/lib/billing-identity";
 
 type ServiceClient = ReturnType<typeof createServiceSupabaseClient>;
 
@@ -43,13 +44,14 @@ type ServiceClient = ReturnType<typeof createServiceSupabaseClient>;
  *   zero (lib/usage-limit.ts counts from `current_period_start`). There is
  *   no instant in which the quota is lower than the replies already used.
  *
- * **THE UPI CONSTRAINT, which shapes all of this.** Razorpay only allows a
+ * **Razorpay may refuse to reprice a live mandate.** Razorpay only allows a
  * live subscription to be updated when its mandate was authorised **by
- * card** -- UPI AutoPay and eMandate mandates cannot be updated. UPI
- * AutoPay is a confirmed requirement for this product, so that refusal is
- * an expected outcome, not an edge case. When it happens, the recurring
- * mandate is cancelled at period end instead and the customer is asked to
- * authorise the new plan before then. The dashboard shows the same thing
+ * card**. This product takes cards only (decided 2026-10-21; UPI was
+ * dropped in Phase 17c), so the refusal should be rare -- but a mandate
+ * that somehow was not card-authorised, or any provider-side refusal, is
+ * still an expected outcome and not a failure. When it happens, the
+ * recurring mandate is cancelled at period end instead and the customer is
+ * asked to authorise the new plan before then. The dashboard shows the same thing
  * it shows for any cancellation -- "nothing will renew, re-subscribe
  * before <date>" -- because that is the identical instruction, and giving
  * it a second distinct state would be two ways of saying one thing.
@@ -139,6 +141,12 @@ export async function changePlan(params: {
       "changePlan to the current plan",
     );
   }
+
+  // The form carries the billing details too, and the next invoice (the
+  // pro-rata charge, or the renewal) is issued to whatever is saved when the
+  // payment lands -- so what the customer just confirmed is saved now. The
+  // paths above that start a new mandate save it themselves.
+  await saveBillingIdentity(supabase, params.businessId, params.identity);
 
   const interval = row.billing_interval ?? "monthly";
 
@@ -307,8 +315,8 @@ async function scheduleDowngrade(
     return { outcome: "scheduled", effectiveAt, toPlanKey: params.toPlanKey };
   }
 
-  // The documented refusal: a mandate authorised by UPI AutoPay or
-  // eMandate cannot be updated. Cancel it at the cycle boundary instead
+  // The documented refusal: a mandate that was not authorised by card
+  // cannot be updated. Cancel it at the cycle boundary instead
   // and ask for a new mandate on the new plan -- the customer keeps
   // everything they paid for, and nothing charges at the old price.
   return reauthorisationRequired(supabase, params, fromPlanKey, row, effectiveAt, moved.reason);

@@ -340,16 +340,21 @@ export async function getEntitlementForBusiness(businessId: string): Promise<Ent
  */
 export async function getBillingIdentityForBusiness(
   businessId: string,
-): Promise<{ stateCode: string | null; gstin: string | null } | null> {
+): Promise<{ name: string | null; address: string | null; stateCode: string | null; gstin: string | null } | null> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("subscriptions")
-    .select("billing_state_code, gstin")
+    .select("billing_name, billing_address, billing_state_code, gstin")
     .eq("business_id", businessId)
     .maybeSingle();
 
   if (error || !data) return null;
-  return { stateCode: data.billing_state_code ?? null, gstin: data.gstin ?? null };
+  return {
+    name: data.billing_name ?? null,
+    address: data.billing_address ?? null,
+    stateCode: data.billing_state_code ?? null,
+    gstin: data.gstin ?? null,
+  };
 }
 
 /**

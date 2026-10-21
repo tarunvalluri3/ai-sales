@@ -243,14 +243,17 @@ insert into _tap_results select ok(
 --
 -- Pinned as an exact count, the same technique 048 uses for plan keys: a
 -- value this app never writes, left behind in the constraint, fails here.
--- 46 before this phase (20261022000000) plus 9 lifecycle actions.
+-- 46 before this phase (20261022000000) plus 9 lifecycle actions. Phase 17c
+-- (20261026000000) later added 3 more, so the live total is 58; that figure
+-- is pinned by 051 and asserted here as the same live constraint, so this
+-- file changes in step with every later extension of the list.
 insert into _tap_results select is(
   (select (length(pg_get_constraintdef(oid)) - length(replace(pg_get_constraintdef(oid), '::text', '')))
             / length('::text')
      from pg_constraint
      where conrelid = 'public.audit_log'::regclass and conname = 'audit_log_action_check'),
-  55,
-  'audit_log.action accepts exactly 55 actions -- 46 before Phase 17b plus its 9 subscription lifecycle entries'
+  58,
+  'audit_log.action accepts exactly 58 actions -- 46 before Phase 17b, plus its 9 lifecycle entries, plus 3 from Phase 17c'
 );
 
 -- Simulate a signed-in user whose active Clerk organization is org_a.

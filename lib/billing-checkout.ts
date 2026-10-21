@@ -22,6 +22,8 @@ import {
   updateBillingSubscription,
 } from "@/lib/billing-store";
 import { proRataUpgradeQuote, type ProRataQuote } from "@/lib/billing-prorata";
+import type { BillingIdentity } from "@/lib/billing-identity";
+import { resolveInvoiceHolds } from "@/lib/invoice-store";
 
 type ServiceClient = ReturnType<typeof createServiceSupabaseClient>;
 
@@ -74,13 +76,6 @@ export type OrderCheckoutSession = {
 };
 
 export type CheckoutSession = MonthlyCheckoutSession | OrderCheckoutSession;
-
-export type BillingIdentity = {
-  /** GST state code -- the customer's place of supply. Required at checkout. */
-  stateCode: string;
-  /** Optional: a registered business customer's GSTIN, upper-cased. */
-  gstin: string | null;
-};
 
 function requireConfig() {
   const config = getRazorpayConfig();
@@ -480,29 +475,70 @@ export async function confirmOrderCheckout(params: {
 }
 
 /**
- * Stores the customer's place of supply and optional GSTIN.
+ * Stores the customer's billing identity: name, address, place of supply
+ * and optional GSTIN -- everything a GST tax invoice prints about the
+ * recipient (Phase 17c).
  *
- * **Captured at checkout specifically for Phase 17c.** Its invoices cannot
- * be issued without the state code -- it is what decides CGST+SGST versus
- * a single IGST line -- and collecting it after the fact would mean
- * chasing every customer who had already paid. Best-effort on write
- * failure: losing it is a 17c problem to chase, and failing a payment the
- * customer is in the middle of making over an address field would be
- * worse.
+ * **Strict on write failure.** Before 17c this was best-effort, because
+ * losing it was a problem for later. Now an invoice cannot be issued
+ * without it, and every caller runs BEFORE the customer is shown the
+ * payment sheet, so refusing to continue costs nothing -- whereas carrying
+ * on and then taking a payment we cannot invoice would put a paying
+ * customer's invoice on hold.
+ *
+ * **Applies to future invoices only.** Issued invoices are immutable
+ * snapshots (20261026000000): nothing written here can reach one.
  */
-async function saveBillingIdentity(
+export async function saveBillingIdentity(
   supabase: ServiceClient,
   businessId: string,
   identity: BillingIdentity,
 ): Promise<void> {
   const { error } = await supabase
     .from("subscriptions")
-    .update({ billing_state_code: identity.stateCode, gstin: identity.gstin })
+    .update({
+      billing_name: identity.name,
+      billing_address: identity.address,
+      billing_state_code: identity.stateCode,
+      gstin: identity.gstin,
+    })
     .eq("business_id", businessId);
 
   if (error) {
     logEvent("billing_identity_save_failed", businessId, { code: error.code ?? "unknown" }, "error");
+    throw new AppError(
+      "We could not save your billing details. Please try again.",
+      `billing_identity_save_failed ${error.code ?? "unknown"}`,
+    );
   }
+}
+
+/**
+ * Saves billing details from the billing page, outside any checkout, and
+ * then retries every invoice that was waiting on them. A customer fixing a
+ * missing state therefore gets the invoice they were owed within seconds,
+ * emailed, with nothing further to do.
+ */
+export async function updateBillingDetails(params: {
+  businessId: string;
+  userId: string;
+  identity: BillingIdentity;
+}): Promise<{ invoicesIssued: number }> {
+  const supabase = createServiceSupabaseClient();
+  await ensureSubscriptionRow(supabase, params.businessId);
+  await saveBillingIdentity(supabase, params.businessId, params.identity);
+
+  await recordAuditLogEntry(
+    params.businessId,
+    params.userId,
+    "billing_details.updated",
+    "subscription",
+    params.businessId,
+    { stateCode: params.identity.stateCode, hasGstin: params.identity.gstin !== null },
+  );
+
+  const resolution = await resolveInvoiceHolds(supabase, { businessId: params.businessId });
+  return { invoicesIssued: resolution.issued };
 }
 
 /**

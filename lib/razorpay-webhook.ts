@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { PLAN_KEYS, type PlanKey } from "@/lib/plans";
 import type { BillingNoticeKind } from "@/lib/billing-notices";
+import type { CreditNoteReason, PaymentForInvoice } from "@/lib/invoice-core";
+import type { IssueCreditNoteOutcome, IssueInvoiceOutcome } from "@/lib/invoice-service";
 
 /**
  * Razorpay webhook handling: payload parsing, idempotency, and the state
@@ -52,6 +54,8 @@ export const HANDLED_RAZORPAY_EVENTS = [
   "subscription.completed",
   "payment.failed",
   "order.paid",
+  // Phase 17c: a refund of a taxed invoice needs a credit note.
+  "refund.processed",
 ] as const;
 
 export type HandledRazorpayEvent = (typeof HANDLED_RAZORPAY_EVENTS)[number];
@@ -100,6 +104,19 @@ const paymentEntitySchema = z.object({
   order_id: z.string().nullable().optional(),
   method: z.string().optional(),
   error_code: z.string().nullable().optional(),
+  /** Unix seconds: when the payment was taken. Decides the invoice date and financial year. */
+  created_at: z.number().optional(),
+  notes: notesSchema,
+});
+
+const refundEntitySchema = z.object({
+  id: z.string(),
+  payment_id: z.string(),
+  amount: z.number(),
+  currency: z.string().optional(),
+  status: z.string().optional(),
+  /** Unix seconds. */
+  created_at: z.number().optional(),
   notes: notesSchema,
 });
 
@@ -119,6 +136,7 @@ const webhookBodySchema = z.object({
       subscription: z.object({ entity: subscriptionEntitySchema }).optional(),
       payment: z.object({ entity: paymentEntitySchema }).optional(),
       order: z.object({ entity: orderEntitySchema }).optional(),
+      refund: z.object({ entity: refundEntitySchema }).optional(),
     })
     .default({}),
 });
@@ -215,6 +233,22 @@ export type RazorpayWebhookDeps = {
     action: BillingAuditAction,
     metadata: Record<string, string | number | boolean | null>,
   ): Promise<void>;
+  /**
+   * Phase 17c: issues the GST tax invoice a successful payment is owed
+   * (lib/invoice-service.ts). Idempotent on the payment id. Resolves for
+   * every outcome that retrying cannot improve -- including parking the
+   * payment because customer details are missing -- and THROWS only for a
+   * transient failure, so the webhook answers non-2xx and Razorpay retries.
+   */
+  issueInvoice(payment: PaymentForInvoice): Promise<IssueInvoiceOutcome>;
+  /** Phase 17c: issues the credit note a processed refund requires. Idempotent on the refund id. */
+  issueCreditNote(refund: {
+    paymentId: string;
+    refundId: string;
+    amountPaise: number;
+    refundedAt: Date;
+    reason: CreditNoteReason;
+  }): Promise<IssueCreditNoteOutcome>;
   log(
     event: string,
     businessId: string,
@@ -404,6 +438,10 @@ async function dispatch(
     return handleOrderPaid(deps, body, now);
   }
 
+  if (event === "refund.processed") {
+    return handleRefundProcessed(deps, body, now);
+  }
+
   if (!subscriptionEntity) {
     deps.log("razorpay_webhook_missing_subscription_entity", businessId ?? "unknown", { event }, "error");
     return "unresolved";
@@ -439,7 +477,7 @@ async function dispatch(
     case "subscription.activated":
       return handleActivated(deps, row, subscriptionEntity, now);
     case "subscription.charged":
-      return handleCharged(deps, row, subscriptionEntity, now);
+      return handleCharged(deps, row, subscriptionEntity, body, now);
     case "subscription.pending":
       return handlePending(deps, row, now);
     case "subscription.halted":
@@ -571,6 +609,7 @@ async function handleCharged(
   deps: RazorpayWebhookDeps,
   row: BillingSubscriptionRow,
   entity: SubscriptionEntity,
+  body: RazorpayWebhookBody,
   now: Date,
 ): Promise<WebhookOutcome> {
   const period = periodFrom(entity);
@@ -615,12 +654,12 @@ async function handleCharged(
     });
   }
 
-  // A receipt on every single monthly charge is mail nobody asked for, and
-  // Phase 17c's GST invoice is the document that actually has to arrive.
-  // Only the two charges a business genuinely needs told about are mailed:
-  // the first one (the trial converting to a paid plan) and a recovery
-  // after a failure, where the business is waiting to hear that its AI is
-  // back on.
+  // A receipt on every single monthly charge is mail nobody asked for: the
+  // GST invoice issued at the end of this handler is the document that
+  // arrives for each one. Only the two charges a business genuinely needs
+  // told about are mailed here: the first one (the trial converting to a
+  // paid plan) and a recovery after a failure, where the business is waiting
+  // to hear that its AI is back on.
   if (row.status === "trialing") {
     await deps.sendNotice("subscription_active", row, { periodEndIso: period.end, planKey: appliedPlanKey });
   } else if (recovering) {
@@ -633,7 +672,24 @@ async function handleCharged(
     planChanged,
     periodEnd: period.end,
   });
-  void now;
+
+  // LAST, on purpose. The money has moved and the row says so; only now is
+  // the legal record of it written (Phase 17c: one GST tax invoice per
+  // successful charge, for the amount actually collected). It is the one
+  // step here that can THROW on a transient failure -- which makes Razorpay
+  // retry, and on that retry this row is already `active`, so a notice
+  // placed after it would never be sent. Everything that must happen
+  // exactly once is therefore done before it.
+  await issueInvoiceFor(deps, row.business_id, {
+    payment: body.payload.payment?.entity,
+    eventCreatedAt: body.created_at,
+    now,
+    purpose: "subscription_charge",
+    planKey: appliedPlanKey,
+    period,
+    orderId: null,
+    subscriptionId: entity.id,
+  });
   return "processed";
 }
 
@@ -848,10 +904,31 @@ async function handleOrderPaid(
     return "unresolved";
   }
 
+  const invoiceBase = {
+    payment: body.payload.payment?.entity,
+    eventCreatedAt: body.created_at,
+    now,
+    purpose,
+    planKey,
+    orderId: order.id,
+    subscriptionId: null,
+    orderAmountPaise: order.amount,
+  } as const;
+
   // Already applied -- by the Checkout callback, or by an earlier delivery
-  // of a different event carrying the same order. Not an error.
+  // of a different event carrying the same order. Not an error, and NOT the
+  // end of the road: the callback only ever moves the plan, so the invoice
+  // for this payment may still be owed. It is issued here, idempotently on
+  // the payment id, whichever of the two paths applied the plan first.
   if (row.razorpay_order_id === order.id && row.plan_key === planKey && row.status === "active") {
     deps.log("razorpay_order_paid_already_applied", businessId, { orderId: order.id });
+    await issueInvoiceFor(deps, businessId, {
+      ...invoiceBase,
+      period:
+        row.current_period_start && row.current_period_end
+          ? { start: row.current_period_start, end: row.current_period_end }
+          : null,
+    });
     return "processed";
   }
 
@@ -866,6 +943,9 @@ async function handleOrderPaid(
     });
     await deps.sendNotice("subscription_active", row, { periodEndIso: period.end, planKey });
     deps.log("razorpay_annual_order_applied", businessId, { planKey, periodEnd: period.end });
+    // Last: the only step that can throw on a transient failure (see
+    // handleCharged), so everything that must happen once is done first.
+    await issueInvoiceFor(deps, businessId, { ...invoiceBase, period });
     return "processed";
   }
 
@@ -880,7 +960,136 @@ async function handleOrderPaid(
     orderId: order.id,
   });
   deps.log("razorpay_prorata_upgrade_applied", businessId, { planKey, previousPlanKey: row.plan_key });
+  await issueInvoiceFor(deps, businessId, {
+    ...invoiceBase,
+    period:
+      row.current_period_start && row.current_period_end
+        ? { start: row.current_period_start, end: row.current_period_end }
+        : null,
+  });
   return "processed";
+}
+
+/**
+ * Issues the invoice for one payment, from the `payment` entity of the
+ * event -- **the amount actually collected, never the plan's list price.**
+ * A pro-rated upgrade charges a sum that is no plan's price, and an invoice
+ * stating the list price when a different amount was taken would be wrong.
+ *
+ * A payment entity with no usable amount cannot be invoiced and is logged
+ * at error level (it reaches Sentry) rather than guessed at; the state
+ * change that triggered this has already been applied and is not undone.
+ * A payment that is present but not `captured` is not a payment yet and
+ * gets no invoice.
+ */
+async function issueInvoiceFor(
+  deps: RazorpayWebhookDeps,
+  businessId: string,
+  input: {
+    payment: z.infer<typeof paymentEntitySchema> | undefined;
+    eventCreatedAt: number | undefined;
+    now: Date;
+    purpose: PaymentForInvoice["purpose"];
+    planKey: PlanKey;
+    period: { start: string; end: string } | null;
+    orderId: string | null;
+    subscriptionId: string | null;
+    orderAmountPaise?: number;
+  },
+): Promise<void> {
+  const payment = input.payment;
+  if (!payment || typeof payment.amount !== "number") {
+    deps.log(
+      "razorpay_payment_without_amount_no_invoice",
+      businessId,
+      { purpose: input.purpose, paymentId: payment?.id ?? null },
+      "error",
+    );
+    return;
+  }
+  if (payment.status !== undefined && payment.status !== "captured") {
+    deps.log("razorpay_payment_not_captured_no_invoice", businessId, {
+      paymentId: payment.id,
+      status: payment.status,
+    });
+    return;
+  }
+  if (input.orderAmountPaise !== undefined && input.orderAmountPaise !== payment.amount) {
+    // Invoice what was actually collected, and say so loudly.
+    deps.log(
+      "razorpay_payment_differs_from_order",
+      businessId,
+      { paymentId: payment.id, paidPaise: payment.amount, orderPaise: input.orderAmountPaise },
+      "error",
+    );
+  }
+
+  const paidAtSeconds = payment.created_at ?? input.eventCreatedAt;
+  const paidAt = paidAtSeconds ? new Date(paidAtSeconds * 1000) : input.now;
+
+  await deps.issueInvoice({
+    businessId,
+    paymentId: payment.id,
+    orderId: input.orderId ?? payment.order_id ?? null,
+    subscriptionId: input.subscriptionId,
+    amountPaise: payment.amount,
+    currency: payment.currency ?? "INR",
+    paidAt,
+    purpose: input.purpose,
+    planKey: input.planKey,
+    period: input.period,
+  });
+}
+
+/**
+ * `refund.processed`: money went back to the customer, so the tax invoice
+ * it was taken against needs a credit note. Idempotent on the refund id,
+ * so the manual script (scripts/issue-credit-note.mjs), this webhook and a
+ * refund made by hand in the Razorpay dashboard can all arrive for the same
+ * refund and produce one note.
+ *
+ * A refund for a payment this app never invoiced -- the small
+ * authentication charge Razorpay refunds itself, or a payment from before
+ * invoicing existed -- has no invoice to credit and is acknowledged
+ * quietly. A refund that would take the credit notes past the invoice is
+ * refused by the service and logged at error level; retrying cannot fix it,
+ * so it is acknowledged rather than retried.
+ */
+async function handleRefundProcessed(
+  deps: RazorpayWebhookDeps,
+  body: RazorpayWebhookBody,
+  now: Date,
+): Promise<WebhookOutcome> {
+  const refund = body.payload.refund?.entity;
+  if (!refund) {
+    deps.log("razorpay_refund_event_without_refund_entity", "unknown", {}, "error");
+    return "unresolved";
+  }
+
+  const reason = noteString(refund.notes, "credit_note_reason");
+  const outcome = await deps.issueCreditNote({
+    paymentId: refund.payment_id,
+    refundId: refund.id,
+    amountPaise: refund.amount,
+    refundedAt: refund.created_at ? new Date(refund.created_at * 1000) : now,
+    reason: isCreditNoteReasonValue(reason) ? reason : "other",
+  });
+
+  deps.log("razorpay_refund_processed", "unknown", {
+    refundId: refund.id,
+    paymentId: refund.payment_id,
+    outcome: outcome.status,
+  });
+  return "processed";
+}
+
+function isCreditNoteReasonValue(value: string | null): value is CreditNoteReason {
+  return (
+    value === "duplicate_or_incorrect_charge" ||
+    value === "charge_after_cancellation" ||
+    value === "sustained_outage" ||
+    value === "other"
+  );
 }
 
 /**

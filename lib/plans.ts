@@ -227,11 +227,28 @@ export type GstBreakdown = {
 export function gstBreakdown(grossPaise: number, supply: GstSupply): GstBreakdown {
   const taxablePaise = taxableValuePaise(grossPaise);
   const taxPaise = grossPaise - taxablePaise;
+  return { grossPaise, taxablePaise, ...splitGstTax(taxPaise, supply) };
+}
+
+/**
+ * The CGST / SGST / IGST layout of a tax amount that has ALREADY been
+ * determined. This is the single place the floor-and-remainder rule lives:
+ * `gstBreakdown` uses it, and so do Phase 17c's credit notes, which derive
+ * a note's tax proportionally from the invoice it reverses and therefore
+ * start from a tax figure rather than a gross.
+ */
+export function splitGstTax(
+  taxPaise: number,
+  supply: GstSupply,
+): { readonly taxPaise: number } & (
+  | { readonly supply: "intra-state"; readonly cgstPaise: number; readonly sgstPaise: number }
+  | { readonly supply: "inter-state"; readonly igstPaise: number }
+) {
   if (supply === "inter-state") {
-    return { grossPaise, taxablePaise, taxPaise, supply, igstPaise: taxPaise };
+    return { taxPaise, supply, igstPaise: taxPaise };
   }
   const cgstPaise = Math.floor(taxPaise / 2);
-  return { grossPaise, taxablePaise, taxPaise, supply, cgstPaise, sgstPaise: taxPaise - cgstPaise };
+  return { taxPaise, supply, cgstPaise, sgstPaise: taxPaise - cgstPaise };
 }
 
 /**

@@ -64,6 +64,10 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "subscription.expired": "Subscription ended",
   "subscription.plan_changed": "Plan changed",
   "subscription.plan_change_scheduled": "Plan change scheduled for period end",
+  // Phase 17c.
+  "invoice.issued": "GST tax invoice issued",
+  "credit_note.issued": "Credit note issued",
+  "billing_details.updated": "Billing details updated",
 };
 
 export default async function AuditLogPage() {
