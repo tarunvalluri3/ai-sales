@@ -563,29 +563,58 @@ test("the billing name falls back to the business name, which is a real fact we 
   assert.equal(outcome.invoice.customer_name, "Fallback Business Name");
 });
 
-test("the real supplier config still has TODO placeholders, so the generator refuses to issue anything", async () => {
-  const problems = CFG.supplierConfigProblems(CFG.SUPPLIER);
+// A fixture with the same shape and the same placeholders as the shipped config, so this test keeps
+// meaning the same thing after the owner fills the real values in.
+const PLACEHOLDER_SUPPLIER = {
+  ...SUPPLIER,
+  address: "TODO: registered address of the supplier",
+  sacCode: "TODO: SAC code",
+};
+
+test("a supplier config with TODO placeholders makes the generator refuse to issue anything", async () => {
+  const problems = CFG.supplierConfigProblems(PLACEHOLDER_SUPPLIER);
   assert.ok(problems.some((p) => p.startsWith("address")), "the address placeholder is detected");
   assert.ok(problems.some((p) => p.startsWith("sacCode")), "the SAC placeholder is detected");
-  assert.throws(() => CFG.assertSupplierConfigReady(CFG.SUPPLIER), CFG.SupplierConfigIncompleteError);
+  assert.throws(() => CFG.assertSupplierConfigReady(PLACEHOLDER_SUPPLIER), CFG.SupplierConfigIncompleteError);
 
-  // The supplier facts that ARE known are right: a regression guard on the one place they live.
+  // Through the real service: nothing is issued, nothing is snapshotted, the payment is parked.
+  const { deps, state } = makeStore({ supplier: PLACEHOLDER_SUPPLIER });
+  const outcome = await SVC.issueInvoiceForPayment(deps, paymentFixture());
+  assert.equal(outcome.status, "held");
+  assert.equal(outcome.reason, "supplier_config_incomplete");
+  assert.equal(state.invoices.length, 0);
+  assert.equal(state.counters.size, 0, "and no number was taken");
+  assert.throws(
+    () => CORE.buildInvoiceDraft({ payment: paymentFixture(), customer: { ...CUSTOMER_TELANGANA, stateName: "Telangana" }, supplier: PLACEHOLDER_SUPPLIER, isTest: false }),
+    CFG.SupplierConfigIncompleteError,
+    "building a draft refuses too, so no caller can route around the service",
+  );
+});
+
+test("the shipped supplier config is either complete and valid, or refuses -- never half-filled", async () => {
+  // The supplier facts that are known are right: a regression guard on the one place they live.
   assert.equal(CFG.SUPPLIER.gstin, "36BYQPT2686E1ZR");
   assert.equal(CFG.SUPPLIER.stateCode, "36");
   assert.equal(CFG.SUPPLIER.name, "Waves Web Studio");
   assert.equal(validateGstin(CFG.SUPPLIER.gstin, CFG.SUPPLIER.stateCode).ok, true);
 
-  // Through the real service: nothing is issued, nothing is snapshotted, the payment is parked.
+  const problems = CFG.supplierConfigProblems(CFG.SUPPLIER);
   const { deps, state } = makeStore({ supplier: CFG.SUPPLIER });
   const outcome = await SVC.issueInvoiceForPayment(deps, paymentFixture());
-  assert.equal(outcome.status, "held");
-  assert.equal(outcome.reason, "supplier_config_incomplete");
-  assert.equal(state.invoices.length, 0);
-  assert.throws(
-    () => CORE.buildInvoiceDraft({ payment: paymentFixture(), customer: { ...CUSTOMER_TELANGANA, stateName: "Telangana" }, supplier: CFG.SUPPLIER, isTest: false }),
-    CFG.SupplierConfigIncompleteError,
-    "building a draft refuses too, so no caller can route around the service",
-  );
+
+  if (problems.length > 0) {
+    // Still has TODOs: the generator must refuse, and say which values.
+    assert.equal(outcome.status, "held");
+    assert.equal(outcome.reason, "supplier_config_incomplete");
+    assert.equal(state.invoices.length, 0);
+    assert.ok(problems.every((p) => /TODO|empty|sac|address|gstin|state/i.test(p)));
+  } else {
+    // The owner has filled it in: it must issue, and the invoice must carry exactly those values.
+    assert.equal(outcome.status, "issued");
+    assert.equal(outcome.invoice.supplier_address, CFG.SUPPLIER.address);
+    assert.equal(outcome.invoice.sac_code, CFG.SUPPLIER.sacCode);
+    assert.ok(!/TODO/i.test(outcome.invoice.supplier_address + outcome.invoice.sac_code));
+  }
 });
 
 test("supplier config is also refused for a bad GSTIN, a mismatched state or a non-SAC", () => {
