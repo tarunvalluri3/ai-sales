@@ -153,6 +153,13 @@ A **grandfathered tenant** that subscribes gets `ensureSubscriptionRow()`, which
 - **`scripts/run-razorpay-webhook-tests.mjs`**, 24 tests driving the real state machine against an in-memory store. Includes **the idempotency test the brief asked for** -- the same `subscription.charged` twice extends the period once, with one write and one audit row -- plus the fresh-event-id variant proving the absolute-assignment layer independently, the claim-release-on-failure path, the pending-retry grace anchor, the trialing-cancel constraint hazard, `order.paid` already-applied no-op, a rogue `order.paid` with notes we did not write granting nothing, and the pro-rata arithmetic.
 - **Wired into CI** as its own step ("Razorpay signature and webhook lifecycle tests", after the GST step, before Build), the same way 17a's plan-tax tests were. `npm run test:razorpay` runs both files; `npm test` remains the pgTAP suite.
 
+**Two failures CI caught that nothing local could have, both fixed (PR #85, first run red, second green):**
+
+1. **The new trigger broke 17a's own pgTAP file.** `048` inserted its two `subscriptions` fixture rows explicitly; with `businesses_create_trial_subscription` in place those rows already exist by then, so the inserts collided on the primary key (`23505`). `048`'s fixture is now an `UPDATE` of the trigger-created row for `org_a`, and `org_b` needs **no setup at all** -- the trigger already gives it exactly the trialing starter row that test wanted. Notably, writing `org_b`'s row again would have been *impossible* rather than merely redundant: `trial_started_at` is write-once, so re-stamping it is refused by the very trigger `048` assertion 9 exists to test. This is the first real consequence of the trigger showing up in a test, and it is the right one.
+2. **`049` was missing a `reset role`** before `finish()`. `_tap_results` is granted `INSERT` to `authenticated` and nothing else, so leaving the session as `authenticated` failed the final `SELECT` with `permission denied for table _tap_results`. `048` does the reset; `049` now does too.
+
+Neither was reachable locally -- pgTAP is not available in PGlite (`enable_pgtap_extension` is one of the 12 migrations that cannot apply there), and the CLI points at production, so **staging via CI is the only validator for these two files.** Worth remembering: a pgTAP file is effectively untested until CI runs it.
+
 ### 11. Checks actually run
 
 - `npm run lint` -- **pass** (after fixing one `react-hooks/set-state-in-effect` error: the Checkout script is now loaded with `next/script`'s `onReady` instead of a manual effect).

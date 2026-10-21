@@ -40,21 +40,27 @@ values
 
 -- A paid row and a trialing row, so both branches of the date constraints
 -- are represented by a real row rather than only by the rejections below.
-insert into public.subscriptions (
-  business_id, plan_key, status, current_period_start, current_period_end, razorpay_subscription_id
-)
-values (
-  '00000000-0000-0000-0000-00000000000a', 'growth', 'active',
-  now() - interval '3 days', now() + interval '27 days', 'sub_test_a'
-);
-
-insert into public.subscriptions (
-  business_id, plan_key, status, trial_started_at, trial_ends_at
-)
-values (
-  '00000000-0000-0000-0000-00000000000b', 'starter', 'trialing',
-  now() - interval '2 days', now() + interval '12 days'
-);
+--
+-- UPDATED for Phase 17b (migration 20261025000000): both rows already
+-- exist by the time we get here. `businesses_create_trial_subscription`
+-- creates a trialing subscription in the same transaction as the business
+-- insert above, so these are now UPDATEs rather than INSERTs -- an INSERT
+-- would collide on the primary key, which is exactly what this file
+-- asserts in assertion 7.
+--
+-- org_b needs no setup at all: the trigger already gives it precisely the
+-- trialing starter row this test wanted (status 'trialing', plan_key
+-- 'starter', both trial dates set). Writing it again would in fact be
+-- *impossible* -- `trial_started_at` is write-once (assertion 9), so an
+-- UPDATE re-stamping it would be refused by the very trigger this file
+-- goes on to test.
+update public.subscriptions
+   set plan_key = 'growth',
+       status = 'active',
+       current_period_start = now() - interval '3 days',
+       current_period_end = now() + interval '27 days',
+       razorpay_subscription_id = 'sub_test_a'
+ where business_id = '00000000-0000-0000-0000-00000000000a';
 
 -- 1-2. The registry and the database agree on which plans and statuses
 -- exist. Counting the quoted literals in the constraint definition pins

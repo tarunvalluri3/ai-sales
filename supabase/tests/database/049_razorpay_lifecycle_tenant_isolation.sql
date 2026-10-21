@@ -303,6 +303,13 @@ insert into _tap_results select throws_ok(
   'org_a session cannot schedule its own plan change or clear its own grace anchor'
 );
 
+-- Back to the unrestricted connecting role before finishing, exactly as
+-- 048 does. `_tap_results` is granted INSERT to `authenticated` and
+-- nothing else, so `finish()` and the final SELECT below have to run as
+-- the connecting role -- leaving the session as `authenticated` fails with
+-- `permission denied for table _tap_results`.
+reset role;
+
 insert into _tap_results select * from finish();
 select line from _tap_results;
 rollback;
