@@ -638,7 +638,20 @@ export type AuditLogAction =
   | "copilot.action_completed"
   | "copilot.action_superseded"
   // Must stay in lockstep with audit_log_action_check, extended by 20261022000000.
-  | "notification_preferences.updated";
+  | "notification_preferences.updated"
+  // Phase 17b: the Razorpay subscription lifecycle, extended by
+  // 20261025000000. Entries caused by a webhook or by the daily billing
+  // sweep record actor_user_id = 'system:razorpay' (SYSTEM_ACTOR_RAZORPAY
+  // in lib/audit-log.ts), since no signed-in user caused them.
+  | "subscription.checkout_started"
+  | "subscription.activated"
+  | "subscription.charged"
+  | "subscription.payment_failed"
+  | "subscription.grace_lapsed"
+  | "subscription.cancellation_scheduled"
+  | "subscription.expired"
+  | "subscription.plan_changed"
+  | "subscription.plan_change_scheduled";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

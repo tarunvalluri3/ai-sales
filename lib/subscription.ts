@@ -74,7 +74,17 @@ const subscriptionRowSchema = z.object({
   current_period_end: z.string().nullable(),
   cancel_at_period_end: z.boolean(),
   razorpay_subscription_id: z.string().nullable(),
+  // Phase 17b. All nullable, so a pre-17b row (and the whole
+  // grandfathered, row-less case) behaves exactly as it did before.
+  billing_interval: z.enum(["monthly", "annual"]).nullable().default(null),
+  scheduled_plan_key: z.enum(PLAN_KEYS).nullable().default(null),
+  past_due_since: z.string().nullable().default(null),
+  razorpay_order_id: z.string().nullable().default(null),
 });
+
+/** The columns every entitlement read needs. Kept next to the schema that parses them. */
+const ENTITLEMENT_COLUMNS =
+  "plan_key, status, trial_started_at, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, razorpay_subscription_id, billing_interval, scheduled_plan_key, past_due_since, razorpay_order_id";
 
 export type Entitlement = {
   planKey: PlanKey;
@@ -98,6 +108,31 @@ export type Entitlement = {
   serving: boolean;
   notServingReason: null | "trial_expired" | "grace_period_lapsed" | "subscription_expired";
   channels: Readonly<Record<ChannelKey, boolean>>;
+
+  /* --- Phase 17b: what /dashboard/billing needs to render honestly --- */
+
+  /** ISO, or null outside a trial. */
+  trialEndsAt: string | null;
+  /** True when the plan is cancelled or set to cancel, so nothing renews. */
+  cancelAtPeriodEnd: boolean;
+  /**
+   * A downgrade waiting for the period boundary. The *current* plan's quota
+   * and channels still apply until then -- which is exactly why a
+   * downgrade can never put a business over its new quota mid-period.
+   */
+  scheduledPlanKey: PlanKey | null;
+  /** 'monthly' = a Razorpay mandate. 'annual' = a one-time order. Null before checkout. */
+  billingInterval: "monthly" | "annual" | null;
+  /**
+   * True once a mandate or an annual order exists for this business -- i.e.
+   * money has been authorised at least once. Distinguishes "trialing, card
+   * on file, will convert" from "trialing, never checked out, will simply
+   * stop", which are the same `status` but very different situations to
+   * show a customer (and the second is what `trial_ending_3d` mails about).
+   */
+  hasPaymentMethod: boolean;
+  /** ISO. When a renewal first failed, i.e. when the 5-day grace started. */
+  pastDueSince: string | null;
 };
 
 function startOfCurrentUtcMonth(now: Date): Date {
@@ -126,6 +161,12 @@ function grandfatheredEntitlement(now: Date): Entitlement {
     serving: true,
     notServingReason: null,
     channels: plan.channels,
+    trialEndsAt: null,
+    cancelAtPeriodEnd: false,
+    scheduledPlanKey: null,
+    billingInterval: null,
+    hasPaymentMethod: false,
+    pastDueSince: null,
   };
 }
 
@@ -143,8 +184,20 @@ function grandfatheredEntitlement(now: Date): Entitlement {
  *   current_period_end has already passed (a renewal webhook that has not
  *   landed yet), the grace window applies rather than an immediate stop:
  *   a paying customer must not be cut off because our own webhook is late.
- * - `past_due`: identical to active until PAST_DUE_GRACE_DAYS past
- *   current_period_end, then stops. The confirmed 5-day grace.
+ * - `past_due`: identical to active -- full quota, AI still replying --
+ *   until PAST_DUE_GRACE_DAYS (5) past the moment the payment first
+ *   failed. The confirmed 5-day grace.
+ *
+ *   **Phase 17b anchored that window to `past_due_since` rather than to
+ *   `current_period_end`.** Razorpay retries a failed charge over several
+ *   days and fires `subscription.pending` again on each retry, so a grace
+ *   measured from the period end was fine for the first failure and wrong
+ *   for a renewal that fails repeatedly -- and a grace re-stamped on each
+ *   retry would never end at all. The window is `max(current_period_end,
+ *   past_due_since + 5 days)`: never shorter than the period the customer
+ *   has already paid for, and never restarted. A row with no
+ *   `past_due_since` (pre-17b, or a status set by hand) keeps 17a's
+ *   period-end behaviour exactly.
  * - `cancelled`: paid through current_period_end, so it keeps serving to
  *   that moment and then stops. No grace -- this one is the customer's own
  *   decision, not a failed payment.
@@ -158,6 +211,12 @@ export function entitlementFromRow(row: z.infer<typeof subscriptionRowSchema>, n
     status: row.status,
     grandfathered: false,
     channels: plan.channels,
+    trialEndsAt: row.status === "trialing" ? row.trial_ends_at : null,
+    cancelAtPeriodEnd: row.cancel_at_period_end || row.status === "cancelled",
+    scheduledPlanKey: row.scheduled_plan_key,
+    billingInterval: row.billing_interval,
+    hasPaymentMethod: row.razorpay_subscription_id !== null || row.razorpay_order_id !== null,
+    pastDueSince: row.past_due_since,
   };
 
   if (row.status === "trialing") {
@@ -192,8 +251,18 @@ export function entitlementFromRow(row: z.infer<typeof subscriptionRowSchema>, n
     serving = nowMs <= periodEndMs;
     notServingReason = serving ? null : "subscription_expired";
   } else {
-    // active and past_due: the 5-day grace past the period end.
-    serving = nowMs <= addDays(new Date(periodEnd), PAST_DUE_GRACE_DAYS).getTime();
+    // active and past_due: the 5-day grace. Anchored to the first failed
+    // payment when we have it, and never shorter than the period the
+    // customer already paid for -- see this function's doc comment.
+    const periodGraceEndMs = addDays(new Date(periodEnd), PAST_DUE_GRACE_DAYS).getTime();
+    const failureGraceEndMs = row.past_due_since
+      ? addDays(new Date(row.past_due_since), PAST_DUE_GRACE_DAYS).getTime()
+      : null;
+    const graceEndMs =
+      failureGraceEndMs === null
+        ? periodGraceEndMs
+        : Math.max(new Date(periodEnd).getTime(), failureGraceEndMs);
+    serving = nowMs <= graceEndMs;
     notServingReason = serving ? null : "grace_period_lapsed";
   }
 
@@ -225,9 +294,7 @@ export async function getEntitlement(
 ): Promise<Entitlement> {
   const { data, error } = await supabase
     .from("subscriptions")
-    .select(
-      "plan_key, status, trial_started_at, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, razorpay_subscription_id",
-    )
+    .select(ENTITLEMENT_COLUMNS)
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -259,6 +326,30 @@ export async function getEntitlement(
  */
 export async function getEntitlementForBusiness(businessId: string): Promise<Entitlement> {
   return getEntitlement(createServerSupabaseClient(), businessId);
+}
+
+/**
+ * The place-of-supply details /dashboard/billing pre-fills its checkout
+ * form with, so a returning customer is not asked for their state twice.
+ *
+ * Read with the **Clerk-session** client, i.e. behind the
+ * `subscriptions_select_own_business` policy: a business reading its own
+ * billing address is exactly what that SELECT grant is for. Null for a
+ * business with no row yet (every grandfathered tenant) and null on a read
+ * error, both of which mean the same thing to the form -- ask.
+ */
+export async function getBillingIdentityForBusiness(
+  businessId: string,
+): Promise<{ stateCode: string | null; gstin: string | null } | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("billing_state_code, gstin")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return { stateCode: data.billing_state_code ?? null, gstin: data.gstin ?? null };
 }
 
 /**

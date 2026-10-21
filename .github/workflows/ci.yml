@@ -63,6 +63,17 @@ jobs:
         # build. Deliberately its own step: `npm test` stays the pgTAP suite.
         run: npm run test:plan-tax
 
+      - name: Razorpay signature and webhook lifecycle tests
+        # Phase 17b: app/api/webhooks/razorpay/route.ts is the one endpoint
+        # in this codebase where a verification bug is directly
+        # monetisable -- a forged `subscription.charged` would grant a Scale
+        # plan for free. These cover all three HMAC forms (the two Checkout
+        # callbacks and the webhook, whose field orders differ), plus the
+        # idempotency case: the same charge event twice extends the period
+        # once. Pure modules, no database and no secrets, so it runs
+        # alongside the GST tests rather than with the pgTAP suite.
+        run: npm run test:razorpay
+
       - name: Build
         run: npm run build
 
