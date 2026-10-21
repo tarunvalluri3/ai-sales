@@ -20,7 +20,6 @@ const envSchema = z.object({
   GEMINI_CHAT_MODEL: z.string().min(1),
   GEMINI_EMBEDDING_MODEL: z.string().min(1),
   GEMINI_EMBEDDING_DIMENSION: z.string().regex(/^\d+$/, "must be a positive integer"),
-  AI_MONTHLY_TOKEN_LIMIT: z.string().regex(/^\d+$/, "must be a positive integer").optional(),
   CRON_SECRET: z.string().min(1).optional(),
   RESEND_API_KEY: z.string().min(1).optional(),
   NOTIFICATION_EMAIL_FROM: z.string().min(1).optional(),

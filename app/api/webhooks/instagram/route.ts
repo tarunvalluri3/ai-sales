@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { loadBusinessAiContext } from "@/lib/business-ai-context";
@@ -16,6 +16,7 @@ import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { logEvent } from "@/lib/logger";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
 
 /**
  * Phase 26's inbound Instagram DM receiver -- the Instagram analog of
@@ -257,6 +258,19 @@ async function handleInboundMessage(
     instagramBusinessAccountId,
     event.sender.id,
     response.answer,
+  );
+
+  // Phase 17a: same quota reminder dispatch as the chat route and the
+  // WhatsApp webhook -- one quota covers every channel, so every channel
+  // has to be able to warn about it. In after() so Meta's webhook
+  // acknowledgement is never held up by an outbound email.
+  after(() =>
+    sendUsageReminderIfDue(
+      supabase,
+      businessId,
+      response.quotaSnapshot,
+      response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
+    ),
   );
 }
 

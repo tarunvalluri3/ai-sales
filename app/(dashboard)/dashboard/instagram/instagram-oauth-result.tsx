@@ -9,6 +9,7 @@ const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   invalid: "That connection link was invalid. Please try again.",
   forbidden: "You don't have permission to do this.",
   config: "Instagram isn't configured yet. Please try again later.",
+  not_entitled: "Instagram messaging isn't available on any plan yet.",
   unexpected: "Something went wrong connecting Instagram. Please try again.",
 };
 

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { connectWhatsappNumber, disconnectWhatsappNumber } from "@/lib/whatsapp";
+import { channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -33,6 +34,19 @@ export async function connectWhatsappAction(
   const authError = requireMinRole(orgRole, "org:admin");
   if (authError) {
     return { error: authError };
+  }
+
+  // Phase 17a: WhatsApp is a Growth/Scale entitlement. Checked here, not
+  // only on the page that renders the form -- an admin on Starter can post
+  // to this action directly, and a hidden form is not an authorization
+  // boundary. Before the field validation below, so a plan that does not
+  // include the channel is refused regardless of what was submitted.
+  //
+  // Disconnecting is deliberately NOT gated: a business must always be
+  // able to detach its own Meta credentials, whatever it is paying for.
+  const entitlement = await getEntitlementForBusiness(businessId);
+  if (!entitlement.channels.whatsapp) {
+    return { error: channelNotEntitledMessage("whatsapp", entitlement) };
   }
 
   const parsed = connectSchema.safeParse({
