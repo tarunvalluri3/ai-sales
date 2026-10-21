@@ -121,8 +121,8 @@ export default function TermsOfServicePage() {
             <Link href="/pricing" className="font-medium text-ds-accent hover:text-ds-accent-strong">
               Pricing
             </Link>{" "}
-            page. Fees are stated in Indian Rupees and are exclusive of GST, which is charged
-            additionally at the applicable rate and shown on your invoice. Subscriptions renew
+            page. Fees are stated in Indian Rupees and are inclusive of GST, which is contained in
+            the price rather than added to it and is shown separately on your invoice. Subscriptions renew
             automatically for successive periods until cancelled.
           </p>
           <p>

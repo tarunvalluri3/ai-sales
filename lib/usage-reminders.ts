@@ -82,7 +82,7 @@ function formatDate(iso: string): string {
 }
 
 function planPriceLine(plan: PlanDefinition): string {
-  return `${formatPaiseAsInr(plan.monthlyPricePaise)} / month + ${GST_RATE_PERCENT}% GST`;
+  return `${formatPaiseAsInr(plan.monthlyPricePaise)} / month, inclusive of ${GST_RATE_PERCENT}% GST`;
 }
 
 /**

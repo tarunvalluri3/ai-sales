@@ -16,8 +16,15 @@ export const metadata = {
  *
  * PRICE POINTS AND QUOTAS WERE CONFIRMED BY THE USER 2026-10-21 (Phase
  * 17a) -- Starter ₹1,499 / 1,000 replies, Growth ₹3,999 / 3,000, Scale
- * ₹9,999 / 10,000, all exclusive of 18% GST. They were a proposal from
- * 2026-10-19 until then.
+ * ₹9,999 / 10,000. They were a proposal from 2026-10-19 until then.
+ *
+ * **Every price on this page is GST-INCLUSIVE** (decided 2026-10-21): the
+ * figure shown is the total charged, with 18% GST contained in it, and the
+ * annual figures (ten months' gross, "two months free") are inclusive too.
+ * This is a legal-accuracy matter -- the page must not promise a tax
+ * treatment we do not apply. If this ever flips back to exclusive, every
+ * "inclusive" sentence below, /terms and lib/usage-reminders.ts change
+ * together.
  *
  * **This page no longer holds its own numbers.** Every figure rendered
  * below comes from `lib/plans.ts`, which is also what `lib/usage-limit.ts`
@@ -56,8 +63,8 @@ export default function PricingPage() {
             card required. Cancel any time.
           </p>
           <p className="text-2xs text-ds-text-muted">
-            All prices are in Indian Rupees and exclusive of GST, charged additionally at{" "}
-            {GST_RATE_PERCENT}%. Annual billing gives you two months free.
+            All prices are in Indian Rupees and inclusive of {GST_RATE_PERCENT}% GST — the price you
+            see is the total you pay. Annual billing gives you two months free.
           </p>
         </div>
 
@@ -86,10 +93,13 @@ export default function PricingPage() {
               <div className="flex flex-col gap-1">
                 <p className="text-3xl font-semibold text-ds-text-primary">
                   {formatPaiseAsInr(plan.monthlyPricePaise)}
-                  <span className="text-sm font-normal text-ds-text-muted"> / month</span>
+                  <span className="text-sm font-normal text-ds-text-muted">
+                    {" "}
+                    / month, incl. GST
+                  </span>
                 </p>
                 <p className="text-2xs text-ds-text-muted">
-                  or {formatPaiseAsInr(plan.annualPricePaise)} / year — two months free
+                  or {formatPaiseAsInr(plan.annualPricePaise)} / year, incl. GST — two months free
                 </p>
               </div>
 
@@ -160,9 +170,10 @@ export default function PricingPage() {
 
           <Section title="Billing">
             <p>
-              Plans are billed monthly or annually in advance, in Indian Rupees, plus{" "}
-              {GST_RATE_PERCENT}% GST. We issue a GST invoice for every payment to the email address
-              on your account. You can upgrade at any time and we charge only the difference for the
+              Plans are billed monthly or annually in advance, in Indian Rupees. The price you see
+              includes {GST_RATE_PERCENT}% GST, so that is the total you are charged. We issue a GST
+              invoice for every payment to the email address on your account, showing the taxable
+              value and the GST contained in the price. You can upgrade at any time and we charge only the difference for the
               rest of your period; downgrades take effect at your next renewal.
             </p>
             <p>

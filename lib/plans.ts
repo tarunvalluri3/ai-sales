@@ -16,9 +16,12 @@
  * mis-sale.
  *
  * Prices are in **paise** (integer), never rupees-as-float: 1,499.00 is
- * 149_900. GST is stored as a rate and added at display/invoice time
- * rather than baked into the price, because every figure the page shows is
- * exclusive of it and Phase 17b has to charge the same way.
+ * 149_900. **Every price in this file is GST-INCLUSIVE** (decided
+ * 2026-10-21, superseding the earlier exclusive-of-GST proposal): 149_900
+ * is the total a customer is charged, with 18% GST already inside it. The
+ * taxable value and the tax are *derived* from that gross by the helpers
+ * below -- nothing is added on top at display or checkout time, and
+ * Phase 17b's invoices must split the gross the same way (STATE.md).
  *
  * Channel entitlements are **data**, not code. Instagram is `false` on
  * every plan today -- not because the feature is missing (Phase 26 built
@@ -40,7 +43,11 @@ export type PlanKey = (typeof PLAN_KEYS)[number];
 export const CHANNEL_KEYS = ["website", "whatsapp", "instagram"] as const;
 export type ChannelKey = (typeof CHANNEL_KEYS)[number];
 
-/** India-only for v1, so one rate, applied to every plan. */
+/**
+ * India-only for v1, so one rate, applied to every plan. It is the rate
+ * *contained in* each gross price, not a surcharge on top of it. Must stay
+ * a whole number: the integer arithmetic below depends on it.
+ */
 export const GST_RATE_PERCENT = 18;
 
 /** Confirmed 2026-10-21: 14 days, 200 AI replies, one per organisation ever. */
@@ -59,7 +66,9 @@ export type PlanDefinition = {
   readonly key: PlanKey;
   readonly name: string;
   readonly tagline: string;
+  /** GST-INCLUSIVE gross, in paise: the total charged per month. */
   readonly monthlyPricePaise: number;
+  /** GST-INCLUSIVE gross, in paise: the total charged per year (two months free). */
   readonly annualPricePaise: number;
   /** AI replies per billing period. The unit the pricing page sells in. */
   readonly monthlyReplyQuota: number;
@@ -162,7 +171,75 @@ export function isChannelEnabledForPlan(planKey: PlanKey, channel: ChannelKey): 
   return PLANS[planKey].channels[channel];
 }
 
-/** 1,499 from 149_900, with Indian digit grouping. Every price here is whole rupees. */
+/* ------------------------------------------------------------------ *
+ * GST derivation from a GST-inclusive gross.
+ *
+ * The rounding rule (one rule, so the pricing page, the reminder emails
+ * and Phase 17b's invoices can never disagree by a paisa):
+ *
+ *   taxable = round(gross / 1.18, 2 decimal places) -- i.e. to the paisa
+ *   tax     = gross - taxable
+ *
+ * Tax is the *remainder*, never rounded independently, so that
+ * taxable + tax equals the gross the customer was charged EXACTLY.
+ *
+ * Intra-state supply is split into CGST + SGST. Those two are never both
+ * rounded: CGST = floor(tax / 2) and SGST = tax - CGST, so
+ * CGST + SGST === tax by construction, and any odd paisa lands on SGST.
+ * Scale at ₹9,999 is the case that breaks naive rounding: tax is
+ * ₹1,525.27, each half is ₹762.635, and rounding both up would bill
+ * ₹1,525.28 -- a paisa more than the tax inside the price.
+ *
+ * Inter-state supply is a single IGST line at the full tax amount.
+ *
+ * Everything is integer paise: no float division, so no 0.1 + 0.2 drift.
+ * "Round" is half-up on the exact integer quotient.
+ * ------------------------------------------------------------------ */
+
+/** The taxable value contained in a GST-inclusive gross, to the paisa. */
+export function taxableValuePaise(grossPaise: number): number {
+  const divisor = 100 + GST_RATE_PERCENT;
+  // round-half-up(gross * 100 / divisor), computed entirely in integers.
+  return Math.floor((grossPaise * 200 + divisor) / (2 * divisor));
+}
+
+/** The GST contained in a GST-inclusive gross: gross minus the taxable value. */
+export function taxAmountPaise(grossPaise: number): number {
+  return grossPaise - taxableValuePaise(grossPaise);
+}
+
+export type GstSupply = "intra-state" | "inter-state";
+
+export type GstBreakdown = {
+  readonly grossPaise: number;
+  readonly taxablePaise: number;
+  readonly taxPaise: number;
+} & (
+  | { readonly supply: "intra-state"; readonly cgstPaise: number; readonly sgstPaise: number }
+  | { readonly supply: "inter-state"; readonly igstPaise: number }
+);
+
+/**
+ * The invoice-line split of a gross price. `intra-state` when the supplier
+ * and the customer's place of supply are in the same state (CGST + SGST),
+ * `inter-state` otherwise (IGST).
+ */
+export function gstBreakdown(grossPaise: number, supply: GstSupply): GstBreakdown {
+  const taxablePaise = taxableValuePaise(grossPaise);
+  const taxPaise = grossPaise - taxablePaise;
+  if (supply === "inter-state") {
+    return { grossPaise, taxablePaise, taxPaise, supply, igstPaise: taxPaise };
+  }
+  const cgstPaise = Math.floor(taxPaise / 2);
+  return { grossPaise, taxablePaise, taxPaise, supply, cgstPaise, sgstPaise: taxPaise - cgstPaise };
+}
+
+/**
+ * 1,499 from 149_900, with Indian digit grouping. Rounds to whole rupees,
+ * which is only correct for the GST-inclusive GROSS prices (all whole
+ * rupees). Never use it for a taxable value or a tax amount -- those carry
+ * paise (₹8,473.73) and would silently display wrong.
+ */
 export function formatPaiseAsInr(paise: number): string {
   return `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
@@ -189,7 +266,10 @@ export function formatReplyQuota(quota: number): string {
  * parted company, and one of the two is now a lie to a paying customer.
  * ------------------------------------------------------------------ */
 
+// All GST-INCLUSIVE grosses: the totals charged, 18% GST contained within.
 type AdvertisedMonthlyPricePaise = { starter: 149_900; growth: 399_900; scale: 999_900 };
+// "Two months free" = ten months' gross, so these are exactly 10x the monthly figures.
+type AdvertisedAnnualPricePaise = { starter: 1_499_000; growth: 3_999_000; scale: 9_999_000 };
 type AdvertisedMonthlyReplyQuota = { starter: 1_000; growth: 3_000; scale: 10_000 };
 type AdvertisedWhatsappIncluded = { starter: false; growth: true; scale: true };
 type AdvertisedInstagramIncluded = { starter: false; growth: false; scale: false };
@@ -203,6 +283,14 @@ const _pricesMatchAdvertised: Exact<
   ? true
   : "lib/plans.ts: PLANS' monthly prices no longer match the prices /pricing advertises" = true;
 void _pricesMatchAdvertised;
+
+const _annualPricesMatchAdvertised: Exact<
+  { [K in PlanKey]: (typeof PLANS)[K]["annualPricePaise"] },
+  AdvertisedAnnualPricePaise
+> extends true
+  ? true
+  : "lib/plans.ts: PLANS' annual prices no longer match the prices /pricing advertises" = true;
+void _annualPricesMatchAdvertised;
 
 const _quotasMatchAdvertised: Exact<
   { [K in PlanKey]: (typeof PLANS)[K]["monthlyReplyQuota"] },
