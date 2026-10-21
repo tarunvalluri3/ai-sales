@@ -125,8 +125,40 @@ Core set:
 | `INSTAGRAM_APP_SECRET` | **no** |
 | `INSTAGRAM_WEBHOOK_VERIFY_TOKEN` | **no** |
 | `INSTAGRAM_OAUTH_REDIRECT_URI` | **no** — config, not a secret, but no client component needs it |
+| `RAZORPAY_KEY_ID` | **yes** — public; it is sent to the browser so Checkout can open |
+| `RAZORPAY_KEY_SECRET` | **no** |
+| `RAZORPAY_WEBHOOK_SECRET` | **no** — a *different* secret from the key secret |
+| `RAZORPAY_PLAN_STARTER_MONTHLY` | config — a plan id, not a secret |
+| `RAZORPAY_PLAN_GROWTH_MONTHLY` | config |
+| `RAZORPAY_PLAN_SCALE_MONTHLY` | config |
 
-Add a variable only when a feature actually requires it. Razorpay variables remain deferred to its phase. Keep the live list in `STATE.md` §5 in sync.
+Add a variable only when a feature actually requires it. Keep the live list in `STATE.md` §5 in sync.
+
+The six `RAZORPAY_*` variables (Phase 17b) are all `.optional()` in `lib/env.ts`, the same "degrade, don't fail startup" posture as `RESEND_API_KEY` and the WhatsApp/Instagram secrets. `getRazorpayConfig()` returns `null` if **any** piece is missing — a half-configured integration (keys but no plan ids) would otherwise fail in the middle of a customer's checkout — and every caller treats that as an explicit "not configured" outcome: `/dashboard/billing` says payments are not set up, `app/api/webhooks/razorpay/route.ts` refuses every request, and the daily billing sweep no-ops.
+
+`RAZORPAY_KEY_ID` is the one public value in the set. It is published in every Razorpay Checkout integration on the internet and authorises nothing on its own — the secret is what signs requests. It is still deliberately **not** `NEXT_PUBLIC_*`: it is read server-side and returned by a Server Action only to an authenticated `org:admin`, so there is no reason to bake it into the client bundle served to every visitor.
+
+`RAZORPAY_WEBHOOK_SECRET` is **not** the API key secret — Razorpay generates it separately when the webhook endpoint is created and shows it once. `app/api/webhooks/razorpay/route.ts` **fails closed** without it, exactly like the Resend, WhatsApp and Instagram webhooks: unset means every request is refused (401). That posture matters more here than anywhere else in this codebase. An unauthenticated version of that endpoint would let anyone POST a `subscription.charged` body and grant themselves a Scale plan, indefinitely, for free.
+
+**Three different HMACs, all in `lib/razorpay-signature.ts`** (verified by hand with `node:crypto`, no `razorpay` package, matching the WhatsApp/Instagram/Resend webhooks' own manual checks). All are HMAC-SHA256 with a **hex** digest, and all three comparisons are constant-time:
+
+| What | Message | Key |
+|---|---|---|
+| Checkout callback, subscription | `payment_id` + `\|` + `subscription_id` | `RAZORPAY_KEY_SECRET` |
+| Checkout callback, one-time order | `order_id` + `\|` + `payment_id` | `RAZORPAY_KEY_SECRET` |
+| Webhook (`X-Razorpay-Signature`) | the raw request body, byte for byte | `RAZORPAY_WEBHOOK_SECRET` |
+
+Note that the field order is **reversed** between the two callback forms. Both callbacks are verified against **the id this app stored**, never the id the browser returned — Razorpay's own guide says so, and the reason is that verifying a signature against a value supplied by the same client that supplied the signature proves nothing about which subscription or order was really paid for.
+
+**Webhooks are the source of truth for subscription state; the Checkout callback is UI.** A customer closing the tab mid-payment must not leave the app inconsistent with the money, so every state transition lives behind the webhook handler, and the callback paths only write patches the webhook would write identically (shared via `annualActivationPatch` / `prorataActivationPatch` in `lib/razorpay-webhook.ts`).
+
+**Replay protection is a ledger, not a timestamp.** Razorpay signs only the body, so there is no signed timestamp to check the way Svix's scheme allows for Resend. Instead, the unique `x-razorpay-event-id` is claimed as the primary key of `public.razorpay_webhook_events` before any state change, which makes a replayed `subscription.charged` a no-op rather than merely a rejected request. A claim whose work then fails is released, so a retry is a real second chance rather than a skipped duplicate. Underneath that, every transition **assigns the absolute period Razorpay sent** rather than incrementing our own, so re-applying a charge event writes the same values twice even if the ledger were bypassed entirely.
+
+**No client ever supplies an amount or a price.** Every amount sent to Razorpay is derived server-side from `lib/plans.ts` — including the pro-rated upgrade difference (`lib/billing-prorata.ts`). The plan key is the only billing input a client provides, it is validated against `PLAN_KEYS`, and on the monthly confirmation path it is not even accepted: the plan is read back from the Razorpay subscription the customer actually authorised. Before every subscription it creates, `lib/razorpay.ts` re-reads the plan from Razorpay and refuses to proceed unless the amount, currency, period and interval still match the registry — a dashboard edit must not be able to change what a customer is charged.
+
+`public.razorpay_webhook_events` and `public.billing_notice_sends` have **zero grants** to `anon`/`authenticated`, the same posture as `usage_reminder_sends` and `email_suppressions`. A tenant able to `DELETE` from the first could replay its own `subscription.charged` and extend its paid period for free; a tenant able to delete from the second could make this app re-send the same billing email indefinitely. `public.subscriptions` keeps Phase 17a's grants exactly — `SELECT` only, no tenant write path at all — and the service-role client remains its only writer.
+
+**Place of supply and GSTIN** (`subscriptions.billing_state_code`, `subscriptions.gstin`) are captured at checkout for Phase 17c's tax invoices: the state code decides CGST+SGST versus a single IGST line. The state code is validated against the closed registry in `lib/india-states.ts` and the GSTIN against its 15-character format, in Zod **and** as a database check constraint — a malformed GSTIN on an issued tax invoice is a problem for the customer, not just for us. A declared GSTIN's first two digits must match the declared state.
 
 `WHATSAPP_APP_SECRET`/`WHATSAPP_WEBHOOK_VERIFY_TOKEN` (Phase 16) are app-level only — one Meta App serves every tenant's own connected number. Per-business `phone_number_id`/`waba_id`/`access_token` are never env vars; they live in `whatsapp_connections`/`whatsapp_credentials`. Both are optional in `lib/env.ts`'s schema (same "degrade, don't fail startup" reasoning as `CRON_SECRET`) — `app/api/webhooks/whatsapp/route.ts` fails closed (401/403) on every request when either is unset, rather than either breaking app startup or accepting an unverified webhook.
 

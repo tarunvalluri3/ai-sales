@@ -51,6 +51,19 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "copilot.action_completed": "Copilot action completed",
   "copilot.action_superseded": "Copilot action superseded",
   "notification_preferences.updated": "Notification settings updated",
+  // Phase 17b. The entries written by the Razorpay webhook and the daily
+  // billing sweep carry actor "system:razorpay" rather than a user id --
+  // worth knowing when reading this list, since every other row here was
+  // caused by a person.
+  "subscription.checkout_started": "Checkout started",
+  "subscription.activated": "Subscription activated",
+  "subscription.charged": "Subscription payment taken",
+  "subscription.payment_failed": "Subscription payment failed",
+  "subscription.grace_lapsed": "Grace period lapsed -- AI replies paused",
+  "subscription.cancellation_scheduled": "Cancellation scheduled for period end",
+  "subscription.expired": "Subscription ended",
+  "subscription.plan_changed": "Plan changed",
+  "subscription.plan_change_scheduled": "Plan change scheduled for period end",
 };
 
 export default async function AuditLogPage() {

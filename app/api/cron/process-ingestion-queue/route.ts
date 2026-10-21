@@ -10,6 +10,7 @@ import { runSlaEscalationSweep } from "@/lib/sla-routing";
 import { sendDailyDigestEmails } from "@/lib/notifications";
 import { runStalledLeadFollowUpSweep } from "@/lib/stalled-leads";
 import { processWorkflowRuns, runNoActivityWorkflowSweep } from "@/lib/workflow-engine";
+import { runBillingLifecycleSweep } from "@/lib/billing-lifecycle";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
       stalledLeadFollowUp,
       workflowRuns,
       workflowNoActivitySweep,
+      billingLifecycle,
     ] = await Promise.all([
       processIngestionQueue(),
       processWebhookDeliveries(),
@@ -79,6 +81,14 @@ export async function GET(request: NextRequest) {
       runStalledLeadFollowUpSweep(),
       processWorkflowRuns(),
       runNoActivityWorkflowSweep(),
+      // Phase 17b: the four billing facts only a clock notices -- a 5-day
+      // grace running out, an annual term coming up (annual is a one-time
+      // order, so nothing renews itself), a trial ending with no payment
+      // method, and a finished period whose stored status has not caught
+      // up. Folded in here rather than given its own cron entry because
+      // Vercel's Hobby plan caps cron jobs, which is the same reason every
+      // other queue above shares this route.
+      runBillingLifecycleSweep(),
     ]);
     return jsonSuccess({
       ingestion,
@@ -92,6 +102,7 @@ export async function GET(request: NextRequest) {
       stalledLeadFollowUp,
       workflowRuns,
       workflowNoActivitySweep,
+      billingLifecycle,
     });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);

@@ -16,7 +16,7 @@
 -- Adding a plan in TypeScript without a migration (or the reverse) fails
 -- here rather than in production.
 --
--- Includes positive controls (assertions 10 and 14). An isolation test
+-- Includes positive controls (assertions 10, 11 and 15). An isolation test
 -- that only ever proves denial will also pass against a table nobody can
 -- use at all, which would hide a broken grant rather than reveal it.
 --
@@ -27,7 +27,7 @@
 -- Same session-simulation technique as 001_businesses_tenant_isolation.sql.
 
 begin;
-select plan(19);
+select plan(20);
 create temporary table _tap_results (line text);
 grant insert on _tap_results to authenticated;
 
@@ -40,21 +40,27 @@ values
 
 -- A paid row and a trialing row, so both branches of the date constraints
 -- are represented by a real row rather than only by the rejections below.
-insert into public.subscriptions (
-  business_id, plan_key, status, current_period_start, current_period_end, razorpay_subscription_id
-)
-values (
-  '00000000-0000-0000-0000-00000000000a', 'growth', 'active',
-  now() - interval '3 days', now() + interval '27 days', 'sub_test_a'
-);
-
-insert into public.subscriptions (
-  business_id, plan_key, status, trial_started_at, trial_ends_at
-)
-values (
-  '00000000-0000-0000-0000-00000000000b', 'starter', 'trialing',
-  now() - interval '2 days', now() + interval '12 days'
-);
+--
+-- UPDATED for Phase 17b (migration 20261025000000): both rows already
+-- exist by the time we get here. `businesses_create_trial_subscription`
+-- creates a trialing subscription in the same transaction as the business
+-- insert above, so these are now UPDATEs rather than INSERTs -- an INSERT
+-- would collide on the primary key, which is exactly what this file
+-- asserts in assertion 7.
+--
+-- org_b needs no setup at all: the trigger already gives it precisely the
+-- trialing starter row this test wanted (status 'trialing', plan_key
+-- 'starter', both trial dates set). Writing it again would in fact be
+-- *impossible* -- `trial_started_at` is write-once (assertion 9), so an
+-- UPDATE re-stamping it would be refused by the very trigger this file
+-- goes on to test.
+update public.subscriptions
+   set plan_key = 'growth',
+       status = 'active',
+       current_period_start = now() - interval '3 days',
+       current_period_end = now() + interval '27 days',
+       razorpay_subscription_id = 'sub_test_a'
+ where business_id = '00000000-0000-0000-0000-00000000000a';
 
 -- 1-2. The registry and the database agree on which plans and statuses
 -- exist. Counting the quoted literals in the constraint definition pins
@@ -137,17 +143,35 @@ insert into _tap_results select throws_ok(
   'the same razorpay_subscription_id cannot be attached to two businesses'
 );
 
--- 9-10. The other half of "one trial, ever": trial_started_at is
+-- 9-11. The other half of "one trial, ever": trial_started_at is
 -- write-once, enforced by a trigger, so it survives even the service-role
--- client (which bypasses RLS but not triggers). Assertion 10 is the
+-- client (which bypasses RLS but not triggers). Assertion 11 is the
 -- control -- the trigger must freeze the trial's *start*, not the whole
 -- row, or Phase 17b could not move a trialing business onto a paid plan.
+-- `now() + interval '1 day'`, not `now()`, and the difference matters.
+-- `now()` is the TRANSACTION's start time, and since Phase 17b the row
+-- was created by `businesses_create_trial_subscription` inside this same
+-- transaction, its `trial_started_at` IS `now()`. The write-once trigger
+-- fires only when the value actually changes -- re-writing the identical
+-- timestamp is a no-op and is deliberately allowed -- so testing with
+-- `now()` would assert nothing and pass for the wrong reason. A different
+-- value is what the rule is actually about.
 insert into _tap_results select throws_ok(
-  $$ update public.subscriptions set trial_started_at = now()
+  $$ update public.subscriptions set trial_started_at = now() + interval '1 day'
      where business_id = '00000000-0000-0000-0000-00000000000b' $$,
   '23514',
   null,
   'trial_started_at cannot be changed once set (a business gets one trial, ever)'
+);
+
+-- ...and it cannot be cleared either, which is the other way to try to
+-- hand out a second trial.
+insert into _tap_results select throws_ok(
+  $$ update public.subscriptions set trial_started_at = null
+     where business_id = '00000000-0000-0000-0000-00000000000b' $$,
+  '23514',
+  null,
+  'trial_started_at cannot be cleared once set'
 );
 
 insert into _tap_results select lives_ok(
@@ -157,7 +181,7 @@ insert into _tap_results select lives_ok(
   'a trialing subscription can still be converted to a paid one (the trigger freezes the trial start, not the row)'
 );
 
--- 11. The at-most-once guarantee behind the quota reminder emails: the
+-- 12. The at-most-once guarantee behind the quota reminder emails: the
 -- second claim of the same threshold in the same period collides on the
 -- primary key, which is what stops a burst of replies emailing a business
 -- six times about 50%.
@@ -172,7 +196,7 @@ insert into _tap_results select throws_ok(
   'the same threshold cannot be claimed twice for the same business and period'
 );
 
--- 12. ...while the next period is new key space, so the ledger resets
+-- 13. ...while the next period is new key space, so the ledger resets
 -- itself with no sweeper job.
 insert into _tap_results select lives_ok(
   $$ insert into public.usage_reminder_sends (business_id, period_start, threshold_percent)
@@ -180,7 +204,7 @@ insert into _tap_results select lives_ok(
   'the same threshold can be claimed again in the next billing period'
 );
 
--- 13. usage_reminder_sends is service-role-only: a tenant able to delete
+-- 14. usage_reminder_sends is service-role-only: a tenant able to delete
 -- from it could make this app re-send the same quota email indefinitely.
 insert into _tap_results select ok(
   not has_table_privilege('authenticated', 'public.usage_reminder_sends', 'select')
@@ -202,7 +226,7 @@ select set_config(
   true
 );
 
--- 14. Positive control: a business can read its own plan. The dashboard
+-- 15. Positive control: a business can read its own plan. The dashboard
 -- needs this, and without it assertion 15 would pass against a table
 -- nobody can read.
 insert into _tap_results select is(
@@ -211,7 +235,7 @@ insert into _tap_results select is(
   'org_a session can read its own subscription (subscriptions_select_own_business)'
 );
 
--- 15. ...and only its own.
+-- 16. ...and only its own.
 insert into _tap_results select is(
   (select count(*)::int from public.subscriptions
      where business_id = '00000000-0000-0000-0000-00000000000b'),
@@ -219,7 +243,7 @@ insert into _tap_results select is(
   'org_a session cannot read org_b''s subscription'
 );
 
--- 16-18. No write path exists for a tenant at all -- not INSERT, not an
+-- 17-19. No write path exists for a tenant at all -- not INSERT, not an
 -- UPDATE of its own row, not an UPDATE of another business's. The refusal
 -- is a missing grant (42501), which is deliberately stronger than an RLS
 -- policy that filters rows: there is nothing for a future Server Action to
@@ -252,7 +276,7 @@ insert into _tap_results select throws_ok(
 -- 003_products_tenant_isolation.sql's comment for why (Phase 19b).
 reset role;
 
--- 19. The index the per-turn quota count depends on. Asserted because it
+-- 20. The index the per-turn quota count depends on. Asserted because it
 -- is not cosmetic: lib/usage-limit.ts runs a COUNT scoped to
 -- (business_id, created_at) on every chat turn, in the prospect's own wait.
 insert into _tap_results select ok(

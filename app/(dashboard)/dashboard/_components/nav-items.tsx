@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   Camera,
   CircleHelp,
+  CreditCard,
   Clock,
   Contact,
   LayoutDashboard,
@@ -85,6 +86,11 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Business Profile", href: "/dashboard/profile", icon: Building2 },
       { label: "Business Hours", href: "/dashboard/business-hours", icon: Clock },
+      // Phase 17b. Visible to everyone, like every other item here: the
+      // page itself explains that billing is admin-only, and a nav entry
+      // that vanishes for some of the team answers no question. The
+      // org:admin gate is on the page and on each Server Action.
+      { label: "Billing", href: "/dashboard/billing", icon: CreditCard },
       { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
       { label: "Webhooks", href: "/dashboard/webhooks", icon: Webhook },
       { label: "Audit Log", href: "/dashboard/audit-log", icon: ScrollText },

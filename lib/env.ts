@@ -32,6 +32,29 @@ const envSchema = z.object({
   INSTAGRAM_APP_SECRET: z.string().min(1).optional(),
   INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
   INSTAGRAM_OAUTH_REDIRECT_URI: z.string().min(1).optional(),
+  /**
+   * Phase 17b: Razorpay. All six are `.optional()`, the same "degrade,
+   * don't fail startup" posture as RESEND_API_KEY and the WhatsApp and
+   * Instagram secrets -- `getRazorpayConfig()` returns null when any piece
+   * is missing and every caller handles that as an explicit "not
+   * configured" outcome (the billing page says so, the webhook refuses
+   * every request, the billing sweep no-ops). A developer without Razorpay
+   * keys must still be able to run this app, and a production deploy that
+   * loses one variable should lose one feature rather than fail to boot.
+   *
+   * RAZORPAY_KEY_ID is **public** -- it goes to the browser so Checkout
+   * can open -- but is deliberately not NEXT_PUBLIC_*: it is read
+   * server-side and returned by a Server Action only to an authenticated
+   * org:admin, so there is no reason to bake it into the client bundle for
+   * every visitor. The other two are secrets and are never logged, never
+   * returned to a client, and never interpolated into an error message.
+   */
+  RAZORPAY_KEY_ID: z.string().min(1).optional(),
+  RAZORPAY_KEY_SECRET: z.string().min(1).optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().min(1).optional(),
+  RAZORPAY_PLAN_STARTER_MONTHLY: z.string().min(1).optional(),
+  RAZORPAY_PLAN_GROWTH_MONTHLY: z.string().min(1).optional(),
+  RAZORPAY_PLAN_SCALE_MONTHLY: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
