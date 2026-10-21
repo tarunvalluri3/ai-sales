@@ -75,15 +75,47 @@ test("annual prices are ten months of gross and also split exactly", () => {
   }
 });
 
-test("invariants hold across a sweep of grosses, including every paise value near the plans", () => {
-  for (let gross = 1; gross <= 20_000; gross++) {
+// Exhaustive, not sampled: every integer gross from 1 paisa to ₹1,00,000
+// (10,000,000 paise). That covers every real price -- the largest, Scale's
+// annual gross, is 9,999,000 paise -- so the invariants are proven at the
+// magnitudes where the money actually is. Plain comparisons rather than
+// assert.* calls in the hot loop (10M iterations x 4 checks); the first
+// violation throws with the offending gross.
+const SWEEP_MAX_PAISE = 10_000_000;
+
+test(`invariants hold for EVERY gross from 1 to ${SWEEP_MAX_PAISE} paise`, () => {
+  const largestRealGross = Math.max(...ORDERED_PLANS.map((p) => p.annualPricePaise));
+  assert.ok(
+    SWEEP_MAX_PAISE >= largestRealGross,
+    "the sweep must reach the largest real price (annual Scale)",
+  );
+
+  let oddTaxCount = 0;
+  for (let gross = 1; gross <= SWEEP_MAX_PAISE; gross++) {
     const taxable = taxableValuePaise(gross);
-    // taxable is the nearest paisa to gross / 1.18 (checked in exact integer terms:
-    // |taxable * 118 - gross * 100| <= 59, i.e. within half a paisa after scaling).
-    assert.ok(Math.abs(taxable * 118 - gross * 100) <= 59, `taxable off by >0.5 paisa at ${gross}`);
-    const split = gstBreakdown(gross, "intra-state");
-    assert.equal(split.cgstPaise + split.sgstPaise, split.taxPaise, `CGST+SGST != tax at ${gross}`);
-    assert.equal(split.taxablePaise + split.taxPaise, gross, `taxable+tax != gross at ${gross}`);
-    assert.ok(split.sgstPaise - split.cgstPaise <= 1, `halves differ by >1 paisa at ${gross}`);
+    // taxable is the nearest paisa to gross / 1.18, checked in exact integer terms:
+    // |taxable * 118 - gross * 100| <= 59, i.e. within half a paisa after scaling.
+    if (Math.abs(taxable * 118 - gross * 100) > 59) {
+      throw new Error(`taxable is not the nearest paisa at gross=${gross}`);
+    }
+
+    const intra = gstBreakdown(gross, "intra-state");
+    if (intra.cgstPaise + intra.sgstPaise !== intra.taxPaise) {
+      throw new Error(`CGST+SGST != tax at gross=${gross}`);
+    }
+    if (intra.taxablePaise + intra.taxPaise !== gross) {
+      throw new Error(`taxable+tax != gross at gross=${gross}`);
+    }
+    if (intra.cgstPaise < 0 || intra.sgstPaise - intra.cgstPaise > 1 || intra.sgstPaise < intra.cgstPaise) {
+      throw new Error(`CGST/SGST not a floor/remainder split at gross=${gross}`);
+    }
+
+    const inter = gstBreakdown(gross, "inter-state");
+    if (inter.igstPaise !== intra.taxPaise || inter.taxablePaise + inter.igstPaise !== gross) {
+      throw new Error(`IGST != tax, or taxable+IGST != gross, at gross=${gross}`);
+    }
+    if (intra.taxPaise % 2 === 1) oddTaxCount++;
   }
+  // The odd-paisa branch must actually have been exercised, or the sweep proves nothing about it.
+  assert.ok(oddTaxCount > 1_000_000, "sweep should hit the odd-tax (half-paisa) case very often");
 });

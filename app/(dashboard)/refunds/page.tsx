@@ -129,7 +129,7 @@ export default function RefundsPolicyPage() {
             An approved refund is processed to the original payment method through our payment
             gateway. We initiate it within <strong>7 working days</strong> of approving your request.
             How long it then takes to appear on your statement depends on your bank or card issuer,
-            and is typically a further 5 to 10 working days. Any GST charged on a refunded amount is
+            and is typically a further 5 to 10 working days. The GST contained in a refunded amount is
             refunded with it.
           </p>
         </Section>

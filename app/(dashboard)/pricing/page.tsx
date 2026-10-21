@@ -173,8 +173,9 @@ export default function PricingPage() {
               Plans are billed monthly or annually in advance, in Indian Rupees. The price you see
               includes {GST_RATE_PERCENT}% GST, so that is the total you are charged. We issue a GST
               invoice for every payment to the email address on your account, showing the taxable
-              value and the GST contained in the price. You can upgrade at any time and we charge only the difference for the
-              rest of your period; downgrades take effect at your next renewal.
+              value and the GST contained in the price. You can upgrade at any time and we charge
+              only the difference for the rest of your period; downgrades take effect at your next
+              renewal.
             </p>
             <p>
               You can cancel any time from your dashboard and keep access until the end of the period
