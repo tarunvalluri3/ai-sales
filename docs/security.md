@@ -61,6 +61,16 @@ Prioritize tenant isolation, referential integrity, predictable queries, useful 
 
 Whichever is chosen, record it in `STATE.md` and apply it consistently. Never leave a business-owned table with RLS off *and* an unscoped access path.
 
+### 3a. Legal records: invoices and credit notes (Phase 17c)
+
+`public.invoices` and `public.credit_notes` are GST legal records and follow a stricter model than every other table:
+
+- **Immutable, in the database.** A trigger rejects `UPDATE`, `DELETE` and `TRUNCATE` for every role that is not DDL-owner, the service role included; no client role holds those privileges either. The service role also has no `INSERT` — rows arrive only through the `SECURITY DEFINER` functions `issue_invoice()` / `issue_credit_note()`, which are `EXECUTE`-able by the service role alone and own the gap-free numbering (a counter row incremented under a row lock in the same transaction as the insert; never a Postgres `SEQUENCE`).
+- **Tenant-scoped, read-only to the business.** `SELECT` for `authenticated` behind the usual `clerk_org_id` policy. The application narrows that further: the billing page and the PDF download routes (`app/api/billing/{invoices,credit-notes}/[id]/pdf`) require an `org:admin` of the owning business, checked on the server on every request; another business's id is an indistinguishable 404.
+- **No foreign key to `businesses`.** The supplier must keep its tax records when a customer deletes its account, and neither a cascade nor `SET NULL` (an `UPDATE`) is compatible with immutability. Each row carries a full snapshot of the supplier and customer instead.
+- **Test-mode documents are a separate, marked series** (`is_test`, numbered `TST/…` and `TSC/…`) so a Razorpay test payment can never enter the real series.
+- **`business_id` on these paths comes from the verified webhook body or the stored invoice, never from a client**, and the PDF is rendered from the stored snapshot only.
+
 ---
 
 ## 4. The public chat widget

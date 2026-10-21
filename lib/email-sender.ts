@@ -41,6 +41,13 @@ export type SendEmailOptions = {
    * went to the notifications inbox, which nobody reads.
    */
   replyTo?: string | null;
+  /**
+   * Files to attach -- used by Phase 17c to send the GST invoice or credit
+   * note PDF with its email. Goes through the same path as everything else
+   * here, so an attachment never bypasses suppression: a burned address is
+   * refused before Resend is called, exactly as for a plain email.
+   */
+  attachments?: { filename: string; content: Uint8Array; contentType?: string }[];
 };
 
 export async function sendEmail(options: SendEmailOptions): Promise<SendEmailOutcome> {
@@ -65,6 +72,15 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailOut
       html: options.email.html,
       text: options.email.text,
       ...(replyTo ? { replyTo } : {}),
+      ...(options.attachments?.length
+        ? {
+            attachments: options.attachments.map((file) => ({
+              filename: stripLineBreaks(file.filename),
+              content: Buffer.from(file.content),
+              ...(file.contentType ? { contentType: file.contentType } : {}),
+            })),
+          }
+        : {}),
     });
     return error ? "failed" : "sent";
   } catch {

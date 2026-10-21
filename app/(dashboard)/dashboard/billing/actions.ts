@@ -6,12 +6,13 @@ import { requireAuthContext } from "@/lib/auth";
 import { requireBusinessContext } from "@/lib/business-context";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { PLAN_KEYS } from "@/lib/plans";
-import { isIndianStateCode } from "@/lib/india-states";
+import { parseBillingIdentityForm } from "@/lib/billing-identity";
 import {
   confirmMonthlyCheckout,
   confirmOrderCheckout,
   startAnnualCheckout,
   startMonthlyCheckout,
+  updateBillingDetails,
   type CheckoutSession,
 } from "@/lib/billing-checkout";
 import { cancelAtPeriodEnd, changePlan, type PlanChangeResult } from "@/lib/billing-plan-change";
@@ -46,47 +47,10 @@ export type BillingActionState = {
 
 const planKeySchema = z.enum(PLAN_KEYS);
 
-/**
- * The customer's place of supply, and optionally their GSTIN.
- *
- * Required at checkout, not optional, because Phase 17c cannot issue a
- * lawful tax invoice without it: the state code is what decides CGST+SGST
- * versus a single IGST line. Validated against the closed registry in
- * lib/india-states.ts rather than accepted as free text.
- *
- * The GSTIN is optional (most customers will not be registered) and is
- * upper-cased before validation, so a lower-case entry is accepted rather
- * than rejected for a reason the customer cannot see. Its first two digits
- * must match the declared state, because a GSTIN carries its holder's
- * state code and an invoice showing two different states would be wrong on
- * its face.
- */
-const identitySchema = z
-  .object({
-    stateCode: z.string().refine(isIndianStateCode, "Select your state."),
-    gstin: z
-      .string()
-      .trim()
-      .transform((value) => value.toUpperCase())
-      .refine(
-        (value) => value === "" || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(value),
-        "That does not look like a valid 15-character GSTIN.",
-      )
-      .transform((value) => (value === "" ? null : value)),
-  })
-  .refine(
-    (value) => value.gstin === null || value.gstin.slice(0, 2) === value.stateCode,
-    "Your GSTIN's state code does not match the state you selected.",
-  );
-
 const startCheckoutSchema = z.object({
   planKey: planKeySchema,
   interval: z.enum(["monthly", "annual"]),
 });
-
-function fieldErrorMessage(error: z.ZodError): string {
-  return error.issues[0]?.message ?? "Check the details below and try again.";
-}
 
 /** Starts a first subscription, or re-subscribes after a lapse. */
 export async function startCheckoutAction(
@@ -102,11 +66,8 @@ export async function startCheckoutAction(
   });
   if (!parsedPlan.success) return { error: "Choose a plan and a billing period." };
 
-  const parsedIdentity = identitySchema.safeParse({
-    stateCode: formData.get("stateCode"),
-    gstin: formData.get("gstin") ?? "",
-  });
-  if (!parsedIdentity.success) return { error: fieldErrorMessage(parsedIdentity.error) };
+  const parsedIdentity = parseBillingIdentityForm(formData);
+  if (!parsedIdentity.ok) return { error: parsedIdentity.error };
 
   try {
     const session =
@@ -115,13 +76,13 @@ export async function startCheckoutAction(
             businessId,
             userId,
             planKey: parsedPlan.data.planKey,
-            identity: parsedIdentity.data,
+            identity: parsedIdentity.identity,
           })
         : await startMonthlyCheckout({
             businessId,
             userId,
             planKey: parsedPlan.data.planKey,
-            identity: parsedIdentity.data,
+            identity: parsedIdentity.identity,
           });
     return { session };
   } catch (error) {
@@ -222,11 +183,8 @@ export async function changePlanAction(
   const parsedPlan = planKeySchema.safeParse(formData.get("planKey"));
   if (!parsedPlan.success) return { error: "Choose a plan." };
 
-  const parsedIdentity = identitySchema.safeParse({
-    stateCode: formData.get("stateCode"),
-    gstin: formData.get("gstin") ?? "",
-  });
-  if (!parsedIdentity.success) return { error: fieldErrorMessage(parsedIdentity.error) };
+  const parsedIdentity = parseBillingIdentityForm(formData);
+  if (!parsedIdentity.ok) return { error: parsedIdentity.error };
 
   let result: PlanChangeResult;
   try {
@@ -234,7 +192,7 @@ export async function changePlanAction(
       businessId,
       userId,
       toPlanKey: parsedPlan.data,
-      identity: parsedIdentity.data,
+      identity: parsedIdentity.identity,
     });
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
@@ -284,6 +242,44 @@ export async function cancelSubscriptionAction(
     return {
       success: true,
       notice: `Cancelled. You keep full access until ${formatIstDate(accessUntil)}, the end of the period you have paid for.`,
+    };
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+}
+
+/**
+ * Saves the customer's billing name, address, state and GSTIN (Phase 17c).
+ * `org:admin` only, like every other billing action.
+ *
+ * **Changes apply to future invoices only.** Issued invoices are immutable
+ * snapshots, so nothing here can alter one. What it DOES do is issue any
+ * invoice that was parked for want of these details -- the reply says so, so
+ * the customer sees the missing document arrive.
+ */
+export async function updateBillingDetailsAction(
+  _prevState: BillingActionState,
+  formData: FormData,
+): Promise<BillingActionState> {
+  await requireAuthContext({ role: "org:admin" });
+  const { businessId, userId } = await requireBusinessContext();
+
+  const parsedIdentity = parseBillingIdentityForm(formData);
+  if (!parsedIdentity.ok) return { error: parsedIdentity.error };
+
+  try {
+    const { invoicesIssued } = await updateBillingDetails({
+      businessId,
+      userId,
+      identity: parsedIdentity.identity,
+    });
+    revalidatePath("/dashboard/billing");
+    return {
+      success: true,
+      notice:
+        invoicesIssued > 0
+          ? `Billing details saved. We issued ${invoicesIssued === 1 ? "the invoice" : `${invoicesIssued} invoices`} that ${invoicesIssued === 1 ? "was" : "were"} waiting on them and emailed ${invoicesIssued === 1 ? "it" : "them"} to you.`
+          : "Billing details saved. They apply to your next invoice; invoices already issued are never changed.",
     };
   } catch (error) {
     return { error: logAndGetUserMessage(error) };

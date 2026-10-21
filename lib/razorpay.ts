@@ -289,7 +289,7 @@ export async function checkRazorpayPlan(planKey: PlanKey, expectedAmountPaise: n
  * Why not Razorpay's documented ceiling (it supports up to 100 years, and
  * 30 years of monthly cycles is 360)? Because a bigger number buys nothing
  * real. No Indian recurring mandate survives ten years untouched -- RBI's
- * e-mandate rules make cards and UPI AutoPay re-authenticate on their own
+ * e-mandate rules make recurring card mandates re-authenticate on their own
  * schedule, and cards expire long before then -- so the practical lifetime
  * of any one mandate is years, not decades. 120 is comfortably past that,
  * while still being a bounded commitment rather than an unbounded one.
@@ -450,7 +450,7 @@ export type SubscriptionPlanUpdateOutcome =
   | { outcome: "updated"; subscription: RazorpaySubscription }
   /**
    * Razorpay refused the update. The documented case this covers is a
-   * mandate authorised by UPI AutoPay or eMandate rather than by card:
+   * mandate that was not authorised by card:
    * **only card-authorised subscriptions can be updated**. It is not an
    * error in our code and it must not fail the customer's plan change --
    * the caller falls back to cancel-at-period-end plus a re-authorisation
@@ -575,6 +575,127 @@ export async function createOrder(params: {
       "We got an unexpected response from our payment provider. Please try again.",
       "razorpay_order_unexpected_shape",
     );
+  }
+  return parsed.data;
+}
+
+/* ------------------------------------------------------------------ *
+ * Payments and refunds (Phase 17c: credit notes)
+ * ------------------------------------------------------------------ */
+
+/** 'test' for rzp_test_* keys, 'live' for rzp_live_*, null when unconfigured or unrecognisable. */
+export function razorpayKeyMode(): "test" | "live" | null {
+  const keyId = getRazorpayConfig()?.keyId;
+  if (!keyId) return null;
+  if (keyId.startsWith("rzp_test_")) return "test";
+  if (keyId.startsWith("rzp_live_")) return "live";
+  return null;
+}
+
+const paymentResponseSchema = z.object({
+  id: z.string(),
+  amount: z.number(),
+  currency: z.string(),
+  status: z.string(),
+  amount_refunded: z.number().optional(),
+  order_id: z.string().nullable().optional(),
+  method: z.string().optional(),
+  created_at: z.number().optional(),
+});
+
+export type RazorpayPayment = z.infer<typeof paymentResponseSchema>;
+
+export async function fetchPayment(paymentId: string): Promise<RazorpayPayment> {
+  const config = getRazorpayConfig();
+  if (!config) {
+    throw new AppError(
+      "Payments are not set up yet. Please contact us and we will sort it out.",
+      "fetchPayment called with no Razorpay configuration",
+    );
+  }
+  const raw = await razorpayRequest<unknown>(config, `/payments/${encodeURIComponent(paymentId)}`, { method: "GET" });
+  const parsed = paymentResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new AppError(
+      "We got an unexpected response from our payment provider.",
+      "razorpay_payment_unexpected_shape",
+    );
+  }
+  return parsed.data;
+}
+
+const refundResponseSchema = z.object({
+  id: z.string(),
+  payment_id: z.string(),
+  amount: z.number(),
+  currency: z.string(),
+  status: z.string(),
+  created_at: z.number().optional(),
+});
+
+export type RazorpayRefund = z.infer<typeof refundResponseSchema>;
+
+/**
+ * Refunds part or all of a captured payment. **Moves real money back**, so
+ * the only caller is the hand-run script scripts/issue-credit-note.mjs,
+ * which prints what it is about to do and requires an explicit flag.
+ *
+ * `speed: "normal"` is the default Razorpay speed and costs nothing extra.
+ * The notes carry the credit-note reason, so the `refund.processed`
+ * webhook issues a note with the same reason the script would have.
+ */
+export async function createRefund(params: {
+  paymentId: string;
+  amountPaise: number;
+  notes: Record<string, string>;
+  receipt: string;
+}): Promise<RazorpayRefund> {
+  const config = getRazorpayConfig();
+  if (!config) {
+    throw new AppError(
+      "Payments are not set up yet. Please contact us and we will sort it out.",
+      "createRefund called with no Razorpay configuration",
+    );
+  }
+  if (!Number.isSafeInteger(params.amountPaise) || params.amountPaise <= 0) {
+    throw new AppError("That refund amount is not valid.", `razorpay_refund_amount_invalid ${params.amountPaise}`);
+  }
+  const raw = await razorpayRequest<unknown>(config, `/payments/${encodeURIComponent(params.paymentId)}/refund`, {
+    method: "POST",
+    body: {
+      amount: params.amountPaise,
+      speed: "normal",
+      receipt: params.receipt.slice(0, 40),
+      notes: params.notes,
+    },
+  });
+  const parsed = refundResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new AppError(
+      "We got an unexpected response from our payment provider.",
+      "razorpay_refund_unexpected_shape",
+    );
+  }
+  return parsed.data;
+}
+
+const refundDetailSchema = refundResponseSchema.extend({
+  notes: z.record(z.string(), z.unknown()).nullable().optional(),
+});
+
+/** Reads one refund back from Razorpay (the credit-note script's recovery path). */
+export async function fetchRefund(refundId: string): Promise<z.infer<typeof refundDetailSchema>> {
+  const config = getRazorpayConfig();
+  if (!config) {
+    throw new AppError(
+      "Payments are not set up yet. Please contact us and we will sort it out.",
+      "fetchRefund called with no Razorpay configuration",
+    );
+  }
+  const raw = await razorpayRequest<unknown>(config, `/refunds/${encodeURIComponent(refundId)}`, { method: "GET" });
+  const parsed = refundDetailSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new AppError("We got an unexpected response from our payment provider.", "razorpay_refund_unexpected_shape");
   }
   return parsed.data;
 }

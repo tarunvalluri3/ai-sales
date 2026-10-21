@@ -651,7 +651,13 @@ export type AuditLogAction =
   | "subscription.cancellation_scheduled"
   | "subscription.expired"
   | "subscription.plan_changed"
-  | "subscription.plan_change_scheduled";
+  | "subscription.plan_change_scheduled"
+  // Phase 17c, extended by 20261026000000. 'invoice.issued' and
+  // 'credit_note.issued' are written by the webhook / the credit-note script
+  // (actor 'system:razorpay'); 'billing_details.updated' by a signed-in admin.
+  | "invoice.issued"
+  | "credit_note.issued"
+  | "billing_details.updated";
 
 export type AuditLogMetadata = Record<string, string | number | boolean | null>;
 

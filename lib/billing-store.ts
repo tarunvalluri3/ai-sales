@@ -5,6 +5,11 @@ import { logEvent } from "@/lib/logger";
 import { sendEmail } from "@/lib/email-sender";
 import { recordSystemAuditLogEntry } from "@/lib/audit-log";
 import { buildBillingNoticeEmail } from "@/lib/billing-emails";
+import {
+  createCreditNoteServiceDeps,
+  createInvoiceServiceDeps,
+} from "@/lib/invoice-store";
+import { issueCreditNoteForRefund, issueInvoiceForPayment } from "@/lib/invoice-service";
 import { billingNoticeKey, type BillingNoticeKind } from "@/lib/billing-notices";
 import { PLAN_KEYS, type PlanKey } from "@/lib/plans";
 import { SUBSCRIPTION_STATUSES } from "@/lib/subscription";
@@ -292,6 +297,10 @@ export function createRazorpayWebhookDeps(supabase: ServiceClient): RazorpayWebh
       // target_id is a uuid column, so the business itself is the target:
       // a subscription has no surrogate id (its primary key IS business_id).
       recordSystemAuditLogEntry(businessId, action, "subscription", businessId, metadata),
+    // Phase 17c: the legal record of each payment. The wiring lives in
+    // lib/invoice-store.ts; this only hands the webhook the two entry points.
+    issueInvoice: (payment) => issueInvoiceForPayment(createInvoiceServiceDeps(supabase), payment),
+    issueCreditNote: (refund) => issueCreditNoteForRefund(createCreditNoteServiceDeps(supabase), refund),
     log: logEvent,
   };
 }

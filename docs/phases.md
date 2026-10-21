@@ -154,6 +154,8 @@ Deliberately late-stage. Plans, subscription state, payment handling, webhook si
 
 Never trust client-supplied payment or subscription status.
 
+**Phase 17c — GST tax invoices, credit notes, payment history (the legal half of billing).** Live Razorpay keys stay blocked until this is in production and one real payment has been run end to end. See `STATE.md` and `docs/security.md` §3a.
+
 ## Phase 18 — Analytics / monitoring
 
 Production observability after the core product works. Approved tools only. Track meaningful events without logging secrets or unnecessary personal data.

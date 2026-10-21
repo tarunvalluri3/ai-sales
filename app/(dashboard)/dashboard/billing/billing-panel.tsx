@@ -3,7 +3,7 @@
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { useToast } from "../_components/toast";
-import { INDIAN_STATES } from "@/lib/india-states";
+import { BillingDetailsFields, type BillingIdentityValues } from "./billing-details";
 import {
   cancelSubscriptionAction,
   changePlanAction,
@@ -29,13 +29,17 @@ import {
  * sheet closed" path below simply refreshes instead of reporting a
  * failure: the honest answer is "we do not know yet, and we will".
  *
- * **UPI AutoPay is offered, not just cards**, and that needs nothing in
- * this file: Razorpay Checkout shows every method enabled on the account
- * for a recurring mandate, so UPI appears once it is toggled on in the
- * dashboard (Subscriptions -> Settings). It is in range -- UPI AutoPay and
- * domestic cards both cap recurring charges at Rs 15,000, and the largest
- * plan here is Rs 9,999 a month. The annual plans are one-time orders, not
- * mandates, so that cap does not apply to them at all.
+ * **Cards only** (decided 2026-10-21). Checkout is configured to show a
+ * single "Pay via Card" block and hide every other method, so what the
+ * customer is offered does not depend on which methods happen to be enabled
+ * on the Razorpay account at the time. The Razorpay dashboard is still the
+ * place the other methods are switched off at the source
+ * (Subscriptions -> Settings): this client option is the belt, that is the
+ * braces.
+ *
+ * The billing-details fields are the same component the "Billing details"
+ * card uses, so a GST invoice is always made out to what the customer
+ * confirmed at the moment they paid.
  */
 
 const RAZORPAY_CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
@@ -103,13 +107,15 @@ export function BillingPanel({
   identity,
   plans,
   gstRatePercent,
+  supplierStateName,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
   usage: { repliesUsed: number; replyQuota: number; degraded: boolean };
-  identity: { stateCode: string | null; gstin: string | null };
+  identity: BillingIdentityValues;
   plans: PlanSummary[];
   gstRatePercent: number;
+  supplierStateName: string;
 }) {
   const { toast } = useToast();
   const [interval, setInterval] = useState<"monthly" | "annual">(entitlement.billingInterval ?? "monthly");
@@ -160,6 +166,15 @@ export function BillingPanel({
           : { order_id: session.orderId }),
         notes: { plan: session.planKey },
         theme: { color: "#17150f" },
+        // Cards only: one block that lists only the card method, with the
+        // default blocks (UPI, netbanking, wallets...) switched off.
+        config: {
+          display: {
+            blocks: { cards_only: { name: "Pay via card", instruments: [{ method: "card" }] } },
+            sequence: ["block.cards_only"],
+            preferences: { show_default_blocks: false },
+          },
+        },
         handler: (response: RazorpayCheckoutResponse) => {
           setCheckoutOpen(false);
           const formData = new FormData();
@@ -320,49 +335,12 @@ export function BillingPanel({
           <input type="hidden" name="planKey" value={selectedPlan} />
           <input type="hidden" name="interval" value={interval} />
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-ds-text-primary">
-                State <span className="text-ds-text-muted">(required)</span>
-              </span>
-              <select
-                name="stateCode"
-                required
-                defaultValue={identity.stateCode ?? ""}
-                className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-              >
-                <option value="">Select your state</option>
-                {INDIAN_STATES.map((state) => (
-                  <option key={state.code} value={state.code}>
-                    {state.name}
-                  </option>
-                ))}
-              </select>
-              <span className="text-2xs text-ds-text-muted">
-                Your place of supply. It decides how {gstRatePercent}% GST is shown on your invoice —
-                CGST and SGST within your state, IGST outside it.
-              </span>
-            </label>
-
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-ds-text-primary">
-                GSTIN <span className="text-ds-text-muted">(optional)</span>
-              </span>
-              <input
-                type="text"
-                name="gstin"
-                maxLength={15}
-                defaultValue={identity.gstin ?? ""}
-                placeholder="22AAAAA0000A1Z5"
-                autoComplete="off"
-                className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 font-mono text-sm uppercase text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-              />
-              <span className="text-2xs text-ds-text-muted">
-                Add it if your business is GST-registered and we will put it on your invoice so you can
-                claim input credit.
-              </span>
-            </label>
-          </div>
+          <BillingDetailsFields
+            defaults={identity}
+            gstRatePercent={gstRatePercent}
+            supplierStateName={supplierStateName}
+            idPrefix="checkout"
+          />
 
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -387,7 +365,7 @@ export function BillingPanel({
               <span className="text-2xs text-ds-text-muted">Loading the payment window…</span>
             ) : null}
             <span className="text-2xs text-ds-text-muted">
-              Cards and UPI AutoPay. {entitlement.isTrial ? "You are not charged until your trial ends." : ""}
+              Cards only. {entitlement.isTrial ? "You are not charged until your trial ends." : ""}
             </span>
           </div>
         </form>
