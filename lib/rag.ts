@@ -23,6 +23,8 @@ import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib
 import { isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
+import { TurnTimer } from "@/lib/turn-timings";
+import { insertTurnMetrics } from "@/lib/ai-response-metrics";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -40,8 +42,63 @@ import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
  * asks the model to attempt when both capabilities are enabled
  * (recommend_products -> check_available_slots -> book_appointment in
  * one turn), which a cap of 2 truncates before the booking step.
+ *
+ * 4, not 3, since 2026-10-21: the loop now also ends with a send_reply
+ * call (see SEND_REPLY_TOOL_NAME), and that call occupies an iteration of
+ * its own. Three *tool* rounds plus the send_reply round is 4, so the
+ * exact chain the old cap of 3 permitted still fits. The cap is still not
+ * an error: a turn that reaches it falls through to the separate
+ * structured-output call below, which is what every turn used to do.
  */
-const MAX_TOOL_ITERATIONS = 3;
+const MAX_TOOL_ITERATIONS = 4;
+
+/**
+ * The tool the model calls to deliver its finished reply, instead of
+ * writing the reply as plain text.
+ *
+ * This is the fix for the "generated answer thrown away" problem measured
+ * 2026-10-21. The loop's model call used to write a complete prose answer
+ * that was discarded the instant it turned out no tool was requested, and
+ * a second, tools-unbound structured-output call then regenerated the same
+ * answer over the same messages -- two full generations per turn, always,
+ * and three on a turn that used a tool.
+ *
+ * Why a tool and not one of the obvious alternatives, all measured
+ * against this model (gemini-3.1-flash-lite) before choosing:
+ *
+ * - Deriving `escalate`/`usedContext` from the loop call's prose without a
+ *   second Gemini call cannot preserve their semantics: both are model
+ *   judgements, defined by the field descriptions in
+ *   SalesEmployeeResponseSchema, and any heuristic that replaced them
+ *   would be a different rule wearing the same column name. The eval suite
+ *   covers escalation precisely because it is not derivable from the text.
+ * - Capping the loop call's output tokens so it cannot write prose is
+ *   unsafe at any useful value: a tool call's arguments count against the
+ *   same budget (measured: 14-25 output tokens for the simple lookups,
+ *   more for book_appointment), while a typical prose answer here is only
+ *   56-73 -- so a cap low enough to stop the prose is low enough to
+ *   truncate a booking, and a cap safe for the booking never binds.
+ * - Telling the loop call to emit "tool calls or a short sentinel only"
+ *   works mechanically (output drops to a single token) but changes which
+ *   tools get called: measured over 5 runs each, every question that today
+ *   answers straight from context started calling a catalog tool instead,
+ *   because writing the answer was the only thing competing with calling a
+ *   tool. That converts cheap no-tool turns into one-tool turns -- the
+ *   slowest class there is (p90 18.1s) -- so it trades a 200ms saving for
+ *   seconds of loss.
+ *
+ * A tool-shaped final answer keeps the model's own choice intact (reply
+ * now vs. look something up first), and the reply is no longer thrown
+ * away: the first response that contains it IS the answer. The structured
+ * fields come from SalesEmployeeResponseSchema itself -- the same Zod
+ * object, with the same field descriptions, that the structured-output
+ * call used -- so their semantics are unchanged by construction.
+ *
+ * The old path is still there, unchanged, as the fallback for a turn where
+ * the model writes prose anyway or never gets around to send_reply. The
+ * worst case is therefore exactly today's behaviour, never worse.
+ */
+const SEND_REPLY_TOOL_NAME = "send_reply";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -146,6 +203,16 @@ export type SalesEmployeeResponse = {
    * as an empty card.
    */
   recommendedProducts: RecommendedItem[];
+  /**
+   * The `ai_response_metrics` row this turn wrote, or null when it wrote
+   * none (every early-return path below, which makes no Gemini call, and
+   * a failed metrics write). Plumbing, not product data: it exists so the
+   * request handler can append the stages that happen after this function
+   * returns -- the assistant message write, escalation handling -- to the
+   * same row, off the prospect's critical path. See
+   * lib/ai-response-metrics.ts's finalizeTurnMetrics().
+   */
+  metricsRowId: string | null;
 };
 
 type KnowledgeChunkMetadata = {
@@ -167,16 +234,25 @@ class KnowledgeRetriever extends BaseRetriever<KnowledgeChunkMetadata> {
   private readonly supabase: SupabaseClient;
   private readonly businessId: string;
   private readonly limit: number;
+  private readonly timer: TurnTimer | undefined;
 
-  constructor(fields: { supabase: SupabaseClient; businessId: string; limit?: number }) {
+  constructor(fields: { supabase: SupabaseClient; businessId: string; limit?: number; timer?: TurnTimer }) {
     super();
     this.supabase = fields.supabase;
     this.businessId = fields.businessId;
     this.limit = fields.limit ?? 5;
+    this.timer = fields.timer;
   }
 
   async _getRelevantDocuments(query: string): Promise<Document<KnowledgeChunkMetadata>[]> {
-    const results = await searchKnowledgeChunks(this.supabase, this.businessId, query, this.limit);
+    // The embedding call and the vector search are recorded separately,
+    // not as one "retrieval" number: one is a Gemini round trip and the
+    // other a Supabase one, and only the second is affected by the
+    // function's region.
+    const results = await searchKnowledgeChunks(this.supabase, this.businessId, query, this.limit, (timings) => {
+      this.timer?.record("embedding", timings.embedMs);
+      this.timer?.record("vector_search", timings.searchMs);
+    });
     return results.map(
       (result) =>
         new Document({
@@ -212,7 +288,7 @@ const SYSTEM_TEMPLATE = `You are a sales employee of {businessName} -- not a sup
 {appointmentInstruction}
 {capabilityChainingInstruction}
 {businessProfileContext}
-Reference context (retrieved business knowledge, relevant to the current question):
+Reference context -- this is ALREADY the result of a semantic search of this business's full knowledge base, run automatically for the prospect's current message before this turn started, over the exact same knowledge base that search_knowledge_base searches. The <retrieved_context> tag states the query that was used:
 {context}
 
 You have four kinds of information available to you:
@@ -226,7 +302,7 @@ Rules:
 - Answer only using the reference context above, this conversation's own messages, and tool results.
 - A retrieved passage counts as usable context whenever it is about the same product, service, or topic the prospect is asking about -- treat it as relevant even if the prospect's wording doesn't match it exactly. This includes capability/availability questions ("can you...", "do you offer...", "is it possible to...", "do you do..."): if a retrieved passage describes {businessName} performing or offering that thing, answer from it directly and confidently -- do not decline just because the passage isn't phrased as a direct answer to the question.
 - Before concluding you don't have relevant information about a specific or general offering, actually check for it, rather than answering only from whatever happened to be retrieved as reference context above -- unless you already checked the same thing earlier in this conversation: use check_product_details for a specific named product/service, check_faq_topic for a specific FAQ topic, or list_products_and_services for a broad question like "what do you offer" or "what services do you provide." Only decline a question about the business's offerings after you've actually tried the relevant tool (or already know from earlier in this conversation that it won't help).
-- If, after trying the relevant tool(s) above, you still don't have an answer and the reference context above doesn't cover it either, try search_knowledge_base before declining -- it searches this business's full knowledge base for content that isn't shaped as a discrete product/service/FAQ (a policy, a warranty term, an about-us fact, or anything else genuinely stated in the business's own documents). Reformulate the prospect's question into the search query if their exact wording seems too narrow. Only fall back to category 4 (unknown) once this has also come up empty.
+- If, after trying the relevant tool(s) above, you still don't have an answer and the reference context above doesn't cover it either, try search_knowledge_base before declining -- it searches this business's full knowledge base for content that isn't shaped as a discrete product/service/FAQ (a policy, a warranty term, an about-us fact, or anything else genuinely stated in the business's own documents). Reformulate the prospect's question into the search query -- and only call search_knowledge_base with a query that is materially DIFFERENT from the prospect's own message: a different topic, a broader category, or different terminology. Re-searching the prospect's own wording returns the reference context above again, so it tells you nothing new and only makes the prospect wait: when that is the only query you have, use what is already above instead of searching for it twice. Only fall back to category 4 (unknown) once this has also come up empty, or once there is no materially different query left to try.
 - If, even after checking the reference context and the relevant tool, you only have partial or adjacent information -- not a complete answer -- share what you do know and ask a clarifying question to keep helping the prospect, rather than opening with "I don't have that information."
 - Category 4 (unknown) is for when nothing retrieved or returned by a tool -- including search_knowledge_base -- is genuinely about what the prospect is asking -- a different topic entirely, not just different phrasing, and not something you simply haven't checked yet. Only then say plainly that you don't have that information -- do not guess, do not answer from general knowledge, and do not generalize from other businesses.
 - Do not offer to connect the prospect with a human or ask for their contact details as your default response to an ordinary unclear or unanswered question -- that is not the first move. Only make that offer when: the prospect explicitly asks for a person, the message is a complaint, the prospect asks you to commit to something (custom pricing, contractual terms, guarantees) you are not authorized to promise, or this exact same question or topic has already come up unresolved earlier in this conversation (check the conversation history above) and you still can't answer it. On a genuine first-time unknown that doesn't match any of those, ask a clarifying question instead -- what the prospect is trying to accomplish, or which part of their question matters most -- to keep the conversation moving toward something you can actually help with.
@@ -242,11 +318,57 @@ Rules:
 - Handle price or timing hesitation like a real salesperson would: acknowledge the concern and address it using only real catalog or knowledge content (an actual price, an actual policy) -- never invent a discount, guarantee, availability, or timeline that isn't grounded in the context above.
 - Write like a real sales person chatting, not a document. Keep the answer short: a few brief sentences (roughly 3-4 lines), never one long paragraph. When you're listing multiple things -- services offered, product options, steps, features -- use a short bullet list instead of folding them into a sentence.
 - Set usedContext to true if the answer above was grounded in the reference context or a search_knowledge_base result, including a same-topic passage answering a differently-worded question as described above. Set it to false only if none of that was genuinely about the question, or the question fell into category 4 and was declined rather than answered from context.
-- Set escalate to true, with a short escalationReason, when the prospect explicitly asks to speak with a person, the message is a complaint, the prospect asks you to commit to something (custom pricing, contractual terms, guarantees) you are not authorized to promise, or this exact same question/topic has already come up unresolved earlier in this conversation and still can't be answered. Otherwise set escalate to false -- in particular, false on an ordinary first unclear question that hasn't come up before. Always still provide a real answer, even when escalating -- e.g. acknowledge the request and say a team member will follow up.`;
+- Set escalate to true, with a short escalationReason, when the prospect explicitly asks to speak with a person, the message is a complaint, the prospect asks you to commit to something (custom pricing, contractual terms, guarantees) you are not authorized to promise, or this exact same question/topic has already come up unresolved earlier in this conversation and still can't be answered. Otherwise set escalate to false -- in particular, false on an ordinary first unclear question that hasn't come up before. Always still provide a real answer, even when escalating -- e.g. acknowledge the request and say a team member will follow up.{sendReplyInstruction}`;
+
+/**
+ * Appended to the system prompt for the tool-calling loop's calls only --
+ * never for the fallback structured-output call, which is rendered from
+ * the same template with this slot empty so that path keeps the exact
+ * prompt it has always had.
+ */
+const SEND_REPLY_INSTRUCTION = `
+- Your reply only reaches the prospect through the ${SEND_REPLY_TOOL_NAME} tool. Every turn ends with exactly one ${SEND_REPLY_TOOL_NAME} call: call any other tool you need first, then call ${SEND_REPLY_TOOL_NAME} with your finished reply. Never write the reply as plain text, and never call ${SEND_REPLY_TOOL_NAME} in the same step as another tool -- make the other call first, read its result, then send the reply.`;
+
+/**
+ * Shaped for `bindTools()`, same convention as lib/tools/*. The schema is
+ * SalesEmployeeResponseSchema itself, deliberately and not a copy of it:
+ * the field descriptions the model reads when filling this tool's
+ * arguments are then literally the same text that defined those fields
+ * when they came back from withStructuredOutput(), so `escalate`,
+ * `usedContext` and `escalationReason` cannot quietly drift apart from
+ * their documented meaning. `grounded` and `recommendedProducts` are not
+ * in here at all -- they never came from the model (see
+ * SalesEmployeeResponse) and still don't.
+ */
+const sendReplyTool = {
+  name: SEND_REPLY_TOOL_NAME,
+  description:
+    "Sends your reply to the prospect. This is how every turn ends: once you have everything you need -- either straight from the reference context and this conversation, or from tool results you have already received -- call this with your finished reply. Do not write the reply as plain text; it only reaches the prospect through this tool.",
+  schema: SalesEmployeeResponseSchema,
+};
 
 /**
  * Shared Gemini chat model construction, so future callers needing a
  * Gemini chat model don't duplicate this setup.
+ *
+ * No `thinkingConfig`, measured rather than assumed (2026-10-21). This
+ * integration only sends a thinkingConfig when one is set
+ * (node_modules/@langchain/google-genai/dist/chat_models.js), so omitting
+ * it means the model's own default -- and for `gemini-3.1-flash-lite`
+ * that default spends **zero** thinking tokens on this prompt: measured
+ * over four question shapes (a priced product, a broad "what do you
+ * offer", a complaint, an unknown product), on both the tool-bound call
+ * and the structured-output call, `thoughtsTokenCount` was absent from
+ * every response. `models.get` does report `"thinking": true` for it, so
+ * the capability exists and is simply not used by default.
+ *
+ * So there is nothing here to switch off, and two things not to do:
+ * setting `thinkingBudget: 0` changes no token count and no latency
+ * (identical measurements) while adding a parameter that errors on a model
+ * that doesn't support thinking, and setting `thinkingLevel: "LOW"` --
+ * the obvious "minimise it" reading -- *adds* 85-124 thinking tokens per
+ * call and makes every call slower. Any future change here needs its own
+ * measurement; `ai_response_metrics.thinking_tokens` is what to read.
  */
 export function getChatModel(): ChatGoogleGenerativeAI {
   return new ChatGoogleGenerativeAI({
@@ -254,6 +376,18 @@ export function getChatModel(): ChatGoogleGenerativeAI {
     model: process.env.GEMINI_CHAT_MODEL!,
     temperature: 0.2,
   });
+}
+
+/**
+ * Thinking tokens are billed and spent but are not in `output_tokens`:
+ * @langchain/google-genai maps `output_tokens` to Gemini's
+ * `candidatesTokenCount`, which excludes them, while `total_tokens` maps
+ * to `totalTokenCount`, which includes them. The difference is therefore
+ * the only place hidden thinking time shows up at all.
+ */
+function thinkingTokensOf(usage: AIMessage["usage_metadata"]): number {
+  if (!usage) return 0;
+  return Math.max(0, (usage.total_tokens ?? 0) - (usage.input_tokens ?? 0) - (usage.output_tokens ?? 0));
 }
 
 function buildPrompt(): ChatPromptTemplate {
@@ -288,6 +422,12 @@ function isFirstTurn(history: ConversationMessage[]): boolean {
  * estimated). The early-return fallback path above intentionally emits
  * nothing: no Gemini call was made, so there is no latency/cost to
  * report.
+ *
+ * Since 2026-10-21 that event and the `ai_response_metrics` row also
+ * carry a per-stage breakdown (`lib/turn-timings.ts`) and the turn's true
+ * end-to-end duration -- persisted rather than logged, because Vercel's
+ * Hobby plan keeps 30 minutes of function logs, which makes a log-only
+ * breakdown unreadable by the time anyone asks about it.
  */
 export async function askSalesEmployee(
   supabase: SupabaseClient,
@@ -302,6 +442,11 @@ export async function askSalesEmployee(
     recommendProductsEnabled: false,
     appointmentsEnabled: false,
   },
+  // Created here when the caller doesn't own one. app/api/chat/route.ts
+  // passes its own, started on the handler's first line, so the recorded
+  // total covers the prospect's real wait rather than starting partway
+  // through it.
+  timer: TurnTimer = new TurnTimer(),
 ): Promise<SalesEmployeeResponse> {
   // Phase 22h: checked before any Gemini call this turn would make,
   // including the embedding call retrieval itself makes -- a business
@@ -309,7 +454,7 @@ export async function askSalesEmployee(
   // full response. escalate: true so app/api/chat/route.ts's existing
   // escalation handling (flagConversationNeedsAttention + logEvent)
   // picks this up with no new call site needed there.
-  const withinQuota = await isWithinUsageQuota(supabase, businessId);
+  const withinQuota = await timer.time("quota_check", () => isWithinUsageQuota(supabase, businessId));
   if (!withinQuota) {
     logEvent("ai_usage_quota_exceeded", businessId, { conversationId }, "error");
     return {
@@ -320,6 +465,7 @@ export async function askSalesEmployee(
       escalate: true,
       escalationReason: "usage_quota_exceeded",
       recommendedProducts: [],
+      metricsRowId: null,
     };
   }
 
@@ -332,7 +478,7 @@ export async function askSalesEmployee(
   // last element (app/api/chat/route.ts inserts it before fetching
   // history), so a genuinely first-turn conversation has length 1, not 0.
   if (isFirstTurn(history)) {
-    const cached = await getCachedResponse(supabase, businessId, question, language);
+    const cached = await timer.time("cache_read", () => getCachedResponse(supabase, businessId, question, language));
     if (cached) {
       logEvent("ai_response_cache_hit", businessId, { conversationId });
       return {
@@ -343,11 +489,12 @@ export async function askSalesEmployee(
         escalate: false,
         escalationReason: null,
         recommendedProducts: [],
+        metricsRowId: null,
       };
     }
   }
 
-  const retriever = new KnowledgeRetriever({ supabase, businessId });
+  const retriever = new KnowledgeRetriever({ supabase, businessId, timer });
   let documents: Document<KnowledgeChunkMetadata>[];
   try {
     documents = await retriever.invoke(question);
@@ -371,6 +518,7 @@ export async function askSalesEmployee(
         escalate: true,
         escalationReason: "embedding_rate_limited",
         recommendedProducts: [],
+        metricsRowId: null,
       };
     }
     throw error;
@@ -385,6 +533,7 @@ export async function askSalesEmployee(
       escalate: false,
       escalationReason: null,
       recommendedProducts: [],
+      metricsRowId: null,
     };
   }
 
@@ -392,13 +541,37 @@ export async function askSalesEmployee(
   // rule above has a literal, checkable boundary: a retrieved passage
   // trying to impersonate an instruction still reads as data inside
   // <retrieved_context>, not as part of this system message.
-  const context = `<retrieved_context>\n${documents
+  //
+  // The tag now also states the query these passages came from. Measured
+  // 2026-10-21: without it the model re-ran search_knowledge_base with the
+  // prospect's own wording on turns where this context was already the
+  // answer to that exact search -- a second Gemini round trip and a second
+  // embedding call for passages it had already been given. Naming the
+  // query is what stopped that; the prose rule alone did not.
+  //
+  // The query is prospect-supplied text, so the few characters that could
+  // forge a tag boundary are stripped before it goes into an attribute --
+  // the question itself is already sent verbatim in the human message, so
+  // this adds no new trust, but it must not be able to make the passages
+  // below look like they sit outside <retrieved_context>.
+  const searchQueryAttribute = question.replace(/[<>"\r\n]/g, " ").slice(0, 300);
+  const context = `<retrieved_context search_query="${searchQueryAttribute}" searched="this business's full knowledge base" passages="${documents.length}">\n${documents
     .map((document, index) => `[${index + 1}] ${document.pageContent}`)
     .join("\n\n")}\n</retrieved_context>`;
 
+  // `startedAt` deliberately still starts here, just before the first
+  // Gemini call: it is what `latency_ms` has always measured, and
+  // lib/analytics.ts averages that column across months of existing rows.
+  // The prospect's real wait is `timer`, which started at the top of the
+  // request, and is recorded separately as `total_latency_ms`.
   const startedAt = Date.now();
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let totalThinkingTokens = 0;
+  // Business tools only. A send_reply call is how the turn ends, not a
+  // tool the model chose to use, so counting it here would change what
+  // this column has meant since Phase 21 and make every "one-tool turn"
+  // measurement incomparable with the baseline it is being judged against.
   let toolCallCount = 0;
   // Phase 23 cache eligibility cares specifically about side effects, not
   // tool use in general -- check_product_details/check_faq_topic/
@@ -419,7 +592,7 @@ export async function askSalesEmployee(
   let recommendedProducts: RecommendedItem[] = [];
 
   try {
-    const prompt = await buildPrompt().invoke({
+    const promptValues = {
       context,
       businessName,
       languageInstruction: formatLanguageInstruction(language),
@@ -435,8 +608,21 @@ export async function askSalesEmployee(
       // doc comment) -- already sent once via the `{question}` slot above,
       // so it's dropped here to avoid sending it to Gemini twice.
       history: toLangchainHistory(history.slice(0, -1)),
-    });
-    const messages: BaseMessage[] = prompt.toChatMessages();
+    };
+    // Rendered twice from the one template, differing only in the
+    // send_reply slot. The loop's calls get the instruction; the fallback
+    // structured-output call below gets the prompt exactly as it was
+    // before send_reply existed, so that path is byte-for-byte the old
+    // behaviour rather than the old behaviour plus a stale instruction
+    // about a tool it isn't given.
+    const loopPrompt = await buildPrompt().invoke({ ...promptValues, sendReplyInstruction: SEND_REPLY_INSTRUCTION });
+    const plainPrompt = await buildPrompt().invoke({ ...promptValues, sendReplyInstruction: "" });
+    const loopSystemMessage = loopPrompt.toChatMessages()[0];
+    const plainSystemMessage = plainPrompt.toChatMessages()[0];
+    // Canonical transcript, carrying the *plain* system message: the loop
+    // swaps in its own at call time, so nothing has to be unwound before
+    // the fallback call.
+    const messages: BaseMessage[] = plainPrompt.toChatMessages();
 
     const tools = [
       checkProductDetailsTool,
@@ -447,17 +633,86 @@ export async function askSalesEmployee(
       ...(aiCapabilities.recommendProductsEnabled ? [recommendProductsTool] : []),
       ...(aiCapabilities.appointmentsEnabled ? [checkAvailableSlotsTool, bookAppointmentTool] : []),
     ];
-    const toolModel = getChatModel().bindTools(tools);
+    // `tool_choice: "any"` = Gemini's ANY function-calling mode: the model
+    // must call one of these functions and cannot answer with plain text.
+    // That is not a restriction here, because send_reply is one of them --
+    // "just answer now" is still fully available, it simply has to be
+    // expressed as a call. Without this, measurement showed the model
+    // reverting to prose on exactly the turns that had just received a
+    // tool result (3 of 6 sampled), which fell through to the fallback
+    // structured call and paid for the discarded generation after all.
+    // Nothing is forced *to* send_reply: chaining recommend_products ->
+    // check_available_slots -> book_appointment still works, since every
+    // business tool remains allowed.
+    const toolModel = getChatModel().bindTools([...tools, sendReplyTool], { tool_choice: "any" });
+    // Set the moment the model calls send_reply with valid arguments --
+    // which is also the moment the turn is over, with no second
+    // generation. Still null after the loop means the fallback path.
+    let structured: z.infer<typeof SalesEmployeeResponseSchema> | null = null;
+
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      const aiMessage = await toolModel.invoke(messages);
+      const aiMessage = await timer.time(`model_call_${iteration + 1}`, () =>
+        toolModel.invoke([loopSystemMessage, ...messages.slice(1)]),
+      );
       totalInputTokens += aiMessage.usage_metadata?.input_tokens ?? 0;
       totalOutputTokens += aiMessage.usage_metadata?.output_tokens ?? 0;
+      totalThinkingTokens += thinkingTokensOf(aiMessage.usage_metadata);
+
       if (!aiMessage.tool_calls || aiMessage.tool_calls.length === 0) {
+        // The model wrote prose instead of calling send_reply. Break
+        // without pushing the message, exactly as this loop always has,
+        // so the fallback call below sees the identical transcript it
+        // would have seen before any of this existed.
         break;
       }
 
+      const sendReplyCalls = aiMessage.tool_calls.filter((toolCall) => toolCall.name === SEND_REPLY_TOOL_NAME);
+      const businessToolCalls = aiMessage.tool_calls.filter((toolCall) => toolCall.name !== SEND_REPLY_TOOL_NAME);
+
       messages.push(aiMessage);
-      toolCallCount += aiMessage.tool_calls.length;
+
+      // The reply, and nothing else: the turn ends here.
+      if (sendReplyCalls.length > 0 && businessToolCalls.length === 0) {
+        // Model output is untrusted input (AGENTS.md §3 rule 5): the
+        // arguments are validated against the same schema the structured
+        // path validated, and a failure falls through rather than being
+        // coerced.
+        const parsed = SalesEmployeeResponseSchema.safeParse(sendReplyCalls[0].args);
+        if (parsed.success) {
+          structured = parsed.data;
+          break;
+        }
+        logEvent("ai_send_reply_invalid_args", businessId, { conversationId }, "error");
+        messages.push(
+          new ToolMessage({
+            content: `<tool_result>${JSON.stringify({ sent: false, reason: "invalid_input" })}</tool_result>`,
+            tool_call_id: sendReplyCalls[0].id!,
+            name: SEND_REPLY_TOOL_NAME,
+          }),
+        );
+        continue;
+      }
+
+      toolCallCount += businessToolCalls.length;
+
+      // A send_reply issued in the same step as a real tool is refused,
+      // not executed: its answer would have been written before the tool
+      // result it is supposed to be based on existed. Gemini still
+      // requires a response for every function call it made, so it gets
+      // one that tells it what to do instead.
+      for (const rejected of sendReplyCalls) {
+        messages.push(
+          new ToolMessage({
+            content: `<tool_result>${JSON.stringify({
+              sent: false,
+              reason: "called_alongside_another_tool",
+              instruction: `Read the other tool result first, then call ${SEND_REPLY_TOOL_NAME} on its own.`,
+            })}</tool_result>`,
+            tool_call_id: rejected.id!,
+            name: SEND_REPLY_TOOL_NAME,
+          }),
+        );
+      }
 
       // A single turn's tool calls never depend on each other's results --
       // the model generates every call's args before seeing any result, by
@@ -466,8 +721,11 @@ export async function askSalesEmployee(
       // order below (not completion order), preserving the exact same
       // "last one wins" semantics `recommendedProducts` had under the old
       // sequential loop.
-      const toolOutcomes = await Promise.all(
-        aiMessage.tool_calls.map(async (toolCall) => {
+      const toolOutcomes = await timer.time(
+        `tool_batch_${iteration + 1}`,
+        () =>
+          Promise.all(
+            businessToolCalls.map(async (toolCall) => {
           let toolResult: unknown;
           let sideEffecting = false;
           let chunkIds: string[] = [];
@@ -508,8 +766,13 @@ export async function askSalesEmployee(
             toolResult = { found: false, reason: "invalid_input" };
           }
 
-          return { toolCall, toolResult, sideEffecting, chunkIds, recommended };
-        }),
+              return { toolCall, toolResult, sideEffecting, chunkIds, recommended };
+            }),
+          ),
+        // Recorded with the batch so a persisted turn says *which* tools
+        // ran, not just how many -- the question `tool_call_count` alone
+        // could never answer.
+        businessToolCalls.map((toolCall) => toolCall.name),
       );
 
       for (const outcome of toolOutcomes) {
@@ -526,42 +789,68 @@ export async function askSalesEmployee(
       }
     }
 
-    const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, {
-      name: "SalesEmployeeResponse",
-      includeRaw: true,
-    });
-    const { raw, parsed: result } = await model.invoke(messages);
-    // includeRaw types `raw` as the generic BaseMessage, but a chat
-    // model's raw output is always an AIMessage with usage_metadata at
-    // runtime -- confirmed against @langchain/core's own AIMessage type.
-    const rawUsage = (raw as AIMessage).usage_metadata;
-    totalInputTokens += rawUsage?.input_tokens ?? 0;
-    totalOutputTokens += rawUsage?.output_tokens ?? 0;
+    // The fallback, and only the fallback: reached when the model wrote
+    // prose instead of calling send_reply, or used up every iteration
+    // without getting to it. Identical to what every turn used to do --
+    // same toolless structured-output call, same transcript, same plain
+    // system prompt -- so the worst case here is the old latency, never
+    // worse than it.
+    const usedSendReplyTool = structured !== null;
+    if (structured === null) {
+      const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, {
+        name: "SalesEmployeeResponse",
+        includeRaw: true,
+      });
+      const { raw, parsed } = await timer.time("final_structured_call", () =>
+        model.invoke([plainSystemMessage, ...messages.slice(1)]),
+      );
+      // includeRaw types `raw` as the generic BaseMessage, but a chat
+      // model's raw output is always an AIMessage with usage_metadata at
+      // runtime -- confirmed against @langchain/core's own AIMessage type.
+      const rawUsage = (raw as AIMessage).usage_metadata;
+      totalInputTokens += rawUsage?.input_tokens ?? 0;
+      totalOutputTokens += rawUsage?.output_tokens ?? 0;
+      totalThinkingTokens += thinkingTokensOf(rawUsage);
+      structured = parsed;
+    }
+    const result = structured;
 
     const latencyMs = Date.now() - startedAt;
+    const metricsRowId = await timer.time("metrics_write", () =>
+      insertTurnMetrics(supabase, {
+        businessId,
+        conversationId,
+        latencyMs,
+        totalLatencyMs: timer.elapsedMs(),
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        thinkingTokens: totalThinkingTokens,
+        toolCallCount,
+        stageTimings: timer.toStageTimings(),
+      }),
+    );
+
+    // Logged after the write, so the breakdown it carries includes the
+    // write itself. `stageTimings` is a JSON string because LogMetadata is
+    // flat by design -- it holds stage names and durations only, never
+    // prospect content, which is the rule that type exists to enforce.
     logEvent("ai_response_generated", businessId, {
       conversationId,
       latencyMs,
+      totalLatencyMs: timer.elapsedMs(),
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
+      // Unchanged in meaning (input + output), so a log search across the
+      // retention window still compares like with like. Thinking tokens
+      // are reported alongside it rather than folded into it, for the same
+      // reason total_latency_ms is a new column and not a redefined one.
       totalTokens: totalInputTokens + totalOutputTokens,
+      thinkingTokens: totalThinkingTokens,
       toolCallCount,
+      // false means this turn still paid for the second generation.
+      usedSendReplyTool,
+      stageTimings: JSON.stringify(timer.toStageTimings()),
     });
-
-    // Best-effort: a metrics-write failure must never break a real
-    // chat response. Errors are still visible via lib/errors.ts's own
-    // Sentry wiring, just not re-thrown here.
-    const { error: metricsError } = await supabase.from("ai_response_metrics").insert({
-      business_id: businessId,
-      conversation_id: conversationId,
-      latency_ms: latencyMs,
-      input_tokens: totalInputTokens,
-      output_tokens: totalOutputTokens,
-      tool_call_count: toolCallCount,
-    });
-    if (metricsError) {
-      logEvent("ai_response_metrics_write_failed", businessId, { conversationId }, "error");
-    }
 
     const response: SalesEmployeeResponse = {
       answer: result.answer,
@@ -571,6 +860,7 @@ export async function askSalesEmployee(
       escalate: result.escalate,
       escalationReason: result.escalationReason,
       recommendedProducts,
+      metricsRowId,
     };
 
     if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {

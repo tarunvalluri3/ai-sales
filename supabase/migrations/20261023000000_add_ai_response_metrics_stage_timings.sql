@@ -1,0 +1,71 @@
+-- AI reply latency instrumentation (2026-10-21). Adds the three values a
+-- latency measurement pass needed and could not get from this table.
+--
+-- Why these have to be columns rather than log lines. This project is on
+-- Vercel's Hobby plan, which retains roughly 30 minutes of function logs
+-- (docs/deployment.md §5a, "Log retention"). A per-stage breakdown written
+-- only to a log is therefore unreadable by the time anyone asks why the AI
+-- felt slow yesterday -- which is exactly what happened: the 2026-10-21
+-- pass had to re-derive everything from first principles because the one
+-- persisted number, latency_ms, could not answer it.
+--
+-- What each column is for:
+--
+-- total_latency_ms -- the prospect's real wait, clocked from the chat
+--   route handler's first line to the end of the turn. latency_ms is NOT
+--   redefined: its clock has always started after the quota check, the
+--   cache read, the embedding call and the vector search had already run,
+--   so it understates the wait -- but lib/analytics.ts averages it on
+--   /dashboard/analytics across months of existing rows, and
+--   lib/usage-limit.ts reads this table, so changing its meaning would
+--   silently rewrite the dashboard's own history. The honest fix is a new
+--   value next to the old one, not a new meaning for the old one.
+--
+-- thinking_tokens -- Gemini's thinking tokens, which output_tokens has
+--   never included: @langchain/google-genai maps output_tokens to
+--   candidatesTokenCount, which excludes them, so thinking time was spent,
+--   billed and invisible. Derived in lib/rag.ts as total - input - output.
+--   Measured as 0 for gemini-3.1-flash-lite on this prompt, which is the
+--   point: a future model or version that quietly turns thinking on shows
+--   up here as a number instead of as unexplained latency.
+--
+-- stage_timings -- an ordered JSONB array of {stage, ms} (plus "tools" on
+--   a tool batch, naming which tools ran), covering the whole turn: rate
+--   limits, widget auth, the conversation and message writes, the quota
+--   check, the cache read, the embedding call, the vector search, each
+--   Gemini call, each tool batch, the fallback structured call when there
+--   is one, and the metrics write itself. JSONB and not a column per
+--   stage, because the number of model calls and tool batches varies per
+--   turn (1 to 4 of each) and a fixed set of columns would either
+--   mis-shape that or need a migration every time the pipeline changes.
+--   Shape is written by lib/turn-timings.ts; nothing queries inside it
+--   yet, so no GIN index -- the existing created_at/business_id indexes
+--   serve the "last N turns" reads that do exist, and an unused index on
+--   a write-heavy metrics table is pure cost.
+--
+-- All three are nullable with no default and no backfill: every row that
+-- predates this migration genuinely has no such measurement, and inventing
+-- one (a zero, or latency_ms copied into total_latency_ms) would put a
+-- number that was never measured into the table that measurements are read
+-- from. NULL is the truthful value for "this turn ran before the
+-- instrumentation existed".
+--
+-- No grant changes. ai_response_metrics' existing table-level `grant select
+-- ... to authenticated` already covers new columns, and every write to this
+-- table is made by the service-role client from the chat path, which
+-- bypasses grants and RLS entirely (20260820134000's header). So this
+-- widens nothing: a tenant still reads only its own rows through
+-- ai_response_metrics_select_own_business, and still cannot write any.
+--
+-- Rollback (purely additive, so a new forward migration reverses it --
+-- docs/deployment.md §3a):
+--   alter table public.ai_response_metrics drop column stage_timings;
+--   alter table public.ai_response_metrics drop column thinking_tokens;
+--   alter table public.ai_response_metrics drop column total_latency_ms;
+-- Safe in either order relative to a code rollback: the previous
+-- application code never read or wrote these columns, and the new code
+-- treats a write failure as best-effort and never breaks a chat reply.
+alter table public.ai_response_metrics
+  add column total_latency_ms integer,
+  add column thinking_tokens integer,
+  add column stage_timings jsonb;
