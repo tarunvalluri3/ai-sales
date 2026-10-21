@@ -6,6 +6,14 @@ Last updated: 2026-10-21 (**Phase 17b: Razorpay subscription lifecycle -- money 
 
 ---
 
+## Billing page missing in production -- diagnosed and redeployed 2026-10-21
+
+**Status of the 17b entry below: it is now MIGRATED (production has `20261025000000`, verified with `supabase migration list`) and MERGED (PR #86, `d4686fb`).** The "NOT yet migrated or merged" wording in its heading is stale.
+
+**Cause.** PR #85 (Phase 17b) was opened against `feat/plan-entitlements`, not `main`. When PR #84 merged and deleted that branch, GitHub closed #85 unmerged, so the 17b code never reached `main` and the production deploy for `ece0a4c` (13:02Z) had no `/dashboard/billing`. #86 re-landed 17b on `main` at 13:10Z, but no push-triggered CI run and no Git-triggered Vercel production deploy happened for `d4686fb`, so production stayed on `ece0a4c` until a manual production deploy (`dpl_ATob39UgwhWT46i85bN1oAVsUZus`, 14:44Z) built current `main`. Side effect: CI on the `ece0a4c` push failed at "Sync staging database schema" because staging already held `20261025000000` (applied by the 17b PR runs) while `main` did not yet contain the file; #86 fixes that.
+
+**Verified.** lint, typecheck, `test:plan-tax` 10/10, `test:razorpay` 45/45, `npm run build` all pass locally on `d4686fb`; the new production deploy lists `/dashboard/billing` and `/api/webhooks/razorpay`, and the production URL redirects `/dashboard/billing` to sign-in as expected. Lesson: open stacked PRs against `main`, or retarget before merging the base.
+
 ## Phase 17b -- Razorpay subscription lifecycle: money moves, TEST MODE ONLY -- implemented 2026-10-21, NOT yet migrated or merged
 
 Branch `feat/razorpay-subscriptions`, **branched off `feat/plan-entitlements`, not `main`**, because 17a is still unmerged and this builds directly on its migration and its `lib/plans.ts` / `lib/subscription.ts`. The PR therefore targets `feat/plan-entitlements` so its diff is 17b alone; merging to `main` means merging 17a first (or merging the stack).
