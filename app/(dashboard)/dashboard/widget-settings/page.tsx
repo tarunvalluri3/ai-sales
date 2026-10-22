@@ -9,6 +9,8 @@ import { WidgetBrandingForm } from "./widget-branding-form";
 import { SuggestedQuestionsForm } from "./suggested-questions-form";
 import { AiCapabilitiesForm } from "./ai-capabilities-form";
 import { PublishButton } from "./publish-button";
+import { ReadinessChecklist } from "./readiness-checklist";
+import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
 import { WidgetInstallGuide } from "./widget-install-guide";
 import { SandboxChatPanel } from "../_components/sandbox-chat/sandbox-chat-panel";
 import { PermissionNotice } from "../_components/state-views";
@@ -27,6 +29,7 @@ export default async function WidgetSettingsPage() {
   // without a client-only effect or a hydration mismatch.
   const appOrigin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
   const hasActiveKey = widgetKeys.some((key) => key.status !== "revoked");
+  const readiness = business ? await loadReadinessReport(businessId, business) : null;
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -66,10 +69,13 @@ export default async function WidgetSettingsPage() {
 
       <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
         <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">2. Go live</h2>
+        {readiness ? <ReadinessChecklist report={readiness} canEdit={canEdit} /> : null}
         <PublishButton
           isPublished={business?.published_at != null}
           hasActiveKey={hasActiveKey}
           hasPrivacyPolicyUrl={Boolean(business?.privacy_policy_url)}
+          readinessBlocked={readiness ? readiness.gateApplies && !readiness.canPublish : false}
+          blockingCount={readiness ? readiness.blockingItems.length : 0}
           canEdit={canEdit}
         />
         <SandboxChatPanel />

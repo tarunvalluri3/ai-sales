@@ -87,6 +87,16 @@ jobs:
         # trigger -- is pgTAP files 050 and 051, run against staging below.)
         run: npm run test:invoices
 
+      - name: Onboarding readiness rule tests
+        # feat/onboarding-readiness: the rules that decide whether a business
+        # may publish its AI for the first time (lib/onboarding-readiness.ts).
+        # A regression here could either let an empty business go live in front
+        # of real prospects, or wrongly block a legitimately-ready one. Pure
+        # functions, no database or secrets, so it runs with the other unit
+        # tests ahead of the build. (The new table's tenant isolation is pgTAP
+        # file 052, run against staging below.)
+        run: npm run test:onboarding-readiness
+
       - name: Build
         run: npm run build
 

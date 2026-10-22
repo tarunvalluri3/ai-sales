@@ -4,6 +4,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Business } from "@/lib/supabase/types";
 import type { BusinessProfileInput, WidgetBrandingInput } from "@/lib/schemas/business";
 import { AppError } from "@/lib/errors";
+import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
+import { describeBlockingItems, type ReadinessItem } from "@/lib/onboarding-readiness";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -243,16 +245,57 @@ export async function updateAiCapabilities(
 }
 
 /**
+ * Signals that a business tried to publish for the first time without
+ * enough real, retrievable knowledge for its AI to face prospects
+ * (feat/onboarding-readiness). Carries the blocking items so the caller can
+ * tell the owner exactly what is still missing. Not thrown for a republish.
+ */
+export class BusinessNotReadyError extends Error {
+  readonly blockingItems: ReadinessItem[];
+  constructor(message: string, blockingItems: ReadinessItem[]) {
+    super(message);
+    this.name = "BusinessNotReadyError";
+    this.blockingItems = blockingItems;
+  }
+}
+
+/**
  * Marks a business published (Phase 25c "test your AI before publishing"):
  * sets `published_at` to now, the flag `lib/widget-auth.ts`'s
  * `resolveBusinessFromWidgetKey()` requires before the public /api/chat
  * path will serve real chat for this business. `orgId` must come from a
  * validated session; authorization (org:admin-only) is enforced by the
- * caller, same convention as `updateBusinessProfile`. Unconditional --
- * re-publishing an already-published business simply bumps the
- * timestamp, which is harmless (there is no "unpublish" in this phase).
+ * caller, same convention as `updateBusinessProfile`.
+ *
+ * feat/onboarding-readiness: a business's FIRST publish is gated on the
+ * readiness rules in lib/onboarding-readiness.ts, evaluated server-side
+ * here so a direct action call cannot skip the UI checklist. A republish of
+ * an already-published business is NEVER gated -- re-publishing simply
+ * bumps the timestamp, and a working live agent must never be disabled by
+ * this rule (there is no "unpublish" in this phase). An unready first
+ * publish throws `BusinessNotReadyError` and writes nothing.
  */
 export async function publishBusinessForOrg(orgId: string): Promise<Business> {
+  const business = await getBusinessForOrg(orgId);
+  if (!business) {
+    throw new AppError(
+      "Something went wrong publishing your AI. Please try again.",
+      "publishBusinessForOrg: no business for org",
+    );
+  }
+
+  // The gate applies only to the first publish. An already-live business
+  // republishes freely, so enforcing a new rule never switches it off.
+  if (business.published_at == null) {
+    const report = await loadReadinessReport(business.id, business);
+    if (!report.canPublish) {
+      throw new BusinessNotReadyError(
+        describeBlockingItems(report.blockingItems),
+        report.blockingItems,
+      );
+    }
+  }
+
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
