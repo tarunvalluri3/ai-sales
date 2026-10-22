@@ -25,6 +25,13 @@ import type { WidgetLanguage } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 import { TurnTimer } from "@/lib/turn-timings";
 import { insertTurnMetrics } from "@/lib/ai-response-metrics";
+import { isRedundantSearch } from "@/lib/chat-query-dedupe";
+import { SearchKnowledgeBaseInputSchema } from "@/lib/tools/search-knowledge-base";
+import {
+  CHAT_AI_DEADLINE_MS,
+  CHAT_MODEL_CALL_TIMEOUT_MS,
+  CHAT_TOOL_TIMEOUT_MS,
+} from "@/lib/chat-timeouts";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -114,6 +121,69 @@ export const FALLBACK_MESSAGE =
  */
 export const USAGE_QUOTA_EXCEEDED_MESSAGE =
   "We're experiencing high demand right now, so I'm not able to respond in real time. A member of our team will follow up with you directly — thanks for your patience.";
+
+/**
+ * Shown when the turn hits the AI deadline (lib/chat-timeouts.ts) before a
+ * reply was produced. Honest degradation, never a fabricated answer: the
+ * turn is escalated so a human follows up, and no success metrics row is
+ * written for it (see askSalesEmployee). Distinct wording from
+ * USAGE_QUOTA_EXCEEDED_MESSAGE so the two different situations ("over quota"
+ * vs "this one turn ran long") are not conflated for the prospect.
+ */
+export const RESPONSE_TIMEOUT_MESSAGE =
+  "Sorry — this is taking me longer than expected to answer. I've flagged it for a member of our team, who'll follow up with you shortly.";
+
+/**
+ * The least time (ms) left in the AI budget that is still worth starting a
+ * model call with -- a real model call runs ~1.3-3.7s in production, so
+ * starting one with less than this left would almost certainly be aborted
+ * mid-flight for nothing. Below it, the loop stops and returns an honest
+ * timeout instead of beginning a call it cannot finish.
+ */
+const MIN_MODEL_CALL_BUDGET_MS = 4_000;
+
+/**
+ * Ceiling on a single serialized tool result fed back to the model. Every
+ * tool in lib/tools/* already bounds its row count (list_offerings caps 30
+ * per table, recommend_products 6, search_knowledge_base 8, the check_*
+ * tools return one row), so this never trips for a normal catalog -- it is
+ * a defensive cap on a pathologically large result (e.g. one row with a
+ * huge description) so it cannot blow up the input tokens of every
+ * subsequent model call this turn. ~8k chars is roughly 2k tokens.
+ */
+const MAX_TOOL_RESULT_CHARS = 8_000;
+
+function capToolResultJson(json: string): string {
+  return json.length <= MAX_TOOL_RESULT_CHARS ? json : `${json.slice(0, MAX_TOOL_RESULT_CHARS)}…[truncated]`;
+}
+
+/** True for an AbortSignal.timeout() firing (DOMException "TimeoutError") or any abort LangChain surfaces. */
+function isAbortError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const name = (error as { name?: unknown }).name;
+  return name === "TimeoutError" || name === "AbortError";
+}
+
+/** Milliseconds of AI budget still available, from the start of the turn. */
+function remainingBudgetMs(timer: TurnTimer): number {
+  return CHAT_AI_DEADLINE_MS - timer.elapsedMs();
+}
+
+/**
+ * Races a read-only tool execution against CHAT_TOOL_TIMEOUT_MS. On timeout
+ * the model is told the lookup failed (a result shape every read-only tool
+ * already returns) and the turn moves on; the abandoned query simply
+ * finishes in the background, which is harmless for a read. Only ever used
+ * for read-only tools -- see CHAT_TOOL_TIMEOUT_MS's doc comment for why the
+ * two side-effecting tools are never raced.
+ */
+function withReadToolTimeout<T, F>(work: Promise<T>, onTimeout: F): Promise<T | F> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<F>((resolve) => {
+    timer = setTimeout(() => resolve(onTimeout), CHAT_TOOL_TIMEOUT_MS);
+  });
+  return Promise.race<T | F>([work, timeout]).finally(() => clearTimeout(timer));
+}
 
 export type ConversationMessage = {
   role: "user" | "assistant";
@@ -456,7 +526,32 @@ export async function askSalesEmployee(
   // total covers the prospect's real wait rather than starting partway
   // through it.
   timer: TurnTimer = new TurnTimer(),
+  // Optional, 2026-10-22: the widget route runs checkReplyQuota()
+  // concurrently with its own message/history writes (item 4 of the
+  // latency pass) and hands the verdict in here, so the quota round trip
+  // overlaps those writes instead of running sequentially at the top of
+  // this function. When absent (the WhatsApp/Instagram webhooks and the
+  // dashboard sandbox, which have no such writes to overlap), the check
+  // runs here exactly as before. Either way the gate is the same: a
+  // business over quota never reaches any Gemini call below.
+  prefetchedQuota?: ReplyQuotaStatus,
 ): Promise<SalesEmployeeResponse> {
+  // Honest end-state when the AI deadline (lib/chat-timeouts.ts) is hit
+  // before a reply exists: escalate so a human follows up, write no
+  // success metrics row (metricsRowId stays null, like the over-quota and
+  // embedding-degrade paths), never a fabricated answer. `quota` is in
+  // scope wherever this is called from below.
+  const buildTimeoutResponse = (quota: ReplyQuotaStatus): SalesEmployeeResponse => ({
+    answer: RESPONSE_TIMEOUT_MESSAGE,
+    grounded: false,
+    usedContext: false,
+    sourceChunkIds: [],
+    escalate: true,
+    escalationReason: "response_timeout",
+    recommendedProducts: [],
+    metricsRowId: null,
+    quotaSnapshot: quota,
+  });
   // Phase 22h, rewritten in Phase 17a: checked before any Gemini call
   // this turn would make, including the embedding call retrieval itself
   // makes -- a business over quota must not spend another token, not just
@@ -472,7 +567,7 @@ export async function askSalesEmployee(
   // both, because the visitor's situation is identical: a person will
   // follow up, the conversation is flagged, nothing is invented and the
   // widget still works.
-  const quota = await timer.time("quota_check", () => checkReplyQuota(supabase, businessId));
+  const quota = prefetchedQuota ?? (await timer.time("quota_check", () => checkReplyQuota(supabase, businessId)));
   if (!quota.allowed) {
     logEvent(
       "ai_usage_quota_exceeded",
@@ -623,6 +718,16 @@ export async function askSalesEmployee(
   // straight from the tool's own result, never from the model's separate,
   // toolless final-answer call (see SalesEmployeeResponse's doc comment).
   let recommendedProducts: RecommendedItem[] = [];
+  // Item 3 (STATE.md "chat pipeline latency"): the queries this turn has
+  // already searched the knowledge base with, used to refuse a near-
+  // identical repeat search_knowledge_base call (lib/chat-query-dedupe.ts).
+  // Seeded with the prospect's own message, because the passive retrieval
+  // above already ran exactly that search and handed the model its results
+  // inside <retrieved_context>. A materially different reformulation is
+  // never blocked -- see isRedundantSearch's doc comment.
+  const searchedQueries: string[] = [question];
+  // Set true if the AI deadline is reached before a reply is produced.
+  let timedOut = false;
 
   try {
     const promptValues = {
@@ -684,9 +789,29 @@ export async function askSalesEmployee(
     let structured: z.infer<typeof SalesEmployeeResponseSchema> | null = null;
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-      const aiMessage = await timer.time(`model_call_${iteration + 1}`, () =>
-        toolModel.invoke([loopSystemMessage, ...messages.slice(1)]),
-      );
+      // Item 5 (STATE.md "chat pipeline latency"): stop before starting a
+      // model call there isn't time to finish, and hard-abort one that runs
+      // past its own per-call ceiling. Both end the turn honestly below
+      // rather than letting the platform kill the function mid-generation.
+      const budgetMs = remainingBudgetMs(timer);
+      if (budgetMs < MIN_MODEL_CALL_BUDGET_MS) {
+        timedOut = true;
+        break;
+      }
+      let aiMessage: Awaited<ReturnType<typeof toolModel.invoke>>;
+      try {
+        aiMessage = await timer.time(`model_call_${iteration + 1}`, () =>
+          toolModel.invoke([loopSystemMessage, ...messages.slice(1)], {
+            signal: AbortSignal.timeout(Math.min(CHAT_MODEL_CALL_TIMEOUT_MS, budgetMs)),
+          }),
+        );
+      } catch (error) {
+        if (isAbortError(error)) {
+          timedOut = true;
+          break;
+        }
+        throw error;
+      }
       totalInputTokens += aiMessage.usage_metadata?.input_tokens ?? 0;
       totalOutputTokens += aiMessage.usage_metadata?.output_tokens ?? 0;
       totalThinkingTokens += thinkingTokensOf(aiMessage.usage_metadata);
@@ -763,24 +888,63 @@ export async function askSalesEmployee(
           let sideEffecting = false;
           let chunkIds: string[] = [];
           let recommended: RecommendedItem[] | null = null;
+          // The query a search_knowledge_base call actually ran (so the
+          // turn can refuse a later near-identical repeat). Undefined for
+          // every other tool and for a search that was itself refused.
+          let executedSearchQuery: string | undefined;
+          // Read-only tools are raced against CHAT_TOOL_TIMEOUT_MS; the two
+          // side-effecting tools are never raced (see withReadToolTimeout /
+          // CHAT_TOOL_TIMEOUT_MS). A read-only lookup's timeout verdict is
+          // the same "lookup_failed" shape each already returns on error.
+          const readToolTimedOut = { found: false as const, reason: "lookup_failed" as const };
 
           if (toolCall.name === "check_product_details") {
-            toolResult = await executeCheckProductDetails(supabase, businessId, toolCall.args);
+            toolResult = await withReadToolTimeout(
+              executeCheckProductDetails(supabase, businessId, toolCall.args),
+              readToolTimedOut,
+            );
           } else if (toolCall.name === "check_faq_topic") {
-            toolResult = await executeCheckFaqTopic(supabase, businessId, toolCall.args);
+            toolResult = await withReadToolTimeout(
+              executeCheckFaqTopic(supabase, businessId, toolCall.args),
+              readToolTimedOut,
+            );
           } else if (toolCall.name === "request_callback") {
             sideEffecting = true;
             toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
           } else if (toolCall.name === "list_products_and_services") {
-            toolResult = await executeListOfferings(supabase, businessId);
+            toolResult = await withReadToolTimeout(executeListOfferings(supabase, businessId), readToolTimedOut);
           } else if (toolCall.name === "search_knowledge_base") {
-            const searchResult = await executeSearchKnowledgeBase(supabase, businessId, toolCall.args);
-            if (searchResult.found) {
-              chunkIds = searchResult.passages.map((passage) => passage.chunkId);
+            // Item 3: refuse a near-identical repeat of a query already run
+            // this turn (including the prospect's own message, which the
+            // passive retrieval above already searched). The model is told
+            // to use the passages it already has rather than paying for a
+            // second embedding + vector search. A materially different
+            // reformulation is never blocked (lib/chat-query-dedupe.ts).
+            const parsedSearch = SearchKnowledgeBaseInputSchema.safeParse(toolCall.args);
+            if (parsedSearch.success && isRedundantSearch(parsedSearch.data.query, searchedQueries)) {
+              logEvent("search_knowledge_base_deduped", businessId, { conversationId });
+              toolResult = {
+                searched: false,
+                reason: "already_searched",
+                instruction:
+                  "This query matches one already run this turn -- its results are in the reference context above. Answer from those passages instead of searching again; only search with a materially different query (a different topic, a broader category, or different terminology).",
+              };
+            } else {
+              const searchResult = await withReadToolTimeout(
+                executeSearchKnowledgeBase(supabase, businessId, toolCall.args),
+                readToolTimedOut,
+              );
+              if (parsedSearch.success) executedSearchQuery = parsedSearch.data.query;
+              if (searchResult.found) {
+                chunkIds = searchResult.passages.map((passage) => passage.chunkId);
+              }
+              toolResult = searchResult;
             }
-            toolResult = searchResult;
           } else if (toolCall.name === "recommend_products") {
-            const recommendResult = await executeRecommendProducts(supabase, businessId, toolCall.args);
+            const recommendResult = await withReadToolTimeout(
+              executeRecommendProducts(supabase, businessId, toolCall.args),
+              readToolTimedOut,
+            );
             if (recommendResult.found) {
               // Only items with a real photo become visual cards -- the
               // model still sees every matched item (image or not) in
@@ -790,7 +954,10 @@ export async function askSalesEmployee(
             }
             toolResult = recommendResult;
           } else if (toolCall.name === "check_available_slots") {
-            toolResult = await executeCheckAvailableSlots(supabase, businessId, toolCall.args);
+            toolResult = await withReadToolTimeout(
+              executeCheckAvailableSlots(supabase, businessId, toolCall.args),
+              readToolTimedOut,
+            );
           } else if (toolCall.name === "book_appointment") {
             sideEffecting = true;
             toolResult = await executeBookAppointment(supabase, businessId, conversationId, toolCall.args);
@@ -799,7 +966,7 @@ export async function askSalesEmployee(
             toolResult = { found: false, reason: "invalid_input" };
           }
 
-              return { toolCall, toolResult, sideEffecting, chunkIds, recommended };
+              return { toolCall, toolResult, sideEffecting, chunkIds, recommended, executedSearchQuery };
             }),
           ),
         // Recorded with the batch so a persisted turn says *which* tools
@@ -812,14 +979,29 @@ export async function askSalesEmployee(
         if (outcome.sideEffecting) calledSideEffectingTool = true;
         for (const chunkId of outcome.chunkIds) additionalSourceChunkIds.add(chunkId);
         if (outcome.recommended !== null) recommendedProducts = outcome.recommended;
+        if (outcome.executedSearchQuery !== undefined) searchedQueries.push(outcome.executedSearchQuery);
         messages.push(
           new ToolMessage({
-            content: `<tool_result>${JSON.stringify(outcome.toolResult)}</tool_result>`,
+            content: `<tool_result>${capToolResultJson(JSON.stringify(outcome.toolResult))}</tool_result>`,
             tool_call_id: outcome.toolCall.id!,
             name: outcome.toolCall.name,
           }),
         );
       }
+    }
+
+    // Deadline reached inside the loop before any send_reply arrived:
+    // return an honest timeout now, before the fallback generation (which
+    // would blow the budget we just ran out of). No metrics row is written
+    // for it -- a timed-out turn is never recorded as a success.
+    if (timedOut && structured === null) {
+      logEvent(
+        "ai_response_timeout",
+        businessId,
+        { conversationId, totalLatencyMs: timer.elapsedMs(), toolCallCount },
+        "error",
+      );
+      return buildTimeoutResponse(quota);
     }
 
     // The fallback, and only the fallback: reached when the model wrote
@@ -830,13 +1012,44 @@ export async function askSalesEmployee(
     // worse than it.
     const usedSendReplyTool = structured !== null;
     if (structured === null) {
+      // The fallback is a second full generation; only start it if there is
+      // budget left, and bound it the same way as a loop call. Out of
+      // budget (or aborted mid-call) ends the turn honestly rather than
+      // fabricating one.
+      const budgetMs = remainingBudgetMs(timer);
+      if (budgetMs < MIN_MODEL_CALL_BUDGET_MS) {
+        logEvent(
+          "ai_response_timeout",
+          businessId,
+          { conversationId, totalLatencyMs: timer.elapsedMs(), toolCallCount, stage: "fallback" },
+          "error",
+        );
+        return buildTimeoutResponse(quota);
+      }
       const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, {
         name: "SalesEmployeeResponse",
         includeRaw: true,
       });
-      const { raw, parsed } = await timer.time("final_structured_call", () =>
-        model.invoke([plainSystemMessage, ...messages.slice(1)]),
-      );
+      let raw: BaseMessage;
+      let parsed: z.infer<typeof SalesEmployeeResponseSchema>;
+      try {
+        ({ raw, parsed } = await timer.time("final_structured_call", () =>
+          model.invoke([plainSystemMessage, ...messages.slice(1)], {
+            signal: AbortSignal.timeout(Math.min(CHAT_MODEL_CALL_TIMEOUT_MS, budgetMs)),
+          }),
+        ));
+      } catch (error) {
+        if (isAbortError(error)) {
+          logEvent(
+            "ai_response_timeout",
+            businessId,
+            { conversationId, totalLatencyMs: timer.elapsedMs(), toolCallCount, stage: "fallback" },
+            "error",
+          );
+          return buildTimeoutResponse(quota);
+        }
+        throw error;
+      }
       // includeRaw types `raw` as the generic BaseMessage, but a chat
       // model's raw output is always an AIMessage with usage_metadata at
       // runtime -- confirmed against @langchain/core's own AIMessage type.
