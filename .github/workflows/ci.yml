@@ -97,6 +97,13 @@ jobs:
         # file 052, run against staging below.)
         run: npm run test:onboarding-readiness
 
+      - name: Chat pipeline latency-pass tests
+        # 2026-10-22 latency pass (STATE.md): the search-dedupe guard
+        # (lib/chat-query-dedupe.ts) and the AI deadline ordering invariants
+        # (lib/chat-timeouts.ts). Pure modules, no database and no secrets,
+        # so it runs alongside the other unit suites rather than with pgTAP.
+        run: npm run test:chat-perf
+
       - name: Build
         run: npm run build
 
