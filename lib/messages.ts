@@ -23,6 +23,14 @@ export async function createMessage(
   content: string,
   sourceChunkIds: string[] = [],
   grounded: boolean | null = null,
+  // feat/chat-streaming: set (to an ISO timestamp) only when persisting the
+  // partial text of a streamed assistant reply that was cut off before it
+  // finished -- a disconnect, a visitor abort, or a mid-stream generation
+  // timeout. NULL (the default) is every complete reply and every
+  // non-streaming turn, so this parameter changes nothing for the
+  // WhatsApp/Instagram/sandbox callers, which never pass it. See migration
+  // 20261028000000 and lib/rag.ts streamSalesEmployee.
+  interruptedAt: string | null = null,
 ): Promise<Message> {
   const { data, error } = await supabase
     .from("messages")
@@ -33,6 +41,14 @@ export async function createMessage(
       content,
       source_chunk_ids: sourceChunkIds,
       grounded,
+      // Only name the column when it is actually being set. Omitting it for
+      // a normal (complete) reply means this insert never references
+      // interrupted_at, so it keeps working against a database where the
+      // migration (20261028000000) has not been applied yet -- the same
+      // deploy-ordering lesson the ai_response_metrics columns taught
+      // (STATE.md). The DB default for the column is NULL, identical to
+      // passing null, so this changes nothing semantically.
+      ...(interruptedAt !== null ? { interrupted_at: interruptedAt } : {}),
     })
     .select()
     .single();

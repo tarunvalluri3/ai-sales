@@ -118,11 +118,13 @@ export function WidgetApp({
               privacyPolicyUrl={privacyPolicyUrl}
               messages={chat.messages}
               isAwaitingResponse={chat.isAwaitingResponse}
+              isStreaming={chat.isStreaming}
               isCoolingDown={chat.isCoolingDown}
               panelError={chat.panelError}
               consentGiven={chat.consentGiven}
               onConsentChange={chat.setConsentGiven}
               onSend={chat.sendMessage}
+              onStop={chat.abort}
               onRetry={chat.retryMessage}
               onClose={handleClose}
               onStartNewChat={chat.startNewChat}

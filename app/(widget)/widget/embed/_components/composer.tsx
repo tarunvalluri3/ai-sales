@@ -9,6 +9,8 @@ const COUNTER_THRESHOLD = MAX_MESSAGE_LENGTH - 200;
 export function Composer({
   strings,
   onSend,
+  onStop,
+  isStreaming,
   disabled,
   autoFocus,
   consentGiven,
@@ -17,6 +19,10 @@ export function Composer({
 }: {
   strings: WidgetStrings;
   onSend: (text: string) => void;
+  /** feat/chat-streaming: invoked when the visitor presses stop while a reply is streaming. */
+  onStop: () => void;
+  /** True while a reply is streaming -- the send button becomes a stop button. */
+  isStreaming: boolean;
   disabled: boolean;
   autoFocus: boolean;
   consentGiven: boolean;
@@ -96,23 +102,36 @@ export function Composer({
           placeholder={strings.inputPlaceholder}
           className="max-h-[120px] flex-1 resize-none rounded-xl border border-widget-border bg-widget-surface-elevated px-3 py-2 text-[15px] text-widget-foreground outline-none placeholder:text-widget-muted focus-visible:border-widget-border-strong focus-visible:ring-2 focus-visible:ring-widget-primary disabled:opacity-60"
         />
-        <button
-          type="button"
-          aria-label={strings.sendLabel}
-          onClick={handleSend}
-          disabled={disabled || !value.trim()}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M4 12L20 4L14 20L11 13L4 12Z"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+        {isStreaming ? (
+          <button
+            type="button"
+            aria-label={strings.stopLabel ?? "Stop"}
+            onClick={onStop}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <rect x="5" y="5" width="14" height="14" rx="2.5" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label={strings.sendLabel}
+            onClick={handleSend}
+            disabled={disabled || !value.trim()}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M4 12L20 4L14 20L11 13L4 12Z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );

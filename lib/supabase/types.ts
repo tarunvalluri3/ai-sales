@@ -200,6 +200,8 @@ export type Message = {
   source_chunk_ids: string[];
   grounded: boolean | null;
   created_at: string;
+  /** Non-null when a streamed assistant reply was cut off before completion (disconnect, visitor abort, mid-stream timeout) -- never a successful complete reply. See migration 20261028000000. */
+  interrupted_at: string | null;
 };
 
 export type UnansweredQuestion = {

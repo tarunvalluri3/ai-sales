@@ -12,8 +12,10 @@ import {
   recordConversationConsent,
 } from "@/lib/conversations";
 import { createMessage, listRecentMessages } from "@/lib/messages";
-import { askSalesEmployee } from "@/lib/rag";
+import { askSalesEmployee, streamSalesEmployee, type SalesEmployeeResponse } from "@/lib/rag";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
+import { CORS_HEADERS } from "@/lib/http/widget-cors";
+import { clientWantsStream, encodeStreamEvent, CHAT_STREAM_CONTENT_TYPE, type ChatStreamEvent } from "@/lib/chat-stream";
 import { logEvent } from "@/lib/logger";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 import { dispatchNotification } from "@/lib/notification-dispatch";
@@ -87,6 +89,11 @@ const bodySchema = z.object({
   // or authorization signal -- see lib/conversations.ts's
   // listRecentConversationsForVisitor() doc comment.
   visitorId: z.string().trim().min(1).max(100).optional(),
+  // feat/chat-streaming: an explicit opt-in to the streamed (SSE) response,
+  // alongside the `Accept: text/event-stream` header the widget-loader also
+  // sends. Absent (every currently-live loader) means the byte-identical
+  // buffered JSON response, so this changes nothing for an old embed.
+  stream: z.boolean().optional(),
 });
 
 /**
@@ -252,6 +259,213 @@ export async function POST(request: NextRequest) {
       listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT),
     );
 
+    // Writes the assistant message row and returns it. Shared by the JSON
+    // and streaming paths so both persist a turn identically. `interrupted`
+    // (streaming only) stamps interrupted_at, so a cut-off streamed reply is
+    // never indistinguishable from a complete one (design §d).
+    const writeAssistantMessage = (response: SalesEmployeeResponse, interrupted: boolean) =>
+      timer.time("assistant_message_write", () =>
+        createMessage(
+          supabase,
+          business.businessId,
+          conversationRowId,
+          "assistant",
+          response.answer,
+          response.sourceChunkIds,
+          response.grounded,
+          interrupted ? new Date().toISOString() : null,
+        ),
+      );
+
+    // The after-the-answer work, shared by both paths: unanswered-question
+    // logging, escalation (flag + notification + workflow), metrics finalize
+    // and usage reminders. Awaited parts mirror the JSON path's prior
+    // behaviour exactly; the after() parts stay off the prospect's wait.
+    // An interrupted streamed turn skips unanswered logging and reminders (it
+    // did not complete), but still escalates when the response says so (a
+    // mid-stream timeout escalates for human follow-up; a visitor who left
+    // does not, because that response carries escalate:false).
+    const finalizeTurnSideEffects = async (response: SalesEmployeeResponse, interrupted: boolean) => {
+      // Phase 25b "top unanswered questions": only a genuine knowledge gap
+      // (ungrounded, and not already escalated). A failure here must never
+      // fail the prospect's real response.
+      if (!interrupted && !response.grounded && !response.escalate) {
+        const { error: unansweredError } = await timer.time("unanswered_question_write", async () =>
+          await supabase
+            .from("unanswered_questions")
+            .insert({ business_id: business.businessId, conversation_id: conversationRowId, question: message }),
+        );
+        if (unansweredError) {
+          logEvent("unanswered_question_log_failed", business.businessId, { conversationId: conversation.id }, "error");
+        }
+      }
+
+      if (response.escalate) {
+        // Flags the conversation for dashboard attention -- deliberately
+        // does not change `control`. See prompts/phase-15a-handoff-state-and-ai-pause.md's
+        // "Decisions and assumptions" #1.
+        const flagResult = await timer.time("escalation_flag", () =>
+          flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
+        );
+        logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
+
+        // Gated on the transition into needing attention, not on every
+        // escalated turn. after() so the prospect never waits on an email.
+        if (!flagResult.wasAlreadyFlagged) {
+          const conversationLink = `/dashboard/conversations/${conversation.id}`;
+          after(() =>
+            dispatchNotification({
+              businessId: business.businessId,
+              category: "human_handover",
+              message: `A conversation needs a human: "${message}"`,
+              link: conversationLink,
+              supabase,
+              email: {
+                subject: `A conversation needs a human — ${business.businessName}`,
+                heading: "Your AI handed a conversation to a human",
+                paragraphs: ["The AI couldn't answer this one and flagged it for someone on your team."],
+                facts: [{ label: "What they asked", value: message.slice(0, 200) }],
+                cta: { label: "Take over the conversation", url: `${getAppUrl()}${conversationLink}` },
+              },
+            }),
+          );
+        }
+
+        await timer.time("workflow_trigger", () =>
+          dispatchWorkflowTrigger(supabase, business.businessId, "conversation_needs_attention", {
+            type: "conversation",
+            id: conversationRowId,
+            customerId: conversation.customer_id,
+            leadId: null,
+            conversationId: conversationRowId,
+          }),
+        );
+      }
+
+      // Appends the post-reply stages and restamps the total. In after(), so
+      // it costs the prospect nothing; a no-op when no success row was
+      // written (an interrupted turn, a timeout, a cache hit).
+      after(() => finalizeTurnMetrics(supabase, response.metricsRowId, business.businessId, timer));
+
+      // Phase 17a quota reminder emails -- only for a completed turn. `+ 1`
+      // only when this turn actually wrote an ai_response_metrics row.
+      if (!interrupted) {
+        after(() =>
+          sendUsageReminderIfDue(
+            supabase,
+            business.businessId,
+            response.quotaSnapshot,
+            response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
+          ),
+        );
+      }
+    };
+
+    // feat/chat-streaming: a loader that asked for a stream (its `Accept`
+    // header or the `stream` body flag) gets Server-Sent Events; every
+    // currently-live loader, which sends neither, falls through to the
+    // byte-identical JSON path below. The human-control branch above already
+    // returned JSON regardless -- a streaming loader detects a non-stream
+    // content type and handles that JSON response as it always has.
+    if (clientWantsStream(request.headers.get("accept"), parsed.data.stream)) {
+      const abortController = new AbortController();
+      const onClientAbort = () => abortController.abort();
+      request.signal.addEventListener("abort", onClientAbort);
+      const encoder = new TextEncoder();
+
+      const sseStream = new ReadableStream<Uint8Array>({
+        async start(controller) {
+          const emit = (event: ChatStreamEvent) => {
+            try {
+              controller.enqueue(encoder.encode(encodeStreamEvent(event)));
+            } catch {
+              // The connection is gone -- nothing more can be written, but
+              // persistence below still runs so the turn is recorded.
+            }
+          };
+          // First, always: lets the loader store the conversation id and the
+          // polling cursor even if the stream then dies mid-answer.
+          emit({ type: "meta", conversationId: conversation.id, asOf: userMessageRow.created_at });
+
+          let finalResponse: SalesEmployeeResponse | null = null;
+          let interrupted = false;
+          try {
+            for await (const chunk of streamSalesEmployee(
+              supabase,
+              business.businessId,
+              conversation.id,
+              business.businessName,
+              business.businessProfile,
+              message,
+              history,
+              business.language,
+              { recommendProductsEnabled: business.recommendProductsEnabled, appointmentsEnabled: business.appointmentsEnabled },
+              timer,
+              quota,
+              abortController.signal,
+            )) {
+              if (chunk.kind === "delta") {
+                emit({ type: "delta", text: chunk.text });
+              } else {
+                finalResponse = chunk.response;
+                interrupted = chunk.interrupted;
+              }
+            }
+          } catch (error) {
+            logAndGetUserMessage(error);
+            interrupted = true;
+            emit({ type: "error", kind: "failure" });
+          }
+
+          // Persist first (so the final event can carry the assistant
+          // message's own timestamp as the poll cursor, exactly like the
+          // JSON path -- otherwise a later poll would re-surface the
+          // just-streamed reply as a duplicate). The prospect has already
+          // received every delta, so this is off their critical path.
+          try {
+            if (finalResponse) {
+              const assistantMessageRow = await writeAssistantMessage(finalResponse, interrupted);
+              if (!interrupted) {
+                emit({
+                  type: "final",
+                  escalate: finalResponse.escalate,
+                  recommendedProducts: finalResponse.recommendedProducts,
+                  asOf: assistantMessageRow.created_at,
+                });
+              }
+              await finalizeTurnSideEffects(finalResponse, interrupted);
+            }
+          } catch (error) {
+            logAndGetUserMessage(error);
+          }
+
+          request.signal.removeEventListener("abort", onClientAbort);
+          try {
+            controller.close();
+          } catch {
+            // Already closed/cancelled -- nothing to do.
+          }
+        },
+        cancel() {
+          // The client went away; unwind the generator promptly.
+          request.signal.removeEventListener("abort", onClientAbort);
+          abortController.abort();
+        },
+      });
+
+      return new Response(sseStream, {
+        headers: {
+          ...CORS_HEADERS,
+          "Content-Type": CHAT_STREAM_CONTENT_TYPE,
+          // Belt and braces against any buffering proxy: no transform, and
+          // the nginx/Vercel hint to flush each chunk straight through.
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
     let response;
     try {
       response = await askSalesEmployee(
@@ -272,114 +486,8 @@ export async function POST(request: NextRequest) {
       return withCors(jsonError(userMessage, 500));
     }
 
-    const assistantMessageRow = await timer.time("assistant_message_write", () =>
-      createMessage(
-        supabase,
-        business.businessId,
-        conversationRowId,
-        "assistant",
-        response.answer,
-        response.sourceChunkIds,
-        response.grounded,
-      ),
-    );
-
-    // Phase 25b "top unanswered questions": only a genuine knowledge gap
-    // (ungrounded, and not already escalated -- an escalated turn is
-    // already flagged for staff attention, so logging it here too would
-    // just double-count the same gap under a different metric). A
-    // failure here must never fail the prospect's real response.
-    if (!response.grounded && !response.escalate) {
-      const { error: unansweredError } = await timer.time("unanswered_question_write", async () =>
-        // Awaited inside the callback: a PostgrestFilterBuilder is
-        // thenable but not a Promise, so returning it unawaited would not
-        // satisfy TurnTimer.time()'s signature.
-        await supabase
-          .from("unanswered_questions")
-          .insert({ business_id: business.businessId, conversation_id: conversationRowId, question: message }),
-      );
-      if (unansweredError) {
-        logEvent("unanswered_question_log_failed", business.businessId, { conversationId: conversation.id }, "error");
-      }
-    }
-
-    if (response.escalate) {
-      // Flags the conversation for dashboard attention -- deliberately
-      // does not change `control`. See prompts/phase-15a-handoff-state-and-ai-pause.md's
-      // "Decisions and assumptions" #1 for why escalation alone must not
-      // silence the AI before a human is actually watching.
-      const flagResult = await timer.time("escalation_flag", () =>
-        flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
-      );
-      logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
-
-      // The most urgent event in the product, and until 2026-10-21 it produced
-      // no notification at all -- only a sidebar badge nobody was watching.
-      //
-      // Gated on the transition into needing attention, not on every escalated
-      // turn: without that gate a prospect going back and forth with a stuck AI
-      // would email the business once per turn. The workflow trigger below
-      // deliberately keeps firing every turn, as it always has.
-      //
-      // after() so the prospect never waits on an outbound email, and
-      // dispatchNotification never throws, so no .catch() is needed.
-      if (!flagResult.wasAlreadyFlagged) {
-        const conversationLink = `/dashboard/conversations/${conversation.id}`;
-        after(() =>
-          dispatchNotification({
-            businessId: business.businessId,
-            category: "human_handover",
-            message: `A conversation needs a human: "${message}"`,
-            link: conversationLink,
-            supabase,
-            email: {
-              subject: `A conversation needs a human — ${business.businessName}`,
-              heading: "Your AI handed a conversation to a human",
-              paragraphs: ["The AI couldn't answer this one and flagged it for someone on your team."],
-              facts: [{ label: "What they asked", value: message.slice(0, 200) }],
-              cta: { label: "Take over the conversation", url: `${getAppUrl()}${conversationLink}` },
-            },
-          }),
-        );
-      }
-
-      await timer.time("workflow_trigger", () =>
-        dispatchWorkflowTrigger(supabase, business.businessId, "conversation_needs_attention", {
-          type: "conversation",
-          id: conversationRowId,
-          customerId: conversation.customer_id,
-          leadId: null,
-          conversationId: conversationRowId,
-        }),
-      );
-    }
-
-    // Appends the stages that only exist after askSalesEmployee() has
-    // already written its row -- the assistant message write, the
-    // escalation handling -- and restamps the total, so the persisted
-    // figure covers the turn right up to serializing this response rather
-    // than stopping at the metrics insert. In after(), so it costs the
-    // prospect nothing, and best-effort, so it cannot break the reply.
-    after(() => finalizeTurnMetrics(supabase, response.metricsRowId, business.businessId, timer));
-
-    // Phase 17a: the quota reminder emails (50%, then every 10%, then the
-    // upgrade prompt at 100%). In after(), so the prospect waits on no
-    // outbound email, and derived from the count the quota check at the
-    // top of this turn already made -- never a second query.
-    //
-    // `+ 1` only when this turn actually wrote an ai_response_metrics row,
-    // because that row *is* the unit the quota counts: a cache hit, a
-    // no-knowledge fallback and an over-quota turn each write none and so
-    // move nothing. Each threshold is claimed in the database before its
-    // email is sent, so a burst of concurrent turns still sends one.
-    after(() =>
-      sendUsageReminderIfDue(
-        supabase,
-        business.businessId,
-        response.quotaSnapshot,
-        response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
-      ),
-    );
+    const assistantMessageRow = await writeAssistantMessage(response, false);
+    await finalizeTurnSideEffects(response, false);
 
     return withCors(
       jsonSuccess({

@@ -164,6 +164,10 @@
   var hasHandoffSignal = false;
   var isPanelOpen = false;
   var isSendInFlight = false;
+  // feat/chat-streaming: AbortController per in-flight send (keyed by its
+  // requestId), so a "widget:abort" from the iframe (the visitor pressing
+  // stop) cancels exactly that request's fetch and no other.
+  var inflightControllers = {};
   var lastKnownMessageAt = null;
   var knownMessageIds = {};
   var pollTimeoutId = null;
@@ -376,23 +380,80 @@
     }, 150);
   });
 
+  function postError(requestId, kind) {
+    iframe.contentWindow.postMessage({ type: "widget:error", requestId: requestId, kind: kind }, appOrigin);
+  }
+
+  // Maps one SSE frame to its event object, tolerantly: a malformed frame
+  // is dropped (returns null), never surfaced. Hand-kept in sync with
+  // lib/chat-stream.ts's parseFrame -- this loader is plain JS with no build
+  // step and cannot import it, the same deliberate duplication as the
+  // postMessage shapes.
+  function parseSseFrame(frame) {
+    var data = "";
+    var lines = frame.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].indexOf("data:") === 0) {
+        data += lines[i].slice(lines[i].indexOf("data: ") === 0 ? 6 : 5);
+      }
+    }
+    if (!data) return null;
+    try {
+      return JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+
+  // The buffered JSON path, unchanged in behaviour: an old server, the
+  // human-control response (which stays JSON even for a streaming client),
+  // or any non-stream reply. Mapped to widget:response / widget:error
+  // exactly as this loader always did.
+  function handleJsonResponse(requestId, response, body) {
+    if (response.ok && body && body.ok) {
+      conversationId = body.data.conversationId;
+      storeConversationId(conversationId);
+      if (body.data.asOf) lastKnownMessageAt = body.data.asOf;
+      if (body.data.escalate || body.data.control === "human") {
+        hasHandoffSignal = true;
+      }
+      iframe.contentWindow.postMessage(
+        {
+          type: "widget:response",
+          requestId: requestId,
+          conversationId: body.data.conversationId,
+          answer: body.data.answer,
+          escalate: body.data.escalate,
+          recommendedProducts: body.data.recommendedProducts || [],
+        },
+        appOrigin,
+      );
+      return;
+    }
+    var kind = "failure";
+    if (response.status === 401) kind = "unauthorized";
+    else if (response.status === 429) kind = "rate_limited";
+    postError(requestId, kind);
+  }
+
   async function handleSend(requestId, text, consentGiven) {
     // The synchronous chat response is more current than any poll could
     // be, and this avoids two competing requests updating state at once.
     isSendInFlight = true;
+    // An AbortController per in-flight request, so a "widget:abort" (the
+    // visitor pressing stop) can cancel exactly this fetch. This is NOT a
+    // timeout -- there is still no client-side deadline here; the one
+    // deadline remains the widget panel's own (use-widget-chat.ts's
+    // RESPONSE_TIMEOUT_MS, derived from the server's maxDuration), which a
+    // streamed turn clears on its first token.
+    var controller = new AbortController();
+    inflightControllers[requestId] = controller;
     try {
-      // No AbortSignal and no timeout here, on purpose. The one
-      // client-side deadline for a chat turn lives in the widget panel
-      // (use-widget-chat.ts's RESPONSE_TIMEOUT_MS, derived from the
-      // server's own maxDuration in lib/chat-timeouts.ts). A second,
-      // independent timeout here would be exactly the bug that file
-      // documents -- two unrelated clocks, the shorter one silently
-      // winning and showing the prospect an error for a turn the server
-      // completed. If this request ever needs to be abortable, derive its
-      // deadline from lib/chat-timeouts.ts too.
       var response = await fetch(appOrigin + "/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // Asks for a stream; a server that doesn't stream (or the
+        // human-control branch) answers with JSON and is handled below.
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({
           widgetKey: widgetKey,
           conversationId: conversationId || undefined,
@@ -400,48 +461,104 @@
           consentGiven: !!consentGiven,
           pageUrl: pageUrl,
           visitorId: visitorId,
+          stream: true,
         }),
+        signal: controller.signal,
       });
 
-      var body = await response.json().catch(function () {
-        return null;
-      });
+      var contentType = response.headers.get("content-type") || "";
 
-      if (response.ok && body && body.ok) {
-        conversationId = body.data.conversationId;
-        storeConversationId(conversationId);
-        if (body.data.asOf) lastKnownMessageAt = body.data.asOf;
-        if (body.data.escalate || body.data.control === "human") {
-          hasHandoffSignal = true;
-        }
-        iframe.contentWindow.postMessage(
-          {
-            type: "widget:response",
-            requestId: requestId,
-            conversationId: body.data.conversationId,
-            answer: body.data.answer,
-            escalate: body.data.escalate,
-            recommendedProducts: body.data.recommendedProducts || [],
-          },
-          appOrigin,
-        );
+      // A pre-generation failure (401/429/4xx/5xx) carries a status and a
+      // JSON body, never a stream -- map it exactly as before.
+      if (!response.ok) {
+        var body = await response.json().catch(function () {
+          return null;
+        });
+        handleJsonResponse(requestId, response, body);
         return;
       }
 
-      var kind = "failure";
-      if (response.status === 401) kind = "unauthorized";
-      else if (response.status === 429) kind = "rate_limited";
+      // Not a stream (human-control, or an older server): buffered JSON.
+      if (contentType.indexOf("text/event-stream") === -1 || !response.body) {
+        var jsonBody = await response.json().catch(function () {
+          return null;
+        });
+        handleJsonResponse(requestId, response, jsonBody);
+        return;
+      }
 
-      iframe.contentWindow.postMessage(
-        { type: "widget:error", requestId: requestId, kind: kind },
-        appOrigin,
-      );
+      // Server-Sent Events: relay each event to the iframe as it arrives.
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = "";
+      var sawTerminal = false;
+      var sawDelta = false;
+      for (;;) {
+        var result = await reader.read();
+        if (result.done) break;
+        buffer += decoder.decode(result.value, { stream: true });
+        var boundary;
+        while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+          var frame = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          var event = parseSseFrame(frame);
+          if (!event) continue;
+          if (event.type === "meta") {
+            if (event.conversationId) {
+              conversationId = event.conversationId;
+              storeConversationId(conversationId);
+            }
+            if (event.asOf) lastKnownMessageAt = event.asOf;
+            iframe.contentWindow.postMessage(
+              { type: "widget:stream_start", requestId: requestId, conversationId: conversationId },
+              appOrigin,
+            );
+          } else if (event.type === "delta") {
+            sawDelta = true;
+            iframe.contentWindow.postMessage(
+              { type: "widget:stream_delta", requestId: requestId, text: event.text || "" },
+              appOrigin,
+            );
+          } else if (event.type === "final") {
+            sawTerminal = true;
+            if (event.asOf) lastKnownMessageAt = event.asOf;
+            if (event.escalate) hasHandoffSignal = true;
+            iframe.contentWindow.postMessage(
+              {
+                type: "widget:stream_end",
+                requestId: requestId,
+                escalate: !!event.escalate,
+                recommendedProducts: event.recommendedProducts || [],
+              },
+              appOrigin,
+            );
+          } else if (event.type === "error") {
+            sawTerminal = true;
+            postError(requestId, event.kind || "failure");
+          }
+        }
+      }
+
+      // The stream ended without a terminal event (the connection dropped).
+      // Keep any partial answer already shown rather than erroring over it;
+      // only a stream that produced nothing at all is a failure.
+      if (!sawTerminal) {
+        if (sawDelta) {
+          iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId }, appOrigin);
+        } else {
+          postError(requestId, "failure");
+        }
+      }
     } catch {
-      iframe.contentWindow.postMessage(
-        { type: "widget:error", requestId: requestId, kind: "failure" },
-        appOrigin,
-      );
+      // An abort (the visitor pressed stop, or the page is unloading) is not
+      // an error: finalize whatever streamed. Anything else is a failure.
+      if (controller.signal.aborted) {
+        iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId }, appOrigin);
+      } else {
+        postError(requestId, "failure");
+      }
     } finally {
+      delete inflightControllers[requestId];
       isSendInFlight = false;
       schedulePoll();
     }
@@ -456,6 +573,12 @@
       applyResize(data.width, data.height);
     } else if (data.type === "widget:send" && typeof data.requestId === "string" && typeof data.text === "string") {
       handleSend(data.requestId, data.text, data.consentGiven);
+    } else if (data.type === "widget:abort" && typeof data.requestId === "string") {
+      // The visitor pressed stop: cancel that request's fetch. handleSend's
+      // catch then relays a widget:stream_aborted so the panel keeps the
+      // partial answer instead of showing an error.
+      var pendingController = inflightControllers[data.requestId];
+      if (pendingController) pendingController.abort();
     } else if (data.type === "widget:new_chat") {
       // Phase 25d "start new chat": clear this loader's own copy of the
       // conversation and every piece of poll state derived from it, so

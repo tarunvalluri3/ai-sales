@@ -69,6 +69,54 @@ export type WidgetErrorMessage = {
 };
 
 /**
+ * feat/chat-streaming. The loader (the only context that makes the real
+ * /api/chat fetch) reads the Server-Sent-Events stream and relays it to
+ * this iframe as these three messages, so the panel can paint the answer
+ * token by token into the single assistant bubble it already created for
+ * the turn:
+ *   - stream_start once, carrying the conversation id (same role meta plays
+ *     in widget:response);
+ *   - stream_delta zero or more times, each a chunk of answer text to
+ *     append to that one bubble;
+ *   - stream_end once on clean completion, carrying the terminal escalate
+ *     flag and any product recommendations, OR stream_aborted once when the
+ *     turn was cut off (visitor pressed stop, or the connection dropped
+ *     after some text) -- the partial text stays, nothing is surfaced as an
+ *     error. A pre-stream failure still arrives as widget:error, unchanged.
+ * These are hand-kept in sync with public/widget-loader.js's copies, same
+ * convention as every other shape in this file.
+ */
+export type WidgetStreamStartMessage = {
+  type: "widget:stream_start";
+  requestId: string;
+  conversationId: string;
+};
+
+export type WidgetStreamDeltaMessage = {
+  type: "widget:stream_delta";
+  requestId: string;
+  text: string;
+};
+
+export type WidgetStreamEndMessage = {
+  type: "widget:stream_end";
+  requestId: string;
+  escalate: boolean;
+  recommendedProducts: WidgetRecommendedProduct[];
+};
+
+export type WidgetStreamAbortedMessage = {
+  type: "widget:stream_aborted";
+  requestId: string;
+};
+
+/** iframe -> loader: the visitor pressed stop. The loader aborts the in-flight fetch for this request and replies with widget:stream_aborted. */
+export type WidgetAbortMessage = {
+  type: "widget:abort";
+  requestId: string;
+};
+
+/**
  * Sent by this iframe to the loader on every panel open/close change
  * (Phase 15b), including the initial `false` on mount -- the loader
  * uses this to decide whether it's worth polling for a staff reply at
@@ -152,12 +200,17 @@ export type FromParentMessage =
   | WidgetViewportMessage
   | WidgetResponseMessage
   | WidgetErrorMessage
+  | WidgetStreamStartMessage
+  | WidgetStreamDeltaMessage
+  | WidgetStreamEndMessage
+  | WidgetStreamAbortedMessage
   | WidgetPollResultMessage
   | WidgetRestoreMessage
   | WidgetRecentChatsResultMessage;
 export type ToParentMessage =
   | WidgetResizeMessage
   | WidgetSendMessage
+  | WidgetAbortMessage
   | WidgetPanelOpenMessage
   | WidgetNewChatMessage
   | WidgetRecentChatsRequestMessage
@@ -213,6 +266,40 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
         (data.kind === "unauthorized" || data.kind === "rate_limited" || data.kind === "failure")
       ) {
         return { type: "widget:error", requestId: data.requestId, kind: data.kind };
+      }
+      return null;
+    case "widget:stream_start":
+      if (typeof data.requestId === "string" && typeof data.conversationId === "string") {
+        return { type: "widget:stream_start", requestId: data.requestId, conversationId: data.conversationId };
+      }
+      return null;
+    case "widget:stream_delta":
+      if (typeof data.requestId === "string" && typeof data.text === "string") {
+        return { type: "widget:stream_delta", requestId: data.requestId, text: data.text };
+      }
+      return null;
+    case "widget:stream_end":
+      if (typeof data.requestId === "string" && typeof data.escalate === "boolean") {
+        const recommendedProducts = Array.isArray(data.recommendedProducts)
+          ? data.recommendedProducts.filter(
+              (item): item is WidgetRecommendedProduct =>
+                isPlainObject(item) &&
+                (item.type === "product" || item.type === "service") &&
+                typeof item.id === "string" &&
+                typeof item.name === "string" &&
+                (item.description === null || typeof item.description === "string") &&
+                (item.category === null || typeof item.category === "string") &&
+                (item.priceDisplay === null || typeof item.priceDisplay === "string") &&
+                (item.priceAmount === null || typeof item.priceAmount === "number") &&
+                (item.imageUrl === null || typeof item.imageUrl === "string"),
+            )
+          : [];
+        return { type: "widget:stream_end", requestId: data.requestId, escalate: data.escalate, recommendedProducts };
+      }
+      return null;
+    case "widget:stream_aborted":
+      if (typeof data.requestId === "string") {
+        return { type: "widget:stream_aborted", requestId: data.requestId };
       }
       return null;
     case "widget:poll_result":

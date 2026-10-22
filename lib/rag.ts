@@ -4,7 +4,7 @@ import { BaseRetriever } from "@langchain/core/retrievers";
 import { Document } from "@langchain/core/documents";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import type { AIMessage, BaseMessage } from "@langchain/core/messages";
+import type { AIMessage, AIMessageChunk, BaseMessage } from "@langchain/core/messages";
 import { ToolMessage } from "@langchain/core/messages";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -486,6 +486,308 @@ function isFirstTurn(history: ConversationMessage[]): boolean {
   return history.length <= 1;
 }
 
+/** One element of an AIMessage's `tool_calls` -- its exact shape, without importing the type name. */
+type LoopToolCall = NonNullable<AIMessage["tool_calls"]>[number];
+
+/** The outcome of running one business tool call, shared by the non-streaming loop and the streaming loop so the tool-execution switch lives in exactly one place (design §e). */
+type ToolCallOutcome = {
+  toolCall: LoopToolCall;
+  toolResult: unknown;
+  sideEffecting: boolean;
+  chunkIds: string[];
+  recommended: RecommendedItem[] | null;
+  executedSearchQuery: string | undefined;
+};
+
+/**
+ * Executes a single business tool call and returns its outcome. Lifted
+ * verbatim out of askSalesEmployee()'s inner loop so the streaming path
+ * (streamSalesEmployee) runs the identical switch -- dedupe guard, per-tool
+ * read timeout, recommend_products image filtering, search-chunk capture --
+ * rather than a second, drifting copy. `searchedQueries` is read (for the
+ * redundant-search guard) but never mutated here; the caller appends the
+ * executed query after applying the outcome, preserving the original
+ * "seen within a batch" semantics.
+ */
+async function executeBusinessToolCall(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+  toolCall: LoopToolCall,
+  searchedQueries: string[],
+): Promise<ToolCallOutcome> {
+  let toolResult: unknown;
+  let sideEffecting = false;
+  let chunkIds: string[] = [];
+  let recommended: RecommendedItem[] | null = null;
+  // The query a search_knowledge_base call actually ran (so the turn can
+  // refuse a later near-identical repeat). Undefined for every other tool
+  // and for a search that was itself refused.
+  let executedSearchQuery: string | undefined;
+  // Read-only tools are raced against CHAT_TOOL_TIMEOUT_MS; the two
+  // side-effecting tools are never raced (see withReadToolTimeout /
+  // CHAT_TOOL_TIMEOUT_MS). A read-only lookup's timeout verdict is the same
+  // "lookup_failed" shape each already returns on error.
+  const readToolTimedOut = { found: false as const, reason: "lookup_failed" as const };
+
+  if (toolCall.name === "check_product_details") {
+    toolResult = await withReadToolTimeout(
+      executeCheckProductDetails(supabase, businessId, toolCall.args),
+      readToolTimedOut,
+    );
+  } else if (toolCall.name === "check_faq_topic") {
+    toolResult = await withReadToolTimeout(
+      executeCheckFaqTopic(supabase, businessId, toolCall.args),
+      readToolTimedOut,
+    );
+  } else if (toolCall.name === "request_callback") {
+    sideEffecting = true;
+    toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
+  } else if (toolCall.name === "list_products_and_services") {
+    toolResult = await withReadToolTimeout(executeListOfferings(supabase, businessId), readToolTimedOut);
+  } else if (toolCall.name === "search_knowledge_base") {
+    // Item 3: refuse a near-identical repeat of a query already run this
+    // turn (including the prospect's own message, which the passive
+    // retrieval above already searched). The model is told to use the
+    // passages it already has rather than paying for a second embedding +
+    // vector search. A materially different reformulation is never blocked
+    // (lib/chat-query-dedupe.ts).
+    const parsedSearch = SearchKnowledgeBaseInputSchema.safeParse(toolCall.args);
+    if (parsedSearch.success && isRedundantSearch(parsedSearch.data.query, searchedQueries)) {
+      logEvent("search_knowledge_base_deduped", businessId, { conversationId });
+      toolResult = {
+        searched: false,
+        reason: "already_searched",
+        instruction:
+          "This query matches one already run this turn -- its results are in the reference context above. Answer from those passages instead of searching again; only search with a materially different query (a different topic, a broader category, or different terminology).",
+      };
+    } else {
+      const searchResult = await withReadToolTimeout(
+        executeSearchKnowledgeBase(supabase, businessId, toolCall.args),
+        readToolTimedOut,
+      );
+      if (parsedSearch.success) executedSearchQuery = parsedSearch.data.query;
+      if (searchResult.found) {
+        chunkIds = searchResult.passages.map((passage) => passage.chunkId);
+      }
+      toolResult = searchResult;
+    }
+  } else if (toolCall.name === "recommend_products") {
+    const recommendResult = await withReadToolTimeout(
+      executeRecommendProducts(supabase, businessId, toolCall.args),
+      readToolTimedOut,
+    );
+    if (recommendResult.found) {
+      // Only items with a real photo become visual cards -- the model still
+      // sees every matched item (image or not) in toolResult below, and
+      // must describe an image-less item in its own text instead of relying
+      // on a card.
+      recommended = recommendResult.items.filter((item) => item.imageUrl !== null);
+    }
+    toolResult = recommendResult;
+  } else if (toolCall.name === "check_available_slots") {
+    toolResult = await withReadToolTimeout(
+      executeCheckAvailableSlots(supabase, businessId, toolCall.args),
+      readToolTimedOut,
+    );
+  } else if (toolCall.name === "book_appointment") {
+    sideEffecting = true;
+    toolResult = await executeBookAppointment(supabase, businessId, conversationId, toolCall.args);
+  } else {
+    logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
+    toolResult = { found: false, reason: "invalid_input" };
+  }
+
+  return { toolCall, toolResult, sideEffecting, chunkIds, recommended, executedSearchQuery };
+}
+
+/**
+ * The shared setup for a chat turn, before the first answer-producing model
+ * call: the plan-quota gate, the first-turn response-cache lookup, the
+ * tenant-scoped retrieval, and the <retrieved_context> block. Returns
+ * either a finished early-return response (over quota / cache hit /
+ * embedding degrade / no matching knowledge -- each identical to what
+ * askSalesEmployee() has always returned) or the documents + context to
+ * proceed with. Both askSalesEmployee() and streamSalesEmployee() call
+ * this, so the guarantees behind these early returns (never a fabricated
+ * answer, the exact fallback/quota messages) exist in one place, not two.
+ */
+type PreparedTurn =
+  | { kind: "early"; response: SalesEmployeeResponse }
+  | { kind: "proceed"; quota: ReplyQuotaStatus; documents: Document<KnowledgeChunkMetadata>[]; context: string };
+
+async function prepareTurn(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+  question: string,
+  history: ConversationMessage[],
+  language: WidgetLanguage,
+  timer: TurnTimer,
+  prefetchedQuota: ReplyQuotaStatus | undefined,
+): Promise<PreparedTurn> {
+  const quota = prefetchedQuota ?? (await timer.time("quota_check", () => checkReplyQuota(supabase, businessId)));
+  if (!quota.allowed) {
+    logEvent(
+      "ai_usage_quota_exceeded",
+      businessId,
+      {
+        conversationId,
+        planKey: quota.entitlement.planKey,
+        repliesUsed: quota.repliesUsed,
+        replyQuota: quota.replyQuota,
+        notServingReason: quota.entitlement.notServingReason,
+      },
+      "error",
+    );
+    return {
+      kind: "early",
+      response: {
+        answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
+        grounded: false,
+        usedContext: false,
+        sourceChunkIds: [],
+        escalate: true,
+        escalationReason: quota.entitlement.serving ? "usage_quota_exceeded" : "subscription_not_serving",
+        recommendedProducts: [],
+        metricsRowId: null,
+        quotaSnapshot: quota,
+      },
+    };
+  }
+
+  if (isFirstTurn(history)) {
+    const cached = await timer.time("cache_read", () => getCachedResponse(supabase, businessId, question, language));
+    if (cached) {
+      logEvent("ai_response_cache_hit", businessId, { conversationId });
+      return {
+        kind: "early",
+        response: {
+          answer: cached.answer,
+          grounded: true,
+          usedContext: cached.usedContext,
+          sourceChunkIds: cached.sourceChunkIds,
+          escalate: false,
+          escalationReason: null,
+          recommendedProducts: [],
+          metricsRowId: null,
+          quotaSnapshot: quota,
+        },
+      };
+    }
+  }
+
+  const retriever = new KnowledgeRetriever({ supabase, businessId, timer });
+  let documents: Document<KnowledgeChunkMetadata>[];
+  try {
+    documents = await retriever.invoke(question);
+  } catch (error) {
+    if (isEmbeddingRateLimitError(error)) {
+      logEvent("ai_embedding_rate_limited", businessId, { conversationId }, "error");
+      return {
+        kind: "early",
+        response: {
+          answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
+          grounded: false,
+          usedContext: false,
+          sourceChunkIds: [],
+          escalate: true,
+          escalationReason: "embedding_rate_limited",
+          recommendedProducts: [],
+          metricsRowId: null,
+          quotaSnapshot: quota,
+        },
+      };
+    }
+    throw error;
+  }
+
+  if (documents.length === 0) {
+    return {
+      kind: "early",
+      response: {
+        answer: FALLBACK_MESSAGE,
+        grounded: false,
+        usedContext: false,
+        sourceChunkIds: [],
+        escalate: false,
+        escalationReason: null,
+        recommendedProducts: [],
+        metricsRowId: null,
+        quotaSnapshot: quota,
+      },
+    };
+  }
+
+  // Tag-wrapped (not just described in prose) so the injection-hardening
+  // rule has a literal, checkable boundary; the tag also states the query
+  // these passages came from. The query is prospect-supplied text, so the
+  // few characters that could forge a tag boundary are stripped before it
+  // goes into an attribute. See the long-form reasoning preserved on the
+  // callers before this was extracted.
+  const searchQueryAttribute = question.replace(/[<>"\r\n]/g, " ").slice(0, 300);
+  const context = `<retrieved_context search_query="${searchQueryAttribute}" searched="this business's full knowledge base" passages="${documents.length}">\n${documents
+    .map((document, index) => `[${index + 1}] ${document.pageContent}`)
+    .join("\n\n")}\n</retrieved_context>`;
+
+  return { kind: "proceed", quota, documents, context };
+}
+
+/**
+ * Builds the two rendered system messages (loop vs plain), the canonical
+ * transcript, and the bound tool list for a turn -- the pure,
+ * no-model-call part of the prompt assembly, shared so the streaming and
+ * non-streaming paths cannot drift in how they render the persona or which
+ * tools they expose.
+ */
+async function buildTurnContext(
+  businessName: string,
+  businessProfile: BusinessProfileContext,
+  question: string,
+  history: ConversationMessage[],
+  language: WidgetLanguage,
+  aiCapabilities: { recommendProductsEnabled: boolean; appointmentsEnabled: boolean },
+  context: string,
+): Promise<{
+  loopSystemMessage: BaseMessage;
+  plainSystemMessage: BaseMessage;
+  messages: BaseMessage[];
+  tools: Parameters<ReturnType<typeof getChatModel>["bindTools"]>[0];
+}> {
+  const promptValues = {
+    context,
+    businessName,
+    languageInstruction: formatLanguageInstruction(language),
+    recommendationInstruction: formatRecommendationInstruction(aiCapabilities.recommendProductsEnabled),
+    appointmentInstruction: formatAppointmentInstruction(aiCapabilities.appointmentsEnabled),
+    capabilityChainingInstruction: formatCapabilityChainingInstruction(
+      aiCapabilities.recommendProductsEnabled,
+      aiCapabilities.appointmentsEnabled,
+    ),
+    businessProfileContext: formatBusinessProfileContext(businessProfile),
+    question,
+    // `history`'s own last element is this same turn's question -- already
+    // sent once via the `{question}` slot, so it's dropped here to avoid
+    // sending it to Gemini twice.
+    history: toLangchainHistory(history.slice(0, -1)),
+  };
+  const loopPrompt = await buildPrompt().invoke({ ...promptValues, sendReplyInstruction: SEND_REPLY_INSTRUCTION });
+  const plainPrompt = await buildPrompt().invoke({ ...promptValues, sendReplyInstruction: "" });
+  const loopSystemMessage = loopPrompt.toChatMessages()[0];
+  const plainSystemMessage = plainPrompt.toChatMessages()[0];
+  const messages: BaseMessage[] = plainPrompt.toChatMessages();
+  const tools = [
+    checkProductDetailsTool,
+    checkFaqTopicTool,
+    requestCallbackTool,
+    listOfferingsTool,
+    searchKnowledgeBaseTool,
+    ...(aiCapabilities.recommendProductsEnabled ? [recommendProductsTool] : []),
+    ...(aiCapabilities.appointmentsEnabled ? [checkAvailableSlotsTool, bookAppointmentTool] : []),
+  ];
+  return { loopSystemMessage, plainSystemMessage, messages, tools };
+}
+
 /**
  * Retrieves the given business's own knowledge chunks for `question` and
  * generates a persona-grounded sales-employee answer, per `PRODUCT.md`
@@ -552,140 +854,25 @@ export async function askSalesEmployee(
     metricsRowId: null,
     quotaSnapshot: quota,
   });
-  // Phase 22h, rewritten in Phase 17a: checked before any Gemini call
-  // this turn would make, including the embedding call retrieval itself
-  // makes -- a business over quota must not spend another token, not just
-  // stop short of a full response. escalate: true so
-  // app/api/chat/route.ts's existing escalation handling
-  // (flagConversationNeedsAttention + logEvent) picks this up with no new
-  // call site needed there.
-  //
-  // The verdict is now the business's own **plan** quota in AI replies for
-  // its current billing period, not one global token budget, and it also
-  // covers "not serving at all" (an expired trial, a lapsed 5-day grace
-  // period) -- the prospect-facing behaviour is deliberately identical for
-  // both, because the visitor's situation is identical: a person will
-  // follow up, the conversation is flagged, nothing is invented and the
-  // widget still works.
-  const quota = prefetchedQuota ?? (await timer.time("quota_check", () => checkReplyQuota(supabase, businessId)));
-  if (!quota.allowed) {
-    logEvent(
-      "ai_usage_quota_exceeded",
-      businessId,
-      {
-        conversationId,
-        planKey: quota.entitlement.planKey,
-        repliesUsed: quota.repliesUsed,
-        replyQuota: quota.replyQuota,
-        notServingReason: quota.entitlement.notServingReason,
-      },
-      "error",
-    );
-    return {
-      answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
-      grounded: false,
-      usedContext: false,
-      sourceChunkIds: [],
-      escalate: true,
-      escalationReason: quota.entitlement.serving ? "usage_quota_exceeded" : "subscription_not_serving",
-      recommendedProducts: [],
-      metricsRowId: null,
-      quotaSnapshot: quota,
-    };
-  }
-
-  // Phase 23: only a first-turn question is ever cache-eligible (see
-  // shouldCacheResponse) so a multi-turn conversation never bothers with
-  // the lookup. A hit skips retrieval and every Gemini call this turn
-  // would otherwise make -- the point of "safe response caching for
-  // low-variance questions" (docs/phases.md Phase 23). `history` always
-  // includes the current turn's own just-persisted user message as its
-  // last element (app/api/chat/route.ts inserts it before fetching
-  // history), so a genuinely first-turn conversation has length 1, not 0.
-  if (isFirstTurn(history)) {
-    const cached = await timer.time("cache_read", () => getCachedResponse(supabase, businessId, question, language));
-    if (cached) {
-      logEvent("ai_response_cache_hit", businessId, { conversationId });
-      return {
-        answer: cached.answer,
-        grounded: true,
-        usedContext: cached.usedContext,
-        sourceChunkIds: cached.sourceChunkIds,
-        escalate: false,
-        escalationReason: null,
-        recommendedProducts: [],
-        metricsRowId: null,
-        quotaSnapshot: quota,
-      };
-    }
-  }
-
-  const retriever = new KnowledgeRetriever({ supabase, businessId, timer });
-  let documents: Document<KnowledgeChunkMetadata>[];
-  try {
-    documents = await retriever.invoke(question);
-  } catch (error) {
-    // Confirmed live in production: Gemini's embedding-model quota can be
-    // exhausted by a handful of chat messages in quick succession (every
-    // retrieval call embeds the question). embedTexts() already retries
-    // transient hits -- this is what survives that. Degrade gracefully
-    // (same shape as the usage-quota branch above, including escalate:
-    // true so a human follows up) rather than a raw 500 that would show
-    // the prospect a misleading "check your connection" error for what is
-    // actually a provider-side capacity issue, not a fabricated answer
-    // either way.
-    if (isEmbeddingRateLimitError(error)) {
-      logEvent("ai_embedding_rate_limited", businessId, { conversationId }, "error");
-      return {
-        answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
-        grounded: false,
-        usedContext: false,
-        sourceChunkIds: [],
-        escalate: true,
-        escalationReason: "embedding_rate_limited",
-        recommendedProducts: [],
-        metricsRowId: null,
-        quotaSnapshot: quota,
-      };
-    }
-    throw error;
-  }
-
-  if (documents.length === 0) {
-    return {
-      answer: FALLBACK_MESSAGE,
-      grounded: false,
-      usedContext: false,
-      sourceChunkIds: [],
-      escalate: false,
-      escalationReason: null,
-      recommendedProducts: [],
-      metricsRowId: null,
-      quotaSnapshot: quota,
-    };
-  }
-
-  // Tag-wrapped (not just described in prose) so the injection-hardening
-  // rule above has a literal, checkable boundary: a retrieved passage
-  // trying to impersonate an instruction still reads as data inside
-  // <retrieved_context>, not as part of this system message.
-  //
-  // The tag now also states the query these passages came from. Measured
-  // 2026-10-21: without it the model re-ran search_knowledge_base with the
-  // prospect's own wording on turns where this context was already the
-  // answer to that exact search -- a second Gemini round trip and a second
-  // embedding call for passages it had already been given. Naming the
-  // query is what stopped that; the prose rule alone did not.
-  //
-  // The query is prospect-supplied text, so the few characters that could
-  // forge a tag boundary are stripped before it goes into an attribute --
-  // the question itself is already sent verbatim in the human message, so
-  // this adds no new trust, but it must not be able to make the passages
-  // below look like they sit outside <retrieved_context>.
-  const searchQueryAttribute = question.replace(/[<>"\r\n]/g, " ").slice(0, 300);
-  const context = `<retrieved_context search_query="${searchQueryAttribute}" searched="this business's full knowledge base" passages="${documents.length}">\n${documents
-    .map((document, index) => `[${index + 1}] ${document.pageContent}`)
-    .join("\n\n")}\n</retrieved_context>`;
+  // The quota gate, the first-turn cache lookup, the tenant-scoped
+  // retrieval and the <retrieved_context> block are shared with the
+  // streaming path (streamSalesEmployee) via prepareTurn(), so the
+  // early-return guarantees -- the exact over-quota/embedding-degrade/
+  // no-knowledge messages, never a fabricated answer -- live in one place.
+  // Every early return here is byte-for-byte what this function used to
+  // return inline.
+  const prepared = await prepareTurn(
+    supabase,
+    businessId,
+    conversationId,
+    question,
+    history,
+    language,
+    timer,
+    prefetchedQuota,
+  );
+  if (prepared.kind === "early") return prepared.response;
+  const { quota, documents, context } = prepared;
 
   // `startedAt` deliberately still starts here, just before the first
   // Gemini call: it is what `latency_ms` has always measured, and
@@ -730,47 +917,20 @@ export async function askSalesEmployee(
   let timedOut = false;
 
   try {
-    const promptValues = {
-      context,
+    // Prompt assembly (loop vs plain system message, transcript, tool
+    // list) is shared with the streaming path via buildTurnContext(). The
+    // loop's calls get the send_reply instruction; the fallback
+    // structured-output call below gets the prompt exactly as it was before
+    // send_reply existed (the plain system message), byte-for-byte.
+    const { loopSystemMessage, plainSystemMessage, messages, tools } = await buildTurnContext(
       businessName,
-      languageInstruction: formatLanguageInstruction(language),
-      recommendationInstruction: formatRecommendationInstruction(aiCapabilities.recommendProductsEnabled),
-      appointmentInstruction: formatAppointmentInstruction(aiCapabilities.appointmentsEnabled),
-      capabilityChainingInstruction: formatCapabilityChainingInstruction(
-        aiCapabilities.recommendProductsEnabled,
-        aiCapabilities.appointmentsEnabled,
-      ),
-      businessProfileContext: formatBusinessProfileContext(businessProfile),
+      businessProfile,
       question,
-      // `history`'s own last element is this same turn's question (see its
-      // doc comment) -- already sent once via the `{question}` slot above,
-      // so it's dropped here to avoid sending it to Gemini twice.
-      history: toLangchainHistory(history.slice(0, -1)),
-    };
-    // Rendered twice from the one template, differing only in the
-    // send_reply slot. The loop's calls get the instruction; the fallback
-    // structured-output call below gets the prompt exactly as it was
-    // before send_reply existed, so that path is byte-for-byte the old
-    // behaviour rather than the old behaviour plus a stale instruction
-    // about a tool it isn't given.
-    const loopPrompt = await buildPrompt().invoke({ ...promptValues, sendReplyInstruction: SEND_REPLY_INSTRUCTION });
-    const plainPrompt = await buildPrompt().invoke({ ...promptValues, sendReplyInstruction: "" });
-    const loopSystemMessage = loopPrompt.toChatMessages()[0];
-    const plainSystemMessage = plainPrompt.toChatMessages()[0];
-    // Canonical transcript, carrying the *plain* system message: the loop
-    // swaps in its own at call time, so nothing has to be unwound before
-    // the fallback call.
-    const messages: BaseMessage[] = plainPrompt.toChatMessages();
-
-    const tools = [
-      checkProductDetailsTool,
-      checkFaqTopicTool,
-      requestCallbackTool,
-      listOfferingsTool,
-      searchKnowledgeBaseTool,
-      ...(aiCapabilities.recommendProductsEnabled ? [recommendProductsTool] : []),
-      ...(aiCapabilities.appointmentsEnabled ? [checkAvailableSlotsTool, bookAppointmentTool] : []),
-    ];
+      history,
+      language,
+      aiCapabilities,
+      context,
+    );
     // `tool_choice: "any"` = Gemini's ANY function-calling mode: the model
     // must call one of these functions and cannot answer with plain text.
     // That is not a restriction here, because send_reply is one of them --
@@ -883,91 +1043,9 @@ export async function askSalesEmployee(
         `tool_batch_${iteration + 1}`,
         () =>
           Promise.all(
-            businessToolCalls.map(async (toolCall) => {
-          let toolResult: unknown;
-          let sideEffecting = false;
-          let chunkIds: string[] = [];
-          let recommended: RecommendedItem[] | null = null;
-          // The query a search_knowledge_base call actually ran (so the
-          // turn can refuse a later near-identical repeat). Undefined for
-          // every other tool and for a search that was itself refused.
-          let executedSearchQuery: string | undefined;
-          // Read-only tools are raced against CHAT_TOOL_TIMEOUT_MS; the two
-          // side-effecting tools are never raced (see withReadToolTimeout /
-          // CHAT_TOOL_TIMEOUT_MS). A read-only lookup's timeout verdict is
-          // the same "lookup_failed" shape each already returns on error.
-          const readToolTimedOut = { found: false as const, reason: "lookup_failed" as const };
-
-          if (toolCall.name === "check_product_details") {
-            toolResult = await withReadToolTimeout(
-              executeCheckProductDetails(supabase, businessId, toolCall.args),
-              readToolTimedOut,
-            );
-          } else if (toolCall.name === "check_faq_topic") {
-            toolResult = await withReadToolTimeout(
-              executeCheckFaqTopic(supabase, businessId, toolCall.args),
-              readToolTimedOut,
-            );
-          } else if (toolCall.name === "request_callback") {
-            sideEffecting = true;
-            toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
-          } else if (toolCall.name === "list_products_and_services") {
-            toolResult = await withReadToolTimeout(executeListOfferings(supabase, businessId), readToolTimedOut);
-          } else if (toolCall.name === "search_knowledge_base") {
-            // Item 3: refuse a near-identical repeat of a query already run
-            // this turn (including the prospect's own message, which the
-            // passive retrieval above already searched). The model is told
-            // to use the passages it already has rather than paying for a
-            // second embedding + vector search. A materially different
-            // reformulation is never blocked (lib/chat-query-dedupe.ts).
-            const parsedSearch = SearchKnowledgeBaseInputSchema.safeParse(toolCall.args);
-            if (parsedSearch.success && isRedundantSearch(parsedSearch.data.query, searchedQueries)) {
-              logEvent("search_knowledge_base_deduped", businessId, { conversationId });
-              toolResult = {
-                searched: false,
-                reason: "already_searched",
-                instruction:
-                  "This query matches one already run this turn -- its results are in the reference context above. Answer from those passages instead of searching again; only search with a materially different query (a different topic, a broader category, or different terminology).",
-              };
-            } else {
-              const searchResult = await withReadToolTimeout(
-                executeSearchKnowledgeBase(supabase, businessId, toolCall.args),
-                readToolTimedOut,
-              );
-              if (parsedSearch.success) executedSearchQuery = parsedSearch.data.query;
-              if (searchResult.found) {
-                chunkIds = searchResult.passages.map((passage) => passage.chunkId);
-              }
-              toolResult = searchResult;
-            }
-          } else if (toolCall.name === "recommend_products") {
-            const recommendResult = await withReadToolTimeout(
-              executeRecommendProducts(supabase, businessId, toolCall.args),
-              readToolTimedOut,
-            );
-            if (recommendResult.found) {
-              // Only items with a real photo become visual cards -- the
-              // model still sees every matched item (image or not) in
-              // toolResult below, and must describe an image-less item in
-              // its own text instead of relying on a card.
-              recommended = recommendResult.items.filter((item) => item.imageUrl !== null);
-            }
-            toolResult = recommendResult;
-          } else if (toolCall.name === "check_available_slots") {
-            toolResult = await withReadToolTimeout(
-              executeCheckAvailableSlots(supabase, businessId, toolCall.args),
-              readToolTimedOut,
-            );
-          } else if (toolCall.name === "book_appointment") {
-            sideEffecting = true;
-            toolResult = await executeBookAppointment(supabase, businessId, conversationId, toolCall.args);
-          } else {
-            logEvent("tool_invoked", businessId, { tool: toolCall.name, result: "unrecognized" }, "error");
-            toolResult = { found: false, reason: "invalid_input" };
-          }
-
-              return { toolCall, toolResult, sideEffecting, chunkIds, recommended, executedSearchQuery };
-            }),
+            businessToolCalls.map((toolCall) =>
+              executeBusinessToolCall(supabase, businessId, conversationId, toolCall, searchedQueries),
+            ),
           ),
         // Recorded with the batch so a persisted turn says *which* tools
         // ran, not just how many -- the question `tool_call_count` alone
@@ -1119,6 +1197,454 @@ export async function askSalesEmployee(
     throw new AppError(
       "Something went wrong generating a response. Please try again.",
       "askSalesEmployee: chat generation failed",
+      error,
+    );
+  }
+}
+
+/**
+ * One item a streaming turn emits (design §a/§b). `delta` is a chunk of
+ * answer text in order; `final` is the single terminal item -- it always
+ * arrives last, even on abort or timeout, carrying the full
+ * SalesEmployeeResponse the request handler persists exactly as it
+ * persists askSalesEmployee()'s return. `interrupted` is true only when the
+ * answer was cut off before completion (client disconnect/abort, or a
+ * mid-stream generation timeout); such a turn is never recorded as a
+ * successful complete reply (design §d).
+ */
+export type StreamChunk =
+  | { kind: "delta"; text: string }
+  | { kind: "final"; response: SalesEmployeeResponse; interrupted: boolean };
+
+/** Text carried by one streamed message chunk, whether `content` is a plain string or the structured content-block array. */
+function messageChunkText(chunk: AIMessageChunk): string {
+  const content = chunk.content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  let text = "";
+  for (const block of content) {
+    if (typeof block === "string") text += block;
+    else if (block && typeof block === "object" && "text" in block && typeof block.text === "string") text += block.text;
+  }
+  return text;
+}
+
+/** An AbortSignal that fires when the client goes away OR this call's own ceiling elapses -- so one hung model call cannot outlive either bound. */
+function callAbortSignal(clientSignal: AbortSignal | undefined, timeoutMs: number): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return clientSignal ? AbortSignal.any([clientSignal, timeout]) : timeout;
+}
+
+/**
+ * The streaming twin of askSalesEmployee(), for the widget only (design
+ * §a/§b/§e). Shares prepareTurn(), buildTurnContext() and
+ * executeBusinessToolCall() with the non-streaming path, so the quota gate,
+ * retrieval, persona rendering, tool execution, dedupe and the exact
+ * early-return messages are the one implementation -- only the final-answer
+ * delivery differs.
+ *
+ * The final answer is streamed as plain text (Gemini AUTO mode, no
+ * send_reply tool) because this LangChain/Gemini integration delivers a
+ * tool call's arguments as one whole object, not an incremental token
+ * stream (node_modules/@langchain/google-genai/dist/utils/common.js), so
+ * prose is the only thing that can stream token by token. The model-judged
+ * metadata (escalate/usedContext/escalationReason) comes from a SEPARATE
+ * structured-output call over the same transcript -- the identical call the
+ * non-streaming fallback uses -- fired the moment the model starts writing
+ * the answer, so it overlaps the answer stream into roughly one call's wall
+ * time instead of two.
+ *
+ * The three non-streaming callers (WhatsApp, Instagram, the dashboard
+ * sandbox) never call this -- they keep calling askSalesEmployee() and
+ * receive a complete answer, unchanged.
+ */
+export async function* streamSalesEmployee(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+  businessName: string,
+  businessProfile: BusinessProfileContext,
+  question: string,
+  history: ConversationMessage[] = [],
+  language: WidgetLanguage = "en",
+  aiCapabilities: { recommendProductsEnabled: boolean; appointmentsEnabled: boolean } = {
+    recommendProductsEnabled: false,
+    appointmentsEnabled: false,
+  },
+  timer: TurnTimer = new TurnTimer(),
+  prefetchedQuota?: ReplyQuotaStatus,
+  clientSignal?: AbortSignal,
+): AsyncGenerator<StreamChunk, void, unknown> {
+  const buildTimeoutResponse = (quota: ReplyQuotaStatus): SalesEmployeeResponse => ({
+    answer: RESPONSE_TIMEOUT_MESSAGE,
+    grounded: false,
+    usedContext: false,
+    sourceChunkIds: [],
+    escalate: true,
+    escalationReason: "response_timeout",
+    recommendedProducts: [],
+    metricsRowId: null,
+    quotaSnapshot: quota,
+  });
+
+  const prepared = await prepareTurn(supabase, businessId, conversationId, question, history, language, timer, prefetchedQuota);
+  if (prepared.kind === "early") {
+    // A fixed message (over quota / cache hit / no-knowledge fallback):
+    // there is no generation to stream, but it travels the same wire as one
+    // delta + final so the widget has a single code path.
+    yield { kind: "delta", text: prepared.response.answer };
+    yield { kind: "final", response: prepared.response, interrupted: false };
+    return;
+  }
+  const { quota, documents, context } = prepared;
+
+  const startedAt = Date.now();
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalThinkingTokens = 0;
+  let toolCallCount = 0;
+  let calledSideEffectingTool = false;
+  const additionalSourceChunkIds = new Set<string>();
+  let recommendedProducts: RecommendedItem[] = [];
+  const searchedQueries: string[] = [question];
+  // The answer text actually sent to the prospect so far.
+  let answerText = "";
+  let answerStarted = false;
+
+  const sourceChunkIds = (): string[] => [
+    ...new Set([...documents.map((document) => document.metadata.chunkId), ...additionalSourceChunkIds]),
+  ];
+
+  try {
+    const { plainSystemMessage, messages, tools } = await buildTurnContext(
+      businessName,
+      businessProfile,
+      question,
+      history,
+      language,
+      aiCapabilities,
+      context,
+    );
+    // Business tools only, Gemini AUTO mode (the default -- no tool_choice):
+    // the model may call a tool or write the answer as text. No send_reply
+    // tool here; the answer is streamed prose (see this function's header).
+    const toolModel = getChatModel().bindTools(tools);
+
+    // Fired once, the instant the model starts writing the answer: the same
+    // structured-output call the non-streaming fallback runs, over the same
+    // transcript, concurrent with the answer stream.
+    type TurnMetadata = z.infer<typeof SalesEmployeeResponseSchema>;
+    let metadataPromise: Promise<TurnMetadata | null> | null = null;
+    const startMetadataCall = (): Promise<TurnMetadata | null> => {
+      const budgetMs = remainingBudgetMs(timer);
+      const metaModel = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, {
+        name: "SalesEmployeeResponse",
+        includeRaw: true,
+      });
+      return timer.time("metadata_call", async (): Promise<TurnMetadata | null> => {
+        try {
+          const { raw, parsed } = await metaModel.invoke([plainSystemMessage, ...messages.slice(1)], {
+            signal: callAbortSignal(clientSignal, Math.min(CHAT_MODEL_CALL_TIMEOUT_MS, Math.max(budgetMs, MIN_MODEL_CALL_BUDGET_MS))),
+          });
+          const rawUsage = (raw as AIMessage).usage_metadata;
+          totalInputTokens += rawUsage?.input_tokens ?? 0;
+          totalOutputTokens += rawUsage?.output_tokens ?? 0;
+          totalThinkingTokens += thinkingTokensOf(rawUsage);
+          return parsed as TurnMetadata;
+        } catch (error) {
+          if (isAbortError(error)) return null;
+          throw error;
+        }
+      });
+    };
+
+    let timedOut = false;
+    let interruptedByClient = false;
+
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+      const budgetMs = remainingBudgetMs(timer);
+      if (budgetMs < MIN_MODEL_CALL_BUDGET_MS) {
+        timedOut = true;
+        break;
+      }
+      const signal = callAbortSignal(clientSignal, Math.min(CHAT_MODEL_CALL_TIMEOUT_MS, budgetMs));
+      let gathered: AIMessageChunk | undefined;
+      let iterationTextStarted = false;
+      const iterStart = Date.now();
+      try {
+        const stream = await toolModel.stream([plainSystemMessage, ...messages.slice(1)], { signal });
+        for await (const chunk of stream) {
+          gathered = gathered === undefined ? chunk : gathered.concat(chunk);
+          const text = messageChunkText(chunk);
+          if (text) {
+            if (!answerStarted) {
+              answerStarted = true;
+              iterationTextStarted = true;
+              // The model committed to answering: overlap the metadata call.
+              metadataPromise = startMetadataCall();
+            }
+            answerText += text;
+            yield { kind: "delta", text };
+          }
+        }
+      } catch (error) {
+        timer.record(`model_call_${iteration + 1}`, Date.now() - iterStart);
+        if (isAbortError(error)) {
+          if (clientSignal?.aborted) interruptedByClient = true;
+          else timedOut = true;
+          break;
+        }
+        throw error;
+      }
+      timer.record(`model_call_${iteration + 1}`, Date.now() - iterStart);
+      totalInputTokens += gathered?.usage_metadata?.input_tokens ?? 0;
+      totalOutputTokens += gathered?.usage_metadata?.output_tokens ?? 0;
+      totalThinkingTokens += thinkingTokensOf(gathered?.usage_metadata);
+
+      if (iterationTextStarted) break; // the answer streamed; the turn is over
+      const toolCalls = gathered?.tool_calls ?? [];
+      if (toolCalls.length === 0) break; // neither text nor tools -> fallback
+
+      messages.push(gathered as BaseMessage);
+      toolCallCount += toolCalls.length;
+      const toolOutcomes = await timer.time(
+        `tool_batch_${iteration + 1}`,
+        () =>
+          Promise.all(
+            toolCalls.map((toolCall) =>
+              executeBusinessToolCall(supabase, businessId, conversationId, toolCall, searchedQueries),
+            ),
+          ),
+        toolCalls.map((toolCall) => toolCall.name),
+      );
+      for (const outcome of toolOutcomes) {
+        if (outcome.sideEffecting) calledSideEffectingTool = true;
+        for (const chunkId of outcome.chunkIds) additionalSourceChunkIds.add(chunkId);
+        if (outcome.recommended !== null) recommendedProducts = outcome.recommended;
+        if (outcome.executedSearchQuery !== undefined) searchedQueries.push(outcome.executedSearchQuery);
+        messages.push(
+          new ToolMessage({
+            content: `<tool_result>${capToolResultJson(JSON.stringify(outcome.toolResult))}</tool_result>`,
+            tool_call_id: outcome.toolCall.id!,
+            name: outcome.toolCall.name,
+          }),
+        );
+      }
+    }
+
+    // Client went away (disconnect or an explicit stop) -- possibly after
+    // some text was shown. Persist the partial as interrupted; never a
+    // success, never escalated (the visitor chose to leave).
+    if (interruptedByClient) {
+      logEvent(
+        "ai_response_stream_interrupted",
+        businessId,
+        { conversationId, totalLatencyMs: timer.elapsedMs(), toolCallCount },
+        "error",
+      );
+      yield {
+        kind: "final",
+        interrupted: true,
+        response: {
+          answer: answerText,
+          grounded: false,
+          usedContext: false,
+          sourceChunkIds: sourceChunkIds(),
+          escalate: false,
+          escalationReason: null,
+          recommendedProducts,
+          metricsRowId: null,
+          quotaSnapshot: quota,
+        },
+      };
+      return;
+    }
+
+    // Deadline hit. If text was already shown, mark it interrupted but
+    // escalate (a human follows up on the half-answer). If nothing was
+    // shown, it is the clean timeout message, exactly like the
+    // non-streaming path.
+    if (timedOut) {
+      logEvent(
+        "ai_response_timeout",
+        businessId,
+        { conversationId, totalLatencyMs: timer.elapsedMs(), toolCallCount, streamed: true },
+        "error",
+      );
+      if (answerStarted) {
+        yield {
+          kind: "final",
+          interrupted: true,
+          response: {
+            answer: answerText,
+            grounded: false,
+            usedContext: false,
+            sourceChunkIds: sourceChunkIds(),
+            escalate: true,
+            escalationReason: "response_timeout",
+            recommendedProducts,
+            metricsRowId: null,
+            quotaSnapshot: quota,
+          },
+        };
+      } else {
+        const response = buildTimeoutResponse(quota);
+        yield { kind: "delta", text: response.answer };
+        yield { kind: "final", response, interrupted: false };
+      }
+      return;
+    }
+
+    // Writes the success metrics row, logs, caches, and builds the final
+    // response -- the clean-completion tail shared by the streamed-answer
+    // case and the fallback case below. `usedContext`/`escalate`/
+    // `escalationReason` come from the model (the metadata or fallback
+    // structured call); `grounded` and `recommendedProducts` never did.
+    const finishClean = async (
+      result: z.infer<typeof SalesEmployeeResponseSchema>,
+      streamed: boolean,
+    ): Promise<SalesEmployeeResponse> => {
+      const latencyMs = Date.now() - startedAt;
+      const metricsRowId = await timer.time("metrics_write", () =>
+        insertTurnMetrics(supabase, {
+          businessId,
+          conversationId,
+          latencyMs,
+          totalLatencyMs: timer.elapsedMs(),
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          thinkingTokens: totalThinkingTokens,
+          toolCallCount,
+          stageTimings: timer.toStageTimings(),
+        }),
+      );
+      logEvent("ai_response_generated", businessId, {
+        conversationId,
+        latencyMs,
+        totalLatencyMs: timer.elapsedMs(),
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        totalTokens: totalInputTokens + totalOutputTokens,
+        thinkingTokens: totalThinkingTokens,
+        toolCallCount,
+        usedSendReplyTool: false,
+        streamed,
+        stageTimings: JSON.stringify(timer.toStageTimings()),
+      });
+      const response: SalesEmployeeResponse = {
+        answer: result.answer,
+        grounded: documents.length > 0 && result.usedContext,
+        usedContext: result.usedContext,
+        sourceChunkIds: sourceChunkIds(),
+        escalate: result.escalate,
+        escalationReason: result.escalationReason,
+        recommendedProducts,
+        metricsRowId,
+        quotaSnapshot: quota,
+      };
+      if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
+        await setCachedResponse(supabase, businessId, question, language, response);
+      }
+      return response;
+    };
+
+    // The answer streamed. Await the concurrent metadata call for the
+    // model-judged fields; its answer field is ignored (the prospect
+    // already has the streamed text). If it failed, fall back to
+    // conservative defaults (not grounded, not escalated) rather than
+    // claiming a judgement that was never made.
+    if (answerStarted) {
+      const metadata: TurnMetadata | null = metadataPromise ? await metadataPromise : null;
+      if (!metadata) logEvent("ai_stream_metadata_failed", businessId, { conversationId }, "error");
+      const response = await finishClean(
+        {
+          answer: answerText,
+          usedContext: metadata?.usedContext ?? false,
+          escalate: metadata?.escalate ?? false,
+          escalationReason: metadata?.escalationReason ?? null,
+        },
+        true,
+      );
+      yield { kind: "final", response, interrupted: false };
+      return;
+    }
+
+    // Fallback: the model never streamed an answer (it kept calling tools to
+    // the cap, or produced neither text nor a tool call). Run the same
+    // toolless structured-output call the non-streaming path's fallback runs
+    // and emit its answer as a single delta + final -- not token-streamed,
+    // because there is no streaming generation to ride.
+    const budgetMs = remainingBudgetMs(timer);
+    if (budgetMs < MIN_MODEL_CALL_BUDGET_MS) {
+      logEvent(
+        "ai_response_timeout",
+        businessId,
+        { conversationId, totalLatencyMs: timer.elapsedMs(), toolCallCount, stage: "fallback", streamed: true },
+        "error",
+      );
+      const response = buildTimeoutResponse(quota);
+      yield { kind: "delta", text: response.answer };
+      yield { kind: "final", response, interrupted: false };
+      return;
+    }
+    const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, {
+      name: "SalesEmployeeResponse",
+      includeRaw: true,
+    });
+    let raw: BaseMessage;
+    let parsed: z.infer<typeof SalesEmployeeResponseSchema>;
+    try {
+      ({ raw, parsed } = await timer.time("final_structured_call", () =>
+        model.invoke([plainSystemMessage, ...messages.slice(1)], {
+          signal: callAbortSignal(clientSignal, Math.min(CHAT_MODEL_CALL_TIMEOUT_MS, budgetMs)),
+        }),
+      ));
+    } catch (error) {
+      if (isAbortError(error)) {
+        if (clientSignal?.aborted) {
+          logEvent("ai_response_stream_interrupted", businessId, { conversationId, stage: "fallback" }, "error");
+          yield {
+            kind: "final",
+            interrupted: true,
+            response: {
+              answer: answerText,
+              grounded: false,
+              usedContext: false,
+              sourceChunkIds: sourceChunkIds(),
+              escalate: false,
+              escalationReason: null,
+              recommendedProducts,
+              metricsRowId: null,
+              quotaSnapshot: quota,
+            },
+          };
+          return;
+        }
+        logEvent(
+          "ai_response_timeout",
+          businessId,
+          { conversationId, totalLatencyMs: timer.elapsedMs(), toolCallCount, stage: "fallback", streamed: true },
+          "error",
+        );
+        const response = buildTimeoutResponse(quota);
+        yield { kind: "delta", text: response.answer };
+        yield { kind: "final", response, interrupted: false };
+        return;
+      }
+      throw error;
+    }
+    const rawUsage = (raw as AIMessage).usage_metadata;
+    totalInputTokens += rawUsage?.input_tokens ?? 0;
+    totalOutputTokens += rawUsage?.output_tokens ?? 0;
+    totalThinkingTokens += thinkingTokensOf(rawUsage);
+    answerText = parsed.answer;
+    const response = await finishClean(parsed, false);
+    yield { kind: "delta", text: response.answer };
+    yield { kind: "final", response, interrupted: false };
+  } catch (error) {
+    throw new AppError(
+      "Something went wrong generating a response. Please try again.",
+      "streamSalesEmployee: chat generation failed",
       error,
     );
   }

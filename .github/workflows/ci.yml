@@ -104,6 +104,17 @@ jobs:
         # so it runs alongside the other unit suites rather than with pgTAP.
         run: npm run test:chat-perf
 
+      - name: Chat streaming transport and assembly tests
+        # feat/chat-streaming (STATE.md): the SSE wire codec (lib/chat-stream.ts),
+        # the widget's many-chunks-into-one-bubble reducer
+        # (lib/widget-stream-reducer.ts) and the iframe<->loader protocol
+        # validator. Pure modules, no database and no secrets, so it runs
+        # with the other unit suites. (The model streaming, DB writes,
+        # escalation and tenant isolation are covered by the eval's shared
+        # pipeline and by pgTAP; this guards the transport that can silently
+        # hand a visitor a broken bubble.)
+        run: npm run test:chat-streaming
+
       - name: Build
         run: npm run build
 

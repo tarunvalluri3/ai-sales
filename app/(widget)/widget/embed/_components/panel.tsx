@@ -19,11 +19,13 @@ export function Panel({
   privacyPolicyUrl,
   messages,
   isAwaitingResponse,
+  isStreaming,
   isCoolingDown,
   panelError,
   consentGiven,
   onConsentChange,
   onSend,
+  onStop,
   onRetry,
   onClose,
   onStartNewChat,
@@ -40,11 +42,13 @@ export function Panel({
   privacyPolicyUrl: string | null;
   messages: ChatMessage[];
   isAwaitingResponse: boolean;
+  isStreaming: boolean;
   isCoolingDown: boolean;
   panelError: string | null;
   consentGiven: boolean;
   onConsentChange: (value: boolean) => void;
   onSend: (text: string) => void;
+  onStop: () => void;
   onRetry: (id: string) => void;
   onClose: () => void;
   onStartNewChat: () => void;
@@ -126,7 +130,9 @@ export function Panel({
           <Composer
             strings={strings}
             onSend={onSend}
-            disabled={isAwaitingResponse || isCoolingDown}
+            onStop={onStop}
+            isStreaming={isStreaming}
+            disabled={isAwaitingResponse || isStreaming || isCoolingDown}
             autoFocus
             consentGiven={consentGiven}
             onConsentChange={onConsentChange}
