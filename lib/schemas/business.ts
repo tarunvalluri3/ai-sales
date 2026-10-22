@@ -5,8 +5,12 @@ import { SUPPORTED_WIDGET_LANGUAGES } from "@/lib/widget-i18n";
  * Shared Zod fields for the business profile (Phase 13b). `name` is
  * required, matching the constraint it's always had since onboarding
  * (Phase 4). The other four are optional -- blank input becomes `null`,
- * matching lib/schemas/catalog.ts's existing convention -- and are
- * dashboard-display-only: not read anywhere in lib/rag.ts's AI pipeline.
+ * matching lib/schemas/catalog.ts's existing convention.
+ *
+ * Since Phase 24 these are NOT display-only: description, website,
+ * contactEmail and contactPhone are injected into the AI persona by
+ * lib/rag.ts's formatBusinessProfileContext(). `businessType` remains
+ * display-only (not read by the AI pipeline).
  */
 
 export const businessNameSchema = z

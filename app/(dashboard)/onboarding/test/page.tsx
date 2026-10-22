@@ -4,6 +4,8 @@ import { getBusinessForOrg } from "@/lib/business";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { SandboxChatPanel } from "../../dashboard/_components/sandbox-chat/sandbox-chat-panel";
 import { PublishButton } from "../../dashboard/widget-settings/publish-button";
+import { ReadinessChecklist } from "../../dashboard/widget-settings/readiness-checklist";
+import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
 
 /**
  * Phase 25c "test your AI before publishing": the step onboarding lands
@@ -20,6 +22,7 @@ export default async function OnboardingTestPage() {
     listWidgetKeysForBusiness(businessId),
   ]);
   const hasActiveKey = widgetKeys.some((key) => key.status !== "revoked");
+  const readiness = business ? await loadReadinessReport(businessId, business) : null;
 
   return (
     <div className="flex flex-1 flex-col items-center gap-6 bg-ds-bg px-6 py-10">
@@ -34,10 +37,13 @@ export default async function OnboardingTestPage() {
 
       <div className="flex w-full max-w-xl flex-col gap-4">
         <SandboxChatPanel />
+        {readiness ? <ReadinessChecklist report={readiness} /> : null}
         <PublishButton
           isPublished={business?.published_at != null}
           hasActiveKey={hasActiveKey}
           hasPrivacyPolicyUrl={Boolean(business?.privacy_policy_url)}
+          readinessBlocked={readiness ? readiness.gateApplies && !readiness.canPublish : false}
+          blockingCount={readiness ? readiness.blockingItems.length : 0}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">

@@ -12,6 +12,7 @@
     "test:copilot-lifecycle": "node --test scripts/run-copilot-lifecycle-tests.mjs",
     "test:plan-tax": "node --test scripts/run-plan-tax-tests.mjs",
     "test:invoices": "node --test scripts/run-invoice-tests.mjs",
+    "test:onboarding-readiness": "node --test scripts/run-onboarding-readiness-tests.mjs",
     "test:razorpay": "node --test scripts/run-razorpay-signature-tests.mjs scripts/run-razorpay-webhook-tests.mjs",
     "credit-note": "node --conditions=react-server --env-file=.env.local scripts/issue-credit-note.mjs",
     "eval": "node --env-file=.env.local scripts/run-evals.mjs",

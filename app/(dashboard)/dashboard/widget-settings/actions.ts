@@ -11,7 +11,10 @@ import {
   updateWidgetSuggestedQuestions,
   updateAiCapabilities,
   publishBusinessForOrg,
+  BusinessNotReadyError,
 } from "@/lib/business";
+import { setReadinessDismissal } from "@/lib/onboarding-readiness-data";
+import { isDismissibleItemKey } from "@/lib/onboarding-readiness";
 import { widgetBrandingSchema, widgetSuggestedQuestionsSchema } from "@/lib/schemas/business";
 import { parseOrigins } from "@/lib/schemas/widget-origin";
 import { generateSuggestedQuestions, NoBusinessContentError } from "@/lib/widget-suggested-questions";
@@ -248,10 +251,55 @@ export async function publishBusinessAction(
   try {
     await publishBusinessForOrg(orgId);
   } catch (err) {
+    // A readiness refusal is an expected, user-facing outcome (the business
+    // hasn't given its AI enough to answer with yet) -- surface its message
+    // directly rather than logging it as an error.
+    if (err instanceof BusinessNotReadyError) {
+      return { error: err.message };
+    }
     return { error: logAndGetUserMessage(err) };
   }
 
   await recordAuditLogEntry(businessId, userId, "business.published", "business", businessId);
+
+  revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding/test");
+  return { success: true };
+}
+
+export type ReadinessDismissalActionState = {
+  error?: string;
+  success?: boolean;
+};
+
+/**
+ * Records or clears an explicit "this doesn't apply to us" acknowledgement
+ * for a dismissible readiness item (feat/onboarding-readiness). Only a
+ * conditional item is dismissible (isDismissibleItemKey); a genuinely-
+ * required item can never be waived here. org:admin-only, same tier as
+ * every other business-config write on this page.
+ */
+export async function setReadinessDismissalAction(
+  _prevState: ReadinessDismissalActionState,
+  formData: FormData,
+): Promise<ReadinessDismissalActionState> {
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const itemKey = String(formData.get("itemKey") ?? "");
+  if (!isDismissibleItemKey(itemKey)) {
+    return { error: "That item can't be marked not-applicable." };
+  }
+  const dismissed = formData.get("dismissed") === "true";
+
+  try {
+    await setReadinessDismissal(businessId, userId, itemKey, dismissed);
+  } catch (err) {
+    return { error: logAndGetUserMessage(err) };
+  }
 
   revalidatePath("/dashboard/widget-settings");
   revalidatePath("/onboarding/test");
