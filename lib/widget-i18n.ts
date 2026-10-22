@@ -42,6 +42,8 @@ export type WidgetStrings = {
   closeChatLabel: string;
   inputPlaceholder: string;
   sendLabel: string;
+  /** feat/chat-streaming: label for the stop-generating control shown while a reply is streaming. Optional so existing locale tables need no edit; the composer falls back to "Stop". TODO: translate per locale. */
+  stopLabel?: string;
   consentText: string;
   consentLinkLabel: string;
   teamMemberLabel: string;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { parseFromParentMessage, postToParent, type WidgetErrorKind, type WidgetRecommendedProduct } from "./post-message";
 import type { WidgetStrings } from "@/lib/widget-i18n";
 import { CHAT_CLIENT_TIMEOUT_MS } from "@/lib/chat-timeouts";
+import { appendStreamDelta, finalizeStreamMessage, finalizeAbortedStream } from "@/lib/widget-stream-reducer";
 
 export type ChatMessage = {
   id: string;
@@ -45,6 +46,12 @@ function newId(): string {
 export function useWidgetChat(strings: WidgetStrings) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAwaitingResponse, setIsAwaitingResponse] = useState(false);
+  // feat/chat-streaming: true from send until the stream's terminal event.
+  // Distinct from isAwaitingResponse, which flips off on the first token so
+  // the typing indicator gives way to the streaming text -- isStreaming
+  // keeps the composer's stop control visible while tokens are still
+  // arriving, and keeps the composer from accepting a second send.
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isCoolingDown, setIsCoolingDown] = useState(false);
   const [panelError, setPanelError] = useState<string | null>(null);
   // Phase 22c: set by the widget's own consent checkbox, never inferred
@@ -58,7 +65,10 @@ export function useWidgetChat(strings: WidgetStrings) {
   const hasSucceededRef = useRef(false);
   const consentGivenRef = useRef(false);
   const pendingRef = useRef(
-    new Map<string, { userMessageId: string; assistantPlaceholderId: string; text: string }>(),
+    new Map<
+      string,
+      { userMessageId: string; assistantPlaceholderId: string; text: string; timeoutId?: ReturnType<typeof setTimeout>; sawDelta?: boolean }
+    >(),
   );
 
   useEffect(() => {
@@ -71,9 +81,11 @@ export function useWidgetChat(strings: WidgetStrings) {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
         pendingRef.current.delete(message.requestId);
+        if (pending.timeoutId) clearTimeout(pending.timeoutId);
         hasSucceededRef.current = true;
         conversationIdRef.current = message.conversationId;
         setIsAwaitingResponse(false);
+        setIsStreaming(false);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === pending.assistantPlaceholderId
@@ -87,11 +99,55 @@ export function useWidgetChat(strings: WidgetStrings) {
               : m,
           ),
         );
+      } else if (message.type === "widget:stream_start") {
+        const pending = pendingRef.current.get(message.requestId);
+        if (!pending) return;
+        conversationIdRef.current = message.conversationId;
+      } else if (message.type === "widget:stream_delta") {
+        const pending = pendingRef.current.get(message.requestId);
+        if (!pending) return;
+        if (!pending.sawDelta) {
+          pending.sawDelta = true;
+          // The first token proves the turn is live: drop the whole-turn
+          // client timeout and swap the typing indicator for the streaming
+          // text. A stalled stream is still bounded by the server's own AI
+          // deadline, which ends the turn with a terminal event.
+          if (pending.timeoutId) clearTimeout(pending.timeoutId);
+          setIsAwaitingResponse(false);
+        }
+        setMessages((prev) => appendStreamDelta(prev, pending.assistantPlaceholderId, message.text));
+      } else if (message.type === "widget:stream_end") {
+        const pending = pendingRef.current.get(message.requestId);
+        if (!pending) return;
+        pendingRef.current.delete(message.requestId);
+        if (pending.timeoutId) clearTimeout(pending.timeoutId);
+        hasSucceededRef.current = true;
+        setIsAwaitingResponse(false);
+        setIsStreaming(false);
+        setMessages((prev) =>
+          finalizeStreamMessage(prev, pending.assistantPlaceholderId, {
+            escalate: message.escalate,
+            recommendedProducts: message.recommendedProducts,
+          }),
+        );
+      } else if (message.type === "widget:stream_aborted") {
+        const pending = pendingRef.current.get(message.requestId);
+        if (!pending) return;
+        pendingRef.current.delete(message.requestId);
+        if (pending.timeoutId) clearTimeout(pending.timeoutId);
+        setIsAwaitingResponse(false);
+        setIsStreaming(false);
+        // Keep whatever streamed so far; drop the bubble only if nothing
+        // ever arrived. Never surfaced as an error -- the visitor chose to
+        // stop, or the connection dropped after a partial answer.
+        setMessages((prev) => finalizeAbortedStream(prev, pending.assistantPlaceholderId));
       } else if (message.type === "widget:error") {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
         pendingRef.current.delete(message.requestId);
+        if (pending.timeoutId) clearTimeout(pending.timeoutId);
         setIsAwaitingResponse(false);
+        setIsStreaming(false);
 
         if (message.kind === "unauthorized" && !hasSucceededRef.current) {
           setMessages((prev) => prev.filter((m) => m.id !== pending.assistantPlaceholderId));
@@ -146,39 +202,57 @@ export function useWidgetChat(strings: WidgetStrings) {
   const dispatchSend = useCallback((text: string, userMessageId: string) => {
     const requestId = newId();
     const assistantPlaceholderId = newId();
-    pendingRef.current.set(requestId, { userMessageId, assistantPlaceholderId, text });
 
-    setMessages((prev) => [...prev, { id: assistantPlaceholderId, role: "assistant", content: "" }]);
-    setIsAwaitingResponse(true);
-    postToParent({ type: "widget:send", requestId, text, consentGiven: consentGivenRef.current });
-
-    setTimeout(() => {
+    // The whole-turn client deadline. On a streamed turn the first token
+    // clears it (see the stream_delta handler); on a non-streaming turn
+    // (human-control JSON) or a stream that never produces a token, it
+    // fires and surfaces the error exactly as before. The id is stored so
+    // the stream handlers can clear it.
+    const timeoutId = setTimeout(() => {
       if (!pendingRef.current.has(requestId)) return;
       pendingRef.current.delete(requestId);
       setIsAwaitingResponse(false);
+      setIsStreaming(false);
       setMessages((prev) =>
         prev
           .filter((m) => m.id !== assistantPlaceholderId)
           .map((m) => (m.id === userMessageId ? { ...m, status: "error", errorKind: "failure" } : m)),
       );
     }, RESPONSE_TIMEOUT_MS);
+
+    pendingRef.current.set(requestId, { userMessageId, assistantPlaceholderId, text, timeoutId });
+
+    setMessages((prev) => [...prev, { id: assistantPlaceholderId, role: "assistant", content: "" }]);
+    setIsAwaitingResponse(true);
+    setIsStreaming(true);
+    postToParent({ type: "widget:send", requestId, text, consentGiven: consentGivenRef.current });
   }, []);
 
   const sendMessage = useCallback(
     (rawText: string) => {
       const text = rawText.trim().slice(0, MAX_MESSAGE_LENGTH);
-      if (!text || isAwaitingResponse || isCoolingDown) return;
+      // Double-submission guard: isAwaitingResponse covers the pre-token
+      // wait, isStreaming covers the rest of a turn whose tokens are still
+      // arriving. Neither a second send nor a retry can start mid-turn.
+      if (!text || isAwaitingResponse || isStreaming || isCoolingDown) return;
 
       const userMessageId = newId();
       setMessages((prev) => [...prev, { id: userMessageId, role: "user", content: text }]);
       dispatchSend(text, userMessageId);
     },
-    [isAwaitingResponse, isCoolingDown, dispatchSend],
+    [isAwaitingResponse, isStreaming, isCoolingDown, dispatchSend],
   );
+
+  /** Visitor pressed stop: ask the loader to abort the in-flight fetch. The loader replies with widget:stream_aborted, which finalizes the partial answer. */
+  const abort = useCallback(() => {
+    for (const requestId of pendingRef.current.keys()) {
+      postToParent({ type: "widget:abort", requestId });
+    }
+  }, []);
 
   const retryMessage = useCallback(
     (messageId: string) => {
-      if (isAwaitingResponse || isCoolingDown) return;
+      if (isAwaitingResponse || isStreaming || isCoolingDown) return;
       const target = messages.find((m) => m.id === messageId);
       if (!target || target.role !== "user") return;
       setMessages((prev) =>
@@ -186,7 +260,7 @@ export function useWidgetChat(strings: WidgetStrings) {
       );
       dispatchSend(target.content, messageId);
     },
-    [messages, isAwaitingResponse, isCoolingDown, dispatchSend],
+    [messages, isAwaitingResponse, isStreaming, isCoolingDown, dispatchSend],
   );
 
   const setConsent = useCallback((value: boolean) => {
@@ -196,11 +270,15 @@ export function useWidgetChat(strings: WidgetStrings) {
 
   /** Phase 25d "start new chat": resets this widget instance's own state and tells the loader to clear its stored/in-memory conversation id. */
   const startNewChat = useCallback(() => {
+    for (const pending of pendingRef.current.values()) {
+      if (pending.timeoutId) clearTimeout(pending.timeoutId);
+    }
     pendingRef.current.clear();
     hasSucceededRef.current = false;
     conversationIdRef.current = null;
     setMessages([]);
     setIsAwaitingResponse(false);
+    setIsStreaming(false);
     setIsCoolingDown(false);
     setPanelError(null);
     postToParent({ type: "widget:new_chat" });
@@ -221,10 +299,14 @@ export function useWidgetChat(strings: WidgetStrings) {
    * applies unchanged, even for a picked conversation with zero messages.
    */
   const switchConversation = useCallback((conversationId: string) => {
+    for (const pending of pendingRef.current.values()) {
+      if (pending.timeoutId) clearTimeout(pending.timeoutId);
+    }
     pendingRef.current.clear();
     hasSucceededRef.current = false;
     setMessages([]);
     setIsAwaitingResponse(false);
+    setIsStreaming(false);
     setIsCoolingDown(false);
     setPanelError(null);
     postToParent({ type: "widget:switch_conversation", conversationId });
@@ -233,11 +315,13 @@ export function useWidgetChat(strings: WidgetStrings) {
   return {
     messages,
     isAwaitingResponse,
+    isStreaming,
     isCoolingDown,
     panelError,
     consentGiven,
     setConsentGiven: setConsent,
     sendMessage,
+    abort,
     retryMessage,
     startNewChat,
     recentChats,
