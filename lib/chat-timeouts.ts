@@ -48,3 +48,59 @@ export const CHAT_CLIENT_TIMEOUT_MARGIN_MS = 15_000;
 /** Derived, never written independently -- see this file's header. */
 export const CHAT_CLIENT_TIMEOUT_MS =
   CHAT_SERVER_MAX_DURATION_SECONDS * 1_000 + CHAT_CLIENT_TIMEOUT_MARGIN_MS;
+
+/**
+ * The AI generation deadlines, added 2026-10-22 (STATE.md, "chat pipeline
+ * latency"). They sit *inside* the server's own `maxDuration` above: the
+ * platform kills the function at CHAT_SERVER_MAX_DURATION_SECONDS no matter
+ * what, so these exist to end a slow turn *honestly* -- a clear timeout
+ * escalation, metrics recorded as a timeout and never as a success -- well
+ * before that hard kill, rather than letting the function be shot in the
+ * head mid-generation and the widget show a bare error.
+ *
+ * Values are chosen from the production measurements in `ai_response_metrics`
+ * (not intuition): a single real model call runs ~1.3-3.7 s, the slowest
+ * real turn seen was ~17.7 s end to end, and the slowest synthetic turn
+ * ~46 s. So the ceilings below are generous multiples of the normal case
+ * yet comfortably under the 60 s function limit, leaving headroom for the
+ * pre-AI setup, the post-reply writes, and serialization.
+ *
+ * Each is overridable by an env var for operational tuning without a
+ * deploy, which is what "configurable" in the latency brief means; the
+ * default is used whenever the override is absent or not a positive
+ * integer, so a bad value can never make a turn hang.
+ */
+function positiveIntEnv(name: string, fallbackMs: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallbackMs;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs;
+}
+
+/**
+ * The whole AI generation (the tool-calling loop plus any fallback
+ * structured call), measured from the start of the turn. On exhaustion the
+ * loop stops and returns an honest timeout escalation instead of starting
+ * another model call. 50 s leaves ~10 s of the 60 s function budget for the
+ * setup round trips, the assistant-message write, and response serialization.
+ */
+export const CHAT_AI_DEADLINE_MS = positiveIntEnv("CHAT_AI_DEADLINE_MS", 50_000);
+
+/**
+ * A single Gemini call. Hard-aborted via an AbortSignal -- safe because a
+ * model call has no effect on this app's database. ~8x the normal call,
+ * still well under the overall deadline so one hung call cannot eat it all.
+ */
+export const CHAT_MODEL_CALL_TIMEOUT_MS = positiveIntEnv("CHAT_MODEL_CALL_TIMEOUT_MS", 25_000);
+
+/**
+ * A single read-only tool execution (catalog/FAQ/knowledge lookups). On
+ * timeout the model is told the lookup failed and moves on; the abandoned
+ * query simply finishes in the background. **Deliberately applied to
+ * read-only tools only** -- `request_callback` and `book_appointment` write
+ * rows and run consent gates, so cancelling one mid-flight could report a
+ * failure for a write that actually happened, or leave partial state. Those
+ * two always run to completion and report truthfully (AGENTS.md §3 rule 5,
+ * and the brief's "never skip a tool to save time").
+ */
+export const CHAT_TOOL_TIMEOUT_MS = positiveIntEnv("CHAT_TOOL_TIMEOUT_MS", 15_000);

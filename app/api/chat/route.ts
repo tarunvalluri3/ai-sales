@@ -23,6 +23,7 @@ import { CHAT_SERVER_MAX_DURATION_SECONDS } from "@/lib/chat-timeouts";
 import { TurnTimer } from "@/lib/turn-timings";
 import { finalizeTurnMetrics } from "@/lib/ai-response-metrics";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
+import { checkReplyQuota } from "@/lib/usage-limit";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -198,22 +199,33 @@ export async function POST(request: NextRequest) {
       return withCors(jsonError("Too many requests.", 429));
     }
 
-    // Phase 22c: the widget's own consent checkbox is the only thing
-    // that can set this -- never inferred from the AI or the prospect's
-    // free-text reply. Recorded before the message is processed so a
-    // tool call triggered by this very message already sees it.
-    if (consentGiven) {
-      await timer.time("consent_write", () =>
-        recordConversationConsent(supabase, business.businessId, conversationRowId),
-      );
-    }
-
-    // Persisted unconditionally, regardless of control state, so a human
-    // reviewing the conversation sees every prospect message even while
-    // it's human-controlled and the AI is not being called.
-    const userMessageRow = await timer.time("user_message_write", () =>
-      createMessage(supabase, business.businessId, conversationRowId, "user", message),
-    );
+    // Item 4 of the 2026-10-22 latency pass: three independent round trips
+    // that used to run one after another now run concurrently, co-located
+    // with Supabase in `icn1`. They are genuinely independent -- the
+    // consent write, the user-message write, and the quota count share no
+    // data and none gates another -- so overlapping them removes ~2 serial
+    // round trips from the prospect's wait without weakening any rule:
+    //
+    //  - consent is still awaited before askSalesEmployee(), so a
+    //    book_appointment/request_callback tool call this very turn still
+    //    sees it (Phase 22c);
+    //  - the user message is still persisted unconditionally, before the
+    //    human-control check below, so a human reviewing the conversation
+    //    sees every prospect message even while the AI is paused;
+    //  - the quota verdict is computed here and handed to
+    //    askSalesEmployee() (prefetchedQuota), which still refuses any
+    //    Gemini call when the business is over quota -- the gate is
+    //    unchanged, only its round trip now overlaps these writes instead
+    //    of running sequentially at the top of askSalesEmployee().
+    const [, userMessageRow, quota] = await Promise.all([
+      consentGiven
+        ? timer.time("consent_write", () => recordConversationConsent(supabase, business.businessId, conversationRowId))
+        : Promise.resolve(null),
+      timer.time("user_message_write", () =>
+        createMessage(supabase, business.businessId, conversationRowId, "user", message),
+      ),
+      timer.time("quota_check", () => checkReplyQuota(supabase, business.businessId)),
+    ]);
 
     // Phase 15a's AI-pause guard: once a human has taken over (a
     // deliberate dashboard action, never set by AI output -- see
@@ -253,6 +265,7 @@ export async function POST(request: NextRequest) {
         business.language,
         { recommendProductsEnabled: business.recommendProductsEnabled, appointmentsEnabled: business.appointmentsEnabled },
         timer,
+        quota,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);
