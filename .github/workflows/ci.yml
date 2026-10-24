@@ -115,6 +115,16 @@ jobs:
         # hand a visitor a broken bubble.)
         run: npm run test:chat-streaming
 
+      - name: Abuse rate-limit logic tests
+        # Phase 32 (STATE.md): the pure core of the abuse rate-limit scopes
+        # (lib/abuse-limits.ts) -- trial-vs-normal burst profile selection, the
+        # log-only/fail-open verdict, the IPv4 /24 derivation (and IPv6 skip)
+        # and the new-conversation predicate. Pure module, no database and no
+        # secrets, so it runs with the other unit suites. (The DB check
+        # constraint and zero-grant posture are pgTAP file 054, run against
+        # staging below.)
+        run: npm run test:abuse-limits
+
       - name: Build
         run: npm run build
 
