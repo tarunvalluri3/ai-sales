@@ -16,6 +16,7 @@
     "test:razorpay": "node --test scripts/run-razorpay-signature-tests.mjs scripts/run-razorpay-webhook-tests.mjs",
     "test:chat-perf": "node --test scripts/run-chat-perf-tests.mjs",
     "test:chat-streaming": "node --test scripts/run-chat-streaming-tests.mjs",
+    "test:abuse-limits": "node --test scripts/run-abuse-limit-tests.mjs",
     "credit-note": "node --conditions=react-server --env-file=.env.local scripts/issue-credit-note.mjs",
     "eval": "node --env-file=.env.local scripts/run-evals.mjs",
     "loadtest": "node --env-file=.env.local scripts/run-load-test.mjs"

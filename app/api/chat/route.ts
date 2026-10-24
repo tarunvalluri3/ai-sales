@@ -3,7 +3,19 @@ import { z } from "zod";
 import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { logAndGetUserMessage, AppError } from "@/lib/errors";
 import { resolveBusinessFromWidgetKey, WidgetAuthError, type WidgetBusinessContext } from "@/lib/widget-auth";
-import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
+import {
+  checkAndIncrementRateLimit,
+  incrementRateLimitCounter,
+  checkRateLimitsBatch,
+  type BatchedRateLimitCheck,
+} from "@/lib/rate-limit";
+import {
+  SCOPE_LIMITS,
+  selectBurstLimit,
+  resolveAbuseLimitVerdict,
+  deriveIpv4Subnet,
+  requiresNewConversationCheck,
+} from "@/lib/abuse-limits";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import {
   createConversation,
@@ -142,11 +154,40 @@ export async function POST(request: NextRequest) {
   const { widgetKey, conversationId, message, consentGiven, pageUrl, visitorId } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
+  const ipSubnet = deriveIpv4Subnet(ip);
 
-  const ipAllowed = await timer.time("rate_limit_ip", () =>
-    checkAndIncrementRateLimit("ip", ip, IP_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
-  );
-  if (!ipAllowed) {
+  // The existing `ip` scope plus the two Phase 32 IP-keyed abuse scopes
+  // (STATE.md). All three need only the IP / request body, so they go in one
+  // batched round trip (Stage B's check_rate_limits) before conversation
+  // creation -- the placement a later enforcing stage needs (a hard-limit
+  // rejection must not create a conversation). The abuse scopes are log-only
+  // for now, so their verdicts are discarded here; only the enforcing `ip`
+  // verdict gates. `ip_subnet` is skipped for a non-IPv4 address (decision 5);
+  // `new_conversation_ip` applies only when no conversationId was sent
+  // (decision 4).
+  const ipChecks: BatchedRateLimitCheck[] = [
+    { scope: "ip", identifier: ip, limit: IP_LIMIT, windowSeconds: RATE_LIMIT_WINDOW_SECONDS },
+  ];
+  if (ipSubnet) {
+    ipChecks.push({
+      scope: "ip_subnet",
+      identifier: ipSubnet,
+      limit: SCOPE_LIMITS.ip_subnet.limit,
+      windowSeconds: SCOPE_LIMITS.ip_subnet.windowSeconds,
+    });
+  }
+  if (requiresNewConversationCheck(conversationId)) {
+    ipChecks.push({
+      scope: "new_conversation_ip",
+      identifier: ip,
+      limit: SCOPE_LIMITS.new_conversation_ip.limit,
+      windowSeconds: SCOPE_LIMITS.new_conversation_ip.windowSeconds,
+    });
+  }
+  const ipResults = await timer.time("rate_limit_ip_batch", () => checkRateLimitsBatch(ipChecks));
+  // Missing/malformed -> treat the enforcing `ip` scope as not allowed (fail
+  // closed, unchanged for that scope).
+  if (!ipResults.get("ip")?.allowed) {
     logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }, "error");
     return withCors(jsonError("Too many requests.", 429));
   }
@@ -224,7 +265,7 @@ export async function POST(request: NextRequest) {
     //    Gemini call when the business is over quota -- the gate is
     //    unchanged, only its round trip now overlaps these writes instead
     //    of running sequentially at the top of askSalesEmployee().
-    const [, userMessageRow, quota] = await Promise.all([
+    const [, userMessageRow, quota, burstCount] = await Promise.all([
       consentGiven
         ? timer.time("consent_write", () => recordConversationConsent(supabase, business.businessId, conversationRowId))
         : Promise.resolve(null),
@@ -232,7 +273,29 @@ export async function POST(request: NextRequest) {
         createMessage(supabase, business.businessId, conversationRowId, "user", message),
       ),
       timer.time("quota_check", () => checkReplyQuota(supabase, business.businessId)),
+      // Phase 32 business_burst (log-only): one burst ceiling across ALL of a
+      // tenant's channels. Only the raw increment runs here (it needs just the
+      // scope/identifier/window), concurrently with the reads above so it adds
+      // no latency; the trial-vs-normal ceiling is chosen below from the
+      // entitlement the quota check just loaded -- no extra query (decision 3).
+      timer.time("rate_limit_business_burst", () =>
+        incrementRateLimitCounter("business_burst", business.businessId, SCOPE_LIMITS.business_burst.windowSeconds),
+      ),
     ]);
+
+    // Evaluate the burst counter against the right ceiling now that the
+    // entitlement is known. Log-only in Stage A, so `burstVerdict.allowed`
+    // is always true here; a later enforcing stage consumes it for the
+    // soft-limit response path.
+    const burstProfile = selectBurstLimit(quota.entitlement.status);
+    const burstVerdict = resolveAbuseLimitVerdict("business_burst", burstCount, burstProfile.limit);
+    if (burstVerdict.wouldExceed) {
+      logEvent("rate_limit_would_exceed", business.businessId, {
+        scope: "business_burst",
+        requestCount: burstCount ?? -1,
+        limit: burstProfile.limit,
+      });
+    }
 
     // Phase 15a's AI-pause guard: once a human has taken over (a
     // deliberate dashboard action, never set by AI output -- see

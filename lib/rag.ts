@@ -26,6 +26,7 @@ import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 import { TurnTimer } from "@/lib/turn-timings";
 import { insertTurnMetrics } from "@/lib/ai-response-metrics";
 import { isRedundantSearch } from "@/lib/chat-query-dedupe";
+import { findDuplicateSubmitReply } from "@/lib/duplicate-submit";
 import { SearchKnowledgeBaseInputSchema } from "@/lib/tools/search-knowledge-base";
 import {
   CHAT_AI_DEADLINE_MS,
@@ -188,6 +189,11 @@ function withReadToolTimeout<T, F>(work: Promise<T>, onTimeout: F): Promise<T | 
 export type ConversationMessage = {
   role: "user" | "assistant";
   content: string;
+  // Optional: populated by listRecentMessages() for the Phase 32
+  // duplicate-submit guard (lib/duplicate-submit.ts). Absent on
+  // synthetically-constructed history; the guard treats absent as "cannot
+  // confirm the time window" and does not replay.
+  created_at?: string;
 };
 
 /**
@@ -649,6 +655,37 @@ async function prepareTurn(
         sourceChunkIds: [],
         escalate: true,
         escalationReason: quota.entitlement.serving ? "usage_quota_exceeded" : "subscription_not_serving",
+        recommendedProducts: [],
+        metricsRowId: null,
+        quotaSnapshot: quota,
+      },
+    };
+  }
+
+  // Phase 32, Stage C (STATE.md): a duplicate submit -- the same message
+  // re-posted within 60s of the identical one that was already answered (a
+  // double-tapped send, a client retry loop). Replays the stored assistant
+  // reply with NO Gemini/embedding call and NO ai_response_metrics row, so it
+  // does not count against the tenant's quota (decision 8, matching the
+  // first-turn cache-hit decision). Placed after the quota gate, like the
+  // cache below, so an out-of-quota business still gets the strict stop rather
+  // than a free replay. Works off the in-memory history, no extra query.
+  const replay = findDuplicateSubmitReply(question, history);
+  if (replay) {
+    logEvent("ai_duplicate_submit_replayed", businessId, { conversationId });
+    return {
+      kind: "early",
+      response: {
+        answer: replay.answer,
+        // grounded/escalate are set to suppress the after-the-answer side
+        // effects (unanswered-question logging, escalation): this turn is a
+        // replay of a reply already delivered, so none of that should fire a
+        // second time. metricsRowId null is what keeps it off the quota.
+        grounded: true,
+        usedContext: false,
+        sourceChunkIds: [],
+        escalate: false,
+        escalationReason: null,
         recommendedProducts: [],
         metricsRowId: null,
         quotaSnapshot: quota,

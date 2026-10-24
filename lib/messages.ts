@@ -80,7 +80,10 @@ export async function listRecentMessages(
 ): Promise<ConversationMessage[]> {
   const { data, error } = await supabase
     .from("messages")
-    .select("role, content")
+    // created_at rides along for the Phase 32 duplicate-submit guard
+    // (lib/duplicate-submit.ts), so that check needs no extra query -- it
+    // works off this same in-memory history. toLangchainHistory() ignores it.
+    .select("role, content, created_at")
     .eq("business_id", businessId)
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
@@ -97,6 +100,7 @@ export async function listRecentMessages(
   return data.reverse().map((row) => ({
     role: row.role as "user" | "assistant",
     content: row.content,
+    created_at: row.created_at,
   }));
 }
 

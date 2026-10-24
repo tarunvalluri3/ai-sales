@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 import { after, NextRequest } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
+import { selectBurstLimit } from "@/lib/abuse-limits";
+import { checkReplyQuota } from "@/lib/usage-limit";
 import { loadBusinessAiContext } from "@/lib/business-ai-context";
 import {
   getOrCreateInstagramConversation,
@@ -168,6 +170,17 @@ async function handleInboundMessage(
     return;
   }
 
+  // Phase 32 business_burst (log-only): one burst ceiling spanning all of a
+  // tenant's channels (widget + WhatsApp + Instagram), keyed on business_id,
+  // so a business cannot be hit on three paths at once with each counting
+  // separately. Loaded here after dedup -- so a Meta redelivery never inflates
+  // the bucket -- and the entitlement is reused as askSalesEmployee()'s
+  // prefetched quota below, so the trial-vs-normal ceiling (decision 3) costs
+  // no extra read. Log-only, so the verdict is not acted on yet.
+  const quota = await checkReplyQuota(supabase, businessId);
+  const burstProfile = selectBurstLimit(quota.entitlement.status);
+  await checkAndIncrementRateLimit("business_burst", businessId, burstProfile.limit, burstProfile.windowSeconds, businessId);
+
   const conversation = await getOrCreateInstagramConversation(supabase, businessId, event.sender.id);
 
   const conversationAllowed = await checkAndIncrementRateLimit(
@@ -224,6 +237,11 @@ async function handleInboundMessage(
       recommendProductsEnabled: businessContext.recommendProductsEnabled,
       appointmentsEnabled: businessContext.appointmentsEnabled,
     },
+    // No per-turn timer on this path (webhook, not a prospect's live wait);
+    // reuse the entitlement already loaded for the burst check so quota is not
+    // read twice (same net reads as before Phase 32).
+    undefined,
+    quota,
   );
 
   const assistantMessageRow = await createMessage(
