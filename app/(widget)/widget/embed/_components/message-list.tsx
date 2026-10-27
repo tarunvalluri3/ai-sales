@@ -24,7 +24,7 @@ export function MessageList({
   isAwaitingResponse: boolean;
   onRetry: (id: string) => void;
   suggestedQuestions: string[];
-  onSend: (text: string) => void;
+  onSend: (text: string, options?: { suggested?: boolean }) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wasNearBottomRef = useRef(true);
@@ -63,7 +63,7 @@ export function MessageList({
             <button
               key={question}
               type="button"
-              onClick={() => onSend(question)}
+              onClick={() => onSend(question, { suggested: true })}
               className="w-fit max-w-[85%] rounded-full border border-widget-border-strong px-3.5 py-2 text-left text-sm text-widget-foreground transition-colors hover:bg-widget-assistant-bubble"
             >
               {question}

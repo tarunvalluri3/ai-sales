@@ -11,6 +11,7 @@ import { sendDailyDigestEmails } from "@/lib/notifications";
 import { runStalledLeadFollowUpSweep } from "@/lib/stalled-leads";
 import { processWorkflowRuns, runNoActivityWorkflowSweep } from "@/lib/workflow-engine";
 import { runBillingLifecycleSweep } from "@/lib/billing-lifecycle";
+import { processAnswerBankJobs } from "@/lib/answer-bank/generate";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
       workflowRuns,
       workflowNoActivitySweep,
       billingLifecycle,
+      answerBank,
     ] = await Promise.all([
       processIngestionQueue(),
       processWebhookDeliveries(),
@@ -89,6 +91,10 @@ export async function GET(request: NextRequest) {
       // Vercel's Hobby plan caps cron jobs, which is the same reason every
       // other queue above shares this route.
       runBillingLifecycleSweep(),
+      // Instant answers: backstop for the after() kick that follows a content
+      // change (lib/answer-bank/generate.ts) -- regenerates stale stored
+      // answers and purges expired cached query embeddings.
+      processAnswerBankJobs(),
     ]);
     return jsonSuccess({
       ingestion,
@@ -103,6 +109,7 @@ export async function GET(request: NextRequest) {
       workflowRuns,
       workflowNoActivitySweep,
       billingLifecycle,
+      answerBank,
     });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);

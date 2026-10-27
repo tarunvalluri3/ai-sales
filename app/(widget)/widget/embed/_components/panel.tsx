@@ -47,7 +47,7 @@ export function Panel({
   panelError: string | null;
   consentGiven: boolean;
   onConsentChange: (value: boolean) => void;
-  onSend: (text: string) => void;
+  onSend: (text: string, options?: { suggested?: boolean }) => void;
   onStop: () => void;
   onRetry: (id: string) => void;
   onClose: () => void;

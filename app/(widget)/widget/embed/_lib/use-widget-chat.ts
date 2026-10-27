@@ -199,7 +199,7 @@ export function useWidgetChat(strings: WidgetStrings) {
     return () => window.removeEventListener("message", handleMessage);
   }, [strings]);
 
-  const dispatchSend = useCallback((text: string, userMessageId: string) => {
+  const dispatchSend = useCallback((text: string, userMessageId: string, suggested = false) => {
     const requestId = newId();
     const assistantPlaceholderId = newId();
 
@@ -225,11 +225,17 @@ export function useWidgetChat(strings: WidgetStrings) {
     setMessages((prev) => [...prev, { id: assistantPlaceholderId, role: "assistant", content: "" }]);
     setIsAwaitingResponse(true);
     setIsStreaming(true);
-    postToParent({ type: "widget:send", requestId, text, consentGiven: consentGivenRef.current });
+    postToParent({
+      type: "widget:send",
+      requestId,
+      text,
+      consentGiven: consentGivenRef.current,
+      ...(suggested ? { suggested: true } : {}),
+    });
   }, []);
 
   const sendMessage = useCallback(
-    (rawText: string) => {
+    (rawText: string, options?: { suggested?: boolean }) => {
       const text = rawText.trim().slice(0, MAX_MESSAGE_LENGTH);
       // Double-submission guard: isAwaitingResponse covers the pre-token
       // wait, isStreaming covers the rest of a turn whose tokens are still
@@ -238,7 +244,7 @@ export function useWidgetChat(strings: WidgetStrings) {
 
       const userMessageId = newId();
       setMessages((prev) => [...prev, { id: userMessageId, role: "user", content: text }]);
-      dispatchSend(text, userMessageId);
+      dispatchSend(text, userMessageId, options?.suggested === true);
     },
     [isAwaitingResponse, isStreaming, isCoolingDown, dispatchSend],
   );

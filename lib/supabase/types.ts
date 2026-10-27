@@ -202,6 +202,8 @@ export type Message = {
   created_at: string;
   /** Non-null when a streamed assistant reply was cut off before completion (disconnect, visitor abort, mid-stream timeout) -- never a successful complete reply. See migration 20261028000000. */
   interrupted_at: string | null;
+  /** Which path produced an assistant reply: a stored instant answer (greeting/suggested/faq/catalog) or the model pipeline ('ai'). NULL for rows written before migration 20261030000000 or by a caller that does not record it. */
+  answer_source: "greeting" | "suggested" | "faq" | "catalog" | "ai" | null;
 };
 
 export type UnansweredQuestion = {

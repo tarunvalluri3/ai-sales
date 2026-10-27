@@ -21,13 +21,22 @@ import { bookAppointmentTool, executeBookAppointment } from "@/lib/tools/book-ap
 import { logEvent } from "@/lib/logger";
 import { checkReplyQuota, type ReplyQuotaStatus } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
-import { isEmbeddingRateLimitError } from "@/lib/embeddings";
+import { embedText, isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 import { TurnTimer } from "@/lib/turn-timings";
 import { insertTurnMetrics } from "@/lib/ai-response-metrics";
 import { isRedundantSearch } from "@/lib/chat-query-dedupe";
 import { findDuplicateSubmitReply } from "@/lib/duplicate-submit";
+import {
+  decideFaqInstant,
+  decideLocalInstant,
+  faqPhaseEligible,
+  type InstantContext,
+  type InstantHit,
+  type InstantSource,
+} from "@/lib/answer-bank/decision";
+import { loadCatalogNames, lookupStoredEntry, matchFaqCandidates } from "@/lib/answer-bank/store";
 import { SearchKnowledgeBaseInputSchema } from "@/lib/tools/search-knowledge-base";
 import {
   CHAT_AI_DEADLINE_MS,
@@ -262,6 +271,19 @@ function formatBusinessProfileContext(profile: BusinessProfileContext): string {
 
 export type SalesEmployeeResponse = {
   answer: string;
+  /**
+   * Set only when the answer was served by the instant-answer path
+   * (lib/answer-bank) with no model call. Absent = the normal pipeline
+   * (including its own first-turn cache and duplicate replay), which callers
+   * record as 'ai'.
+   */
+  answerSource?: InstantSource;
+  /**
+   * Set when a stored answer was expected for this message (a suggested
+   * question or the catalog question) but none was fresh -- the caller uses
+   * it to nudge background regeneration. Never part of the reply.
+   */
+  instantMissReason?: string;
   grounded: boolean;
   usedContext: boolean;
   sourceChunkIds: string[];
@@ -629,7 +651,32 @@ async function executeBusinessToolCall(
  */
 type PreparedTurn =
   | { kind: "early"; response: SalesEmployeeResponse }
-  | { kind: "proceed"; quota: ReplyQuotaStatus; documents: Document<KnowledgeChunkMetadata>[]; context: string };
+  | {
+      kind: "proceed";
+      quota: ReplyQuotaStatus;
+      documents: Document<KnowledgeChunkMetadata>[];
+      context: string;
+      instantMissReason: string | undefined;
+    };
+
+/** Misses worth a log line: a candidate existed and was refused. "Nothing to do with instant answers" is not logged. */
+const UNLOGGED_INSTANT_MISSES = new Set(["disabled", "no_local_match", "not_published", "too_long", "not_self_contained", "too_short"]);
+
+/** The early-return response for an instant answer: grounded and non-escalating (so no unanswered-question or escalation side effects fire) and metricsRowId null, which is what keeps it off the tenant's reply quota -- the same rule the first-turn cache and the duplicate-submit replay follow. */
+function instantResponse(hit: InstantHit, quota: ReplyQuotaStatus): SalesEmployeeResponse {
+  return {
+    answer: hit.answer,
+    answerSource: hit.source,
+    grounded: true,
+    usedContext: hit.source !== "greeting",
+    sourceChunkIds: hit.sourceChunkIds,
+    escalate: false,
+    escalationReason: null,
+    recommendedProducts: [],
+    metricsRowId: null,
+    quotaSnapshot: quota,
+  };
+}
 
 async function prepareTurn(
   supabase: SupabaseClient,
@@ -641,6 +688,7 @@ async function prepareTurn(
   timer: TurnTimer,
   prefetchedQuota: ReplyQuotaStatus | undefined,
   queryEmbedding: Promise<number[]> | undefined,
+  instant: InstantContext | undefined,
 ): Promise<PreparedTurn> {
   const quota = prefetchedQuota ?? (await timer.time("quota_check", () => checkReplyQuota(supabase, businessId)));
   if (!quota.allowed) {
@@ -703,7 +751,39 @@ async function prepareTurn(
     };
   }
 
-  if (isFirstTurn(history)) {
+  // Instant answers (STATE.md 2026-10-28): greeting / exact suggested question
+  // / catalog question served with no retrieval and no model call. Placed here
+  // so every gate above has already passed exactly as for an AI reply -- the
+  // quota gate (an over-quota business gets the strict stop, never a free
+  // instant answer) and the duplicate-submit replay -- and BEFORE the
+  // first-turn cache, so a stored answer wins over a one-hour-old cached one.
+  // A hit writes no ai_response_metrics row (metricsRowId null), which is the
+  // existing rule that keeps replays and cache hits off the reply quota; there
+  // is deliberately no "don't count this" switch.
+  const firstTurn = isFirstTurn(history);
+  let instantMissReason: string | undefined;
+  if (instant?.enabled) {
+    const local = await timer.time("instant_local", () =>
+      decideLocalInstant(
+        { message: question, language, isFirstTurn: firstTurn, context: instant },
+        { lookupEntry: (kind, key) => lookupStoredEntry(supabase, businessId, kind, key, language) },
+      ),
+    );
+    if (local.hit) {
+      logEvent("instant_answer_served", businessId, {
+        conversationId,
+        source: local.hit.source,
+        suggestedClick: instant.suggestedClick,
+      });
+      return { kind: "early", response: instantResponse(local.hit, quota) };
+    }
+    instantMissReason = local.reason;
+    if (!UNLOGGED_INSTANT_MISSES.has(local.reason)) {
+      logEvent("instant_answer_miss", businessId, { conversationId, reason: local.reason, suggestedClick: instant.suggestedClick });
+    }
+  }
+
+  if (firstTurn) {
     const cached = await timer.time("cache_read", () => getCachedResponse(supabase, businessId, question, language));
     if (cached) {
       logEvent("ai_response_cache_hit", businessId, { conversationId });
@@ -730,8 +810,41 @@ async function prepareTurn(
   // concurrently with the knowledge search and injected below, so the common
   // catalog lookups need no tool round trip. Never rejects (null = skip).
   const catalogPrefetch = timer.time("catalog_prefetch", () => prefetchSmallCatalog(supabase, businessId));
+  // Retrieval starts now, before the FAQ match below, so a question that is
+  // NOT a FAQ match loses no time to it: the match (query embedding + one
+  // tenant-filtered RPC) runs alongside the vector search. A FAQ hit abandons
+  // the retrieval; its failure, if any, is swallowed here and surfaced below
+  // only on the path that uses it.
+  const retrieval = retriever.invoke(question);
+  retrieval.catch(() => undefined);
+
+  if (instant?.enabled && faqPhaseEligible({ message: question, isFirstTurn: firstTurn, context: instant }) === null) {
+    try {
+      const faq = await timer.time("faq_match", () =>
+        decideFaqInstant(
+          { message: question, isFirstTurn: firstTurn, context: instant },
+          {
+            matchFaqs: async () =>
+              matchFaqCandidates(supabase, businessId, await (queryEmbedding ?? embedText(question))),
+            loadCatalogNames: () => loadCatalogNames(supabase, businessId),
+          },
+        ),
+      );
+      if (faq.hit) {
+        logEvent("instant_answer_served", businessId, { conversationId, source: "faq", suggestedClick: instant.suggestedClick });
+        return { kind: "early", response: instantResponse(faq.hit, quota) };
+      }
+      if (!UNLOGGED_INSTANT_MISSES.has(faq.reason)) {
+        logEvent("instant_answer_miss", businessId, { conversationId, reason: faq.reason, suggestedClick: instant.suggestedClick });
+      }
+    } catch {
+      // The match is an optimisation. If it fails (embedding quota, RPC error) the
+      // normal retrieval below runs and handles the failure exactly as it always has.
+    }
+  }
+
   try {
-    [documents] = await Promise.all([retriever.invoke(question), catalogPrefetch]);
+    [documents] = await Promise.all([retrieval, catalogPrefetch]);
   } catch (error) {
     if (isEmbeddingRateLimitError(error)) {
       logEvent("ai_embedding_rate_limited", businessId, { conversationId }, "error");
@@ -776,14 +889,22 @@ async function prepareTurn(
   // few characters that could forge a tag boundary are stripped before it
   // goes into an attribute. See the long-form reasoning preserved on the
   // callers before this was extracted.
+  const context = buildRetrievedContext(question, documents, await catalogPrefetch);
+
+  return { kind: "proceed", quota, documents, context, instantMissReason };
+}
+
+/** The tag-wrapped <retrieved_context> block shared by the live turn and the offline answer-bank generation, so a stored answer is built from exactly the context a live answer would see. */
+function buildRetrievedContext(
+  question: string,
+  documents: Document<KnowledgeChunkMetadata>[],
+  catalogOfferings: Awaited<ReturnType<typeof prefetchSmallCatalog>>,
+): string {
   const searchQueryAttribute = question.replace(/[<>"\r\n]/g, " ").slice(0, 300);
-  const catalogOfferings = await catalogPrefetch;
   const catalogSection = catalogOfferings ? formatCatalogSection(catalogOfferings) : null;
-  const context = `<retrieved_context search_query="${searchQueryAttribute}" searched="this business's full knowledge base" passages="${documents.length}">\n${documents
+  return `<retrieved_context search_query="${searchQueryAttribute}" searched="this business's full knowledge base" passages="${documents.length}">\n${documents
     .map((document, index) => `[${index + 1}] ${document.pageContent}`)
     .join("\n\n")}${catalogSection ? `\n\n${catalogSection}` : ""}\n</retrieved_context>`;
-
-  return { kind: "proceed", quota, documents, context };
 }
 
 /**
@@ -894,6 +1015,9 @@ export async function askSalesEmployee(
   // searchKnowledgeChunks). Only the widget route passes it; it is awaited
   // only if the turn actually reaches retrieval.
   queryEmbedding?: Promise<number[]>,
+  // Instant-answer context (lib/answer-bank). Only the widget route passes it;
+  // absent means the feature is off for this caller and the turn is unchanged.
+  instant?: InstantContext,
 ): Promise<SalesEmployeeResponse> {
   // Honest end-state when the AI deadline (lib/chat-timeouts.ts) is hit
   // before a reply exists: escalate so a human follows up, write no
@@ -928,9 +1052,10 @@ export async function askSalesEmployee(
     timer,
     prefetchedQuota,
     queryEmbedding,
+    instant,
   );
   if (prepared.kind === "early") return prepared.response;
-  const { quota, documents, context } = prepared;
+  const { quota, documents, context, instantMissReason } = prepared;
 
   // `startedAt` deliberately still starts here, just before the first
   // Gemini call: it is what `latency_ms` has always measured, and
@@ -1244,6 +1369,7 @@ export async function askSalesEmployee(
       recommendedProducts,
       metricsRowId,
       quotaSnapshot: quota,
+      instantMissReason,
     };
 
     if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
@@ -1333,6 +1459,7 @@ export async function* streamSalesEmployee(
   prefetchedQuota?: ReplyQuotaStatus,
   clientSignal?: AbortSignal,
   queryEmbedding?: Promise<number[]>,
+  instant?: InstantContext,
 ): AsyncGenerator<StreamChunk, void, unknown> {
   const buildTimeoutResponse = (quota: ReplyQuotaStatus): SalesEmployeeResponse => ({
     answer: RESPONSE_TIMEOUT_MESSAGE,
@@ -1346,7 +1473,7 @@ export async function* streamSalesEmployee(
     quotaSnapshot: quota,
   });
 
-  const prepared = await prepareTurn(supabase, businessId, conversationId, question, history, language, timer, prefetchedQuota, queryEmbedding);
+  const prepared = await prepareTurn(supabase, businessId, conversationId, question, history, language, timer, prefetchedQuota, queryEmbedding, instant);
   if (prepared.kind === "early") {
     // A fixed message (over quota / cache hit / no-knowledge fallback):
     // there is no generation to stream, but it travels the same wire as one
@@ -1355,7 +1482,7 @@ export async function* streamSalesEmployee(
     yield { kind: "final", response: prepared.response, interrupted: false };
     return;
   }
-  const { quota, documents, context } = prepared;
+  const { quota, documents, context, instantMissReason } = prepared;
 
   const startedAt = Date.now();
   let totalInputTokens = 0;
@@ -1600,6 +1727,7 @@ export async function* streamSalesEmployee(
         recommendedProducts,
         metricsRowId,
         quotaSnapshot: quota,
+        instantMissReason,
       };
       if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
         await setCachedResponse(supabase, businessId, question, language, response);
@@ -1707,4 +1835,68 @@ export async function* streamSalesEmployee(
       error,
     );
   }
+}
+
+/**
+ * Per-answer ceiling for the offline answer-bank generation. Generous: this
+ * runs in a background job, never inside a visitor's request.
+ */
+const BANK_ANSWER_TIMEOUT_MS = 30_000;
+
+export type BankAnswerResult =
+  | { ok: true; answer: string; sourceChunkIds: string[]; contextText: string }
+  | { ok: false; reason: string };
+
+/**
+ * Drafts the stored answer to one suggested question OFFLINE, with the live
+ * pipeline's own ingredients -- the same persona/system prompt, the same
+ * tenant-scoped retrieval, the same <retrieved_context> block and the same
+ * structured-output schema -- but no tools (so no callback, lead or booking
+ * can fire), no `ai_response_metrics` row (so it never counts against the
+ * tenant's reply quota) and no conversation. A draft is returned only when
+ * the model reports it answered from the retrieved context and did not want
+ * to escalate; otherwise the caller stores nothing and the AI keeps answering
+ * that question live. The caller still runs the output checks on the text.
+ */
+export async function generateBankAnswer(
+  supabase: SupabaseClient,
+  businessId: string,
+  businessName: string,
+  businessProfile: BusinessProfileContext,
+  question: string,
+  language: WidgetLanguage,
+): Promise<BankAnswerResult> {
+  const timer = new TurnTimer();
+  const retriever = new KnowledgeRetriever({ supabase, businessId, timer, queryEmbedding: embedText(question) });
+  const [documents, catalogOfferings] = await Promise.all([
+    retriever.invoke(question),
+    prefetchSmallCatalog(supabase, businessId),
+  ]);
+  if (documents.length === 0) return { ok: false, reason: "no_knowledge" };
+
+  const context = buildRetrievedContext(question, documents, catalogOfferings);
+  const { plainSystemMessage, messages } = await buildTurnContext(
+    businessName,
+    businessProfile,
+    question,
+    [{ role: "user", content: question }],
+    language,
+    { recommendProductsEnabled: false, appointmentsEnabled: false },
+    context,
+  );
+  const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, { name: "SalesEmployeeResponse" });
+  const result = await model.invoke([plainSystemMessage, ...messages.slice(1)], {
+    signal: AbortSignal.timeout(BANK_ANSWER_TIMEOUT_MS),
+  });
+
+  if (result.escalate) return { ok: false, reason: "model_wants_escalation" };
+  if (!result.usedContext) return { ok: false, reason: "not_grounded_in_context" };
+  const answer = result.answer.trim();
+  if (answer.length === 0) return { ok: false, reason: "empty_answer" };
+  return {
+    ok: true,
+    answer,
+    sourceChunkIds: documents.map((document) => document.metadata.chunkId),
+    contextText: context,
+  };
 }

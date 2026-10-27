@@ -37,6 +37,8 @@ export type WidgetBusinessContext = {
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
   appointmentsEnabled: boolean;
+  /** The owner's current suggested-question chips -- the only questions an instant (stored) answer may be served for. */
+  suggestedQuestions: string[];
 };
 
 const BUSINESS_COLUMNS =
@@ -184,6 +186,7 @@ export async function resolveBusinessFromWidgetKey(
     language: data.businesses.widget_language,
     recommendProductsEnabled: data.businesses.recommend_products_enabled,
     appointmentsEnabled: data.businesses.appointments_enabled,
+    suggestedQuestions: data.businesses.widget_suggested_questions ?? [],
   };
 }
 
