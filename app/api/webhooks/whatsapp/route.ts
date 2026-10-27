@@ -16,6 +16,8 @@ import {
 } from "@/lib/conversations";
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
+import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
+import { recordGuardrailSignals } from "@/lib/guardrails/record";
 import { logEvent } from "@/lib/logger";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
@@ -175,7 +177,13 @@ async function handleInboundMessage(
   }
 
   const isText = message.type === "text" && typeof message.text?.body === "string";
-  const inboundContent = isText ? message.text!.body!.slice(0, 2000) : `[Received a "${message.type ?? "unknown"}" message]`;
+  // Guardrails Phase 1: sanitised, capped and masked before it is stored or
+  // sent to the model; `message.text.body` is read only here.
+  const prepared = isText ? prepareProspectMessage(message.text!.body!) : null;
+  const inboundContent = prepared ? prepared.text : `[Received a "${message.type ?? "unknown"}" message]`;
+  if (prepared) {
+    after(() => recordGuardrailSignals(businessId, conversation.id, "whatsapp", prepared.signals));
+  }
 
   await createMessage(supabase, businessId, conversation.id, "user", inboundContent);
 
