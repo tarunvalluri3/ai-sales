@@ -205,3 +205,18 @@ export function effectiveNewConversationLimit(signal: ClientSignal): number {
   const base = SCOPE_LIMITS.new_conversation_ip.limit;
   return signal === "too_fast" ? Math.ceil(base / 2) : base;
 }
+
+/**
+ * Seconds until the current fixed rate-limit window closes, for the
+ * `Retry-After` header on a 429 (RFC 9110 §10.2.3: a non-negative integer
+ * number of seconds). Windows are aligned to the Unix epoch
+ * (`floor(now / window) * window`, exactly as public.check_rate_limits and
+ * increment_rate_limit_counter compute `window_start`), so this is exact, not
+ * an estimate. Never returns less than 1, so a client never retries
+ * immediately into the same window.
+ */
+export function secondsUntilWindowEnd(nowMs: number, windowSeconds: number): number {
+  const windowMs = windowSeconds * 1000;
+  const remainingMs = windowMs - (nowMs % windowMs);
+  return Math.max(1, Math.ceil(remainingMs / 1000));
+}

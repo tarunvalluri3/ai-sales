@@ -14,6 +14,9 @@ export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
+  // Retry-After is not a CORS-safelisted response header: without this the
+  // widget loader, which runs on the customer's origin, could not read it.
+  "Access-Control-Expose-Headers": "Retry-After",
 };
 
 export function withCors(response: Response): Response {

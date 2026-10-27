@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { jsonError, jsonSuccess } from "@/lib/api-response";
+import { jsonError, jsonSuccess, jsonTooManyRequests } from "@/lib/api-response";
 import { logAndGetUserMessage, AppError } from "@/lib/errors";
 import { resolveBusinessFromWidgetKey, WidgetAuthError, type WidgetBusinessContext } from "@/lib/widget-auth";
 import {
@@ -18,6 +18,7 @@ import {
   resolveAbuseResponse,
   classifyClientSignal,
   effectiveNewConversationLimit,
+  secondsUntilWindowEnd,
   SOFT_LIMIT_MESSAGE,
 } from "@/lib/abuse-limits";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
@@ -201,7 +202,11 @@ export async function POST(request: NextRequest) {
   // closed, unchanged for that scope).
   if (!ipResults.get("ip")?.allowed) {
     logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }, "error");
-    return withCors(jsonError("Too many requests.", 429));
+    return withCors(
+      jsonTooManyRequests(
+        ipResults.get("ip")?.retryAfterSeconds ?? secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS),
+      ),
+    );
   }
 
   // Stage D hard tier: the two IP-keyed abuse scopes refuse with a bare 429
@@ -211,7 +216,11 @@ export async function POST(request: NextRequest) {
     const result = ipResults.get(scope);
     if (result && resolveAbuseResponse(scope, result.allowed) === "reject_429") {
       logEvent("rate_limit_exceeded", "unknown", { scope }, "error");
-      return withCors(jsonError("Too many requests.", 429));
+      return withCors(
+        jsonTooManyRequests(
+          result.retryAfterSeconds ?? secondsUntilWindowEnd(Date.now(), SCOPE_LIMITS[scope].windowSeconds),
+        ),
+      );
     }
   }
 
@@ -231,7 +240,7 @@ export async function POST(request: NextRequest) {
   );
   if (!keyAllowed) {
     logEvent("rate_limit_exceeded", business.businessId, { scope: "key" }, "error");
-    return withCors(jsonError("Too many requests.", 429));
+    return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
   }
 
   const supabase = createServiceSupabaseClient();
@@ -267,7 +276,7 @@ export async function POST(request: NextRequest) {
     );
     if (!conversationAllowed) {
       logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }, "error");
-      return withCors(jsonError("Too many requests.", 429));
+      return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
     }
 
     // Item 4 of the 2026-10-22 latency pass: three independent round trips
