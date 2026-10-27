@@ -22,6 +22,12 @@ const {
   resolveAbuseLimitVerdict,
   deriveIpv4Subnet,
   requiresNewConversationCheck,
+  ABUSE_SCOPE_TIER,
+  resolveAbuseResponse,
+  SOFT_LIMIT_MESSAGE,
+  CLIENT_TOO_FAST_MS,
+  classifyClientSignal,
+  effectiveNewConversationLimit,
 } = await import(new URL("../lib/abuse-limits.ts", import.meta.url).href);
 
 const { findDuplicateSubmitReply, normalizeSubmitText, DUPLICATE_SUBMIT_WINDOW_MS } = await import(
@@ -162,4 +168,58 @@ test("findDuplicateSubmitReply returns null without a usable timestamp or for an
   ];
   assert.equal(findDuplicateSubmitReply("hi", noTs, NOW), null);
   assert.equal(findDuplicateSubmitReply("   ", [], NOW), null);
+});
+
+test("Stage D tiers: the IP-keyed scopes are hard (429), business_burst is soft", () => {
+  assert.equal(ABUSE_SCOPE_TIER.ip_subnet, "hard");
+  assert.equal(ABUSE_SCOPE_TIER.new_conversation_ip, "hard");
+  assert.equal(ABUSE_SCOPE_TIER.business_burst, "soft");
+});
+
+test("resolveAbuseResponse: allowed always proceeds; a refusal maps to the scope's tier", () => {
+  for (const scope of Object.keys(ABUSE_SCOPE_TIER)) {
+    assert.equal(resolveAbuseResponse(scope, true), "proceed");
+  }
+  assert.equal(resolveAbuseResponse("ip_subnet", false), "reject_429");
+  assert.equal(resolveAbuseResponse("new_conversation_ip", false), "reject_429");
+  assert.equal(resolveAbuseResponse("business_burst", false), "soft_reply");
+});
+
+test("while log-only, no abuse scope can ever yield a non-proceed response (Stage D is dormant)", () => {
+  for (const scope of Object.keys(ABUSE_SCOPE_TIER)) {
+    const verdict = resolveAbuseLimitVerdict(scope, 1_000_000, 1);
+    assert.equal(verdict.allowed, true);
+    assert.equal(resolveAbuseResponse(scope, verdict.allowed), "proceed");
+  }
+});
+
+test("the soft-limit message is fixed text that promises nothing about the business", () => {
+  assert.ok(SOFT_LIMIT_MESSAGE.length > 0 && SOFT_LIMIT_MESSAGE.length < 300);
+  assert.ok(!/[$₹]|price|refund|discount/i.test(SOFT_LIMIT_MESSAGE));
+});
+
+test("new_conversation_ip is 30/h so a shared office or carrier IP is not tripped by a few real visitors", () => {
+  assert.equal(SCOPE_LIMITS.new_conversation_ip.limit, 30);
+  assert.equal(SCOPE_LIMITS.new_conversation_ip.windowSeconds, 3600);
+});
+
+test("classifyClientSignal: under the threshold is too_fast, at or over is ok", () => {
+  assert.equal(classifyClientSignal(0), "too_fast");
+  assert.equal(classifyClientSignal(CLIENT_TOO_FAST_MS - 1), "too_fast");
+  assert.equal(classifyClientSignal(CLIENT_TOO_FAST_MS), "ok");
+  assert.equal(classifyClientSignal(45_000), "ok");
+});
+
+test("classifyClientSignal: a missing or malformed value is unreported, never penalised", () => {
+  for (const v of [undefined, null, NaN, Infinity, -5]) {
+    assert.equal(classifyClientSignal(v), "unreported");
+  }
+});
+
+test("effectiveNewConversationLimit only ever tightens, and only for too_fast", () => {
+  const base = SCOPE_LIMITS.new_conversation_ip.limit;
+  assert.equal(effectiveNewConversationLimit("ok"), base);
+  assert.equal(effectiveNewConversationLimit("unreported"), base);
+  assert.equal(effectiveNewConversationLimit("too_fast"), Math.ceil(base / 2));
+  assert.ok(effectiveNewConversationLimit("too_fast") < base);
 });

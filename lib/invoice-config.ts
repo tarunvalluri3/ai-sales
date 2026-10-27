@@ -9,11 +9,11 @@ import { stateNameForCode } from "@/lib/india-states";
  *
  * Pure and NOT "server-only": the PDF layout and the tests import it.
  *
- * **Two values here are placeholders the owner has not confirmed yet** --
- * `address` and `sacCode` -- and they are written as `TODO:` strings on
- * purpose, not as plausible-looking guesses. A wrong address or tax code on
- * a tax invoice is a legal defect, and because issued invoices are
- * immutable it could never be corrected afterwards. So
+ * `address` and `sacCode` were filled in by the owner on 2026-10-27 (address
+ * as given by the owner; SAC 998314 from the owner's own SAC table). They
+ * were `TODO:` strings until then, on purpose, not plausible-looking guesses.
+ * A wrong address or tax code on a tax invoice is a legal defect, and because
+ * issued invoices are immutable it could never be corrected afterwards. So
  * `assertSupplierConfigReady()` refuses outright while any `TODO` remains,
  * and the issue path calls it before it snapshots anything. The refusal is
  * deliberately NOT limited to production: this repo's `.env.local` points at
@@ -42,15 +42,13 @@ export type SupplierConfig = {
 
 export const SUPPLIER: SupplierConfig = {
   name: "Waves Web Studio",
-  // TODO: replace with the registered principal place of business exactly as
-  // it appears on the GST registration certificate.
-  address: "TODO: registered address of Waves Web Studio, Hyderabad, Telangana",
+  address: "Plot No. 19 Venkatramana Colony, Dammaiguda, Phase 1, Hyderabad, Telangana 500083, India",
   gstin: "36BYQPT2686E1ZR",
   stateCode: "36",
   stateName: "Telangana",
-  // TODO: replace with the SAC code the owner confirms with their CA for
-  // this service (a 4-8 digit code beginning 99).
-  sacCode: "TODO: SAC code",
+  // IT design and development services; the owner's SAC table lists
+  // "Waves AI Pilot as a monthly or annual subscription" under 998314.
+  sacCode: "998314",
 };
 
 /** What is sold, printed on the invoice line. */

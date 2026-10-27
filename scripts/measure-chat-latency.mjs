@@ -24,6 +24,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 const APP_URL = process.env.EVAL_APP_URL || "http://localhost:3000";
+const ORIGIN = process.env.EVAL_ORIGIN || APP_URL;
 const MODE = process.env.MODE === "stream" ? "stream" : "json";
 const ACME_BUSINESS_NAME = "Acme Test Co.";
 const RUNS = Number.parseInt(process.env.RUNS || "8", 10);
@@ -77,7 +78,7 @@ async function sendJson(widgetKey, message, conversationId) {
   const startedAt = performance.now();
   const response = await fetch(`${APP_URL}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Origin: APP_URL },
+    headers: { "Content-Type": "application/json", Origin: ORIGIN },
     body: JSON.stringify({ widgetKey, message, conversationId }),
   });
   const body = await response.json().catch(() => null);
@@ -91,7 +92,7 @@ async function sendStream(widgetKey, message, conversationId) {
   const startedAt = performance.now();
   const response = await fetch(`${APP_URL}/api/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream", Origin: APP_URL },
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream", Origin: ORIGIN },
     body: JSON.stringify({ widgetKey, message, conversationId }),
   });
   if (!response.ok || !response.body) throw new Error(`/api/chat ${response.status}`);

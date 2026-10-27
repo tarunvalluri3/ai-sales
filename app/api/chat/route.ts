@@ -15,6 +15,10 @@ import {
   resolveAbuseLimitVerdict,
   deriveIpv4Subnet,
   requiresNewConversationCheck,
+  resolveAbuseResponse,
+  classifyClientSignal,
+  effectiveNewConversationLimit,
+  SOFT_LIMIT_MESSAGE,
 } from "@/lib/abuse-limits";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import {
@@ -106,6 +110,10 @@ const bodySchema = z.object({
   // sends. Absent (every currently-live loader) means the byte-identical
   // buffered JSON response, so this changes nothing for an old embed.
   stream: z.boolean().optional(),
+  // Phase 32 Stage E: ms between the widget loader starting and this send.
+  // Client-supplied, so it can only ever TIGHTEN a limit (see
+  // lib/abuse-limits.ts classifyClientSignal); absent from older embeds.
+  clientElapsedMs: z.number().int().min(0).max(86_400_000).optional(),
 });
 
 /**
@@ -151,7 +159,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId, message, consentGiven, pageUrl, visitorId } = parsed.data;
+  const { widgetKey, conversationId, message, consentGiven, pageUrl, visitorId, clientElapsedMs } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
   const ipSubnet = deriveIpv4Subnet(ip);
@@ -176,11 +184,15 @@ export async function POST(request: NextRequest) {
       windowSeconds: SCOPE_LIMITS.ip_subnet.windowSeconds,
     });
   }
+  const clientSignal = classifyClientSignal(clientElapsedMs);
   if (requiresNewConversationCheck(conversationId)) {
+    if (clientSignal === "too_fast") {
+      logEvent("bot_signal", "unknown", { signal: "too_fast", elapsedMs: clientElapsedMs ?? -1 });
+    }
     ipChecks.push({
       scope: "new_conversation_ip",
       identifier: ip,
-      limit: SCOPE_LIMITS.new_conversation_ip.limit,
+      limit: effectiveNewConversationLimit(clientSignal),
       windowSeconds: SCOPE_LIMITS.new_conversation_ip.windowSeconds,
     });
   }
@@ -190,6 +202,17 @@ export async function POST(request: NextRequest) {
   if (!ipResults.get("ip")?.allowed) {
     logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }, "error");
     return withCors(jsonError("Too many requests.", 429));
+  }
+
+  // Stage D hard tier: the two IP-keyed abuse scopes refuse with a bare 429
+  // before any conversation exists. Their verdicts are always `allowed`
+  // while the scopes are log-only, so this is dormant until promotion.
+  for (const scope of ["ip_subnet", "new_conversation_ip"] as const) {
+    const result = ipResults.get(scope);
+    if (result && resolveAbuseResponse(scope, result.allowed) === "reject_429") {
+      logEvent("rate_limit_exceeded", "unknown", { scope }, "error");
+      return withCors(jsonError("Too many requests.", 429));
+    }
   }
 
   let business: WidgetBusinessContext;
@@ -295,6 +318,25 @@ export async function POST(request: NextRequest) {
         requestCount: burstCount ?? -1,
         limit: burstProfile.limit,
       });
+    }
+
+    // Stage D soft tier: an enforcing business_burst answers with a fixed
+    // message, flags the conversation for a human and makes no model call.
+    // `burstVerdict.allowed` is always true while the scope is log-only, so
+    // this is dormant until promotion. JSON even for a streaming client, the
+    // same shape as the human-control branch below.
+    if (resolveAbuseResponse("business_burst", burstVerdict.allowed) === "soft_reply") {
+      await timer.time("escalation_flag", () =>
+        flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
+      );
+      return withCors(
+        jsonSuccess({
+          conversationId: conversation.id,
+          answer: SOFT_LIMIT_MESSAGE,
+          escalate: true,
+          asOf: userMessageRow.created_at,
+        }),
+      );
     }
 
     // Phase 15a's AI-pause guard: once a human has taken over (a

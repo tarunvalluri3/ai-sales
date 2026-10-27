@@ -32,7 +32,9 @@ import type { SubscriptionStatus } from "@/lib/subscription";
 export const SCOPE_LIMITS = {
   business_burst: { limit: 150, windowSeconds: 300 },
   business_burst_trial: { limit: 40, windowSeconds: 300 },
-  new_conversation_ip: { limit: 10, windowSeconds: 3600 },
+  // 30, not the original 10: a whole office or mobile-carrier NAT shares one
+  // IP, and 10 new chats an hour would trip real visitors once enforcing.
+  new_conversation_ip: { limit: 30, windowSeconds: 3600 },
   ip_subnet: { limit: 150, windowSeconds: 300 },
 } as const;
 
@@ -137,4 +139,69 @@ export function deriveIpv4Subnet(ip: string): string | null {
  */
 export function requiresNewConversationCheck(conversationId: string | null | undefined): boolean {
   return !conversationId;
+}
+
+/**
+ * Stage D (STATE.md): how a tripped abuse scope is answered once it is
+ * ENFORCING. Nothing here takes effect while a scope is in LOG_ONLY_SCOPES
+ * (its verdict is always `allowed`), so wiring it in changes no live
+ * behaviour; promoting a scope is still just removing it from that set.
+ *
+ * - `hard`: refuse with a bare 429 BEFORE any conversation is created. The
+ *   two IP-keyed scopes, which are checked before the business is known and
+ *   so cannot flag a conversation.
+ * - `soft`: the business is known, so the visitor gets a fixed, server-
+ *   authored reply, the conversation is flagged for a human and no model
+ *   call is made. `business_burst`, whose victim is the tenant, not the
+ *   visitor.
+ *
+ * The pre-existing `ip` / `key` / `conversation` scopes are deliberately not
+ * listed: they keep their plain 429 (decision recorded in STATE.md).
+ */
+export type AbuseScope = "business_burst" | "new_conversation_ip" | "ip_subnet";
+
+export const ABUSE_SCOPE_TIER: Readonly<Record<AbuseScope, "hard" | "soft">> = {
+  business_burst: "soft",
+  new_conversation_ip: "hard",
+  ip_subnet: "hard",
+};
+
+export type AbuseResponse = "proceed" | "reject_429" | "soft_reply";
+
+/** What the route does for one abuse scope's verdict. */
+export function resolveAbuseResponse(scope: AbuseScope, allowed: boolean): AbuseResponse {
+  if (allowed) return "proceed";
+  return ABUSE_SCOPE_TIER[scope] === "hard" ? "reject_429" : "soft_reply";
+}
+
+/** Fixed reply for the soft path. Server-authored, never model output. */
+export const SOFT_LIMIT_MESSAGE =
+  "We're receiving a lot of messages right now. A member of our team has been notified and will follow up with you shortly.";
+
+/**
+ * Stage E: the one client-side signal the widget loader reports, the time in
+ * milliseconds between the loader script starting and this send. A person
+ * cannot open the panel and send in under a second; a script driving the
+ * widget or posting straight to the API can.
+ *
+ * - `too_fast`: a reported value under CLIENT_TOO_FAST_MS.
+ * - `unreported`: no value. NEVER penalised -- every embed loaded before this
+ *   shipped (and any cached loader) omits it, so absence proves nothing.
+ * - `ok`: reported and plausible.
+ *
+ * The signal is client-supplied and trivially forged, so it can only ever
+ * TIGHTEN a limit, never loosen one or grant anything.
+ */
+export const CLIENT_TOO_FAST_MS = 1000;
+export type ClientSignal = "ok" | "too_fast" | "unreported";
+
+export function classifyClientSignal(elapsedMs: number | null | undefined): ClientSignal {
+  if (elapsedMs === null || elapsedMs === undefined || !Number.isFinite(elapsedMs) || elapsedMs < 0) return "unreported";
+  return elapsedMs < CLIENT_TOO_FAST_MS ? "too_fast" : "ok";
+}
+
+/** A `too_fast` request is held to half the new-conversation limit; anything else keeps it. */
+export function effectiveNewConversationLimit(signal: ClientSignal): number {
+  const base = SCOPE_LIMITS.new_conversation_ip.limit;
+  return signal === "too_fast" ? Math.ceil(base / 2) : base;
 }
