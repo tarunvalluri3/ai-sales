@@ -27,7 +27,7 @@ import { embedText, isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 import { TurnTimer } from "@/lib/turn-timings";
-import { insertTurnMetrics } from "@/lib/ai-response-metrics";
+import { recordTurnMetrics, type DeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { isRedundantSearch } from "@/lib/chat-query-dedupe";
 import { findDuplicateSubmitReply } from "@/lib/duplicate-submit";
 import {
@@ -323,6 +323,8 @@ export type SalesEmployeeResponse = {
    * lib/ai-response-metrics.ts's finalizeTurnMetrics().
    */
   metricsRowId: string | null;
+  /** Set instead of an inline insert when the caller asked to defer the metrics write (see recordTurnMetrics): the row to insert from `after()`. Null otherwise. */
+  metricsDraft?: DeferredTurnMetrics | null;
   /**
    * This turn's plan quota verdict, as the check at the top of
    * `askSalesEmployee()` measured it -- the plan, the period, the replies
@@ -525,6 +527,11 @@ export function getChatModel(): ChatGoogleGenerativeAI {
 function thinkingTokensOf(usage: AIMessage["usage_metadata"]): number {
   if (!usage) return 0;
   return Math.max(0, (usage.total_tokens ?? 0) - (usage.input_tokens ?? 0) - (usage.output_tokens ?? 0));
+}
+
+/** Input tokens Gemini served from its implicit prompt cache (usage_metadata.input_token_details.cache_read). Observability only: it shows whether the stable system-prompt prefix is being cached, which is the evidence for or against reordering the prompt. */
+function cachedTokensOf(usage: AIMessage["usage_metadata"]): number {
+  return usage?.input_token_details?.cache_read ?? 0;
 }
 
 function buildPrompt(): ChatPromptTemplate {
@@ -1050,6 +1057,9 @@ export async function askSalesEmployee(
   // Instant-answer context (lib/answer-bank). Only the widget route passes it;
   // absent means the feature is off for this caller and the turn is unchanged.
   instant?: InstantContext,
+  // Part B: true only for the widget route, which writes the metrics row from
+  // after() (recordTurnMetrics). Every other caller keeps the inline insert.
+  deferMetrics = false,
 ): Promise<SalesEmployeeResponse> {
   // Honest end-state when the AI deadline (lib/chat-timeouts.ts) is hit
   // before a reply exists: escalate so a human follows up, write no
@@ -1098,6 +1108,7 @@ export async function askSalesEmployee(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalThinkingTokens = 0;
+  let totalCachedTokens = 0;
   // Business tools only. A send_reply call is how the turn ends, not a
   // tool the model chose to use, so counting it here would change what
   // this column has meant since Phase 21 and make every "one-tool turn"
@@ -1191,6 +1202,7 @@ export async function askSalesEmployee(
       totalInputTokens += aiMessage.usage_metadata?.input_tokens ?? 0;
       totalOutputTokens += aiMessage.usage_metadata?.output_tokens ?? 0;
       totalThinkingTokens += thinkingTokensOf(aiMessage.usage_metadata);
+      totalCachedTokens += cachedTokensOf(aiMessage.usage_metadata);
 
       if (!aiMessage.tool_calls || aiMessage.tool_calls.length === 0) {
         // The model wrote prose instead of calling send_reply. Break
@@ -1354,24 +1366,21 @@ export async function askSalesEmployee(
       totalInputTokens += rawUsage?.input_tokens ?? 0;
       totalOutputTokens += rawUsage?.output_tokens ?? 0;
       totalThinkingTokens += thinkingTokensOf(rawUsage);
+      totalCachedTokens += cachedTokensOf(rawUsage);
       structured = parsed;
     }
     const result = structured;
 
     const latencyMs = Date.now() - startedAt;
-    const metricsRowId = await timer.time("metrics_write", () =>
-      insertTurnMetrics(supabase, {
-        businessId,
-        conversationId,
-        latencyMs,
-        totalLatencyMs: timer.elapsedMs(),
-        inputTokens: totalInputTokens,
-        outputTokens: totalOutputTokens,
-        thinkingTokens: totalThinkingTokens,
-        toolCallCount,
-        stageTimings: timer.toStageTimings(),
-      }),
-    );
+    const { metricsRowId, metricsDraft } = await recordTurnMetrics(supabase, timer, deferMetrics, {
+      businessId,
+      conversationId,
+      latencyMs,
+      inputTokens: totalInputTokens,
+      outputTokens: totalOutputTokens,
+      thinkingTokens: totalThinkingTokens,
+      toolCallCount,
+    });
 
     // Logged after the write, so the breakdown it carries includes the
     // write itself. `stageTimings` is a JSON string because LogMetadata is
@@ -1389,6 +1398,7 @@ export async function askSalesEmployee(
       // reason total_latency_ms is a new column and not a redefined one.
       totalTokens: totalInputTokens + totalOutputTokens,
       thinkingTokens: totalThinkingTokens,
+      cachedInputTokens: totalCachedTokens,
       toolCallCount,
       // false means this turn still paid for the second generation.
       usedSendReplyTool,
@@ -1406,6 +1416,7 @@ export async function askSalesEmployee(
       metricsRowId,
       quotaSnapshot: quota,
       instantMissReason,
+      metricsDraft,
     };
 
     if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
@@ -1496,6 +1507,7 @@ export async function* streamSalesEmployee(
   clientSignal?: AbortSignal,
   queryEmbedding?: Promise<number[]>,
   instant?: InstantContext,
+  deferMetrics = false,
 ): AsyncGenerator<StreamChunk, void, unknown> {
   const buildTimeoutResponse = (quota: ReplyQuotaStatus): SalesEmployeeResponse => ({
     answer: RESPONSE_TIMEOUT_MESSAGE,
@@ -1524,6 +1536,7 @@ export async function* streamSalesEmployee(
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let totalThinkingTokens = 0;
+  let totalCachedTokens = 0;
   let toolCallCount = 0;
   let calledSideEffectingTool = false;
   const additionalSourceChunkIds = new Set<string>();
@@ -1573,6 +1586,7 @@ export async function* streamSalesEmployee(
           totalInputTokens += rawUsage?.input_tokens ?? 0;
           totalOutputTokens += rawUsage?.output_tokens ?? 0;
           totalThinkingTokens += thinkingTokensOf(rawUsage);
+          totalCachedTokens += cachedTokensOf(rawUsage);
           return parsed as TurnMetadata;
         } catch (error) {
           if (isAbortError(error)) return null;
@@ -1623,6 +1637,7 @@ export async function* streamSalesEmployee(
       totalInputTokens += gathered?.usage_metadata?.input_tokens ?? 0;
       totalOutputTokens += gathered?.usage_metadata?.output_tokens ?? 0;
       totalThinkingTokens += thinkingTokensOf(gathered?.usage_metadata);
+      totalCachedTokens += cachedTokensOf(gathered?.usage_metadata);
 
       if (iterationTextStarted) break; // the answer streamed; the turn is over
       const toolCalls = gathered?.tool_calls ?? [];
@@ -1728,19 +1743,15 @@ export async function* streamSalesEmployee(
       streamed: boolean,
     ): Promise<SalesEmployeeResponse> => {
       const latencyMs = Date.now() - startedAt;
-      const metricsRowId = await timer.time("metrics_write", () =>
-        insertTurnMetrics(supabase, {
-          businessId,
-          conversationId,
-          latencyMs,
-          totalLatencyMs: timer.elapsedMs(),
-          inputTokens: totalInputTokens,
-          outputTokens: totalOutputTokens,
-          thinkingTokens: totalThinkingTokens,
-          toolCallCount,
-          stageTimings: timer.toStageTimings(),
-        }),
-      );
+      const { metricsRowId, metricsDraft } = await recordTurnMetrics(supabase, timer, deferMetrics, {
+        businessId,
+        conversationId,
+        latencyMs,
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        thinkingTokens: totalThinkingTokens,
+        toolCallCount,
+      });
       logEvent("ai_response_generated", businessId, {
         conversationId,
         latencyMs,
@@ -1749,6 +1760,7 @@ export async function* streamSalesEmployee(
         outputTokens: totalOutputTokens,
         totalTokens: totalInputTokens + totalOutputTokens,
         thinkingTokens: totalThinkingTokens,
+        cachedInputTokens: totalCachedTokens,
         toolCallCount,
         usedSendReplyTool: false,
         streamed,
@@ -1765,6 +1777,7 @@ export async function* streamSalesEmployee(
         metricsRowId,
         quotaSnapshot: quota,
         instantMissReason,
+        metricsDraft,
       };
       if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
         await setCachedResponse(supabase, businessId, question, language, response);
@@ -1861,6 +1874,7 @@ export async function* streamSalesEmployee(
     totalInputTokens += rawUsage?.input_tokens ?? 0;
     totalOutputTokens += rawUsage?.output_tokens ?? 0;
     totalThinkingTokens += thinkingTokensOf(rawUsage);
+    totalCachedTokens += cachedTokensOf(rawUsage);
     answerText = parsed.answer;
     const response = await finishClean(parsed, false);
     yield { kind: "delta", text: response.answer };
