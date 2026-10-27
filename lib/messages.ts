@@ -31,6 +31,11 @@ export async function createMessage(
   // WhatsApp/Instagram/sandbox callers, which never pass it. See migration
   // 20261028000000 and lib/rag.ts streamSalesEmployee.
   interruptedAt: string | null = null,
+  // Instant answers (migration 20261030000000): which path produced this
+  // assistant reply. Named in the insert only when given, so callers that do
+  // not record it (WhatsApp, Instagram, the sandbox) never reference the
+  // column and keep working against a database without the migration.
+  answerSource: "greeting" | "suggested" | "faq" | "catalog" | "ai" | null = null,
 ): Promise<Message> {
   const { data, error } = await supabase
     .from("messages")
@@ -49,6 +54,7 @@ export async function createMessage(
       // (STATE.md). The DB default for the column is NULL, identical to
       // passing null, so this changes nothing semantically.
       ...(interruptedAt !== null ? { interrupted_at: interruptedAt } : {}),
+      ...(answerSource !== null ? { answer_source: answerSource } : {}),
     })
     .select()
     .single();
