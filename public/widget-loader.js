@@ -439,6 +439,30 @@
     postError(requestId, kind);
   }
 
+  // Widget-open warm-up: when the visitor opens the panel (never on page
+  // load), ask the server to wake the chat function and cache this
+  // business's authorized context for a few seconds, so the first message
+  // is not the one that pays for a cold start. Fire-and-forget: no result is
+  // used, every failure is ignored, and at most one call per 30s so
+  // open/close toggling cannot spam it. The server does no AI work and no
+  // writes for this call (app/api/chat/warm/route.ts).
+  var lastWarmUpAt = 0;
+  function warmUp() {
+    var now = Date.now();
+    if (now - lastWarmUpAt < 30000) return;
+    lastWarmUpAt = now;
+    try {
+      fetch(appOrigin + "/api/chat/warm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widgetKey: widgetKey }),
+        keepalive: true,
+      }).catch(function () {});
+    } catch {
+      // A warm-up must never affect the widget.
+    }
+  }
+
   async function handleSend(requestId, text, consentGiven) {
     // The synchronous chat response is more current than any poll could
     // be, and this avoids two competing requests updating state at once.
@@ -637,6 +661,7 @@
     } else if (data.type === "widget:panel_open" && typeof data.open === "boolean") {
       var wasOpen = isPanelOpen;
       isPanelOpen = data.open;
+      if (isPanelOpen && !wasOpen) warmUp();
       if (isPanelOpen && !wasOpen && hasHandoffSignal) {
         pollNow();
       } else if (!isPanelOpen && pollTimeoutId) {

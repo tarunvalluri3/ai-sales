@@ -71,10 +71,68 @@ type WidgetKeyRow = {
   businesses: WidgetBusinessRow | null;
 };
 
+/**
+ * Per-instance, short-lived cache of fully-authorized widget contexts, filled
+ * ONLY by the widget-open warm-up (/api/chat/warm) and read ONLY by
+ * /api/chat (`useWarmCache`). An entry exists solely because the exact
+ * (key, origin) pair just passed every check below, so a hit is as good as
+ * the lookup it replaces -- except that a key revoked, an origin removed or a
+ * business unpublished inside the TTL still resolves from a warm instance
+ * until the entry expires. 15s is the accepted window; entries are never
+ * written by the chat route itself, so ordinary traffic gets no such window.
+ * In-memory and per serverless instance: a miss (cold instance, another
+ * instance, expiry) just does the normal lookup.
+ */
+const WARM_CONTEXT_TTL_MS = 15_000;
+const WARM_CONTEXT_MAX_ENTRIES = 200;
+const warmContexts = new Map<string, { expiresAt: number; context: WidgetBusinessContext }>();
+
+function warmContextCacheKey(key: string, origin: string) {
+  return `${key}\n${origin}`;
+}
+
+function readWarmContext(key: string, origin: string | null): WidgetBusinessContext | null {
+  if (!origin) return null;
+  const entry = warmContexts.get(warmContextCacheKey(key, origin));
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    warmContexts.delete(warmContextCacheKey(key, origin));
+    return null;
+  }
+  return entry.context;
+}
+
+/**
+ * Runs the full widget-key + origin check (no `last_used_at` write -- the
+ * warm-up must not write) and caches the result for the chat route. Throws
+ * WidgetAuthError exactly like resolveBusinessFromWidgetKey().
+ */
+export async function warmWidgetBusinessContext(key: string, origin: string | null): Promise<void> {
+  const context = await resolveBusinessFromWidgetKey(key, origin, { touchLastUsed: false });
+  if (!origin) return;
+  const now = Date.now();
+  if (warmContexts.size >= WARM_CONTEXT_MAX_ENTRIES) {
+    for (const [cacheKey, entry] of warmContexts) {
+      if (entry.expiresAt <= now) warmContexts.delete(cacheKey);
+    }
+    // Still full of live entries: drop the oldest rather than grow unbounded.
+    if (warmContexts.size >= WARM_CONTEXT_MAX_ENTRIES) {
+      const oldest = warmContexts.keys().next().value;
+      if (oldest !== undefined) warmContexts.delete(oldest);
+    }
+  }
+  warmContexts.set(warmContextCacheKey(key, origin), { expiresAt: now + WARM_CONTEXT_TTL_MS, context });
+}
+
 export async function resolveBusinessFromWidgetKey(
   key: string,
   origin: string | null,
+  options: { touchLastUsed?: boolean; useWarmCache?: boolean } = {},
 ): Promise<WidgetBusinessContext> {
+  if (options.useWarmCache) {
+    const warm = readWarmContext(key, origin);
+    if (warm) return warm;
+  }
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("widget_keys")
@@ -101,15 +159,17 @@ export async function resolveBusinessFromWidgetKey(
   // never fail closed: a business owner deciding whether an old key is
   // safe to revoke should see a stale timestamp on rare write failure,
   // not a broken chat response.
-  void supabase
-    .from("widget_keys")
-    .update({ last_used_at: new Date().toISOString() })
-    .eq("key", key)
-    .then(({ error: updateError }) => {
-      if (updateError) {
-        console.error("widget_keys.last_used_at update failed", updateError);
-      }
-    });
+  if (options.touchLastUsed !== false) {
+    void supabase
+      .from("widget_keys")
+      .update({ last_used_at: new Date().toISOString() })
+      .eq("key", key)
+      .then(({ error: updateError }) => {
+        if (updateError) {
+          console.error("widget_keys.last_used_at update failed", updateError);
+        }
+      });
+  }
 
   return {
     businessId: data.business_id,

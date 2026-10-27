@@ -46,40 +46,48 @@ export type ListOfferingsResult =
  */
 const MAX_OFFERINGS_PER_TABLE = 30;
 
+/**
+ * The tenant-scoped read behind both the tool below and the chat route's
+ * catalog pre-fetch (lib/catalog-prefetch.ts), so the two can never disagree
+ * about what "the catalog" is. Returns null on a database error; logging
+ * stays with the callers because each reports under its own name.
+ */
+export async function loadOfferings(supabase: SupabaseClient, businessId: string): Promise<OfferingSummary[] | null> {
+  const [{ data: products, error: productError }, { data: services, error: serviceError }] = await Promise.all([
+    supabase
+      .from("products")
+      .select("name, description, price")
+      .eq("business_id", businessId)
+      .eq("status", "approved")
+      .order("created_at", { ascending: true })
+      .limit(MAX_OFFERINGS_PER_TABLE),
+    supabase
+      .from("services")
+      .select("name, description, price")
+      .eq("business_id", businessId)
+      .eq("status", "approved")
+      .order("created_at", { ascending: true })
+      .limit(MAX_OFFERINGS_PER_TABLE),
+  ]);
+
+  if (productError || serviceError || !products || !services) return null;
+
+  return [
+    ...products.map((product) => ({ type: "product" as const, name: product.name, description: product.description, price: product.price })),
+    ...services.map((service) => ({ type: "service" as const, name: service.name, description: service.description, price: service.price })),
+  ];
+}
+
 export async function executeListOfferings(
   supabase: SupabaseClient,
   businessId: string,
 ): Promise<ListOfferingsResult> {
-  const { data: products, error: productError } = await supabase
-    .from("products")
-    .select("name, description, price")
-    .eq("business_id", businessId)
-    .eq("status", "approved")
-    .order("created_at", { ascending: true })
-    .limit(MAX_OFFERINGS_PER_TABLE);
+  const offerings = await loadOfferings(supabase, businessId);
 
-  if (productError) {
+  if (offerings === null) {
     logEvent("tool_invoked", businessId, { tool: "list_products_and_services", result: "lookup_failed" }, "error");
     return { found: false, reason: "lookup_failed" };
   }
-
-  const { data: services, error: serviceError } = await supabase
-    .from("services")
-    .select("name, description, price")
-    .eq("business_id", businessId)
-    .eq("status", "approved")
-    .order("created_at", { ascending: true })
-    .limit(MAX_OFFERINGS_PER_TABLE);
-
-  if (serviceError) {
-    logEvent("tool_invoked", businessId, { tool: "list_products_and_services", result: "lookup_failed" }, "error");
-    return { found: false, reason: "lookup_failed" };
-  }
-
-  const offerings: OfferingSummary[] = [
-    ...products.map((product) => ({ type: "product" as const, name: product.name, description: product.description, price: product.price })),
-    ...services.map((service) => ({ type: "service" as const, name: service.name, description: service.description, price: service.price })),
-  ];
 
   if (offerings.length === 0) {
     logEvent("tool_invoked", businessId, { tool: "list_products_and_services", result: "none_found" });

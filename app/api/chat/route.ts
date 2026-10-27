@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
 
   let business: WidgetBusinessContext;
   try {
-    business = await timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin));
+    business = await timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin, { useWarmCache: true }));
   } catch (error) {
     if (error instanceof WidgetAuthError) {
       return withCors(jsonError("Invalid request.", 401));
