@@ -549,6 +549,11 @@
               { type: "widget:stream_delta", requestId: requestId, text: event.text || "" },
               appOrigin,
             );
+          } else if (event.type === "retract") {
+            iframe.contentWindow.postMessage(
+              { type: "widget:stream_retract", requestId: requestId, text: event.text || "" },
+              appOrigin,
+            );
           } else if (event.type === "final") {
             sawTerminal = true;
             if (event.asOf) lastKnownMessageAt = event.asOf;

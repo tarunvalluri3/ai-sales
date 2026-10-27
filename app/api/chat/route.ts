@@ -619,6 +619,8 @@ export async function POST(request: NextRequest) {
             )) {
               if (chunk.kind === "delta") {
                 emit({ type: "delta", text: chunk.text });
+              } else if (chunk.kind === "retract") {
+                emit({ type: "retract", text: chunk.text });
               } else {
                 finalResponse = chunk.response;
                 interrupted = chunk.interrupted;

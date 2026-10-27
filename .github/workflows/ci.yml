@@ -154,6 +154,13 @@ jobs:
         # server-only). No database and no secrets.
         run: npm run test:tool-scope
 
+      - name: Output guardrail tests
+        # Guardrails Phase 4 (STATE.md): the canary / verbatim-prompt leak block,
+        # the unlisted link/email/phone filter, the unbacked-promise detector and
+        # the StreamOutputGuard (hold-back, mid-stream retract), plus the widget
+        # retract wiring. Pure modules, no network and no secrets.
+        run: npm run test:output-guard
+
       - name: Build
         run: npm run build
 

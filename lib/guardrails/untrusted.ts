@@ -30,6 +30,13 @@ export type UntrustedTags = {
   toolResult: string;
   /** Tag name wrapping the business-supplied profile fields. */
   profile: string;
+  /**
+   * Secret marker placed in the system prompt (guardrails Phase 4). It has no
+   * meaning to the model; if it ever appears in a reply, the prompt leaked and
+   * the reply is blocked. While a reply streams, the guard withholds any tail
+   * that could still become this string (StreamOutputGuard).
+   */
+  canary: string;
 };
 
 function randomHex(bytes: number): string {
@@ -46,6 +53,7 @@ export function newUntrustedTags(): UntrustedTags {
     context: `retrieved_context_${nonce}`,
     toolResult: `tool_result_${nonce}`,
     profile: `business_profile_${nonce}`,
+    canary: `ref-${randomHex(8)}`,
   };
 }
 

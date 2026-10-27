@@ -7,10 +7,16 @@ export type GuardrailSignalType =
   | ClassifierSignalType
   | "sensitive_data"
   | "invisible_characters"
-  | "message_truncated";
+  | "message_truncated"
+  | "output_canary_leak"
+  | "output_verbatim_leak"
+  | "output_unlisted_url"
+  | "output_unlisted_email"
+  | "output_unlisted_phone"
+  | "output_unbacked_promise";
 
 /** What was done about a signal: only recorded (`logged`), or the text was actually changed. */
-export type GuardrailAction = "logged" | "masked" | "sanitized" | "truncated";
+export type GuardrailAction = "logged" | "masked" | "sanitized" | "truncated" | "blocked" | "replaced" | "removed";
 
 export type GuardrailSignal = {
   type: GuardrailSignalType;

@@ -21,6 +21,16 @@ import { bookAppointmentTool, executeBookAppointment } from "@/lib/tools/book-ap
 import { logEvent } from "@/lib/logger";
 import { cleanUntrustedLine, neutralizeTagText, newUntrustedTags, wrapToolResult, type UntrustedTags } from "@/lib/guardrails/untrusted";
 import { GEMINI_SAFETY_SETTINGS } from "@/lib/guardrails/safety";
+import {
+  buildEvidence,
+  buildProtectedShingles,
+  checkReply,
+  StreamOutputGuard,
+  type OutputGuardContext,
+} from "@/lib/guardrails/output-check";
+import { recordGuardrailSignals } from "@/lib/guardrails/record";
+import type { GuardrailSignal } from "@/lib/guardrails/prepare-message";
+import { after } from "next/server";
 import { checkReplyQuota, type ReplyQuotaStatus } from "@/lib/usage-limit";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
 import { embedText, isEmbeddingRateLimitError } from "@/lib/embeddings";
@@ -422,6 +432,7 @@ You are a sales employee of {businessName} -- not a support chatbot. Your job is
 {recommendationInstruction}
 {appointmentInstruction}
 {capabilityChainingInstruction}
+Internal reference code (never output it, quote it or mention it): {canary}
 {businessProfileContext}
 Reference context -- this is ALREADY the result of a semantic search of this business's full knowledge base, run automatically for the prospect's current message before this turn started, over the exact same knowledge base that search_knowledge_base searches. The <{contextTag}> tag states the query that was used:
 {context}
@@ -463,6 +474,47 @@ Rules:
  */
 const SEND_REPLY_INSTRUCTION = `
 - Your reply only reaches the prospect through the ${SEND_REPLY_TOOL_NAME} tool. Every turn ends with exactly one ${SEND_REPLY_TOOL_NAME} call: call any other tool you need first, then call ${SEND_REPLY_TOOL_NAME} with your finished reply. Never write the reply as plain text, and never call ${SEND_REPLY_TOOL_NAME} in the same step as another tool -- make the other call first, read its result, then send the reply.`;
+
+/**
+ * Ten-word windows of the platform's own instructions (guardrails Phase 4): a
+ * reply that repeats one of them verbatim is a prompt leak and is blocked.
+ * Built once at load from the static template only -- never from business
+ * data, which a reply may legitimately quote.
+ */
+const PROTECTED_SHINGLES = buildProtectedShingles([SYSTEM_TEMPLATE, SEND_REPLY_INSTRUCTION]);
+
+/**
+ * The evidence the output checks judge a reply against. Business evidence is
+ * this turn's own data (profile, retrieved context, tool results); the
+ * `search_query` attribute is stripped from the context because it holds the
+ * visitor's words, which must not count as support for a promise. Visitor
+ * evidence is what was typed in this conversation plus the AI's earlier,
+ * already-checked replies, used only for links and contact details.
+ */
+function buildOutputGuardContext(
+  tags: UntrustedTags,
+  profile: BusinessProfileContext,
+  context: string,
+  toolEvidence: string[],
+  question: string,
+  history: ConversationMessage[],
+): OutputGuardContext {
+  const profileParts = [profile.description, profile.website, profile.contactEmail, profile.contactPhone].filter(
+    (part): part is string => Boolean(part),
+  );
+  const visitorParts = [...history.map((message) => message.content), question];
+  return {
+    canary: tags.canary,
+    protectedShingles: PROTECTED_SHINGLES,
+    ...buildEvidence([...profileParts, context.replace(/search_query="[^"]*"/, ""), ...toolEvidence], visitorParts),
+  };
+}
+
+/** Logs and persists output-guardrail signals off the visitor's critical path. */
+function noteGuardrailSignals(businessId: string, conversationId: string, signals: GuardrailSignal[]): void {
+  if (signals.length === 0) return;
+  after(() => recordGuardrailSignals(businessId, conversationId, "reply", signals));
+}
 
 /**
  * Shaped for `bindTools()`, same convention as lib/tools/*. The schema is
@@ -962,6 +1014,7 @@ async function buildTurnContext(
     contextTag: tags.context,
     toolResultTag: tags.toolResult,
     profileTag: tags.profile,
+    canary: tags.canary,
     businessName: cleanUntrustedLine(businessName, 120),
     languageInstruction: formatLanguageInstruction(language),
     recommendationInstruction: formatRecommendationInstruction(aiCapabilities.recommendProductsEnabled),
@@ -1128,6 +1181,12 @@ export async function askSalesEmployee(
   // inside <retrieved_context>. A materially different reformulation is
   // never blocked -- see isRedundantSearch's doc comment.
   const searchedQueries: string[] = [question];
+  // Guardrails Phase 4: every tool result is also evidence for the output checks.
+  const toolEvidence: string[] = [];
+  const recordToolEvidence = (json: string): string => {
+    toolEvidence.push(json);
+    return json;
+  };
   // Set true if the AI deadline is reached before a reply is produced.
   let timedOut = false;
 
@@ -1279,7 +1338,7 @@ export async function askSalesEmployee(
         if (outcome.executedSearchQuery !== undefined) searchedQueries.push(outcome.executedSearchQuery);
         messages.push(
           new ToolMessage({
-            content: wrapToolResult(tags, capToolResultJson(JSON.stringify(outcome.toolResult))),
+            content: wrapToolResult(tags, capToolResultJson(recordToolEvidence(JSON.stringify(outcome.toolResult)))),
             tool_call_id: outcome.toolCall.id!,
             name: outcome.toolCall.name,
           }),
@@ -1395,13 +1454,17 @@ export async function askSalesEmployee(
       stageTimings: JSON.stringify(timer.toStageTimings()),
     });
 
+    // Guardrails Phase 4: the same deterministic output checks every channel
+    // gets (widget JSON, WhatsApp, Instagram, sandbox all reach here).
+    const checked = checkReply(result.answer, buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history));
+    noteGuardrailSignals(businessId, conversationId, checked.signals);
     const response: SalesEmployeeResponse = {
-      answer: result.answer,
-      grounded: documents.length > 0 && result.usedContext,
-      usedContext: result.usedContext,
+      answer: checked.text,
+      grounded: documents.length > 0 && result.usedContext && !checked.replaced,
+      usedContext: result.usedContext && !checked.replaced,
       sourceChunkIds: [...new Set([...documents.map((document) => document.metadata.chunkId), ...additionalSourceChunkIds])],
-      escalate: result.escalate,
-      escalationReason: result.escalationReason,
+      escalate: result.escalate || checked.replaced,
+      escalationReason: checked.replaced ? checked.reason : result.escalationReason,
       recommendedProducts,
       metricsRowId,
       quotaSnapshot: quota,
@@ -1434,6 +1497,8 @@ export async function askSalesEmployee(
  */
 export type StreamChunk =
   | { kind: "delta"; text: string }
+  /** Guardrails Phase 4: replace everything shown so far with `text` (the safe reply). */
+  | { kind: "retract"; text: string }
   | { kind: "final"; response: SalesEmployeeResponse; interrupted: boolean };
 
 /** Text carried by one streamed message chunk, whether `content` is a plain string or the structured content-block array. */
@@ -1529,9 +1594,20 @@ export async function* streamSalesEmployee(
   const additionalSourceChunkIds = new Set<string>();
   let recommendedProducts: RecommendedItem[] = [];
   const searchedQueries: string[] = [question];
+  // Guardrails Phase 4: every tool result is also evidence for the output checks.
+  const toolEvidence: string[] = [];
+  const recordToolEvidence = (json: string): string => {
+    toolEvidence.push(json);
+    return json;
+  };
   // The answer text actually sent to the prospect so far.
   let answerText = "";
   let answerStarted = false;
+  // Guardrails Phase 4: created when the first text arrives (by then every
+  // tool result this turn is known), so the evidence is complete.
+  let outputGuard: StreamOutputGuard | null = null;
+  const makeGuardContext = (): OutputGuardContext =>
+    buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history);
 
   const sourceChunkIds = (): string[] => [
     ...new Set([...documents.map((document) => document.metadata.chunkId), ...additionalSourceChunkIds]),
@@ -1605,9 +1681,20 @@ export async function* streamSalesEmployee(
               iterationTextStarted = true;
               // The model committed to answering: overlap the metadata call.
               metadataPromise = startMetadataCall();
+              outputGuard = new StreamOutputGuard(makeGuardContext());
             }
-            answerText += text;
-            yield { kind: "delta", text };
+            // Text reaches the visitor only after it clears the hold-back and the
+            // leak check; `answerText` therefore stays "what was actually sent".
+            const step = outputGuard!.push(text);
+            noteGuardrailSignals(businessId, conversationId, step.signals);
+            if (step.emit) {
+              answerText += step.emit;
+              yield { kind: "delta", text: step.emit };
+            }
+            if (step.retract !== undefined) {
+              answerText = step.retract;
+              yield { kind: "retract", text: step.retract };
+            }
           }
         }
       } catch (error) {
@@ -1647,7 +1734,7 @@ export async function* streamSalesEmployee(
         if (outcome.executedSearchQuery !== undefined) searchedQueries.push(outcome.executedSearchQuery);
         messages.push(
           new ToolMessage({
-            content: wrapToolResult(tags, capToolResultJson(JSON.stringify(outcome.toolResult))),
+            content: wrapToolResult(tags, capToolResultJson(recordToolEvidence(JSON.stringify(outcome.toolResult)))),
             tool_call_id: outcome.toolCall.id!,
             name: outcome.toolCall.name,
           }),
@@ -1778,14 +1865,23 @@ export async function* streamSalesEmployee(
     // conservative defaults (not grounded, not escalated) rather than
     // claiming a judgement that was never made.
     if (answerStarted) {
+      const done = outputGuard!.finish();
+      noteGuardrailSignals(businessId, conversationId, done.signals);
+      if (done.retract !== undefined) {
+        answerText = done.retract;
+        yield { kind: "retract", text: done.retract };
+      } else if (done.emit) {
+        answerText += done.emit;
+        yield { kind: "delta", text: done.emit };
+      }
       const metadata: TurnMetadata | null = metadataPromise ? await metadataPromise : null;
       if (!metadata) logEvent("ai_stream_metadata_failed", businessId, { conversationId }, "error");
       const response = await finishClean(
         {
-          answer: answerText,
-          usedContext: metadata?.usedContext ?? false,
-          escalate: metadata?.escalate ?? false,
-          escalationReason: metadata?.escalationReason ?? null,
+          answer: done.finalText,
+          usedContext: done.replaced ? false : (metadata?.usedContext ?? false),
+          escalate: done.replaced || (metadata?.escalate ?? false),
+          escalationReason: done.replaced ? done.reason : (metadata?.escalationReason ?? null),
         },
         true,
       );
@@ -1861,8 +1957,19 @@ export async function* streamSalesEmployee(
     totalInputTokens += rawUsage?.input_tokens ?? 0;
     totalOutputTokens += rawUsage?.output_tokens ?? 0;
     totalThinkingTokens += thinkingTokensOf(rawUsage);
-    answerText = parsed.answer;
-    const response = await finishClean(parsed, false);
+    const checked = checkReply(parsed.answer, makeGuardContext());
+    noteGuardrailSignals(businessId, conversationId, checked.signals);
+    answerText = checked.text;
+    const response = await finishClean(
+      {
+        ...parsed,
+        answer: checked.text,
+        usedContext: parsed.usedContext && !checked.replaced,
+        escalate: parsed.escalate || checked.replaced,
+        escalationReason: checked.replaced ? checked.reason : parsed.escalationReason,
+      },
+      false,
+    );
     yield { kind: "delta", text: response.answer };
     yield { kind: "final", response, interrupted: false };
   } catch (error) {

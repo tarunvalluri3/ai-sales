@@ -100,6 +100,12 @@ export type WidgetStreamDeltaMessage = {
   text: string;
 };
 
+export type WidgetStreamRetractMessage = {
+  type: "widget:stream_retract";
+  requestId: string;
+  text: string;
+};
+
 export type WidgetStreamEndMessage = {
   type: "widget:stream_end";
   requestId: string;
@@ -204,6 +210,7 @@ export type FromParentMessage =
   | WidgetErrorMessage
   | WidgetStreamStartMessage
   | WidgetStreamDeltaMessage
+  | WidgetStreamRetractMessage
   | WidgetStreamEndMessage
   | WidgetStreamAbortedMessage
   | WidgetPollResultMessage
@@ -278,6 +285,11 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
     case "widget:stream_delta":
       if (typeof data.requestId === "string" && typeof data.text === "string") {
         return { type: "widget:stream_delta", requestId: data.requestId, text: data.text };
+      }
+      return null;
+    case "widget:stream_retract":
+      if (typeof data.requestId === "string" && typeof data.text === "string") {
+        return { type: "widget:stream_retract", requestId: data.requestId, text: data.text };
       }
       return null;
     case "widget:stream_end":
