@@ -21,6 +21,7 @@ import {
   Webhook,
   Workflow,
   Wrench,
+  Zap,
 } from "lucide-react";
 
 export type NavItem = {
@@ -72,6 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Services", href: "/dashboard/services", icon: Wrench },
       { label: "FAQs", href: "/dashboard/faqs", icon: CircleHelp },
       { label: "Knowledge", href: "/dashboard/knowledge", icon: BookOpen },
+      { label: "Instant Answers", href: "/dashboard/answer-bank", icon: Zap },
     ],
   },
   {

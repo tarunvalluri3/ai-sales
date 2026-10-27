@@ -125,6 +125,18 @@ jobs:
         # staging below.)
         run: npm run test:abuse-limits
 
+      - name: Instant-answer decision logic tests
+        # Instant answers (STATE.md 2026-10-28): greeting detection, the
+        # eligibility rules (self-contained, language/script, injection
+        # signals), catalog-question matching, the FAQ similarity / gap /
+        # lexical-guard thresholds, and the output checks on stored answers.
+        # A wrong instant answer (especially a wrong price) is the failure
+        # this guards against. Pure modules with injected lookups, so no
+        # database and no secrets. (Staleness via the content version, tenant
+        # isolation and the zero-grant posture are pgTAP file 056, run
+        # against staging below.)
+        run: npm run test:answer-bank
+
       - name: Build
         run: npm run build
 

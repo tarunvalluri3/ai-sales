@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonSuccess, jsonTooManyRequests } from "@/lib/api-response";
 import { logAndGetUserMessage, AppError } from "@/lib/errors";
-import { embedText } from "@/lib/embeddings";
+import { embedQueryWithCache } from "@/lib/answer-bank/store";
+import { kickAnswerBankRefresh } from "@/lib/answer-bank/generate";
+import type { InstantContext } from "@/lib/answer-bank/decision";
 import { resolveBusinessFromWidgetKey, WidgetAuthError, type WidgetBusinessContext } from "@/lib/widget-auth";
 import {
   checkAndIncrementRateLimit,
@@ -116,6 +118,10 @@ const bodySchema = z.object({
   // Client-supplied, so it can only ever TIGHTEN a limit (see
   // lib/abuse-limits.ts classifyClientSignal); absent from older embeds.
   clientElapsedMs: z.number().int().min(0).max(86_400_000).optional(),
+  // Instant answers: the widget sets this when the message came from a
+  // suggested-question chip. Client-supplied, so it is analytics only -- the
+  // server decides what to serve from the message text itself, never from this.
+  suggested: z.boolean().optional(),
 });
 
 /**
@@ -271,9 +277,17 @@ export async function POST(request: NextRequest) {
   // unhandled rejection; a turn that does reach retrieval awaits the same
   // promise and sees the original error (rate-limit degrade included).
   const embedStartedAt = Date.now();
-  const queryEmbedding = embedText(message);
-  queryEmbedding.then(
-    () => timer.record("embedding_prefetch", Date.now() - embedStartedAt),
+  // A normalized repeat of an earlier question reuses its stored embedding
+  // (query_embedding_cache); a miss embeds as before and writes the vector in
+  // after(), via `storeQueryEmbedding`, once the turn has finished.
+  const embedded = embedQueryWithCache(supabase, business.businessId, message);
+  const queryEmbedding = embedded.then((result) => result.embedding);
+  let storeQueryEmbedding: (() => Promise<void>) | null = null;
+  embedded.then(
+    (result) => {
+      storeQueryEmbedding = result.store;
+      timer.record("embedding_prefetch", Date.now() - embedStartedAt);
+    },
     () => undefined,
   );
 
@@ -407,8 +421,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Instant-answer context for this request. `published` is true by
+    // construction: resolveBusinessFromWidgetKey() refuses an unpublished business.
+    const instant: InstantContext = {
+      businessName: business.businessName,
+      enabled: true,
+      published: true,
+      suggestedQuestions: business.suggestedQuestions,
+      suggestedClick: parsed.data.suggested === true,
+    };
+
+    // The history read runs concurrently with the user-message write, so it may
+    // already contain this very message. Drop it before appending the canonical
+    // copy -- otherwise a genuine first turn arrives as [user, user], which turns
+    // off isFirstTurn() (instant greetings, the first-turn cache) and sends the
+    // question to the model twice.
     const history = [
-      ...priorHistory,
+      ...priorHistory.filter((prior) => !(prior.role === "user" && prior.created_at === userMessageRow.created_at)),
       { role: "user" as const, content: message, created_at: userMessageRow.created_at },
     ].slice(-HISTORY_LIMIT);
 
@@ -427,6 +456,7 @@ export async function POST(request: NextRequest) {
           response.sourceChunkIds,
           response.grounded,
           interrupted ? new Date().toISOString() : null,
+          response.answerSource ?? "ai",
         ),
       );
 
@@ -500,6 +530,15 @@ export async function POST(request: NextRequest) {
       // written (an interrupted turn, a timeout, a cache hit).
       after(() => finalizeTurnMetrics(supabase, response.metricsRowId, business.businessId, timer));
 
+      // Instant answers: persist a freshly computed query embedding for the
+      // next identical question, and nudge regeneration when a stored answer
+      // was expected but none was fresh. Both are best effort and off the wait.
+      const pendingEmbeddingWrite: (() => Promise<void>) | null = storeQueryEmbedding;
+      if (pendingEmbeddingWrite) after(pendingEmbeddingWrite);
+      if (response.instantMissReason === "no_fresh_entry") {
+        after(() => kickAnswerBankRefresh(business.businessId));
+      }
+
       // Phase 17a quota reminder emails -- only for a completed turn. `+ 1`
       // only when this turn actually wrote an ai_response_metrics row.
       if (!interrupted) {
@@ -557,6 +596,7 @@ export async function POST(request: NextRequest) {
               quota,
               abortController.signal,
               queryEmbedding,
+              instant,
             )) {
               if (chunk.kind === "delta") {
                 emit({ type: "delta", text: chunk.text });
@@ -635,6 +675,7 @@ export async function POST(request: NextRequest) {
         timer,
         quota,
         queryEmbedding,
+        instant,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);

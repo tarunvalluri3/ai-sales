@@ -2,6 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { kickAnswerBankRefresh } from "@/lib/answer-bank/generate";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createWidgetKey, revokeWidgetKey, updateWidgetKeyOrigins } from "@/lib/widget-keys";
@@ -262,6 +264,10 @@ export async function publishBusinessAction(
 
   await recordAuditLogEntry(businessId, userId, "business.published", "business", businessId);
 
+  // Instant answers: publishing is when stored answers become servable, so
+  // build them now (off the response) rather than waiting for the daily run.
+  after(() => kickAnswerBankRefresh(businessId));
+
   revalidatePath("/dashboard/widget-settings");
   revalidatePath("/onboarding/test");
   return { success: true };
@@ -372,6 +378,9 @@ export async function saveSuggestedQuestionsAction(questions: string[]): Promise
   }
 
   await recordAuditLogEntry(businessId, userId, "widget_suggested_questions.updated", "business", businessId);
+
+  // New or changed chips need stored answers; the save already queued the job (database trigger).
+  after(() => kickAnswerBankRefresh(businessId));
 
   revalidatePath("/dashboard/widget-settings");
   return { success: true };

@@ -28,6 +28,8 @@ export type WidgetSendMessage = {
   requestId: string;
   text: string;
   consentGiven: boolean;
+  /** Set when the text came from a suggested-question chip. Analytics only; the server never trusts it to pick an answer. */
+  suggested?: boolean;
 };
 
 /**

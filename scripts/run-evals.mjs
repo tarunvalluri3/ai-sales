@@ -111,7 +111,7 @@ async function getAcmeFixture() {
   return { id: business.id, widget_key: widgetKeyRow.key };
 }
 
-async function sendChatMessage(widgetKey, message, { consentGiven } = {}) {
+async function sendChatMessage(widgetKey, message, { consentGiven, conversationId, suggested } = {}) {
   // lib/widget-auth.ts's resolveBusinessFromWidgetKey() requires the
   // request's Origin (or Referer) header to match the business's own
   // configured widget_allowed_origin -- unlike a browser, Node's fetch()
@@ -120,7 +120,7 @@ async function sendChatMessage(widgetKey, message, { consentGiven } = {}) {
   const response = await fetch(`${APP_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: APP_URL },
-    body: JSON.stringify({ widgetKey, message, consentGiven }),
+    body: JSON.stringify({ widgetKey, message, consentGiven, conversationId, suggested }),
   });
   const body = await response.json().catch(() => null);
   if (!response.ok || !body?.ok) {
@@ -294,10 +294,209 @@ function buildCases(businessId) {
   ];
 }
 
+// ---------------------------------------------------------------------------
+// Instant answers (STATE.md 2026-10-28). These cases WRITE to Acme Test Co.
+// only (the standing test business): they temporarily replace its suggested
+// questions, seed a stored answer, a FAQ embedding and edit a product price,
+// and put everything back in `finally`. They need migration 20261030000000
+// applied; against a database without it they fail loudly rather than skip.
+// ---------------------------------------------------------------------------
+
+const STORED_MARKER = "EVAL-STORED-ANSWER";
+
+async function assistantRow(conversationId) {
+  const { data } = await supabase
+    .from("messages")
+    .select("content, answer_source")
+    .eq("conversation_id", conversationId)
+    .eq("role", "assistant")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
+async function metricsCount(conversationId) {
+  const { count } = await supabase
+    .from("ai_response_metrics")
+    .select("*", { count: "exact", head: true })
+    .eq("conversation_id", conversationId);
+  return count ?? 0;
+}
+
+async function acmeState(businessId) {
+  const { data } = await supabase
+    .from("businesses")
+    .select("widget_suggested_questions, answer_bank_version")
+    .eq("id", businessId)
+    .single();
+  return data;
+}
+
+/** Replaces Acme's chips and stores a fresh answer for `question` at the resulting content version. Returns what is needed to restore. */
+async function seedStoredAnswer(businessId, question, answer) {
+  const before = await acmeState(businessId);
+  const { error: chipError } = await supabase
+    .from("businesses")
+    .update({ widget_suggested_questions: [question] })
+    .eq("id", businessId);
+  if (chipError) throw new Error(`seed chips failed: ${chipError.message}`);
+  const after = await acmeState(businessId);
+  const key = question.toLowerCase().replace(/[?.!]+$/, "").trim();
+  const { error } = await supabase.from("answer_bank_entries").upsert(
+    {
+      business_id: businessId,
+      kind: "suggested",
+      question_key: key,
+      question_text: question,
+      language: "en",
+      answer,
+      status: "ready",
+      owner_state: "generated",
+      content_version: after.answer_bank_version,
+    },
+    { onConflict: "business_id,kind,question_key,language" },
+  );
+  if (error) throw new Error(`seed entry failed: ${error.message}`);
+  return { previousChips: before.widget_suggested_questions, key };
+}
+
+async function restoreStoredAnswer(businessId, seeded) {
+  await supabase.from("answer_bank_entries").delete().eq("business_id", businessId).eq("question_key", seeded.key);
+  await supabase.from("businesses").update({ widget_suggested_questions: seeded.previousChips }).eq("id", businessId);
+  // The eval's own AI turns may have first-turn-cached an answer for the probe questions.
+  await supabase.from("ai_response_cache").delete().eq("business_id", businessId);
+  await supabase.from("answer_bank_jobs").delete().eq("business_id", businessId);
+}
+
+function buildInstantAnswerCases(businessId) {
+  const chip = "EVAL chip: how much is Test Product - 1 today?";
+  const stored = `${STORED_MARKER} Test Product - 1 costs $99.`;
+  return [
+    {
+      name: "instant: a greeting gets the instant welcome (no model call, not counted)",
+      run: async ({ widgetKey }) => {
+        const { answer, conversationId } = await sendChatMessage(widgetKey, "Hi");
+        const row = await assistantRow(conversationId);
+        const metrics = await metricsCount(conversationId);
+        const pass = /welcome to acme test co/i.test(answer) && row?.answer_source === "greeting" && metrics === 0;
+        return { pass, detail: `answer="${answer}" source=${row?.answer_source} metricsRows=${metrics}` };
+      },
+    },
+    {
+      name: "instant: a greeting with real content is answered by the AI, not the welcome",
+      run: async ({ widgetKey }) => {
+        const { answer, conversationId } = await sendChatMessage(widgetKey, "Hi, what is the price of Test Product - 1?");
+        const row = await assistantRow(conversationId);
+        return { pass: row?.answer_source === "ai" && /99/.test(answer), detail: `answer="${answer}" source=${row?.answer_source}` };
+      },
+    },
+    {
+      name: "instant: a suggested-question click returns its stored answer; near-misses and follow-ups do not",
+      run: async ({ widgetKey }) => {
+        const seeded = await seedStoredAnswer(businessId, chip, stored);
+        try {
+          const click = await sendChatMessage(widgetKey, chip, { suggested: true });
+          const clickRow = await assistantRow(click.conversationId);
+          if (click.answer !== stored || clickRow?.answer_source !== "suggested") {
+            return { pass: false, detail: `click: answer="${click.answer}" source=${clickRow?.answer_source}` };
+          }
+          if ((await metricsCount(click.conversationId)) !== 0) return { pass: false, detail: "a stored answer wrote an ai_response_metrics row" };
+
+          // Near-miss: a different product / number must not get the stored answer.
+          const near = await sendChatMessage(widgetKey, "EVAL chip: how much is Test Product - 2 today?", { suggested: true });
+          const nearRow = await assistantRow(near.conversationId);
+          if (near.answer.includes(STORED_MARKER) || nearRow?.answer_source !== "ai") {
+            return { pass: false, detail: `near-miss: answer="${near.answer}" source=${nearRow?.answer_source}` };
+          }
+
+          // Follow-up: "how much is it?" after a first turn goes to the AI.
+          const first = await sendChatMessage(widgetKey, "Tell me about Test Product - 1.");
+          const follow = await sendChatMessage(widgetKey, "how much is it?", { conversationId: first.conversationId });
+          const followRow = await assistantRow(first.conversationId);
+          if (follow.answer.includes(STORED_MARKER) || followRow?.answer_source !== "ai") {
+            return { pass: false, detail: `follow-up: answer="${follow.answer}" source=${followRow?.answer_source}` };
+          }
+          return { pass: true };
+        } finally {
+          await restoreStoredAnswer(businessId, seeded);
+        }
+      },
+    },
+    {
+      name: "instant: editing a price invalidates the stored answer immediately",
+      run: async ({ widgetKey }) => {
+        const seeded = await seedStoredAnswer(businessId, chip, stored);
+        const { data: product } = await supabase
+          .from("products")
+          .select("id, price")
+          .eq("business_id", businessId)
+          .eq("name", "Test Product - 1")
+          .maybeSingle();
+        if (!product) {
+          await restoreStoredAnswer(businessId, seeded);
+          return { pass: false, detail: "Acme has no \"Test Product - 1\" to edit" };
+        }
+        try {
+          const fresh = await sendChatMessage(widgetKey, chip, { suggested: true });
+          if (fresh.answer !== stored) return { pass: false, detail: `before the edit the stored answer was not served: "${fresh.answer}"` };
+
+          const { error } = await supabase.from("products").update({ price: Number(product.price) + 1 }).eq("id", product.id);
+          if (error) return { pass: false, detail: `price edit failed: ${error.message}` };
+
+          const after = await sendChatMessage(widgetKey, chip, { suggested: true });
+          const row = await assistantRow(after.conversationId);
+          return {
+            pass: !after.answer.includes(STORED_MARKER) && row?.answer_source === "ai",
+            detail: `after the edit: answer="${after.answer}" source=${row?.answer_source}`,
+          };
+        } finally {
+          await supabase.from("products").update({ price: product.price }).eq("id", product.id);
+          await restoreStoredAnswer(businessId, seeded);
+        }
+      },
+    },
+    {
+      name: "instant: a close FAQ match returns the owner's FAQ answer verbatim",
+      run: async ({ widgetKey }) => {
+        const { data: faq } = await supabase
+          .from("faqs")
+          .select("id, question, answer")
+          .eq("business_id", businessId)
+          .eq("status", "approved")
+          .eq("question", "What does Acme Test Co. provide?")
+          .maybeSingle();
+        if (!faq) return { pass: false, detail: "Acme's FAQ \"What does Acme Test Co. provide?\" is missing" };
+        const embedding = await embedForEval(faq.question);
+        const { error } = await supabase
+          .from("faq_question_embeddings")
+          .upsert({ faq_id: faq.id, business_id: businessId, question_text: faq.question, embedding }, { onConflict: "faq_id" });
+        if (error) return { pass: false, detail: `FAQ embedding seed failed: ${error.message}` };
+        try {
+          const { answer, conversationId } = await sendChatMessage(widgetKey, faq.question);
+          const row = await assistantRow(conversationId);
+          return {
+            pass: answer === faq.answer && row?.answer_source === "faq",
+            detail: `answer="${answer}" source=${row?.answer_source}`,
+          };
+        } finally {
+          await supabase.from("faq_question_embeddings").delete().eq("faq_id", faq.id);
+          await supabase.from("ai_response_cache").delete().eq("business_id", businessId);
+        }
+      },
+    },
+  ];
+}
+
 async function main() {
   await preflight();
   const { id: businessId, widget_key: widgetKey } = await getAcmeFixture();
-  const cases = buildCases(businessId);
+  // EVAL_ONLY="substring" runs just the cases whose name contains it (to re-run a case
+  // that hit a transient error without spending the rate-limit quota on the rest).
+  const only = process.env.EVAL_ONLY?.toLowerCase();
+  const cases = [...buildCases(businessId), ...buildInstantAnswerCases(businessId)].filter(
+    (c) => !only || only.split("|").some((part) => c.name.toLowerCase().includes(part)),
+  );
 
   console.log(`Running ${cases.length} eval case(s) against ${APP_URL}, business "${ACME_BUSINESS_NAME}"...\n`);
 
@@ -306,6 +505,17 @@ async function main() {
   for (const evalCase of cases) {
     let setupResult;
     try {
+      if (evalCase.run) {
+        const outcome = await evalCase.run({ widgetKey, businessId });
+        if (outcome.pass) {
+          console.log(`PASS  ${evalCase.name}`);
+        } else {
+          anyFailed = true;
+          console.log(`FAIL  ${evalCase.name}`);
+          console.log(`      ${outcome.detail ?? ""}`);
+        }
+        continue;
+      }
       if (evalCase.setup) {
         setupResult = await evalCase.setup(businessId);
       }
