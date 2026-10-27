@@ -30,6 +30,13 @@ export type KnowledgeSearchResult = {
  * and the AI latency work needed them separated rather than summed, since
  * only one of the two is affected by which region the function runs in.
  * Callers that don't pass it behave exactly as before.
+ *
+ * `queryEmbeddingPromise` (2026-10-27 latency pass) is an embedding the
+ * caller already started for this same `queryText` -- the chat route kicks
+ * it off once the widget key is authenticated and rate-checked, so it
+ * overlaps the remaining pre-AI database work. It only replaces the embed
+ * call; the tenant-scoped `match_knowledge_chunks` query is unchanged, and a
+ * rejection surfaces here exactly as one from `embedText()` would.
  */
 export async function searchKnowledgeChunks(
   supabase: SupabaseClient,
@@ -37,9 +44,10 @@ export async function searchKnowledgeChunks(
   queryText: string,
   limit = 5,
   onTiming?: (timings: { embedMs: number; searchMs: number }) => void,
+  queryEmbeddingPromise?: Promise<number[]>,
 ): Promise<KnowledgeSearchResult[]> {
   const embedStartedAt = Date.now();
-  const queryEmbedding = await embedText(queryText);
+  const queryEmbedding = await (queryEmbeddingPromise ?? embedText(queryText));
   const embedMs = Date.now() - embedStartedAt;
 
   const searchStartedAt = Date.now();
