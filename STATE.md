@@ -112,9 +112,23 @@ The user sent a real screenshot: the transparent-at-top header (built two entrie
 
 ---
 
-## Instant answers ("answer bank") + pipeline speed -- Phase 0 DONE and approved 2026-10-28; PART A BUILT on branch `feat/answer-bank` (uncommitted), migration NOT yet applied to production, nothing measured after; Part B not started
+## Instant answers ("answer bank") + pipeline speed -- Parts A and B MERGED to `main` 2026-10-28 (PRs #103, #105; guardrails Phase 1 #104 merged alongside); production measured once, see the table below
 
-### Part B -- pipeline speed (2026-10-28, branch `perf/pipeline-part-b`, PR OPEN, NOT merged -- awaiting the user's decision)
+### Final status and production numbers (measured on production after the `1add3f3` deploy, Acme only, 2026-10-28)
+
+**State:** Part A = PR #103, Part B = PR #105, both merged; migrations `20261030000000` and `20261030000100` applied to production; CI green on the combined code. **Migration follow-up (resolved):** `20261031000000_create_guardrail_events.sql` (from #104, not this work) was not in production when the table below was measured; **the user applied it afterwards and `migration list --linked` now shows it applied, so production has no pending migrations.** (Until then `recordGuardrailSignals` writes were best-effort failures; chat was unaffected.) **Still open:** (2) the catalog answer, the offline generation job and the Instant Answers dashboard page have not been exercised on the live site (needs a published business with products/suggested questions and a click on "Refresh answers"); (3) per-type hit rates on REAL traffic do not exist yet; (4) guardrail PRs #106-#109 are another session's stacked work and are still open.
+
+| Production, Acme, stream | Before (Phase 0 run, same day) | After (this deploy) |
+|---|---|---|
+| AI turn (2nd turn) TTFT p50 / p95 | 1732 / 3454 ms | 1733 / 2085 ms |
+| AI turn total p50 / p95 | 2915 / 4691 ms | 3156 / 3447 ms |
+| Instant greeting (first turn) TTFT p50 / max, total p50 / max | n/a (always went to the model; ~2-4 s) | **608 / 679 ms, 670 / 725 ms** (n=5) |
+| Gemini generations per AI turn | 2.0 (answer + metadata call, streaming) | 2.0 (unchanged); **0 for an instant answer** |
+| Instant-answer hit rate per type | n/a | greeting 13 of 21 replies since deploy; suggested 0, faq 0, catalog 0 |
+
+**Read honestly:** the AI-turn p50s are unchanged (n=8, the difference is noise) -- Part A does not touch turns that need the model, and Part B's expected ~100-250ms was not visible at this n; p95 looks better but is within run-to-run variance. The real Part A win is the instant path (greeting ~0.6s vs a 2-4s model turn). The hit-rate row is NOT a real-traffic rate: all 13 greetings are this measurement's own warm-up "Hi" turns, and Acme has no suggested questions or stored catalog answer yet, so suggested/faq/catalog are 0 because they were never exercised, not because they miss. The `metrics_write` stage no longer appears on the reply path (Part B). Production stage p50 on these 8 turns: quota_check 208, history_fetch 134, assistant_message_write 59, model_call_1 1130.
+
+### Part B -- pipeline speed (2026-10-28, branch `perf/pipeline-part-b`, merged as PR #105)
 
 **Shipped behind the kill switch `PIPELINE_PART_B=off`:**
 1. **Quota check and history read start right after widget auth** (previously after the key rate limit and conversation steps), overlapping those round trips. Reads only, tenant-scoped (`business_id` filter), no write happens before the limits pass. `checkReplyQuota` is two serial queries (entitlement, then the count), which made it the long pole of the pre-model block; its logic is untouched (billing/quota not changed).
