@@ -146,6 +146,14 @@ jobs:
         # against staging below.)
         run: npm run test:answer-bank
 
+      - name: Tool scope and write-cap tests
+        # Guardrails Phase 3 (STATE.md): every AI tool is scoped to its business,
+        # no tool can fetch a URL, contacts passed to write tools are verified
+        # against what the visitor typed, and the write caps are wired before
+        # each write. Needs --conditions=react-server (the executors are
+        # server-only). No database and no secrets.
+        run: npm run test:tool-scope
+
       - name: Build
         run: npm run build
 

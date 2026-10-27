@@ -14,6 +14,9 @@ import { getAppUrl } from "@/lib/app-url";
 import { logEvent } from "@/lib/logger";
 import { WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
+import { verifyContactAgainstTranscript } from "@/lib/guardrails/contact-check";
+import { loadVisitorTexts, reserveWriteToolCall } from "@/lib/guardrails/write-caps";
+import { sanitizeShortField } from "@/lib/guardrails/sanitize";
 
 const SOURCE = "book_appointment_tool";
 
@@ -65,13 +68,13 @@ export const BookAppointmentInputSchema = z.object({
 export const bookAppointmentTool = {
   name: "book_appointment",
   description:
-    "Requests an appointment at a specific slot returned by check_available_slots. Only call this after the prospect has explicitly agreed to that exact time AND you already have their email or phone number from this conversation. Before calling, you should have also asked for their name if you don't already have it -- but if they declined or didn't give one, proceed anyway with contactName null; never delay the booking over a missing name. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. The booking is pending the business's own confirmation -- tell the prospect that, don't say it's confirmed. If the result comes back with reason 'missing_contact_info', ask for their email or phone number before calling this tool again. If it comes back with reason 'consent_required', ask the prospect to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent. If it comes back with reason 'slot_unavailable', that slot was just taken -- call check_available_slots again and offer a different time.",
+    "Requests an appointment at a specific slot returned by check_available_slots. Only call this after the prospect has explicitly agreed to that exact time AND you already have their email or phone number from this conversation. Before calling, you should have also asked for their name if you don't already have it -- but if they declined or didn't give one, proceed anyway with contactName null; never delay the booking over a missing name. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. The booking is pending the business's own confirmation -- tell the prospect that, don't say it's confirmed. If the result comes back with reason 'missing_contact_info', ask for their email or phone number before calling this tool again. If it comes back with reason 'consent_required', ask the prospect to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent. If it comes back with reason 'limit_reached', a team member has already been flagged to follow up: tell the prospect that and do not call this tool again. If it comes back with reason 'slot_unavailable', that slot was just taken -- call check_available_slots again and offer a different time.",
   schema: BookAppointmentInputSchema,
 };
 
 export type BookAppointmentResult =
   | { success: true; appointmentId: string; label: string }
-  | { success: false; reason: "missing_contact_info" | "consent_required" | "slot_unavailable" | "invalid_input" | "lookup_failed" };
+  | { success: false; reason: "missing_contact_info" | "consent_required" | "slot_unavailable" | "invalid_input" | "lookup_failed" | "limit_reached" };
 
 /**
  * Authorized executor for the `book_appointment` tool. `businessId`/
@@ -107,6 +110,19 @@ export async function executeBookAppointment(
     logEvent("tool_invoked", businessId, { tool: "book_appointment", conversationId, result: "conversation_not_found" }, "error");
     return { success: false, reason: "lookup_failed" };
   }
+
+  // Guardrails Phase 3: model output is untrusted. Keep a contact detail only if
+  // the visitor actually typed it in this conversation (or it is the channel's
+  // verified identity); drop anything the model supplied that they never said.
+  const visitorTexts = await loadVisitorTexts(supabase, businessId, conversationId);
+  const verified = verifyContactAgainstTranscript(parsed.data, visitorTexts, conversation.source === WHATSAPP_CONVERSATION_SOURCE ? conversation.visitor_id : null);
+  if (verified.rejected.length > 0) {
+    logEvent("guardrail_signal", businessId, { type: "contact_not_typed_by_visitor", rule: verified.rejected.join("+"), action: "removed", mode: "enforce", channel: "tool", tool: "book_appointment" });
+  }
+  parsed.data.contactName = verified.contactName;
+  parsed.data.contactEmail = verified.contactEmail;
+  parsed.data.contactPhone = verified.contactPhone;
+  parsed.data.notes = parsed.data.notes ? sanitizeShortField(parsed.data.notes, 500) : parsed.data.notes;
 
   const contactEmail = normalizeEmail(parsed.data.contactEmail ?? null);
   // A WhatsApp conversation's visitor_id IS the prospect's real phone
@@ -152,6 +168,14 @@ export async function executeBookAppointment(
   if (conversation.source === SANDBOX_CONVERSATION_SOURCE) {
     logEvent("tool_invoked", businessId, { tool: "book_appointment", conversationId, result: "sandbox_skipped" });
     return { success: true, appointmentId: "sandbox", label };
+  }
+
+  // Guardrails Phase 3: per-conversation cap on real booking writes (each call
+  // creates a new appointment and emails the contact).
+  const cap = await reserveWriteToolCall(businessId, conversationId, "book_appointment");
+  if (!cap.allowed) {
+    logEvent("tool_invoked", businessId, { tool: "book_appointment", conversationId, result: "limit_reached" });
+    return { success: false, reason: "limit_reached" };
   }
 
   const appointment = await createAppointment(supabase, businessId, {

@@ -11,6 +11,9 @@ import { enqueueLeadQualifiedWebhooks } from "@/lib/webhooks";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 import { dispatchNotification } from "@/lib/notification-dispatch";
+import { verifyContactAgainstTranscript } from "@/lib/guardrails/contact-check";
+import { loadVisitorTexts, reserveWriteToolCall } from "@/lib/guardrails/write-caps";
+import { sanitizeShortField } from "@/lib/guardrails/sanitize";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -58,13 +61,13 @@ export const RequestCallbackInputSchema = z.object({
 export const requestCallbackTool = {
   name: "request_callback",
   description:
-    "Creates or updates a callback request for the current conversation. Only call this after the prospect has clearly agreed to a callback (in response to either their own request or your offer) AND you already have their email or phone number from this conversation. Before calling, you should have also asked for their name if you don't already have it -- but if they declined or didn't give one, proceed anyway with contactName null; never delay the callback over a missing name. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. If the result comes back with reason 'missing_contact_info', ask the prospect for their email or phone number before calling this tool again -- do not call it again without contact info. If the result comes back with reason 'consent_required', tell the prospect you need their consent to store their details and ask them to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent.",
+    "Creates or updates a callback request for the current conversation. Only call this after the prospect has clearly agreed to a callback (in response to either their own request or your offer) AND you already have their email or phone number from this conversation. Before calling, you should have also asked for their name if you don't already have it -- but if they declined or didn't give one, proceed anyway with contactName null; never delay the callback over a missing name. Pass ONLY contact details the prospect actually typed -- if they gave an email but not a name or phone, pass null for the ones they didn't give; never invent, guess, or placeholder any of contactName/contactEmail/contactPhone. If the result comes back with reason 'missing_contact_info', ask the prospect for their email or phone number before calling this tool again -- do not call it again without contact info. If the result comes back with reason 'limit_reached', a team member has already been flagged to follow up: tell the prospect that and do not call this tool again. If the result comes back with reason 'consent_required', tell the prospect you need their consent to store their details and ask them to check the consent checkbox in the chat panel before calling this tool again -- do not treat a spoken 'yes' as consent.",
   schema: RequestCallbackInputSchema,
 };
 
 export type RequestCallbackResult =
   | { success: true; leadId: string; created: boolean }
-  | { success: false; reason: "missing_contact_info" | "consent_required" | "invalid_input" | "lookup_failed" };
+  | { success: false; reason: "missing_contact_info" | "consent_required" | "invalid_input" | "lookup_failed" | "limit_reached" };
 
 /**
  * Authorized executor for the `request_callback` tool -- the first write
@@ -109,6 +112,19 @@ export async function executeRequestCallback(
     return { success: false, reason: "lookup_failed" };
   }
 
+  // Guardrails Phase 3: model output is untrusted. Keep a contact detail only if
+  // the visitor actually typed it in this conversation (or it is the channel's
+  // verified identity); drop anything the model supplied that they never said.
+  const visitorTexts = await loadVisitorTexts(supabase, businessId, conversationId);
+  const verified = verifyContactAgainstTranscript(parsed.data, visitorTexts, conversation.source === WHATSAPP_CONVERSATION_SOURCE ? conversation.visitor_id : null);
+  if (verified.rejected.length > 0) {
+    logEvent("guardrail_signal", businessId, { type: "contact_not_typed_by_visitor", rule: verified.rejected.join("+"), action: "removed", mode: "enforce", channel: "tool", tool: "request_callback" });
+  }
+  parsed.data.contactName = verified.contactName;
+  parsed.data.contactEmail = verified.contactEmail;
+  parsed.data.contactPhone = verified.contactPhone;
+  parsed.data.notes = parsed.data.notes ? sanitizeShortField(parsed.data.notes, 500) : parsed.data.notes;
+
   const contactEmail = normalizeEmail(parsed.data.contactEmail ?? null);
   // A WhatsApp conversation's visitor_id IS the prospect's real phone
   // number (Meta's own HMAC-verified wa_id, lib/whatsapp.ts) -- more
@@ -135,6 +151,13 @@ export async function executeRequestCallback(
   if (conversation.source === SANDBOX_CONVERSATION_SOURCE) {
     logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "sandbox_skipped" });
     return { success: true, leadId: "sandbox", created: true };
+  }
+
+  // Guardrails Phase 3: per-conversation cap on real callback writes.
+  const cap = await reserveWriteToolCall(businessId, conversationId, "request_callback");
+  if (!cap.allowed) {
+    logEvent("tool_invoked", businessId, { tool: "request_callback", conversationId, result: "limit_reached" });
+    return { success: false, reason: "limit_reached" };
   }
 
   const contactName = parsed.data.contactName?.trim() || null;
