@@ -53,6 +53,9 @@
   // sending more than necessary in the first place. Only used by the
   // server the first time it creates a conversation for this send.
   var pageUrl = window.location.origin + window.location.pathname;
+  // Phase 32 Stage E: when this script started, so each send can report how
+  // long the page had been loaded. Only ever tightens a server-side limit.
+  var loaderStartedAt = Date.now();
 
   var COLLAPSED_SIZE = 84;
   var MARGIN = 20;
@@ -461,6 +464,7 @@
           consentGiven: !!consentGiven,
           pageUrl: pageUrl,
           visitorId: visitorId,
+          clientElapsedMs: Math.max(0, Date.now() - loaderStartedAt),
           stream: true,
         }),
         signal: controller.signal,
