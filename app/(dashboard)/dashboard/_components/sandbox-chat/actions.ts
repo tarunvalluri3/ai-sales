@@ -1,6 +1,9 @@
 "use server";
 
+import { after } from "next/server";
 import { requireBusinessContext } from "@/lib/business-context";
+import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
+import { recordGuardrailSignals } from "@/lib/guardrails/record";
 import { getBusinessForOrg } from "@/lib/business";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createConversation, getConversationForBusiness, SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
@@ -46,8 +49,10 @@ export async function sendSandboxMessage(
     return { ok: false, error: "Business not found." };
   }
 
-  const trimmed = message.trim().slice(0, 2000);
-  if (!trimmed) {
+  // Guardrails Phase 1: same sanitise/cap/mask pipeline as every other channel.
+  const prepared = prepareProspectMessage(message);
+  const trimmed = prepared.text;
+  if (prepared.empty) {
     return { ok: false, error: "Enter a message." };
   }
 
@@ -63,6 +68,7 @@ export async function sendSandboxMessage(
     }
 
     await createMessage(supabase, businessId, conversation.id, "user", trimmed);
+    after(() => recordGuardrailSignals(businessId, conversation.id, "sandbox", prepared.signals));
 
     const response = await askSalesEmployee(
       supabase,

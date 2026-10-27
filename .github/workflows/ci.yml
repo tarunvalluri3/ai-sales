@@ -125,6 +125,15 @@ jobs:
         # staging below.)
         run: npm run test:abuse-limits
 
+      - name: Guardrail logic tests
+        # Guardrails Phase 1 (STATE.md): the pure input guardrails in
+        # lib/guardrails/ -- sanitising, sensitive-number masking, the
+        # multilingual injection/abuse classifier, and the wiring checks that
+        # every channel routes the raw message through prepareProspectMessage.
+        # Pure modules, no database and no secrets. (guardrail_events RLS is
+        # pgTAP file 057, run against staging below.)
+        run: npm run test:guardrails
+
       - name: Instant-answer decision logic tests
         # Instant answers (STATE.md 2026-10-28): greeting detection, the
         # eligibility rules (self-contained, language/script, injection
