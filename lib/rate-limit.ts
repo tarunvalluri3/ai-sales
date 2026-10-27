@@ -49,11 +49,16 @@ export async function incrementRateLimitCounter(
   });
 
   if (error) {
-    logEvent("rate_limit_check_failed", "unknown", { scope }, "error");
+    logEvent("rate_limit_check_failed", "unknown", { scope, ...describeRpcError(error) }, "error");
     return null;
   }
 
   return data as number;
+}
+
+/** The Postgres/PostgREST/network error behind a failed counter call -- code and a truncated message only, never the request (which carries the IP or key). Added 2026-10-28 because the failure was being swallowed with no cause. */
+function describeRpcError(error: { code?: string; message?: string } | null): { errorCode: string; errorMessage: string } {
+  return { errorCode: error?.code ?? "none", errorMessage: (error?.message ?? "no data returned").slice(0, 200) };
 }
 
 export type BatchedRateLimitCheck = {
@@ -104,7 +109,7 @@ export async function checkRateLimitsBatch(
   });
 
   if (error || !data) {
-    logEvent("rate_limit_check_failed", businessId, { scope: "batch" }, "error");
+    logEvent("rate_limit_check_failed", businessId, { scope: "batch", ...describeRpcError(error) }, "error");
     for (const c of checks) {
       const verdict = resolveAbuseLimitVerdict(c.scope, null, c.limit);
       results.set(c.scope, { allowed: verdict.allowed, wouldExceed: false, requestCount: null, retryAfterSeconds: null });

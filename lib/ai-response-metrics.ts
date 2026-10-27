@@ -120,3 +120,58 @@ export async function finalizeTurnMetrics(
     logEvent("ai_response_metrics_finalize_failed", businessId, { metricsRowId }, "error");
   }
 }
+
+/**
+ * Part B (STATE.md 2026-10-28): the metrics row used to be inserted INSIDE the
+ * reply path (stage `metrics_write`, ~75-180ms) and then rewritten a second
+ * time from `after()`. A caller that can run `after()` (the widget route) now
+ * asks for the write to be deferred: the row's id is generated here, the reply
+ * goes out at once, and ONE insert -- carrying the final stage timings -- runs
+ * after the response. Callers without `after()` (WhatsApp, Instagram, the
+ * sandbox) keep the inline insert, so every real AI turn still writes exactly
+ * one row, which is what the reply quota counts.
+ */
+export type DeferredTurnMetrics = { id: string; metrics: TurnMetrics };
+
+export async function recordTurnMetrics(
+  supabase: SupabaseClient,
+  timer: TurnTimer,
+  defer: boolean,
+  metrics: Omit<TurnMetrics, "totalLatencyMs" | "stageTimings">,
+): Promise<{ metricsRowId: string | null; metricsDraft: DeferredTurnMetrics | null }> {
+  if (defer) {
+    const id = crypto.randomUUID();
+    return {
+      metricsRowId: id,
+      metricsDraft: { id, metrics: { ...metrics, totalLatencyMs: timer.elapsedMs(), stageTimings: timer.toStageTimings() } },
+    };
+  }
+  const metricsRowId = await timer.time("metrics_write", () =>
+    insertTurnMetrics(supabase, { ...metrics, totalLatencyMs: timer.elapsedMs(), stageTimings: timer.toStageTimings() }),
+  );
+  return { metricsRowId, metricsDraft: null };
+}
+
+/** Run from `after()`: inserts the deferred row with the turn's final timings. Best effort, like every write to this table. */
+export async function writeDeferredTurnMetrics(
+  supabase: SupabaseClient,
+  draft: DeferredTurnMetrics,
+  timer: TurnTimer,
+): Promise<void> {
+  const { metrics } = draft;
+  const { error } = await supabase.from("ai_response_metrics").insert({
+    id: draft.id,
+    business_id: metrics.businessId,
+    conversation_id: metrics.conversationId,
+    latency_ms: metrics.latencyMs,
+    total_latency_ms: timer.elapsedMs(),
+    input_tokens: metrics.inputTokens,
+    output_tokens: metrics.outputTokens,
+    thinking_tokens: metrics.thinkingTokens,
+    tool_call_count: metrics.toolCallCount,
+    stage_timings: timer.toStageTimings(),
+  });
+  if (error) {
+    logEvent("ai_response_metrics_write_failed", metrics.businessId, { conversationId: metrics.conversationId }, "error");
+  }
+}
