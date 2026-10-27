@@ -28,6 +28,7 @@ const {
   CLIENT_TOO_FAST_MS,
   classifyClientSignal,
   effectiveNewConversationLimit,
+  secondsUntilWindowEnd,
 } = await import(new URL("../lib/abuse-limits.ts", import.meta.url).href);
 
 const { findDuplicateSubmitReply, normalizeSubmitText, DUPLICATE_SUBMIT_WINDOW_MS } = await import(
@@ -222,4 +223,20 @@ test("effectiveNewConversationLimit only ever tightens, and only for too_fast", 
   assert.equal(effectiveNewConversationLimit("unreported"), base);
   assert.equal(effectiveNewConversationLimit("too_fast"), Math.ceil(base / 2));
   assert.ok(effectiveNewConversationLimit("too_fast") < base);
+});
+
+test("secondsUntilWindowEnd: exact seconds to the epoch-aligned window boundary", () => {
+  // 300s windows: 100s into a window leaves 200s.
+  assert.equal(secondsUntilWindowEnd(1_000_000 * 300 * 1000 + 100_000, 300), 200);
+  // Exactly on a boundary starts a fresh full window.
+  assert.equal(secondsUntilWindowEnd(1_000_000 * 300 * 1000, 300), 300);
+});
+
+test("secondsUntilWindowEnd rounds up and never returns less than 1", () => {
+  assert.equal(secondsUntilWindowEnd(1_000_000 * 300 * 1000 + 299_500, 300), 1);
+  assert.equal(secondsUntilWindowEnd(1_000_000 * 300 * 1000 + 299_999, 300), 1);
+  for (let ms = 0; ms < 5000; ms += 137) {
+    const v = secondsUntilWindowEnd(1_700_000_000_000 + ms, 3600);
+    assert.ok(Number.isInteger(v) && v >= 1 && v <= 3600);
+  }
 });

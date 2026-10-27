@@ -13,3 +13,15 @@ export function jsonError(message: string, status: number): Response {
   const body: ErrorBody = { ok: false, error: message };
   return Response.json(body, { status });
 }
+
+/**
+ * A 429 with the standard `Retry-After` header (RFC 9110 §10.2.3), so a
+ * well-behaved client knows when to try again instead of retrying blindly.
+ */
+export function jsonTooManyRequests(retryAfterSeconds: number): Response {
+  const body: ErrorBody = { ok: false, error: "Too many requests." };
+  return Response.json(body, {
+    status: 429,
+    headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) },
+  });
+}
