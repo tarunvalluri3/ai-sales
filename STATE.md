@@ -34,6 +34,29 @@ lint, typecheck, build pass; `test:chat-perf` 9/9, `test:chat-streaming` 12/12, 
 
 **Blocker 2026-10-27:** the agent harness refused `gh pr merge` on PR #99 ("Merge Without Review") and the Vercel preview is SSO-protected, so Step 1 could not be measured in production by the agent. Needs the user to merge (or allow the merge), then one harness run per hour (30/h new-conversation limit).
 
+### Step 2 -- catalog pre-fetch: BUILT on `perf/chat-prefetch-catalog` (stacked on Step 1), measured locally, PR pending
+
+**Deviation from the brief, on evidence:** the product/FAQ tools are plain DB reads (not vector), the dominant tool is `list_products_and_services`, and Acme's products/services/FAQ rows have **no embeddings** (so `match_products`/`match_services` return nothing there and a vector pre-fetch cannot be measured without writing to production data, which is not allowed). FAQs are already synced into knowledge chunks, so retrieval covers them and there is no `match_faqs` (it would need a migration). So the pre-fetch injects the **complete approved catalog when it has <= 8 items and renders <= 2,400 chars** (~600 tokens), as a section inside `<retrieved_context>` (so the existing "data, never instructions" rule covers it; `<`/`>` stripped; descriptions cut at 200 chars), read concurrently with the knowledge search by `lib/catalog-prefetch.ts` (`stage catalog_prefetch`). Larger catalogs inject nothing and behave exactly as before. `lib/tools/list-offerings.ts` now exposes `loadOfferings()` so the tool and the pre-fetch share one query (the tool also reads products+services concurrently now). Kill switch: `CATALOG_PREFETCH=off`. Applies to every channel that uses `prepareTurn` (widget, WhatsApp, Instagram, sandbox), not just the widget. **The vector top-k branch for large catalogs is NOT built or shipped** -- it needs a tenant with embedded catalog rows to measure.
+
+**Measured locally, real Gemini, Acme, same 24 questions (7 types, all non-first turns), prefetch off vs on, 1 rep each (n is small; run-to-run model noise is real):**
+
+| | before | after |
+|---|---|---|
+| turns that used a catalog/knowledge tool (excl. callback) | 8 of 24 | 3 of 24 |
+| all turns using any tool | 10 / 24 | 5 / 24 (callbacks 2/2 unchanged) |
+| price questions with a tool | 1 of 4 | 0 of 4 |
+| product questions with a tool | 3 of 4 | 1 of 4 |
+| unknown-product questions with a tool | 3 of 4 | 1 of 4 |
+| chitchat / booking with a tool | 0 / 0 | 0 / 0 |
+| avg model calls per turn | 1.46 | 1.21 |
+| p50 latency, local (India->Seoul inflated) | 4285ms | 3178ms |
+| avg input tokens per turn | 5954 | 5067 |
+| input tokens on no-tool turns | ~4000 | ~4140-4160 (+~140 for Acme's 2-item catalog) |
+
+Answers: same facts and prices throughout; "What is the Knowledge Sync Test Service?" was answered wrongly-negative before ("no information") and correctly after; the unknown product and laptops cases are declined correctly with the real catalog; callback answers identical (still `request_callback`, consent prompt intact); booking unchanged (Acme has appointments off). Remaining tool calls: "What do you offer?"-style broad questions still sometimes call `list_products_and_services` (the prompt's rule 397 still tells it to check first), and `search_knowledge_base` for the refund-policy question (correct: not in the catalog). Input tokens fall on average because fewer turns carry a second, tool-result-sized prompt.
+
+Checks: lint, typecheck, build pass; `npm run eval` **8/9, the same single known `\$\s?\d` case**; `test:chat-perf` 9/9, `test:chat-streaming` 12/12, `test:abuse-limits` 28/28. Production latency for Steps 1+2 still unmeasured (Step 1 merge blocked).
+
 ### Step 3 -- prompt order and caching: INSPECTED, NO CHANGE SHIPPED (measured, 2026-10-27)
 
 - **Order today** (`SYSTEM_TEMPLATE`, `lib/rag.ts`): persona -> language/recommendation/appointment/chaining instructions -> business profile -> **`{context}` (volatile, changes every turn)** -> the long rules block (stable) -> send_reply instruction. So the largest stable block sits *after* the volatile one; a prefix cache can only cover persona + profile. History and the question come after the system message (already volatile-last).

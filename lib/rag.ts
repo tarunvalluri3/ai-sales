@@ -13,6 +13,7 @@ import { checkProductDetailsTool, executeCheckProductDetails } from "@/lib/tools
 import { checkFaqTopicTool, executeCheckFaqTopic } from "@/lib/tools/check-faq-topic";
 import { requestCallbackTool, executeRequestCallback } from "@/lib/tools/request-callback";
 import { listOfferingsTool, executeListOfferings } from "@/lib/tools/list-offerings";
+import { prefetchSmallCatalog, formatCatalogSection } from "@/lib/catalog-prefetch";
 import { searchKnowledgeBaseTool, executeSearchKnowledgeBase } from "@/lib/tools/search-knowledge-base";
 import { recommendProductsTool, executeRecommendProducts, type RecommendedItem } from "@/lib/tools/recommend-products";
 import { checkAvailableSlotsTool, executeCheckAvailableSlots } from "@/lib/tools/check-available-slots";
@@ -725,8 +726,12 @@ async function prepareTurn(
 
   const retriever = new KnowledgeRetriever({ supabase, businessId, timer, queryEmbedding });
   let documents: Document<KnowledgeChunkMetadata>[];
+  // Step 2 of the 2026-10-27 latency programme: a small catalog is read
+  // concurrently with the knowledge search and injected below, so the common
+  // catalog lookups need no tool round trip. Never rejects (null = skip).
+  const catalogPrefetch = timer.time("catalog_prefetch", () => prefetchSmallCatalog(supabase, businessId));
   try {
-    documents = await retriever.invoke(question);
+    [documents] = await Promise.all([retriever.invoke(question), catalogPrefetch]);
   } catch (error) {
     if (isEmbeddingRateLimitError(error)) {
       logEvent("ai_embedding_rate_limited", businessId, { conversationId }, "error");
@@ -772,9 +777,11 @@ async function prepareTurn(
   // goes into an attribute. See the long-form reasoning preserved on the
   // callers before this was extracted.
   const searchQueryAttribute = question.replace(/[<>"\r\n]/g, " ").slice(0, 300);
+  const catalogOfferings = await catalogPrefetch;
+  const catalogSection = catalogOfferings ? formatCatalogSection(catalogOfferings) : null;
   const context = `<retrieved_context search_query="${searchQueryAttribute}" searched="this business's full knowledge base" passages="${documents.length}">\n${documents
     .map((document, index) => `[${index + 1}] ${document.pageContent}`)
-    .join("\n\n")}\n</retrieved_context>`;
+    .join("\n\n")}${catalogSection ? `\n\n${catalogSection}` : ""}\n</retrieved_context>`;
 
   return { kind: "proceed", quota, documents, context };
 }
