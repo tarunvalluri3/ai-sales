@@ -74,6 +74,18 @@ async function getAcmeWidgetKey() {
 }
 
 /** Non-streaming POST: total == TTFT (answer arrives in one shot). Returns {ttft, total, conversationId}. */
+async function withRetry(fn) {
+  // A transient 429 (the rate-limit counter call fails closed on an infrastructure error) must not abort a measurement run; the failed attempt is not timed.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (attempt >= 3 || !String(error?.message).includes("429")) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
+}
+
 async function sendJson(widgetKey, message, conversationId) {
   const startedAt = performance.now();
   const response = await fetch(`${APP_URL}/api/chat`, {
@@ -126,7 +138,8 @@ async function sendStream(widgetKey, message, conversationId) {
   return { ttft: ttft ?? total, total, conversationId: resolvedConversationId };
 }
 
-const send = MODE === "stream" ? sendStream : sendJson;
+const sendOnce = MODE === "stream" ? sendStream : sendJson;
+const send = (...args) => withRetry(() => sendOnce(...args));
 
 function pct(sorted, p) {
   if (sorted.length === 0) return 0;
