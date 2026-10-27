@@ -42,11 +42,13 @@ export async function incrementRateLimitCounter(
   windowSeconds: number,
 ): Promise<number | null> {
   const supabase = createServiceSupabaseClient();
-  const { data, error } = await supabase.rpc("increment_rate_limit_counter", {
-    p_scope: scope,
-    p_identifier: identifier,
-    p_window_seconds: windowSeconds,
-  });
+  const { data, error } = await withTransportRetry(() =>
+    supabase.rpc("increment_rate_limit_counter", {
+      p_scope: scope,
+      p_identifier: identifier,
+      p_window_seconds: windowSeconds,
+    }),
+  );
 
   if (error) {
     logEvent("rate_limit_check_failed", "unknown", { scope, ...describeRpcError(error) }, "error");
@@ -54,6 +56,27 @@ export async function incrementRateLimitCounter(
   }
 
   return data as number;
+}
+
+/**
+ * Runs a counter RPC and, if it fails with a TRANSPORT error (`fetch failed`:
+ * no response at all, no Postgres error code), tries it once more after a
+ * short pause. The counter calls fail CLOSED for the enforcing scopes, so a
+ * single dropped connection -- e.g. a stale keep-alive socket after a serverless
+ * instance sat idle -- used to become a visitor-facing 429 with quota to spare.
+ * Only transport errors are retried: a real database error, or any verdict
+ * (including "over the limit"), is returned as-is, and no limit changes. The
+ * worst case is that the first attempt reached the database and counted, so the
+ * retry counts the same request twice -- one extra increment in a fixed window,
+ * in the direction of stricter limiting, never looser.
+ */
+async function withTransportRetry<T extends { error: { code?: string; message?: string } | null }>(call: () => PromiseLike<T>): Promise<T> {
+  const first = await call();
+  if (first.error && !first.error.code && /fetch failed/i.test(first.error.message ?? "")) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return call();
+  }
+  return first;
 }
 
 /** The Postgres/PostgREST/network error behind a failed counter call -- code and a truncated message only, never the request (which carries the IP or key). Added 2026-10-28 because the failure was being swallowed with no cause. */
@@ -99,14 +122,16 @@ export async function checkRateLimitsBatch(
   if (checks.length === 0) return results;
 
   const supabase = createServiceSupabaseClient();
-  const { data, error } = await supabase.rpc("check_rate_limits", {
-    p_checks: checks.map((c) => ({
-      scope: c.scope,
-      identifier: c.identifier,
-      limit: c.limit,
-      window_seconds: c.windowSeconds,
-    })),
-  });
+  const { data, error } = await withTransportRetry(() =>
+    supabase.rpc("check_rate_limits", {
+      p_checks: checks.map((c) => ({
+        scope: c.scope,
+        identifier: c.identifier,
+        limit: c.limit,
+        window_seconds: c.windowSeconds,
+      })),
+    }),
+  );
 
   if (error || !data) {
     logEvent("rate_limit_check_failed", businessId, { scope: "batch", ...describeRpcError(error) }, "error");
