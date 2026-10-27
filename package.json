@@ -21,9 +21,11 @@
     "test:tool-scope": "node --conditions=react-server --test scripts/run-tool-scope-tests.mjs",
     "test:output-guard": "node --test scripts/run-output-guard-tests.mjs",
     "test:guardrail-response": "node --test scripts/run-guardrail-response-tests.mjs",
+    "test:eval-judges": "node --test scripts/run-eval-judges-tests.mjs",
     "test:answer-bank": "node --test scripts/run-answer-bank-tests.mjs",
     "credit-note": "node --conditions=react-server --env-file=.env.local scripts/issue-credit-note.mjs",
     "eval": "node --env-file=.env.local scripts/run-evals.mjs",
+    "eval:redteam": "node --env-file=.env.local scripts/run-evals.mjs --suite=redteam",
     "loadtest": "node --env-file=.env.local scripts/run-load-test.mjs"
   },
   "dependencies": {

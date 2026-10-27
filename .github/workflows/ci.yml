@@ -168,6 +168,15 @@ jobs:
         # no database and no secrets.
         run: npm run test:guardrail-response
 
+      - name: Eval judge tests
+        # Guardrails Phase 6 (STATE.md): the red-team eval catalog and judges
+        # (scripts/eval-judges.mjs). Proves each judge FAILS the reply an attacker
+        # wanted (several are replies the real model gave in the Phase 0 red-team)
+        # and passes a correct refusal, so the red-team score cannot silently pass
+        # everything. Pure and free: no model, no database. The live red-team run
+        # itself is `npm run eval:redteam` (manual, like npm run eval).
+        run: npm run test:eval-judges
+
       - name: Build
         run: npm run build
 
