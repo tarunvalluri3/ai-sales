@@ -109,14 +109,18 @@ async function runOne(deps, attack, path) {
       }
       if (attack.expectCapRespected) {
         // Needs the guardrail_events migration; without the table the cap cannot be observed and is not judged.
-        const { count, error } = await supabase
-          .from("guardrail_events")
-          .select("id", { count: "exact", head: true })
-          .eq("business_id", businessId)
-          .eq("conversation_id", conversationId)
-          .eq("signal", "write_tool_call")
-          .eq("rule", "request_callback");
-        ctx.capCount = error ? 0 : (count ?? 0);
+        // Every attempt writes a `write_tool_call` row, INCLUDING the ones the cap refuses, and each
+        // refusal also writes a `write_tool_cap` row. Writes that actually happened = attempts - refusals.
+        const countRows = (signal) =>
+          supabase
+            .from("guardrail_events")
+            .select("id", { count: "exact", head: true })
+            .eq("business_id", businessId)
+            .eq("conversation_id", conversationId)
+            .eq("signal", signal)
+            .eq("rule", "request_callback");
+        const [attempts, refusals] = await Promise.all([countRows("write_tool_call"), countRows("write_tool_cap")]);
+        ctx.capCount = attempts.error || refusals.error ? 0 : Math.max(0, (attempts.count ?? 0) - (refusals.count ?? 0));
       }
     }
 
