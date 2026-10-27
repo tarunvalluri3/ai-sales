@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonSuccess, jsonTooManyRequests } from "@/lib/api-response";
 import { logAndGetUserMessage, AppError } from "@/lib/errors";
+import { embedText } from "@/lib/embeddings";
 import { resolveBusinessFromWidgetKey, WidgetAuthError, type WidgetBusinessContext } from "@/lib/widget-auth";
 import {
   checkAndIncrementRateLimit,
@@ -235,6 +236,22 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError(userMessage, 500));
   }
 
+  const supabase = createServiceSupabaseClient();
+
+  // 2026-10-27 latency pass: the conversation lookup is a tenant-scoped READ
+  // that needs only the authenticated business, so it overlaps the key
+  // rate-limit round trip instead of following it. If the key limit then
+  // rejects the request the lookup result is simply discarded (its rejection
+  // is swallowed here and re-surfaced below only on the path that uses it).
+  // The conversation CREATE stays after the key check: a rate-limited
+  // request must not write anything.
+  const conversationLookup = conversationId
+    ? timer.time("conversation_lookup", () =>
+        getConversationForBusiness(supabase, business.businessId, conversationId),
+      )
+    : null;
+  conversationLookup?.catch(() => undefined);
+
   const keyAllowed = await timer.time("rate_limit_key", () =>
     checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
   );
@@ -243,14 +260,25 @@ export async function POST(request: NextRequest) {
     return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
   }
 
-  const supabase = createServiceSupabaseClient();
+  // Start the question's embedding NOW -- widget auth and the per-key rate
+  // limit have both passed, so this is never reachable by an unauthenticated
+  // or rate-limited caller (cost-abuse) -- so the Gemini round trip overlaps
+  // the conversation/rate-limit/write/history/quota database work below
+  // instead of following it. Whether it is used is decided later: a turn
+  // that ends before retrieval (rejected conversation, human control, over
+  // quota, duplicate replay, first-turn cache hit) just discards the result.
+  // The no-op rejection handler stops an unused failed embed from becoming an
+  // unhandled rejection; a turn that does reach retrieval awaits the same
+  // promise and sees the original error (rate-limit degrade included).
+  const embedStartedAt = Date.now();
+  const queryEmbedding = embedText(message);
+  queryEmbedding.then(
+    () => timer.record("embedding_prefetch", Date.now() - embedStartedAt),
+    () => undefined,
+  );
 
   try {
-    let conversation = conversationId
-      ? await timer.time("conversation_lookup", () =>
-          getConversationForBusiness(supabase, business.businessId, conversationId),
-        )
-      : null;
+    let conversation = conversationLookup ? await conversationLookup : null;
 
     if (conversationId && !conversation) {
       return withCors(jsonError("Invalid request.", 400));
@@ -297,7 +325,14 @@ export async function POST(request: NextRequest) {
     //    Gemini call when the business is over quota -- the gate is
     //    unchanged, only its round trip now overlaps these writes instead
     //    of running sequentially at the top of askSalesEmployee().
-    const [, userMessageRow, quota, burstCount] = await Promise.all([
+    //
+    // The history read overlaps them too (it used to follow the user-message
+    // write). It cannot see that write, so the just-persisted row is appended
+    // to the result afterwards -- every consumer (isFirstTurn, the
+    // duplicate-submit guard, toLangchainHistory) relies on the current
+    // question being the last element, and still gets exactly that. A
+    // human-control turn wastes this one read; that branch is rare.
+    const [, userMessageRow, quota, burstCount, priorHistory] = await Promise.all([
       consentGiven
         ? timer.time("consent_write", () => recordConversationConsent(supabase, business.businessId, conversationRowId))
         : Promise.resolve(null),
@@ -312,6 +347,9 @@ export async function POST(request: NextRequest) {
       // entitlement the quota check just loaded -- no extra query (decision 3).
       timer.time("rate_limit_business_burst", () =>
         incrementRateLimitCounter("business_burst", business.businessId, SCOPE_LIMITS.business_burst.windowSeconds),
+      ),
+      timer.time("history_fetch", () =>
+        listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT),
       ),
     ]);
 
@@ -369,9 +407,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const history = await timer.time("history_fetch", () =>
-      listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT),
-    );
+    const history = [
+      ...priorHistory,
+      { role: "user" as const, content: message, created_at: userMessageRow.created_at },
+    ].slice(-HISTORY_LIMIT);
 
     // Writes the assistant message row and returns it. Shared by the JSON
     // and streaming paths so both persist a turn identically. `interrupted`
@@ -517,6 +556,7 @@ export async function POST(request: NextRequest) {
               timer,
               quota,
               abortController.signal,
+              queryEmbedding,
             )) {
               if (chunk.kind === "delta") {
                 emit({ type: "delta", text: chunk.text });
@@ -594,6 +634,7 @@ export async function POST(request: NextRequest) {
         { recommendProductsEnabled: business.recommendProductsEnabled, appointmentsEnabled: business.appointmentsEnabled },
         timer,
         quota,
+        queryEmbedding,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);

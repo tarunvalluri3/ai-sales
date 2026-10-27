@@ -6,6 +6,42 @@ Last updated: 2026-10-27. **Current state:** `main` is the only branch (local an
 
 ---
 
+## perf/chat-pre-ai-parallel -- chat latency programme, Step 0 + Step 1 -- BUILT 2026-10-27, PR pending (no migration)
+
+Four-step programme (user brief 2026-10-27): 1 pre-AI work off the critical path, 2 pre-fetch product/FAQ to cut the tool round trip, 3 prompt order/caching, 4 widget-open warm-up. One branch + PR per step, measured before/after, revert if it does not help. **Only Steps 0 and 1 are done.**
+
+### Step 0 -- baseline (read-only on production)
+
+`ai_response_metrics`, last 14 days: 210 rows, 157 with `stage_timings`. **Caveat: 140 of the 157 are one business (Acme test/harness traffic) and local-machine runs are mixed in (stage means ~170-200ms = India->Seoul; production `icn1` is ~60-77ms), so this is not an organic distribution.** `total_latency_ms` p50/p90: all 4943/8115; first turns 5127/8643; later turns 4154/5959; streaming 5113/6742; non-streaming 4803/8670. Tools 0/1/2+ = 95/54/8 (60/34/5%); later turns 17/17/0. By tool: `list_products_and_services` 32, `request_callback` 18, `check_product_details` 8, `check_available_slots` 6, `recommend_products` 3, `search_knowledge_base` 3; no FAQ tool in the data. 0-tool p50 4186, 1-tool 5732, 2+ 7195. Stage mean/p90: `model_call_1` 1192/1487, `model_call_2` 1380/1764, `tool_batch_1` 663/1973, `embedding` 541/772, `quota_check` 325/582, `metadata_call` (stream) 1929/1567.
+
+Fresh production harness (`EVAL_APP_URL=https://ai-sales-ashy-eight.vercel.app EVAL_ORIGIN=http://localhost:3000`, 2nd turns): **stream n=10 TTFT p50 2130 / p95 5153ms, total p50 3622 / p95 6434ms.** JSON run died at n=5 (2.5-3.9s) on a `429`: each measured turn also opens a warm-up conversation, so 2 runs x 10 = 40 new conversations > the `new_conversation_ip` limit of 30/h. The limiter was not worked around; run one mode per hour or use RUNS<=12.
+
+### Step 1 -- what changed
+
+- **Embedding starts once widget auth AND the per-key rate limit have passed** (never before: cost-abuse), concurrently with conversation create/lookup, conversation rate limit, consent/user-message/quota/burst and history. The promise is handed to `askSalesEmployee`/`streamSalesEmployee` -> `prepareTurn` -> `KnowledgeRetriever` -> `searchKnowledgeChunks` (new optional last param) and awaited only if the turn reaches retrieval; an unused result is discarded, a failed unused one is swallowed, a used failed one rejects exactly like `embedText()` did (embedding-rate-limit degrade intact). New stage `embedding_prefetch` = the real embed duration; the existing `embedding` stage now records only the residual wait.
+- **Conversation lookup overlaps the key rate-limit round trip** (read-only; the conversation CREATE still follows the key check so a rate-limited request writes nothing).
+- **History fetch overlaps the user-message write** (and consent/quota/burst); the just-written user row is appended so history still ends with the current question (`isFirstTurn`, duplicate-submit guard, first-turn cache all unchanged). Window: a message written by another request in the ~60ms between the read and our write is missed for this one turn.
+- **Not changed, deliberately:** the `ip` batch still runs before widget auth (running them together would let rate-limited traffic cause DB reads); `rate_limit_key` still follows auth (a counter row per garbage key would be abuse); the user-message write is not moved. Metrics/audit writes were already in `after()`/concurrent -- nothing left to move.
+- **Known cost:** a turn that ends before retrieval (duplicate-submit replay, first-turn cache hit, over quota, human control) now still pays one embedding call it used to skip. Embedding is the cheapest call in the turn; first-turn cache hits are the main case.
+
+Files: `app/api/chat/route.ts`, `lib/rag.ts`, `lib/retrieval.ts`, `STATE.md`. No packages, env vars or migrations.
+
+### Step 1 -- checks
+
+lint, typecheck, build pass; `test:chat-perf` 9/9, `test:chat-streaming` 12/12, `test:abuse-limits` 28/28, `test:copilot-lifecycle` 27/27, `test:plan-tax` 10/10, `test:invoices` 77/77, `test:onboarding-readiness` 15/15, `test:razorpay` 45/45. `npm run eval` against a local production build: **8/9, the same single `\$\s?\d` hallucination case, same answer text.** Local stage rows confirm the overlap (`embedding_prefetch` ~520-560ms, `embedding` residual 0ms). pgTAP not run (no SQL change).
+
+### Step 1 -- production before/after: PENDING deploy (see below once measured)
+
+**Blocker 2026-10-27:** the agent harness refused `gh pr merge` on PR #99 ("Merge Without Review") and the Vercel preview is SSO-protected, so Step 1 could not be measured in production by the agent. Needs the user to merge (or allow the merge), then one harness run per hour (30/h new-conversation limit).
+
+### Step 3 -- prompt order and caching: INSPECTED, NO CHANGE SHIPPED (measured, 2026-10-27)
+
+- **Order today** (`SYSTEM_TEMPLATE`, `lib/rag.ts`): persona -> language/recommendation/appointment/chaining instructions -> business profile -> **`{context}` (volatile, changes every turn)** -> the long rules block (stable) -> send_reply instruction. So the largest stable block sits *after* the volatile one; a prefix cache can only cover persona + profile. History and the question come after the system message (already volatile-last).
+- **Measured against the real model** (`gemini-3.1-flash-lite`, raw REST `generateContent`, the real template with placeholders filled, no tool declarations, 10 calls per order with varying `<retrieved_context>`): **`cachedContentTokenCount` was 0 on all 20 calls, for both the current order and a context-last order.** Total prompt ~2.2K tokens (2,232 current / 2,171 context-last). A probe that accidentally sent a ~17.8K-token prompt *did* report 15,512 cached tokens on alternate calls, so implicit caching works but only well above this prompt's size.
+- **Conclusion:** reordering would be a prompt change (the rules say "the reference context above", "the business profile above"; moving `{context}` below them means rewording rules) for no measurable cache benefit at ~2.2K tokens. **Not shipped.** Duplicated text exists (the final two rules restate the `usedContext`/`escalate` field descriptions), but trimming it changes rule text the brief says not to touch, for ~200 tokens of ~2.2K; left alone. Revisit only if the prompt grows past several thousand tokens (e.g. Step 2's pre-fetch), and re-run the same probe then.
+
+---
+
 ## Phase 32 -- abuse rate limiting and spam protection -- Stages A-C MERGED (PR #96, `a2bd5b3`, 2026-10-24); Stages D-E BUILT 2026-10-27 (still log-only, dormant until a scope is promoted)
 
 Goal: close a real hole and a real blind spot in the existing protections, **without** changing any live enforced behaviour yet. The lever is the NUMBER of turns a script can drive, not the per-turn cost (already structurally bounded). The damage this guards against lands on the **tenant** (their plan/trial reply quota burned out, their dashboard flooded with `needs_attention`), not on our own AI bill (`checkReplyQuota()` already stops the spend before any Gemini call).

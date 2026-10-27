@@ -320,9 +320,17 @@ class KnowledgeRetriever extends BaseRetriever<KnowledgeChunkMetadata> {
   private readonly businessId: string;
   private readonly limit: number;
   private readonly timer: TurnTimer | undefined;
+  private readonly queryEmbedding: Promise<number[]> | undefined;
 
-  constructor(fields: { supabase: SupabaseClient; businessId: string; limit?: number; timer?: TurnTimer }) {
+  constructor(fields: {
+    supabase: SupabaseClient;
+    businessId: string;
+    limit?: number;
+    timer?: TurnTimer;
+    queryEmbedding?: Promise<number[]>;
+  }) {
     super();
+    this.queryEmbedding = fields.queryEmbedding;
     this.supabase = fields.supabase;
     this.businessId = fields.businessId;
     this.limit = fields.limit ?? 5;
@@ -337,7 +345,7 @@ class KnowledgeRetriever extends BaseRetriever<KnowledgeChunkMetadata> {
     const results = await searchKnowledgeChunks(this.supabase, this.businessId, query, this.limit, (timings) => {
       this.timer?.record("embedding", timings.embedMs);
       this.timer?.record("vector_search", timings.searchMs);
-    });
+    }, this.queryEmbedding);
     return results.map(
       (result) =>
         new Document({
@@ -631,6 +639,7 @@ async function prepareTurn(
   language: WidgetLanguage,
   timer: TurnTimer,
   prefetchedQuota: ReplyQuotaStatus | undefined,
+  queryEmbedding: Promise<number[]> | undefined,
 ): Promise<PreparedTurn> {
   const quota = prefetchedQuota ?? (await timer.time("quota_check", () => checkReplyQuota(supabase, businessId)));
   if (!quota.allowed) {
@@ -714,7 +723,7 @@ async function prepareTurn(
     }
   }
 
-  const retriever = new KnowledgeRetriever({ supabase, businessId, timer });
+  const retriever = new KnowledgeRetriever({ supabase, businessId, timer, queryEmbedding });
   let documents: Document<KnowledgeChunkMetadata>[];
   try {
     documents = await retriever.invoke(question);
@@ -874,6 +883,10 @@ export async function askSalesEmployee(
   // runs here exactly as before. Either way the gate is the same: a
   // business over quota never reaches any Gemini call below.
   prefetchedQuota?: ReplyQuotaStatus,
+  // Optional: an embedding of `question` the caller already started (see
+  // searchKnowledgeChunks). Only the widget route passes it; it is awaited
+  // only if the turn actually reaches retrieval.
+  queryEmbedding?: Promise<number[]>,
 ): Promise<SalesEmployeeResponse> {
   // Honest end-state when the AI deadline (lib/chat-timeouts.ts) is hit
   // before a reply exists: escalate so a human follows up, write no
@@ -907,6 +920,7 @@ export async function askSalesEmployee(
     language,
     timer,
     prefetchedQuota,
+    queryEmbedding,
   );
   if (prepared.kind === "early") return prepared.response;
   const { quota, documents, context } = prepared;
@@ -1311,6 +1325,7 @@ export async function* streamSalesEmployee(
   timer: TurnTimer = new TurnTimer(),
   prefetchedQuota?: ReplyQuotaStatus,
   clientSignal?: AbortSignal,
+  queryEmbedding?: Promise<number[]>,
 ): AsyncGenerator<StreamChunk, void, unknown> {
   const buildTimeoutResponse = (quota: ReplyQuotaStatus): SalesEmployeeResponse => ({
     answer: RESPONSE_TIMEOUT_MESSAGE,
@@ -1324,7 +1339,7 @@ export async function* streamSalesEmployee(
     quotaSnapshot: quota,
   });
 
-  const prepared = await prepareTurn(supabase, businessId, conversationId, question, history, language, timer, prefetchedQuota);
+  const prepared = await prepareTurn(supabase, businessId, conversationId, question, history, language, timer, prefetchedQuota, queryEmbedding);
   if (prepared.kind === "early") {
     // A fixed message (over quota / cache hit / no-knowledge fallback):
     // there is no generation to stream, but it travels the same wire as one
