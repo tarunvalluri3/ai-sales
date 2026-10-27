@@ -43,7 +43,7 @@ import { getAppUrl } from "@/lib/app-url";
 import { after } from "next/server";
 import { CHAT_SERVER_MAX_DURATION_SECONDS } from "@/lib/chat-timeouts";
 import { TurnTimer } from "@/lib/turn-timings";
-import { finalizeTurnMetrics } from "@/lib/ai-response-metrics";
+import { finalizeTurnMetrics, writeDeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
 import { checkReplyQuota } from "@/lib/usage-limit";
 import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
@@ -275,6 +275,26 @@ export async function POST(request: NextRequest) {
     : null;
   conversationLookup?.catch(() => undefined);
 
+  // Part B: two more tenant-scoped READS that need only the authenticated
+  // business (and, for history, the conversation id the client sent), so they
+  // start now and overlap the key rate-limit and conversation round trips
+  // instead of waiting behind them -- the quota check is two serial queries
+  // (entitlement, then the reply count) and was the long pole of the next
+  // block. Reads only: a request the key/conversation limit then rejects wastes
+  // at most these two reads and writes nothing. A history read for an id that
+  // turns out not to be this business's conversation returns no rows (the
+  // query filters on business_id) and is discarded when the lookup rejects it.
+  // PIPELINE_PART_B=off restores the previous ordering (reads after the key and
+  // conversation checks, metrics row inserted inline) -- the kill switch and the
+  // "before" arm of the interleaved latency measurement.
+  const partB = process.env.PIPELINE_PART_B !== "off";
+  const quotaCheck = partB ? timer.time("quota_check", () => checkReplyQuota(supabase, business.businessId)) : null;
+  quotaCheck?.catch(() => undefined);
+  const earlyHistory = partB && conversationId
+    ? timer.time("history_fetch", () => listRecentMessages(supabase, business.businessId, conversationId, HISTORY_LIMIT))
+    : null;
+  earlyHistory?.catch(() => undefined);
+
   const keyAllowed = await timer.time("rate_limit_key", () =>
     checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
   );
@@ -374,7 +394,7 @@ export async function POST(request: NextRequest) {
       timer.time("user_message_write", () =>
         createMessage(supabase, business.businessId, conversationRowId, "user", message),
       ),
-      timer.time("quota_check", () => checkReplyQuota(supabase, business.businessId)),
+      quotaCheck ?? timer.time("quota_check", () => checkReplyQuota(supabase, business.businessId)),
       // Phase 32 business_burst (log-only): one burst ceiling across ALL of a
       // tenant's channels. Only the raw increment runs here (it needs just the
       // scope/identifier/window), concurrently with the reads above so it adds
@@ -383,9 +403,11 @@ export async function POST(request: NextRequest) {
       timer.time("rate_limit_business_burst", () =>
         incrementRateLimitCounter("business_burst", business.businessId, SCOPE_LIMITS.business_burst.windowSeconds),
       ),
-      timer.time("history_fetch", () =>
-        listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT),
-      ),
+      // A brand-new conversation has no earlier messages to read.
+      earlyHistory ??
+        (partB && !conversationId
+          ? Promise.resolve([])
+          : timer.time("history_fetch", () => listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT))),
       // Guardrails Phase 5: abusive messages already recorded in this conversation.
       // Returns 0 without a query unless the abuse check is enforcing.
       countAbuseStrikes(supabase, business.businessId, conversationRowId),
@@ -555,7 +577,15 @@ export async function POST(request: NextRequest) {
       // Appends the post-reply stages and restamps the total. In after(), so
       // it costs the prospect nothing; a no-op when no success row was
       // written (an interrupted turn, a timeout, a cache hit).
-      after(() => finalizeTurnMetrics(supabase, response.metricsRowId, business.businessId, timer));
+      // Part B: a deferred row is inserted here, once, with the final timings
+      // (no inline insert on the reply path, no second UPDATE). A turn that wrote
+      // its row inline (or wrote none) takes the original finalize path.
+      const metricsDraft = response.metricsDraft;
+      if (metricsDraft) {
+        after(() => writeDeferredTurnMetrics(supabase, metricsDraft, timer));
+      } else {
+        after(() => finalizeTurnMetrics(supabase, response.metricsRowId, business.businessId, timer));
+      }
 
       // Instant answers: persist a freshly computed query embedding for the
       // next identical question, and nudge regeneration when a stored answer
@@ -654,6 +684,7 @@ export async function POST(request: NextRequest) {
               abortController.signal,
               queryEmbedding,
               instant,
+              partB,
             )) {
               if (chunk.kind === "delta") {
                 emit({ type: "delta", text: chunk.text });
@@ -735,6 +766,7 @@ export async function POST(request: NextRequest) {
         quota,
         queryEmbedding,
         instant,
+        partB,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);
