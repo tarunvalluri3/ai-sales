@@ -49,6 +49,8 @@ import { checkReplyQuota } from "@/lib/usage-limit";
 import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
 import { sanitizeShortField } from "@/lib/guardrails/sanitize";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
+import { hasClassifierFlag, resolveInputGuardrailAction } from "@/lib/guardrails/response-policy";
+import { countAbuseStrikes } from "@/lib/guardrails/events";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -365,7 +367,7 @@ export async function POST(request: NextRequest) {
     // duplicate-submit guard, toLangchainHistory) relies on the current
     // question being the last element, and still gets exactly that. A
     // human-control turn wastes this one read; that branch is rare.
-    const [, userMessageRow, quota, burstCount, priorHistory] = await Promise.all([
+    const [, userMessageRow, quota, burstCount, priorHistory, abuseStrikes] = await Promise.all([
       consentGiven
         ? timer.time("consent_write", () => recordConversationConsent(supabase, business.businessId, conversationRowId))
         : Promise.resolve(null),
@@ -384,6 +386,9 @@ export async function POST(request: NextRequest) {
       timer.time("history_fetch", () =>
         listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT),
       ),
+      // Guardrails Phase 5: abusive messages already recorded in this conversation.
+      // Returns 0 without a query unless the abuse check is enforcing.
+      countAbuseStrikes(supabase, business.businessId, conversationRowId),
     ]);
 
     // Evaluate the burst counter against the right ceiling now that the
@@ -487,11 +492,14 @@ export async function POST(request: NextRequest) {
     // did not complete), but still escalates when the response says so (a
     // mid-stream timeout escalates for human follow-up; a visitor who left
     // does not, because that response carries escalate:false).
+    // Guardrails Phase 5: a message the classifier flagged (injection / abuse) is not a
+    // knowledge gap, so it must not show up in the owner's "top unanswered questions".
+    const flaggedByGuardrails = hasClassifierFlag(prepared.signals);
     const finalizeTurnSideEffects = async (response: SalesEmployeeResponse, interrupted: boolean) => {
       // Phase 25b "top unanswered questions": only a genuine knowledge gap
       // (ungrounded, and not already escalated). A failure here must never
       // fail the prospect's real response.
-      if (!interrupted && !response.grounded && !response.escalate) {
+      if (!interrupted && !response.grounded && !response.escalate && !flaggedByGuardrails) {
         const { error: unansweredError } = await timer.time("unanswered_question_write", async () =>
           await supabase
             .from("unanswered_questions")
@@ -571,6 +579,36 @@ export async function POST(request: NextRequest) {
         );
       }
     };
+
+    // Guardrails Phase 5: when an input check is ENFORCING (lib/guardrails/config.ts;
+    // none is yet) the visitor gets a fixed reply, the conversation is flagged for a
+    // human through the normal escalation path, and the model is never called.
+    // Repeated abuse ends the AI's replies for the rest of the conversation.
+    const inputAction = resolveInputGuardrailAction(prepared.signals, abuseStrikes);
+    if (inputAction.kind !== "none") {
+      const guardrailResponse: SalesEmployeeResponse = {
+        answer: inputAction.reply,
+        grounded: true,
+        usedContext: false,
+        sourceChunkIds: [],
+        escalate: true,
+        escalationReason: inputAction.reason,
+        recommendedProducts: [],
+        metricsRowId: null,
+        quotaSnapshot: quota,
+      };
+      const guardrailMessageRow = await writeAssistantMessage(guardrailResponse, false);
+      await finalizeTurnSideEffects(guardrailResponse, false);
+      return withCors(
+        jsonSuccess({
+          conversationId: conversation.id,
+          answer: guardrailResponse.answer,
+          escalate: true,
+          control: conversation.control,
+          asOf: guardrailMessageRow.created_at,
+        }),
+      );
+    }
 
     // feat/chat-streaming: a loader that asked for a stream (its `Accept`
     // header or the `stream` body flag) gets Server-Sent Events; every

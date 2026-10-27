@@ -13,6 +13,8 @@ import { getService } from "@/lib/services";
 import { channelLabel } from "@/lib/conversation-channel";
 import { getCustomerSnapshotForWorkflow } from "@/lib/customers";
 import { computePriority } from "@/lib/copilot";
+import { listConversationGuardrailFlags } from "@/lib/guardrails/events";
+import { describeGuardrailFlags } from "@/lib/guardrails/response-policy";
 import { LiveConversationPanel } from "../_components/live-conversation-panel";
 import { InfoPanel } from "../_components/info-panel";
 import { ConversationPanes } from "../_components/conversation-panes";
@@ -31,13 +33,14 @@ export default async function ConversationDetailPage({
     notFound();
   }
 
-  const [messages, lead, appointment, business, conversationTags, catalogTags] = await Promise.all([
+  const [messages, lead, appointment, business, conversationTags, catalogTags, guardrailFlagSignals] = await Promise.all([
     listMessagesForConversation(supabase, businessId, conversation.id),
     getLeadForConversation(businessId, conversation.id),
     getAppointmentForConversation(supabase, businessId, conversation.id),
     getBusinessForOrg(orgId),
     listTagsForConversation(businessId, conversation.id),
     listTagsForBusiness(businessId),
+    listConversationGuardrailFlags(supabase, businessId, conversation.id),
   ]);
 
   // Resolved to a real name rather than shown as a raw id -- a lead's
@@ -97,6 +100,7 @@ export default async function ConversationDetailPage({
           catalogTags={catalogTags}
           canEditTags={hasMinRole(orgRole, "org:sales_agent")}
           recommendedAction={recommendedAction}
+          guardrailFlags={describeGuardrailFlags(guardrailFlagSignals)}
         />
       }
     />

@@ -161,6 +161,13 @@ jobs:
         # retract wiring. Pure modules, no network and no secrets.
         run: npm run test:output-guard
 
+      - name: Guardrail response-path tests
+        # Guardrails Phase 5 (STATE.md): the enforcing response policy (fixed safe
+        # reply + handover, repeated-abuse cut-off), the owner-facing flag labels,
+        # and the wiring in the widget route, WhatsApp and Instagram. Pure modules,
+        # no database and no secrets.
+        run: npm run test:guardrail-response
+
       - name: Build
         run: npm run build
 

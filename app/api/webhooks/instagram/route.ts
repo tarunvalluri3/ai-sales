@@ -18,6 +18,8 @@ import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
+import { resolveInputGuardrailAction } from "@/lib/guardrails/response-policy";
+import { countAbuseStrikes } from "@/lib/guardrails/events";
 import { logEvent } from "@/lib/logger";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
@@ -227,6 +229,19 @@ async function handleInboundMessage(
   const businessContext = await loadBusinessAiContext(businessId);
   if (!businessContext) {
     logEvent("instagram_business_context_missing", businessId, {}, "error");
+    return;
+  }
+
+  // Guardrails Phase 5: when an input check is ENFORCING (lib/guardrails/config.ts; none
+  // is yet) the prospect gets a fixed reply, the conversation is flagged for a human,
+  // and the model is never called. Repeated abuse ends the AI's replies for good.
+  const inputAction = resolveInputGuardrailAction(
+    prepared?.signals ?? [],
+    await countAbuseStrikes(supabase, businessId, conversation.id),
+  );
+  if (inputAction.kind !== "none") {
+    await flagConversationNeedsAttention(supabase, businessId, conversation.id, businessContext.clerkOrgId);
+    await sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, event.sender.id, inputAction.reply);
     return;
   }
 

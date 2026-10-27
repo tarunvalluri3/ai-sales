@@ -60,6 +60,15 @@ export async function reserveWriteToolCall(
     const allowed = count <= cap;
     if (!allowed) {
       logEvent("guardrail_signal", businessId, { type: "write_tool_cap", rule: tool, action: "blocked", mode: "enforce", channel: "tool", count, cap });
+      await supabase.from("guardrail_events").insert({
+        business_id: businessId,
+        conversation_id: conversationId,
+        channel: "tool",
+        signal: "write_tool_cap",
+        rule: tool,
+        action: "blocked",
+        mode: "enforce",
+      });
       await flagConversationForHuman(businessId, conversationId);
     }
     return { allowed, count, cap };
