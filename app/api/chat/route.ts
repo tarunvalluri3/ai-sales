@@ -44,6 +44,9 @@ import { TurnTimer } from "@/lib/turn-timings";
 import { finalizeTurnMetrics } from "@/lib/ai-response-metrics";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
 import { checkReplyQuota } from "@/lib/usage-limit";
+import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
+import { sanitizeShortField } from "@/lib/guardrails/sanitize";
+import { recordGuardrailSignals } from "@/lib/guardrails/record";
 
 /**
  * The one intentionally public, unauthenticated endpoint in this app
@@ -161,7 +164,19 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId, message, consentGiven, pageUrl, visitorId, clientElapsedMs } = parsed.data;
+  const { widgetKey, conversationId, consentGiven, clientElapsedMs } = parsed.data;
+  // Guardrails Phase 1: `message` below is the sanitised, length-capped,
+  // sensitive-number-masked text -- the ONLY form of the prospect's message
+  // that reaches the database, the model, notifications or the unanswered-
+  // questions log. the raw body field is read exactly once, here (a unit
+  // test asserts that). A message with nothing visible left is rejected.
+  const prepared = prepareProspectMessage(parsed.data.message);
+  if (prepared.empty) {
+    return withCors(jsonError("Invalid request.", 400));
+  }
+  const message = prepared.text;
+  const pageUrl = parsed.data.pageUrl === undefined ? undefined : sanitizeShortField(parsed.data.pageUrl, 2048);
+  const visitorId = parsed.data.visitorId === undefined ? undefined : sanitizeShortField(parsed.data.visitorId, 100) || undefined;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
   const ipSubnet = deriveIpv4Subnet(ip);
@@ -306,6 +321,10 @@ export async function POST(request: NextRequest) {
       logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }, "error");
       return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
     }
+
+    // Guardrails Phase 1: persist this message's guardrail signals (log-only
+    // classifier hits, masking, sanitising) off the critical path.
+    after(() => recordGuardrailSignals(business.businessId, conversationRowId, "chat_widget", prepared.signals));
 
     // Item 4 of the 2026-10-22 latency pass: three independent round trips
     // that used to run one after another now run concurrently, co-located
