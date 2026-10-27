@@ -32,6 +32,14 @@ lint, typecheck, build pass; `test:chat-perf` 9/9, `test:chat-streaming` 12/12, 
 
 ### Step 1 -- production before/after: PENDING deploy (see below once measured)
 
+**Blocker 2026-10-27:** the agent harness refused `gh pr merge` on PR #99 ("Merge Without Review") and the Vercel preview is SSO-protected, so Step 1 could not be measured in production by the agent. Needs the user to merge (or allow the merge), then one harness run per hour (30/h new-conversation limit).
+
+### Step 3 -- prompt order and caching: INSPECTED, NO CHANGE SHIPPED (measured, 2026-10-27)
+
+- **Order today** (`SYSTEM_TEMPLATE`, `lib/rag.ts`): persona -> language/recommendation/appointment/chaining instructions -> business profile -> **`{context}` (volatile, changes every turn)** -> the long rules block (stable) -> send_reply instruction. So the largest stable block sits *after* the volatile one; a prefix cache can only cover persona + profile. History and the question come after the system message (already volatile-last).
+- **Measured against the real model** (`gemini-3.1-flash-lite`, raw REST `generateContent`, the real template with placeholders filled, no tool declarations, 10 calls per order with varying `<retrieved_context>`): **`cachedContentTokenCount` was 0 on all 20 calls, for both the current order and a context-last order.** Total prompt ~2.2K tokens (2,232 current / 2,171 context-last). A probe that accidentally sent a ~17.8K-token prompt *did* report 15,512 cached tokens on alternate calls, so implicit caching works but only well above this prompt's size.
+- **Conclusion:** reordering would be a prompt change (the rules say "the reference context above", "the business profile above"; moving `{context}` below them means rewording rules) for no measurable cache benefit at ~2.2K tokens. **Not shipped.** Duplicated text exists (the final two rules restate the `usedContext`/`escalate` field descriptions), but trimming it changes rule text the brief says not to touch, for ~200 tokens of ~2.2K; left alone. Revisit only if the prompt grows past several thousand tokens (e.g. Step 2's pre-fetch), and re-run the same probe then.
+
 ---
 
 ## Phase 32 -- abuse rate limiting and spam protection -- Stages A-C MERGED (PR #96, `a2bd5b3`, 2026-10-24); Stages D-E BUILT 2026-10-27 (still log-only, dormant until a scope is promoted)
