@@ -675,3 +675,33 @@ export type AuditLogEntry = {
   metadata: AuditLogMetadata | null;
   created_at: string;
 };
+
+// Phase 33 (docs/phases.md): the /apache platform-admin panel. Deliberately
+// separate from the tenant-scoped types above -- see
+// 20261102000000_create_platform_admins.sql and
+// 20261102000100_create_admin_audit_log.sql for why these are not the
+// same tables as businesses/audit_log.
+
+export type PlatformAdminRole = "owner" | "support" | "viewer";
+
+export type PlatformAdmin = {
+  user_id: string;
+  role: PlatformAdminRole;
+  created_at: string;
+};
+
+export type AdminAuditLogMetadata = Record<string, string | number | boolean | null>;
+
+export type AdminAuditLogEntry = {
+  id: string;
+  actor_user_id: string;
+  action: string;
+  target_type: string;
+  target_id: string;
+  business_id: string | null;
+  before: AdminAuditLogMetadata | null;
+  after: AdminAuditLogMetadata | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
