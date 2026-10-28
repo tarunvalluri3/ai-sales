@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
@@ -25,7 +25,7 @@ export default async function ConversationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { businessId, orgId, orgRole } = await requireBusinessContext();
+  const { businessId, orgId, orgRole } = await requireLiveBusinessContext();
   const supabase = createServerSupabaseClient();
 
   const conversation = await getConversationForBusiness(supabase, businessId, id);

@@ -6,7 +6,8 @@ import { requireAuthContext } from "@/lib/auth";
 import { requireBusinessContext } from "@/lib/business-context";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { PLAN_KEYS } from "@/lib/plans";
-import { parseBillingIdentityForm } from "@/lib/billing-identity";
+import { billingIdentitySchema, parseBillingIdentityForm } from "@/lib/billing-identity";
+import { getBillingIdentityForBusiness, getEntitlementForBusiness } from "@/lib/subscription";
 import {
   confirmMonthlyCheckout,
   confirmOrderCheckout,
@@ -126,6 +127,7 @@ export async function confirmSubscriptionCheckoutAction(
   }
 
   revalidatePath("/dashboard/billing");
+  revalidatePath("/onboarding");
   return { success: true, notice: "Payment method authorised." };
 }
 
@@ -169,7 +171,58 @@ export async function confirmOrderCheckoutAction(
   }
 
   revalidatePath("/dashboard/billing");
+  revalidatePath("/onboarding");
   return { success: true, notice: "Payment received." };
+}
+
+/**
+ * "Update payment method" for a subscription whose renewal has failed
+ * (`past_due`): authorises a fresh card on the CURRENT plan. Checkout opens in
+ * the browser; the retry's `subscription.charged` webhook is what moves the
+ * business back to `active` and the agent back on -- nothing is assumed here.
+ *
+ * Deliberately limited to `past_due`. Starting a new mandate cancels the old
+ * one immediately (startMonthlyCheckout), which is right for a mandate that is
+ * already failing and wrong for a healthy one: a customer who opened the sheet
+ * and closed it would be left with no mandate and no renewal. Swapping the
+ * card on a healthy mandate needs a provider-side flow this app does not have
+ * yet, and is not offered. An expired plan re-subscribes through "Choose a
+ * plan" instead.
+ *
+ * Billing name and GSTIN come from what the business has already saved, run
+ * through the same schema the checkout form uses.
+ */
+export async function updatePaymentMethodAction(): Promise<BillingActionState> {
+  await requireAuthContext({ role: "org:admin" });
+  const { businessId, userId } = await requireBusinessContext();
+
+  const entitlement = await getEntitlementForBusiness(businessId);
+  if (entitlement.status !== "past_due" || entitlement.billingInterval !== "monthly") {
+    return { error: "There is no failed payment to fix right now." };
+  }
+
+  const saved = await getBillingIdentityForBusiness(businessId);
+  const identity = billingIdentitySchema.safeParse({
+    name: saved?.name ?? "",
+    address: saved?.address ?? "",
+    stateCode: saved?.stateCode ?? "",
+    gstin: saved?.gstin ?? "",
+  });
+  if (!identity.success) {
+    return { error: "Complete your billing details first, then update your payment method." };
+  }
+
+  try {
+    const session = await startMonthlyCheckout({
+      businessId,
+      userId,
+      planKey: entitlement.planKey,
+      identity: identity.data,
+    });
+    return { session };
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
 }
 
 /** Upgrade (immediately, pro-rated) or downgrade (at period end). */

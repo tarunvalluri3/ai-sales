@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { listCustomersForBusiness } from "@/lib/customers";
 import { listSegmentsForBusiness, listCustomersInSegment } from "@/lib/segments";
@@ -11,7 +11,7 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<{ segment?: string }>;
 }) {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireLiveBusinessContext();
   const canManageSegments = hasMinRole(orgRole, "org:admin");
   const { segment: segmentId } = await searchParams;
 

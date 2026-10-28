@@ -121,6 +121,54 @@ export async function updateKnowledgeDocumentAction(
   redirect("/dashboard/knowledge");
 }
 
+/**
+ * Same update as `updateKnowledgeDocumentAction`, minus the `redirect()`.
+ * That action's redirect is correct for its one existing caller (the
+ * standalone `/dashboard/knowledge/[id]/edit` page), but the onboarding
+ * wizard edits a document inline, in place, without navigating anywhere
+ * -- a `redirect()` there would bounce the user straight into the
+ * dashboard's pre-publish guard (2026-10-29 bugfix, STATE.md). Kept as a
+ * separate export rather than branching the existing one, so that
+ * action's one real caller is untouched.
+ */
+export async function updateKnowledgeDocumentInPlaceAction(
+  _prevState: KnowledgeFormState,
+  formData: FormData,
+): Promise<KnowledgeFormState> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const parsed = updateKnowledgeSchema.safeParse({
+    id: formData.get("id"),
+    title: formData.get("title"),
+    content: formData.get("content"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Enter a valid knowledge document." };
+  }
+
+  const { id, ...input } = parsed.data;
+
+  let updated: boolean;
+  try {
+    updated = await updateKnowledgeDocument(businessId, id, input);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  if (!updated) {
+    return { error: "This knowledge document no longer exists." };
+  }
+
+  triggerIngestionProcessing();
+  revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
+  return { success: true };
+}
+
 export async function deleteKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,

@@ -155,6 +155,7 @@ export default async function BillingPage() {
           billingInterval: entitlement.billingInterval,
           hasPaymentMethod: entitlement.hasPaymentMethod,
           pastDueSince: entitlement.pastDueSince,
+          graceUntil: entitlement.graceUntil,
         }}
         usage={{
           repliesUsed: quota.repliesUsed,

@@ -198,3 +198,35 @@ export async function setReadinessDismissal(
     );
   }
 }
+
+/**
+ * Ingestion status of each approved FAQ's generated knowledge document,
+ * keyed by the FAQ's own id (not the document id) -- same source_type/
+ * source_id correlation `loadReadinessReport` uses internally. Exposed
+ * separately so the onboarding wizard's FAQs step can show real per-item
+ * "Processing"/"Ready" state instead of gating Continue on raw row count,
+ * which used to go green before the async embedding pipeline actually
+ * finished (2026-10-29 bugfix, STATE.md).
+ */
+export async function getFaqGeneratedDocStatuses(businessId: string): Promise<Record<string, IngestionStatus>> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("knowledge_documents")
+    .select("source_id, ingestion_status")
+    .eq("business_id", businessId)
+    .eq("source_type", "faq");
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong checking your FAQ readiness. Please try again.",
+      "getFaqGeneratedDocStatuses: knowledge_documents fetch failed",
+      error,
+    );
+  }
+
+  const statuses: Record<string, IngestionStatus> = {};
+  for (const row of data ?? []) {
+    if (row.source_id) statuses[row.source_id as string] = row.ingestion_status as IngestionStatus;
+  }
+  return statuses;
+}

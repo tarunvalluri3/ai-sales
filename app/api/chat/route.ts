@@ -46,6 +46,7 @@ import { TurnTimer } from "@/lib/turn-timings";
 import { finalizeTurnMetrics, writeDeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
 import { checkReplyQuota } from "@/lib/usage-limit";
+import { AGENT_UNAVAILABLE_MESSAGE, canAgentServe } from "@/lib/agent-serving";
 import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
 import { sanitizeShortField } from "@/lib/guardrails/sanitize";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
@@ -290,6 +291,11 @@ export async function POST(request: NextRequest) {
   const partB = process.env.PIPELINE_PART_B !== "off";
   const quotaCheck = partB ? timer.time("quota_check", () => checkReplyQuota(supabase, business.businessId)) : null;
   quotaCheck?.catch(() => undefined);
+  // Billing hardening: whether the subscription lets this agent serve at all.
+  // Started here so its (cached, ~15s) read overlaps the rate-limit round trips
+  // like the quota check does; acted on once the visitor's message is stored.
+  const servingCheck = timer.time("serving_check", () => canAgentServe(business.businessId));
+  servingCheck.catch(() => undefined);
   const earlyHistory = partB && conversationId
     ? timer.time("history_fetch", () => listRecentMessages(supabase, business.businessId, conversationId, HISTORY_LIMIT))
     : null;
@@ -387,7 +393,7 @@ export async function POST(request: NextRequest) {
     // duplicate-submit guard, toLangchainHistory) relies on the current
     // question being the last element, and still gets exactly that. A
     // human-control turn wastes this one read; that branch is rare.
-    const [, userMessageRow, quota, burstCount, priorHistory, abuseStrikes] = await Promise.all([
+    const [, userMessageRow, quota, burstCount, priorHistory, abuseStrikes, agentServing] = await Promise.all([
       consentGiven
         ? timer.time("consent_write", () => recordConversationConsent(supabase, business.businessId, conversationRowId))
         : Promise.resolve(null),
@@ -411,7 +417,27 @@ export async function POST(request: NextRequest) {
       // Guardrails Phase 5: abusive messages already recorded in this conversation.
       // Returns 0 without a query unless the abuse check is enforcing.
       countAbuseStrikes(supabase, business.businessId, conversationRowId),
+      servingCheck,
     ]);
+
+    // The subscription no longer lets this agent serve (lapsed past grace,
+    // cancelled and past its paid period, expired trial). The visitor's message
+    // was stored above, so the owner still sees it in the dashboard; the visitor
+    // gets a neutral notice with no billing detail, no model call is made and no
+    // assistant message is stored. JSON even for a streaming client, the same
+    // shape as the human-control branch below.
+    if (!agentServing) {
+      logEvent("chat_agent_not_serving", business.businessId, { conversationId: conversation.id });
+      return withCors(
+        jsonSuccess({
+          conversationId: conversation.id,
+          answer: AGENT_UNAVAILABLE_MESSAGE,
+          escalate: false,
+          control: conversation.control,
+          asOf: userMessageRow.created_at,
+        }),
+      );
+    }
 
     // Evaluate the burst counter against the right ceiling now that the
     // entitlement is known. Log-only in Stage A, so `burstVerdict.allowed`
@@ -692,6 +718,8 @@ export async function POST(request: NextRequest) {
               queryEmbedding,
               instant,
               partB,
+              "widget",
+              business.liveSource,
             )) {
               if (chunk.kind === "delta") {
                 emit({ type: "delta", text: chunk.text });
@@ -775,6 +803,7 @@ export async function POST(request: NextRequest) {
         instant,
         partB,
         "widget",
+        business.liveSource,
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);

@@ -25,10 +25,13 @@ export function ProductsList({
   products,
   canEdit,
   deleteProductAction,
+  onEdit,
 }: {
   products: Product[];
   canEdit: boolean;
   deleteProductAction: typeof DeleteProductAction;
+  /** When set, "Edit" calls this instead of navigating to /dashboard/products/[id]/edit -- used by the onboarding wizard to keep editing inline. */
+  onEdit?: (id: string) => void;
 }) {
   const [sort, setSort] = useState<SortState>(null);
 
@@ -60,12 +63,22 @@ export function ProductsList({
           <TableCell align="right">
             <div className="flex items-center justify-end gap-3">
               {canEdit ? (
-                <Link
-                  href={`/dashboard/products/${product.id}/edit`}
-                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-                >
-                  Edit
-                </Link>
+                onEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(product.id)}
+                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <Link
+                    href={`/dashboard/products/${product.id}/edit`}
+                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  >
+                    Edit
+                  </Link>
+                )
               ) : null}
               <DeleteButton action={deleteProductAction} id={product.id} canEdit={canEdit} />
             </div>

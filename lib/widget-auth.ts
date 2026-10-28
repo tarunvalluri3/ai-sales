@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
+import { loadLiveAgentSourceByVersion, type LiveAgentSource } from "@/lib/agent-runtime";
 
 /**
  * Thrown for any widget-key/origin resolution failure. Deliberately
@@ -37,21 +38,36 @@ export type WidgetBusinessContext = {
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
   appointmentsEnabled: boolean;
-  /** The owner's current suggested-question chips -- the only questions an instant (stored) answer may be served for. */
+  /** The owner's LIVE suggested-question chips -- the only questions an instant (stored) answer may be served for. */
   suggestedQuestions: string[];
+  /**
+   * The published version this request is served from. Every content field
+   * above comes from its snapshot, and lib/rag.ts reads knowledge, catalog and
+   * FAQs from it (never the draft tables). Draft -> Publish -> Live, 2026-10-29.
+   */
+  liveSource: LiveAgentSource;
 };
 
-const BUSINESS_COLUMNS =
-  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, recommend_products_enabled, published_at, appointments_enabled, privacy_policy_url, status, deleted_at";
+// Identity + lifecycle only. Everything the AI says or shows comes from the
+// live snapshot (live_version_id), not from draft columns.
+const AUTH_COLUMNS = "id, clerk_org_id, published_at, live_version_id, status, deleted_at";
 
-type WidgetBusinessRow = {
+// The branding endpoint additionally keeps the draft widget columns, used only
+// as a cosmetic fallback for an agent that has never been published.
+const BRANDING_COLUMNS = `${AUTH_COLUMNS}, name, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, privacy_policy_url`;
+
+type WidgetAuthRow = {
   id: string;
   clerk_org_id: string;
+  published_at: string | null;
+  live_version_id: string | null;
+  /** Phase 33 Stop 2 (docs/phases.md): a platform admin's suspend/soft-delete action must actually stop the AI replying, not just mark a column. */
+  status: "active" | "suspended";
+  deleted_at: string | null;
+};
+
+type WidgetBrandingRow = WidgetAuthRow & {
   name: string;
-  description: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  website: string | null;
   widget_language: WidgetLanguage;
   widget_accent_color: string | null;
   widget_logo_url: string | null;
@@ -60,20 +76,14 @@ type WidgetBusinessRow = {
   widget_cta_text: string | null;
   widget_position: WidgetPosition;
   widget_suggested_questions: string[] | null;
-  recommend_products_enabled: boolean;
-  published_at: string | null;
-  appointments_enabled: boolean;
   privacy_policy_url: string | null;
-  /** Phase 33 Stop 2 (docs/phases.md): a platform admin's suspend/soft-delete action must actually stop the AI replying, not just mark a column. */
-  status: "active" | "suspended";
-  deleted_at: string | null;
 };
 
 type WidgetKeyRow = {
   business_id: string;
   status: string;
   allowed_origins: string[];
-  businesses: WidgetBusinessRow | null;
+  businesses: WidgetAuthRow | null;
 };
 
 /**
@@ -141,7 +151,7 @@ export async function resolveBusinessFromWidgetKey(
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("widget_keys")
-    .select(`business_id, status, allowed_origins, businesses(${BUSINESS_COLUMNS})`)
+    .select(`business_id, status, allowed_origins, businesses(${AUTH_COLUMNS})`)
     .eq("key", key)
     .maybeSingle<WidgetKeyRow>();
 
@@ -183,20 +193,32 @@ export async function resolveBusinessFromWidgetKey(
       });
   }
 
+  // A published business with no readable live version fails closed like any
+  // other failed check: the draft tables are never a fallback for a prospect.
+  if (!data.businesses.live_version_id) {
+    throw new WidgetAuthError();
+  }
+  const liveSource = await loadLiveAgentSourceByVersion(data.business_id, data.businesses.live_version_id);
+  if (!liveSource) {
+    throw new WidgetAuthError();
+  }
+  const config = liveSource.snapshot.config;
+
   return {
     businessId: data.business_id,
-    businessName: data.businesses.name,
+    businessName: config.name,
     clerkOrgId: data.businesses.clerk_org_id,
     businessProfile: {
-      description: data.businesses.description,
-      contactEmail: data.businesses.contact_email,
-      contactPhone: data.businesses.contact_phone,
-      website: data.businesses.website,
+      description: config.description,
+      contactEmail: config.contactEmail,
+      contactPhone: config.contactPhone,
+      website: config.website,
     },
-    language: data.businesses.widget_language,
-    recommendProductsEnabled: data.businesses.recommend_products_enabled,
-    appointmentsEnabled: data.businesses.appointments_enabled,
-    suggestedQuestions: data.businesses.widget_suggested_questions ?? [],
+    language: config.language,
+    recommendProductsEnabled: config.capabilities.recommendProducts,
+    appointmentsEnabled: config.capabilities.appointments,
+    suggestedQuestions: config.persona.suggestedQuestions,
+    liveSource,
   };
 }
 
@@ -232,12 +254,36 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("widget_keys")
-    .select(`business_id, status, businesses(${BUSINESS_COLUMNS})`)
+    .select(`business_id, status, businesses(${BRANDING_COLUMNS})`)
     .eq("key", key)
-    .maybeSingle<{ business_id: string; status: string; businesses: WidgetBusinessRow | null }>();
+    .maybeSingle<{ business_id: string; status: string; businesses: WidgetBrandingRow | null }>();
 
   if (error || !data || !data.businesses || data.status !== "active") {
     return null;
+  }
+
+  // Branding is part of the published agent: once a live version exists the
+  // widget shows ITS branding, so an unpublished colour/greeting edit is not
+  // visible to visitors. Before the first publish there is no live agent (chat
+  // itself fails closed), so the draft columns are only a cosmetic preview.
+  if (data.businesses.live_version_id) {
+    const liveSource = await loadLiveAgentSourceByVersion(data.business_id, data.businesses.live_version_id);
+    if (liveSource) {
+      const config = liveSource.snapshot.config;
+      return {
+        businessId: data.business_id,
+        businessName: config.name,
+        language: config.language,
+        accentColor: config.channels.accentColor,
+        logoUrl: config.channels.logoUrl,
+        welcomeText: config.persona.welcomeText,
+        welcomeTextClosed: config.persona.welcomeTextClosed,
+        ctaText: config.persona.ctaText,
+        position: config.channels.position,
+        suggestedQuestions: config.persona.suggestedQuestions,
+        privacyPolicyUrl: config.channels.privacyPolicyUrl,
+      };
+    }
   }
 
   return {

@@ -2,6 +2,7 @@ import "server-only";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import { embedText } from "@/lib/embeddings";
+import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -10,7 +11,44 @@ export type KnowledgeSearchResult = {
   document_id: string;
   content: string;
   similarity: number;
+  /** Set only by a live search (match_live_knowledge_chunks) -- the generated-document source the chunk came from. */
+  source_type?: string;
+  source_id?: string | null;
 };
+
+/**
+ * Tenant- and version-scoped similarity search over the LIVE copy of the
+ * knowledge chunks (Draft -> Publish -> Live). `versionId` pins the search to
+ * the one published version the caller is serving; a chunk edited, added or
+ * deleted in the draft since is simply not in it. `sourceTypes` optionally
+ * narrows to generated documents (e.g. product/service for recommendations).
+ */
+export async function searchLiveKnowledgeChunks(
+  supabase: SupabaseClient,
+  businessId: string,
+  versionId: string,
+  queryEmbedding: number[],
+  limit: number,
+  sourceTypes: string[] | null = null,
+): Promise<KnowledgeSearchResult[]> {
+  const { data, error } = await supabase.rpc("match_live_knowledge_chunks", {
+    p_business_id: businessId,
+    p_version_id: versionId,
+    p_query_embedding: queryEmbedding,
+    p_match_count: limit,
+    p_source_types: sourceTypes,
+  });
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong searching your knowledge base. Please try again.",
+      "searchLiveKnowledgeChunks failed",
+      error,
+    );
+  }
+
+  return data;
+}
 
 /**
  * Tenant-scoped similarity search over a business's knowledge chunks.
@@ -37,6 +75,11 @@ export type KnowledgeSearchResult = {
  * overlaps the remaining pre-AI database work. It only replaces the embed
  * call; the tenant-scoped `match_knowledge_chunks` query is unchanged, and a
  * rejection surfaces here exactly as one from `embedText()` would.
+ *
+ * `source` (Draft -> Publish -> Live): `draft` (the default) searches the
+ * editing tables' chunks -- the dashboard's "Testing draft" chat. A `live`
+ * source searches only that published version's chunk copy; the prospect-
+ * facing channels always pass one.
  */
 export async function searchKnowledgeChunks(
   supabase: SupabaseClient,
@@ -45,10 +88,20 @@ export async function searchKnowledgeChunks(
   limit = 5,
   onTiming?: (timings: { embedMs: number; searchMs: number }) => void,
   queryEmbeddingPromise?: Promise<number[]>,
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<KnowledgeSearchResult[]> {
   const embedStartedAt = Date.now();
   const queryEmbedding = await (queryEmbeddingPromise ?? embedText(queryText));
   const embedMs = Date.now() - embedStartedAt;
+
+  if (source.kind === "live") {
+    const searchStartedAt = Date.now();
+    try {
+      return await searchLiveKnowledgeChunks(supabase, businessId, source.versionId, queryEmbedding, limit);
+    } finally {
+      onTiming?.({ embedMs, searchMs: Date.now() - searchStartedAt });
+    }
+  }
 
   const searchStartedAt = Date.now();
   const { data, error } = await supabase.rpc("match_knowledge_chunks", {

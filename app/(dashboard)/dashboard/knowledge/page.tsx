@@ -32,7 +32,8 @@ export default async function KnowledgePage() {
         <h1 className="text-2xl font-semibold text-ds-text-primary">Knowledge</h1>
         <p className="text-sm text-ds-text-secondary">
           This is what your AI sales employee is allowed to know. New documents start as drafts —
-          publish one to make it part of your AI&rsquo;s live reference context.
+          approve one to include it in your agent, then use Publish changes (top of the page) to
+          make it live.
         </p>
       </div>
 

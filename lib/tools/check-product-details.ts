@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
 import { escapeLikePattern } from "@/lib/sql-escape";
+import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
+import type { SnapshotCatalogItem } from "@/lib/agent-snapshot";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -48,6 +50,7 @@ export async function executeCheckProductDetails(
   supabase: SupabaseClient,
   businessId: string,
   rawArgs: unknown,
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<CheckProductDetailsResult> {
   const parsed = CheckProductDetailsInputSchema.safeParse(rawArgs);
   if (!parsed.success) {
@@ -56,6 +59,32 @@ export async function executeCheckProductDetails(
   }
 
   const { query } = parsed.data;
+
+  // Draft -> Publish -> Live: a live turn looks the item up in the published
+  // snapshot (same case-insensitive exact-name rule as the ilike below), never
+  // in the editing tables. Products win over services, as below.
+  if (source.kind === "live") {
+    const wanted = query.toLowerCase();
+    const matches = (item: SnapshotCatalogItem) => item.name.toLowerCase() === wanted;
+    const product = source.snapshot.products.find(matches);
+    const service = product ? undefined : source.snapshot.services.find(matches);
+    const found = product ?? service;
+    if (!found) {
+      logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "not_found" });
+      return { found: false, reason: "not_found" };
+    }
+    logEvent("tool_invoked", businessId, {
+      tool: "check_product_details",
+      result: product ? "found_product" : "found_service",
+    });
+    return {
+      found: true,
+      type: product ? "product" : "service",
+      name: found.name,
+      description: found.description,
+      price: found.price === null ? null : String(found.price),
+    };
+  }
 
   const { data: product, error: productError } = await supabase
     .from("products")

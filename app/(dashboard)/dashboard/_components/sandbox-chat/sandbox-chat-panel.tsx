@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { ConversationMessage } from "@/lib/rag";
 import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { renderWidgetMarkdown } from "@/lib/widget-markdown";
+import { Badge } from "../badge";
 import { sendSandboxMessage } from "./actions";
 
 type DisplayMessage = ConversationMessage & {
@@ -86,11 +87,17 @@ export function SandboxChatPanel() {
     <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ds-text-primary">Test your AI</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold text-ds-text-primary">Test your AI</h2>
+            <Badge tone="accent" size="sm" title="This chat reads your draft, including changes you haven't published yet.">
+              Testing draft
+            </Badge>
+          </div>
           <p className="text-sm text-ds-text-secondary">
-            Chat with your AI sales employee exactly as a prospect would -- this uses your real
-            products, services, FAQs, and knowledge, but nothing here is visible to prospects or
-            counted as a real lead unless you say something that triggers a callback request.
+            Chat with your AI sales employee exactly as a prospect would -- this uses your current
+            draft products, services, FAQs, and knowledge (including changes you haven&rsquo;t published
+            yet), but nothing here is visible to prospects or counted as a real lead unless you say
+            something that triggers a callback request.
           </p>
         </div>
         {messages.length > 0 ? (

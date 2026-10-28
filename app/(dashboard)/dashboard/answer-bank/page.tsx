@@ -1,4 +1,4 @@
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { getAnswerBankView, MAX_EDITED_ANSWER_CHARS, type AnswerBankEntryView } from "@/lib/answer-bank/dashboard";
 import { Badge, type BadgeTone } from "../_components/badge";
@@ -64,7 +64,7 @@ function statusOf(entry: AnswerBankEntryView): { tone: BadgeTone; label: string;
 }
 
 export default async function AnswerBankPage({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireLiveBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:member");
   const [view, { notice: noticeCode }] = await Promise.all([getAnswerBankView(businessId), searchParams]);
   const notice = noticeCode ? NOTICES[noticeCode] : undefined;

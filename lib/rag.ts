@@ -7,6 +7,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { AIMessage, AIMessageChunk, BaseMessage } from "@langchain/core/messages";
 import { ToolMessage } from "@langchain/core/messages";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
+import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import { checkProductDetailsTool, executeCheckProductDetails } from "@/lib/tools/check-product-details";
@@ -32,6 +33,7 @@ import { recordGuardrailSignals } from "@/lib/guardrails/record";
 import type { GuardrailSignal } from "@/lib/guardrails/prepare-message";
 import { after } from "next/server";
 import { checkReplyQuota, type ReplyQuotaStatus } from "@/lib/usage-limit";
+import { AGENT_UNAVAILABLE_MESSAGE } from "@/lib/agent-serving";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
 import { embedText, isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
@@ -368,6 +370,7 @@ class KnowledgeRetriever extends BaseRetriever<KnowledgeChunkMetadata> {
   private readonly limit: number;
   private readonly timer: TurnTimer | undefined;
   private readonly queryEmbedding: Promise<number[]> | undefined;
+  private readonly source: AgentSource;
 
   constructor(fields: {
     supabase: SupabaseClient;
@@ -375,9 +378,12 @@ class KnowledgeRetriever extends BaseRetriever<KnowledgeChunkMetadata> {
     limit?: number;
     timer?: TurnTimer;
     queryEmbedding?: Promise<number[]>;
+    /** Which copy of the knowledge to search: the published version (prospect-facing) or the draft (dashboard test chat). Defaults to the draft. */
+    source?: AgentSource;
   }) {
     super();
     this.queryEmbedding = fields.queryEmbedding;
+    this.source = fields.source ?? DRAFT_SOURCE;
     this.supabase = fields.supabase;
     this.businessId = fields.businessId;
     this.limit = fields.limit ?? 5;
@@ -392,7 +398,7 @@ class KnowledgeRetriever extends BaseRetriever<KnowledgeChunkMetadata> {
     const results = await searchKnowledgeChunks(this.supabase, this.businessId, query, this.limit, (timings) => {
       this.timer?.record("embedding", timings.embedMs);
       this.timer?.record("vector_search", timings.searchMs);
-    }, this.queryEmbedding);
+    }, this.queryEmbedding, this.source);
     return results.map(
       (result) =>
         new Document({
@@ -633,6 +639,7 @@ async function executeBusinessToolCall(
   conversationId: string,
   toolCall: LoopToolCall,
   searchedQueries: string[],
+  source: AgentSource,
 ): Promise<ToolCallOutcome> {
   let toolResult: unknown;
   let sideEffecting = false;
@@ -650,19 +657,19 @@ async function executeBusinessToolCall(
 
   if (toolCall.name === "check_product_details") {
     toolResult = await withReadToolTimeout(
-      executeCheckProductDetails(supabase, businessId, toolCall.args),
+      executeCheckProductDetails(supabase, businessId, toolCall.args, source),
       readToolTimedOut,
     );
   } else if (toolCall.name === "check_faq_topic") {
     toolResult = await withReadToolTimeout(
-      executeCheckFaqTopic(supabase, businessId, toolCall.args),
+      executeCheckFaqTopic(supabase, businessId, toolCall.args, source),
       readToolTimedOut,
     );
   } else if (toolCall.name === "request_callback") {
     sideEffecting = true;
     toolResult = await executeRequestCallback(supabase, businessId, conversationId, toolCall.args);
   } else if (toolCall.name === "list_products_and_services") {
-    toolResult = await withReadToolTimeout(executeListOfferings(supabase, businessId), readToolTimedOut);
+    toolResult = await withReadToolTimeout(executeListOfferings(supabase, businessId, source), readToolTimedOut);
   } else if (toolCall.name === "search_knowledge_base") {
     // Item 3: refuse a near-identical repeat of a query already run this
     // turn (including the prospect's own message, which the passive
@@ -681,7 +688,7 @@ async function executeBusinessToolCall(
       };
     } else {
       const searchResult = await withReadToolTimeout(
-        executeSearchKnowledgeBase(supabase, businessId, toolCall.args),
+        executeSearchKnowledgeBase(supabase, businessId, toolCall.args, source),
         readToolTimedOut,
       );
       if (parsedSearch.success) executedSearchQuery = parsedSearch.data.query;
@@ -692,7 +699,7 @@ async function executeBusinessToolCall(
     }
   } else if (toolCall.name === "recommend_products") {
     const recommendResult = await withReadToolTimeout(
-      executeRecommendProducts(supabase, businessId, toolCall.args),
+      executeRecommendProducts(supabase, businessId, toolCall.args, source),
       readToolTimedOut,
     );
     if (recommendResult.found) {
@@ -772,6 +779,7 @@ async function prepareTurn(
   prefetchedQuota: ReplyQuotaStatus | undefined,
   queryEmbedding: Promise<number[]> | undefined,
   instant: InstantContext | undefined,
+  source: AgentSource,
 ): Promise<PreparedTurn> {
   const quota = prefetchedQuota ?? (await timer.time("quota_check", () => checkReplyQuota(supabase, businessId)));
   if (!quota.allowed) {
@@ -790,11 +798,16 @@ async function prepareTurn(
     return {
       kind: "early",
       response: {
-        answer: USAGE_QUOTA_EXCEEDED_MESSAGE,
+        // Defence in depth: the widget, WhatsApp and Instagram handlers refuse
+        // a non-serving agent before this point (lib/agent-serving.ts), so a
+        // turn only lands here via the dashboard sandbox. A lapsed
+        // subscription gets the neutral unavailable message, never the quota
+        // wording, and does not page the owner about a "handover".
+        answer: quota.entitlement.serving ? USAGE_QUOTA_EXCEEDED_MESSAGE : AGENT_UNAVAILABLE_MESSAGE,
         grounded: false,
         usedContext: false,
         sourceChunkIds: [],
-        escalate: true,
+        escalate: quota.entitlement.serving,
         escalationReason: quota.entitlement.serving ? "usage_quota_exceeded" : "subscription_not_serving",
         recommendedProducts: [],
         metricsRowId: null,
@@ -866,8 +879,14 @@ async function prepareTurn(
     }
   }
 
-  if (firstTurn) {
-    const cached = await timer.time("cache_read", () => getCachedResponse(supabase, businessId, question, language));
+  // The first-turn response cache belongs to the published agent: it is keyed
+  // by the live version and skipped entirely for the draft test chat, so a
+  // draft answer is never cached for (or read back by) a prospect.
+  if (firstTurn && source.kind === "live") {
+    const liveVersionId = source.versionId;
+    const cached = await timer.time("cache_read", () =>
+      getCachedResponse(supabase, businessId, question, language, liveVersionId),
+    );
     if (cached) {
       logEvent("ai_response_cache_hit", businessId, { conversationId });
       return {
@@ -887,12 +906,12 @@ async function prepareTurn(
     }
   }
 
-  const retriever = new KnowledgeRetriever({ supabase, businessId, timer, queryEmbedding });
+  const retriever = new KnowledgeRetriever({ supabase, businessId, timer, queryEmbedding, source });
   let documents: Document<KnowledgeChunkMetadata>[];
   // Step 2 of the 2026-10-27 latency programme: a small catalog is read
   // concurrently with the knowledge search and injected below, so the common
   // catalog lookups need no tool round trip. Never rejects (null = skip).
-  const catalogPrefetch = timer.time("catalog_prefetch", () => prefetchSmallCatalog(supabase, businessId));
+  const catalogPrefetch = timer.time("catalog_prefetch", () => prefetchSmallCatalog(supabase, businessId, source));
   // Retrieval starts now, before the FAQ match below, so a question that is
   // NOT a FAQ match loses no time to it: the match (query embedding + one
   // tenant-filtered RPC) runs alongside the vector search. A FAQ hit abandons
@@ -908,8 +927,8 @@ async function prepareTurn(
           { message: question, isFirstTurn: firstTurn, context: instant },
           {
             matchFaqs: async () =>
-              matchFaqCandidates(supabase, businessId, await (queryEmbedding ?? embedText(question))),
-            loadCatalogNames: () => loadCatalogNames(supabase, businessId),
+              matchFaqCandidates(supabase, businessId, await (queryEmbedding ?? embedText(question)), source),
+            loadCatalogNames: () => loadCatalogNames(supabase, businessId, source),
           },
         ),
       );
@@ -1119,6 +1138,11 @@ export async function askSalesEmployee(
   // should always pass the real one; "user" is only a fallback for any
   // caller this change missed.
   trigger: GeminiUsageTrigger = "user",
+  // Draft -> Publish -> Live (2026-10-29): where knowledge, catalog and FAQs
+  // are read from. The prospect-facing callers (widget, WhatsApp, Instagram)
+  // pass their LIVE source; the default is the draft, used by the dashboard's
+  // "Testing draft" chat.
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<SalesEmployeeResponse> {
   // Honest end-state when the AI deadline (lib/chat-timeouts.ts) is hit
   // before a reply exists: escalate so a human follows up, write no
@@ -1154,6 +1178,7 @@ export async function askSalesEmployee(
     prefetchedQuota,
     queryEmbedding,
     instant,
+    source,
   );
   if (prepared.kind === "early") return prepared.response;
   const { quota, documents, context, tags, instantMissReason } = prepared;
@@ -1365,7 +1390,7 @@ export async function askSalesEmployee(
         () =>
           Promise.all(
             businessToolCalls.map((toolCall) =>
-              executeBusinessToolCall(supabase, businessId, conversationId, toolCall, searchedQueries),
+              executeBusinessToolCall(supabase, businessId, conversationId, toolCall, searchedQueries, source),
             ),
           ),
         // Recorded with the batch so a persisted turn says *which* tools
@@ -1538,8 +1563,8 @@ export async function askSalesEmployee(
       metricsDraft,
     };
 
-    if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
-      await setCachedResponse(supabase, businessId, question, language, response);
+    if (source.kind === "live" && shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
+      await setCachedResponse(supabase, businessId, question, language, source.versionId, response);
     }
 
     return response;
@@ -1633,6 +1658,8 @@ export async function* streamSalesEmployee(
   // parameter. Defaults to "widget" because this generator currently has
   // exactly one caller (the widget route's streaming branch).
   trigger: GeminiUsageTrigger = "widget",
+  // See askSalesEmployee()'s matching parameter. The widget route passes its live source.
+  source: AgentSource = DRAFT_SOURCE,
 ): AsyncGenerator<StreamChunk, void, unknown> {
   const buildTimeoutResponse = (quota: ReplyQuotaStatus): SalesEmployeeResponse => ({
     answer: RESPONSE_TIMEOUT_MESSAGE,
@@ -1646,7 +1673,7 @@ export async function* streamSalesEmployee(
     quotaSnapshot: quota,
   });
 
-  const prepared = await prepareTurn(supabase, businessId, conversationId, question, history, language, timer, prefetchedQuota, queryEmbedding, instant);
+  const prepared = await prepareTurn(supabase, businessId, conversationId, question, history, language, timer, prefetchedQuota, queryEmbedding, instant, source);
   if (prepared.kind === "early") {
     // A fixed message (over quota / cache hit / no-knowledge fallback):
     // there is no generation to stream, but it travels the same wire as one
@@ -1846,7 +1873,7 @@ export async function* streamSalesEmployee(
         () =>
           Promise.all(
             toolCalls.map((toolCall) =>
-              executeBusinessToolCall(supabase, businessId, conversationId, toolCall, searchedQueries),
+              executeBusinessToolCall(supabase, businessId, conversationId, toolCall, searchedQueries, source),
             ),
           ),
         toolCalls.map((toolCall) => toolCall.name),
@@ -1975,8 +2002,8 @@ export async function* streamSalesEmployee(
         instantMissReason,
         metricsDraft,
       };
-      if (shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
-        await setCachedResponse(supabase, businessId, question, language, response);
+      if (source.kind === "live" && shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
+        await setCachedResponse(supabase, businessId, question, language, source.versionId, response);
       }
       return response;
     };

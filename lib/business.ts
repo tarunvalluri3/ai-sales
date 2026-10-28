@@ -1,12 +1,13 @@
 import "server-only";
 import { cache } from "react";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Business } from "@/lib/supabase/types";
+import type { Business, OnboardingStep } from "@/lib/supabase/types";
 import type { BusinessProfileInput, WidgetBrandingInput } from "@/lib/schemas/business";
 import { AppError } from "@/lib/errors";
 import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
 import { describeBlockingItems, type ReadinessItem } from "@/lib/onboarding-readiness";
 import { track } from "@/lib/analytics-events";
+import { getEntitlementForBusiness } from "@/lib/subscription";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -248,10 +249,12 @@ export async function updateAiCapabilities(
 }
 
 /**
- * Signals that a business tried to publish for the first time without
- * enough real, retrievable knowledge for its AI to face prospects
- * (feat/onboarding-readiness). Carries the blocking items so the caller can
- * tell the owner exactly what is still missing. Not thrown for a republish.
+ * Signals that a publish was refused because the draft does not give the AI
+ * enough real, retrievable knowledge to face prospects
+ * (feat/onboarding-readiness) -- on the first publish AND, since Draft ->
+ * Publish -> Live, on every later one. Carries the blocking items so the
+ * caller can tell the owner exactly what is still missing; empty when the
+ * refusal is only "knowledge is still processing".
  */
 export class BusinessNotReadyError extends Error {
   readonly blockingItems: ReadinessItem[];
@@ -262,23 +265,42 @@ export class BusinessNotReadyError extends Error {
   }
 }
 
+/** What a publish did: the live version now serving, and whether it differs from the previous one. */
+export type PublishAgentResult = {
+  business: Business;
+  version: number;
+  /** False when the draft already equalled the live version -- publishing again is a no-op. */
+  changed: boolean;
+};
+
+/** Postgres error text the publish function raises while knowledge is still being embedded. */
+const PUBLISH_PROCESSING_PREFIX = "AGENT_PUBLISH_PROCESSING:";
+
 /**
- * Marks a business published (Phase 25c "test your AI before publishing"):
- * sets `published_at` to now, the flag `lib/widget-auth.ts`'s
- * `resolveBusinessFromWidgetKey()` requires before the public /api/chat
- * path will serve real chat for this business. `orgId` must come from a
- * validated session; authorization (org:admin-only) is enforced by the
- * caller, same convention as `updateBusinessProfile`.
+ * The one publish path (Draft -> Publish -> Live, 2026-10-29): freezes the
+ * current draft -- business profile/persona/branding, approved products,
+ * services and FAQs, published knowledge -- into a new immutable
+ * `agent_versions` snapshot and makes it the version the widget, WhatsApp and
+ * Instagram serve. Used by the onboarding "Publish agent" button AND the
+ * dashboard's "Publish changes"; there is no second route.
  *
- * feat/onboarding-readiness: a business's FIRST publish is gated on the
- * readiness rules in lib/onboarding-readiness.ts, evaluated server-side
- * here so a direct action call cannot skip the UI checklist. A republish of
- * an already-published business is NEVER gated -- re-publishing simply
- * bumps the timestamp, and a working live agent must never be disabled by
- * this rule (there is no "unpublish" in this phase). An unready first
- * publish throws `BusinessNotReadyError` and writes nothing.
+ * `orgId` must come from a validated session; authorization (org:admin-only)
+ * is enforced by the caller, same convention as `updateBusinessProfile`.
+ *
+ * Validation runs EVERY time, not just on the first publish: an edit that
+ * pushes the draft below the readiness bar (e.g. FAQs under the minimum)
+ * throws `BusinessNotReadyError` carrying the same missing-items list and
+ * writes nothing -- the live version keeps serving exactly as it was. (This
+ * replaces the previous "a republish is never gated" rule, which only existed
+ * because a republish used to change nothing the AI could say.)
+ *
+ * Atomic and idempotent: the snapshot, the version row, the live chunk copy,
+ * the live-pointer flip and the response-cache purge all happen inside the
+ * `publish_agent` database function in one transaction under a row lock.
+ * Publishing a draft identical to the live version returns that version with
+ * `changed: false` and touches nothing.
  */
-export async function publishBusinessForOrg(orgId: string): Promise<Business> {
+export async function publishBusinessForOrg(orgId: string): Promise<PublishAgentResult> {
   const business = await getBusinessForOrg(orgId);
   if (!business) {
     throw new AppError(
@@ -287,31 +309,40 @@ export async function publishBusinessForOrg(orgId: string): Promise<Business> {
     );
   }
 
-  // The gate applies only to the first publish. An already-live business
-  // republishes freely, so enforcing a new rule never switches it off.
-  // Captured before the update below (which unconditionally re-stamps
-  // published_at on every call) -- this is the only point that can tell
-  // "first publish" from "republish".
+  // The subscription is the server-side source of truth for whether an agent
+  // may be live (lib/agent-serving.ts). A lapsed one cannot publish: going
+  // live would serve nobody, and "Publish changes" would look like it worked.
+  // Read fresh (not the runtime's short-lived cache) -- a customer who has
+  // just fixed their payment must be able to publish straight away. Grace
+  // period counts as valid, same as the runtime.
+  const entitlement = await getEntitlementForBusiness(business.id);
+  if (!entitlement.serving) {
+    throw new BusinessNotReadyError(
+      "Your subscription is not active, so changes can't go live. Choose a plan in Billing, then publish again -- your current agent is unchanged.",
+      [],
+    );
+  }
+
+  // `blockingItems` is evaluated regardless of publish state ("read
+  // blockingItems for the audit view" -- lib/onboarding-readiness.ts); the
+  // report's `canPublish`/`gateApplies` still describe the old first-publish-
+  // only rule, so they are deliberately not used here.
   const isFirstPublish = business.published_at == null;
-  if (isFirstPublish) {
-    const report = await loadReadinessReport(business.id, business);
-    if (!report.canPublish) {
-      throw new BusinessNotReadyError(
-        describeBlockingItems(report.blockingItems),
-        report.blockingItems,
-      );
-    }
+  const report = await loadReadinessReport(business.id, business);
+  if (report.blockingItems.length > 0) {
+    throw new BusinessNotReadyError(describeBlockingItems(report.blockingItems), report.blockingItems);
   }
 
   const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("businesses")
-    .update({ published_at: new Date().toISOString() })
-    .eq("clerk_org_id", orgId)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("publish_agent", { p_business_id: business.id });
 
   if (error) {
+    if (error.message?.includes(PUBLISH_PROCESSING_PREFIX)) {
+      throw new BusinessNotReadyError(
+        "Some of your knowledge is still being processed. Try again in a few seconds -- your live agent is unchanged.",
+        [],
+      );
+    }
     throw new AppError(
       "Something went wrong publishing your AI. Please try again.",
       "publishBusinessForOrg failed",
@@ -319,11 +350,56 @@ export async function publishBusinessForOrg(orgId: string): Promise<Business> {
     );
   }
 
-  if (isFirstPublish) {
-    track(supabase, data.id, "business.first_published");
+  const published = (data as { version: number; changed: boolean }[] | null)?.[0];
+  if (!published) {
+    throw new AppError(
+      "Something went wrong publishing your AI. Please try again.",
+      "publishBusinessForOrg: publish_agent returned no row",
+    );
   }
 
-  return data;
+  // Re-read (bypassing this request's memoized copy) so the caller sees the
+  // post-publish row.
+  const { data: refreshed, error: refreshError } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("clerk_org_id", orgId)
+    .single();
+  if (refreshError) {
+    throw new AppError(
+      "Something went wrong publishing your AI. Please try again.",
+      "publishBusinessForOrg: refresh failed",
+      refreshError,
+    );
+  }
+
+  if (isFirstPublish) {
+    track(supabase, refreshed.id, "business.first_published");
+  }
+
+  return { business: refreshed, version: published.version, changed: published.changed };
+}
+
+/**
+ * Persists the onboarding-step cache (lib/onboarding-steps.ts). `orgId`
+ * must come from a validated session. Never sets 'live' -- that only
+ * ever happens inside `publishBusinessForOrg`, atomically with
+ * `published_at`, so the two can never disagree.
+ */
+export async function saveOnboardingStep(orgId: string, step: Exclude<OnboardingStep, "live">): Promise<void> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("businesses")
+    .update({ onboarding_step: step })
+    .eq("clerk_org_id", orgId);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong saving your onboarding progress. Please try again.",
+      "saveOnboardingStep failed",
+      error,
+    );
+  }
 }
 
 /**

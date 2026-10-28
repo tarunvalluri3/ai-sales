@@ -1,4 +1,4 @@
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { listLeadsForBusiness, computePossibleDuplicateLeads } from "@/lib/leads";
 import { listProductsByIds } from "@/lib/products";
@@ -9,7 +9,7 @@ import { LeadsList } from "./leads-list";
 import { TagManager } from "./tag-manager";
 
 export default async function LeadsPage() {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireLiveBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:sales_agent");
   const [leads, tags] = await Promise.all([listLeadsForBusiness(businessId), listTagsForBusiness(businessId)]);
   const tagsByLeadId = await listTagsForLeads(

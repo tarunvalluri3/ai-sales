@@ -24,8 +24,9 @@ export function PublishButton({
 }) {
   const [state, formAction, isPending] = useActionState(publishBusinessAction, initialState);
   const published = isPublished || state.success === true;
-  // The gate only applies to a first publish, so once published the button
-  // is never readiness-blocked (a republish is always allowed).
+  // Draft -> Publish -> Live: this button is the FIRST publish (onboarding's
+  // "Publish agent"). Later publishes go through the dashboard header's
+  // "Publish changes", which submits the same action. Both are readiness-gated.
   const blockedNow = !published && readinessBlocked;
 
   return (
@@ -37,7 +38,7 @@ export function PublishButton({
           </h2>
           <p className="max-w-xl text-sm text-ds-text-secondary">
             {published
-              ? "Your widget keys will serve real chat to visitors. Publishing again is safe and just refreshes the status."
+              ? "Your widget keys will serve real chat to visitors. Later edits save as a draft and go live when you use Publish changes in the dashboard header."
               : "Prospects can't chat with this business yet -- your widget keys won't respond until you publish. Test it above first."}
           </p>
         </div>
@@ -77,9 +78,16 @@ export function PublishButton({
       ) : null}
 
       {state.error ? (
-        <p role="alert" className="text-sm text-ds-danger">
-          {state.error}
-        </p>
+        <div role="alert" className="flex flex-col gap-1 text-sm text-ds-danger">
+          <p>{state.error}</p>
+          {state.blockingItems && state.blockingItems.length > 0 ? (
+            <ul className="list-disc pl-5 text-xs">
+              {state.blockingItems.map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       <form action={formAction}>
@@ -89,7 +97,7 @@ export function PublishButton({
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
           className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
-          {isPending ? "Publishing…" : published ? "Republish" : "Publish"}
+          {isPending ? "Publishing…" : "Publish agent"}
         </button>
       </form>
     </div>

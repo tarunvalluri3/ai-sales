@@ -136,8 +136,14 @@ export type Entitlement = {
    * show a customer (and the second is what `trial_ending_3d` mails about).
    */
   hasPaymentMethod: boolean;
-  /** ISO. When a renewal first failed, i.e. when the 5-day grace started. */
+  /** ISO. When a renewal first failed, i.e. when the grace period started. */
   pastDueSince: string | null;
+  /**
+   * ISO. When the grace period ends and the agent stops serving. Set only
+   * while `status` is `past_due` (derived from `past_due_since` and
+   * PAST_DUE_GRACE_DAYS, not stored), null otherwise.
+   */
+  graceUntil: string | null;
 };
 
 function startOfCurrentUtcMonth(now: Date): Date {
@@ -172,6 +178,7 @@ function grandfatheredEntitlement(now: Date): Entitlement {
     billingInterval: null,
     hasPaymentMethod: false,
     pastDueSince: null,
+    graceUntil: null,
   };
 }
 
@@ -222,6 +229,7 @@ export function entitlementFromRow(row: z.infer<typeof subscriptionRowSchema>, n
     billingInterval: row.billing_interval,
     hasPaymentMethod: row.razorpay_subscription_id !== null || row.razorpay_order_id !== null,
     pastDueSince: row.past_due_since,
+    graceUntil: null as string | null,
   };
 
   if (row.status === "trialing") {
@@ -272,6 +280,7 @@ export function entitlementFromRow(row: z.infer<typeof subscriptionRowSchema>, n
         : Math.max(new Date(periodEnd).getTime(), failureGraceEndMs);
     serving = nowMs <= graceEndMs;
     notServingReason = serving ? null : "grace_period_lapsed";
+    if (row.status === "past_due") base.graceUntil = new Date(graceEndMs).toISOString();
   }
 
   return {

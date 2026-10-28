@@ -38,12 +38,16 @@ export function SiteHeader() {
   // Phase 33 (docs/phases.md): /apache (the platform-admin panel) renders
   // its own header (app/(dashboard)/apache/_components/header.tsx) exactly
   // like /dashboard does, for the same reason -- grouped here so neither
-  // branch below needs to know it exists twice.
-  const isDashboard = pathname?.startsWith("/dashboard") || pathname?.startsWith("/apache");
+  // branch below needs to know it exists twice. The onboarding wizard
+  // (2026-10-29 redesign) joined this group for the same reason: its own
+  // `WizardShell` top bar (logo + autosave indicator + account menu, no
+  // dashboard link) replaces the generic centered-logo bar this file used
+  // to render for it.
+  const isDashboard =
+    pathname?.startsWith("/dashboard") || pathname?.startsWith("/apache") || pathname?.startsWith("/onboarding");
   const isAuthFlow =
     pathname?.startsWith("/sign-in") ||
     pathname?.startsWith("/sign-up") ||
-    pathname?.startsWith("/onboarding") ||
     pathname?.startsWith("/session-tasks");
 
   // Hooks run before the early returns below, as they must.

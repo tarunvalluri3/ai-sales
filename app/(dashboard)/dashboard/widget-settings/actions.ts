@@ -228,13 +228,19 @@ export async function updateAiCapabilitiesAction(
 export type PublishBusinessState = {
   error?: string;
   success?: boolean;
+  /** The "missing items" list when the publish was refused because the draft is no longer ready. */
+  blockingItems?: string[];
+  /** False when the draft already matched the live version (nothing was published). */
+  changed?: boolean;
 };
 
 /**
- * Phase 25c "test your AI before publishing": the one-way switch that
- * lets lib/widget-auth.ts's resolveBusinessFromWidgetKey() start serving
- * real chat for this business's widget keys. Used both by the onboarding
- * "test your AI" step and the ongoing sandbox on /dashboard/widget-settings.
+ * The single publish entry point (Draft -> Publish -> Live): the onboarding
+ * "Publish agent" button and the dashboard header's "Publish changes" both
+ * submit this action. First publish turns the agent on (lib/widget-auth.ts
+ * starts serving real chat for this business's widget keys); every later one
+ * promotes the current draft to the live version. See
+ * lib/business.ts's publishBusinessForOrg for the validation + atomic publish.
  */
 export async function publishBusinessAction(
   _prevState: PublishBusinessState,
@@ -250,27 +256,31 @@ export async function publishBusinessAction(
     return { error: authError };
   }
 
+  let result;
   try {
-    await publishBusinessForOrg(orgId);
+    result = await publishBusinessForOrg(orgId);
   } catch (err) {
-    // A readiness refusal is an expected, user-facing outcome (the business
-    // hasn't given its AI enough to answer with yet) -- surface its message
-    // directly rather than logging it as an error.
+    // A readiness refusal is an expected, user-facing outcome (the draft
+    // doesn't give the AI enough to answer with) -- surface its message and
+    // the missing-items list directly rather than logging it as an error.
+    // The live agent is untouched: nothing was written.
     if (err instanceof BusinessNotReadyError) {
-      return { error: err.message };
+      return { error: err.message, blockingItems: err.blockingItems.map((item) => item.label) };
     }
     return { error: logAndGetUserMessage(err) };
   }
 
-  await recordAuditLogEntry(businessId, userId, "business.published", "business", businessId);
+  if (result.changed) {
+    await recordAuditLogEntry(businessId, userId, "business.published", "business", businessId);
 
-  // Instant answers: publishing is when stored answers become servable, so
-  // build them now (off the response) rather than waiting for the daily run.
-  after(() => kickAnswerBankRefresh(businessId));
+    // Instant answers: publishing is when stored answers become servable, so
+    // build them now (off the response) rather than waiting for the daily run.
+    after(() => kickAnswerBankRefresh(businessId));
+  }
 
-  revalidatePath("/dashboard/widget-settings");
-  revalidatePath("/onboarding/test");
-  return { success: true };
+  revalidatePath("/dashboard", "layout");
+  revalidatePath("/onboarding");
+  return { success: true, changed: result.changed };
 }
 
 export type ReadinessDismissalActionState = {
@@ -308,7 +318,7 @@ export async function setReadinessDismissalAction(
   }
 
   revalidatePath("/dashboard/widget-settings");
-  revalidatePath("/onboarding/test");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 

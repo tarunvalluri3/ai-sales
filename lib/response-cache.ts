@@ -48,23 +48,37 @@ function normalizeQuestion(question: string): string {
   return question.trim().toLowerCase().replace(/\s+/g, " ").replace(/[?.!]+$/g, "");
 }
 
-/** `language` is folded into the hash (Phase 25a) so a business that changes/varies its widget_language never gets a cached answer written in a different language served back. */
-function hashQuestion(businessId: string, question: string, language: string): string {
-  return createHash("sha256").update(`${businessId}:${language}:${normalizeQuestion(question)}`).digest("hex");
+/**
+ * `language` is folded into the hash (Phase 25a) so a business that changes/varies its widget_language never gets a cached answer written in a different language served back.
+ *
+ * `versionId` (Draft -> Publish -> Live, 2026-10-29) is the published agent
+ * version the answer was produced from. Folding it in means a publish
+ * invalidates every cached answer by construction -- the new version simply
+ * never matches an old key -- and a request still in flight on the previous
+ * version cannot write an entry the new version would read. (Publishing also
+ * deletes the business's rows, so stale ones do not linger.) The cache is only
+ * ever used for live turns; the dashboard's draft test chat bypasses it, so a
+ * draft answer can never be cached for, or read back by, a prospect.
+ */
+function hashQuestion(businessId: string, question: string, language: string, versionId: string): string {
+  return createHash("sha256")
+    .update(`${businessId}:${versionId}:${language}:${normalizeQuestion(question)}`)
+    .digest("hex");
 }
 
-/** Looks up a live (not-yet-expired) cached answer for this business/question/language. Returns `null` on a miss or any lookup error -- a cache-read failure must never break a real chat response, it just skips the cache. */
+/** Looks up a live (not-yet-expired) cached answer for this business/version/question/language. Returns `null` on a miss or any lookup error -- a cache-read failure must never break a real chat response, it just skips the cache. */
 export async function getCachedResponse(
   supabase: SupabaseClient,
   businessId: string,
   question: string,
   language: string,
+  versionId: string,
 ): Promise<CachedResponse | null> {
   const { data, error } = await supabase
     .from("ai_response_cache")
     .select("answer, used_context, source_chunk_ids")
     .eq("business_id", businessId)
-    .eq("question_hash", hashQuestion(businessId, question, language))
+    .eq("question_hash", hashQuestion(businessId, question, language, versionId))
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
 
@@ -86,13 +100,14 @@ export async function setCachedResponse(
   businessId: string,
   question: string,
   language: string,
+  versionId: string,
   response: CachedResponse,
 ): Promise<void> {
   try {
     const { error } = await supabase.from("ai_response_cache").upsert(
       {
         business_id: businessId,
-        question_hash: hashQuestion(businessId, question, language),
+        question_hash: hashQuestion(businessId, question, language, versionId),
         answer: response.answer,
         used_context: response.usedContext,
         source_chunk_ids: response.sourceChunkIds,

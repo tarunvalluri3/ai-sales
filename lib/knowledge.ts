@@ -442,13 +442,35 @@ export async function getCitationDetails(businessId: string, chunkIds: string[])
   }
 
   const supabase = createServerSupabaseClient();
-  const { data: chunks, error: chunksError } = await supabase
+  const { data: draftChunks, error: chunksError } = await supabase
     .from("knowledge_chunks")
     .select("id, document_id, content")
     .eq("business_id", businessId)
     .in("id", chunkIds);
 
-  if (chunksError || !chunks || chunks.length === 0) {
+  if (chunksError || !draftChunks) {
+    return [];
+  }
+
+  // Draft -> Publish -> Live: a prospect-facing answer cites chunks of the
+  // PUBLISHED copy. Where the draft chunk has since been re-embedded (an
+  // unpublished edit) or deleted, resolve the citation from the live copy
+  // instead of dropping it. Same ids, so the draft row wins when both exist.
+  const foundIds = new Set(draftChunks.map((chunk) => chunk.id));
+  const missingIds = chunkIds.filter((id) => !foundIds.has(id));
+  let liveChunks: typeof draftChunks = [];
+  if (missingIds.length > 0) {
+    const { data } = await supabase
+      .from("live_knowledge_chunks")
+      .select("id, document_id, content")
+      .eq("business_id", businessId)
+      .in("id", missingIds);
+    const seen = new Set<string>();
+    liveChunks = (data ?? []).filter((chunk) => (seen.has(chunk.id) ? false : (seen.add(chunk.id), true)));
+  }
+  const chunks = [...draftChunks, ...liveChunks];
+
+  if (chunks.length === 0) {
     return [];
   }
 
