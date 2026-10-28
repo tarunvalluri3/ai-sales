@@ -70,8 +70,22 @@ async function readRequestContext(): Promise<{ ip: string | null; userAgent: str
   return { ip, userAgent };
 }
 
-/** Lists the most recent platform-admin audit entries, newest first, for the Audit Log page (Stop 5) and any per-tenant Activity tab (Stop 2). */
-export async function listAdminAuditLog(options?: { businessId?: string; limit?: number }) {
+/**
+ * Lists the most recent platform-admin audit entries, newest first, for
+ * the Audit Log page (Stop 5) and any per-tenant Activity tab (Stop 2).
+ * Stop 5 adds `actorUserId`/`action`/`targetType`/`search` filters for the
+ * Audit Log page's own filter bar -- `search` matches `target_id` or
+ * `business_id` (exact), the two identifiers an admin is most likely to
+ * paste in while investigating something specific.
+ */
+export async function listAdminAuditLog(options?: {
+  businessId?: string;
+  actorUserId?: string;
+  action?: string;
+  targetType?: string;
+  search?: string;
+  limit?: number;
+}) {
   const supabase = createAdminSupabaseClient();
   let query = supabase
     .from("admin_audit_log")
@@ -81,6 +95,26 @@ export async function listAdminAuditLog(options?: { businessId?: string; limit?:
 
   if (options?.businessId) {
     query = query.eq("business_id", options.businessId);
+  }
+  if (options?.actorUserId) {
+    query = query.eq("actor_user_id", options.actorUserId);
+  }
+  if (options?.action) {
+    query = query.eq("action", options.action);
+  }
+  if (options?.targetType) {
+    query = query.eq("target_type", options.targetType);
+  }
+  if (options?.search) {
+    const term = options.search.trim();
+    if (term) {
+      // business_id is a uuid column -- an .eq against it on a non-uuid
+      // search term would error the whole query, so only include it when
+      // the term actually looks like one (same guard as
+      // lib/admin-tenants.ts's listTenants()).
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+      query = query.or(isUuid ? `target_id.eq.${term},business_id.eq.${term}` : `target_id.eq.${term}`);
+    }
   }
 
   const { data, error } = await query;

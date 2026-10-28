@@ -719,3 +719,36 @@ export type PlatformAdminNote = {
   note: string;
   created_at: string;
 };
+
+// Phase 33 Stop 5 (docs/phases.md): Feature Flags and Announcements.
+
+export type FeatureFlag = {
+  key: string;
+  description: string;
+  default_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FeatureFlagOverride = {
+  flag_key: string;
+  business_id: string;
+  enabled: boolean;
+  updated_at: string;
+  updated_by: string;
+};
+
+export type AnnouncementSeverity = "info" | "warning" | "critical";
+export type AnnouncementTargetType = "all" | "selected";
+
+export type PlatformAnnouncement = {
+  id: string;
+  message: string;
+  severity: AnnouncementSeverity;
+  target_type: AnnouncementTargetType;
+  target_business_ids: string[] | null;
+  active: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
