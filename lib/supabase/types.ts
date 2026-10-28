@@ -23,6 +23,12 @@ export type Business = {
   published_at: string | null;
   appointments_enabled: boolean;
   appointment_slot_minutes: number;
+  // Phase 33 Stop 2 (docs/phases.md): platform-admin tenant lifecycle.
+  status: "active" | "suspended";
+  suspended_at: string | null;
+  suspended_reason: string | null;
+  deleted_at: string | null;
+  deletion_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -703,5 +709,13 @@ export type AdminAuditLogEntry = {
   after: AdminAuditLogMetadata | null;
   ip: string | null;
   user_agent: string | null;
+  created_at: string;
+};
+
+export type PlatformAdminNote = {
+  id: string;
+  business_id: string;
+  author_user_id: string;
+  note: string;
   created_at: string;
 };

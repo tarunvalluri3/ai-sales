@@ -42,7 +42,7 @@ export type WidgetBusinessContext = {
 };
 
 const BUSINESS_COLUMNS =
-  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, recommend_products_enabled, published_at, appointments_enabled, privacy_policy_url";
+  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, recommend_products_enabled, published_at, appointments_enabled, privacy_policy_url, status, deleted_at";
 
 type WidgetBusinessRow = {
   id: string;
@@ -64,6 +64,9 @@ type WidgetBusinessRow = {
   published_at: string | null;
   appointments_enabled: boolean;
   privacy_policy_url: string | null;
+  /** Phase 33 Stop 2 (docs/phases.md): a platform admin's suspend/soft-delete action must actually stop the AI replying, not just mark a column. */
+  status: "active" | "suspended";
+  deleted_at: string | null;
 };
 
 type WidgetKeyRow = {
@@ -152,7 +155,14 @@ export async function resolveBusinessFromWidgetKey(
   // WidgetAuthError is deliberate, not an oversight -- docs/security.md
   // §10 already establishes that this endpoint must never reveal which
   // specific check failed.
-  if (data.status !== "active" || !origin || !data.allowed_origins.includes(origin) || !data.businesses.published_at) {
+  if (
+    data.status !== "active" ||
+    !origin ||
+    !data.allowed_origins.includes(origin) ||
+    !data.businesses.published_at ||
+    data.businesses.status === "suspended" ||
+    data.businesses.deleted_at
+  ) {
     throw new WidgetAuthError();
   }
 

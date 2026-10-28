@@ -1,8 +1,9 @@
 import "server-only";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
-import { PLANS, type PlanKey } from "@/lib/plans";
+import type { PlanKey } from "@/lib/plans";
 import { estimateCallCostUsd, USD_TO_INR_RATE } from "@/lib/gemini-pricing";
+import { monthlyValuePaise } from "@/lib/admin-billing-shared";
 
 /**
  * Phase 33 (docs/phases.md): platform-wide metrics for the /apache
@@ -101,24 +102,6 @@ async function dailyKpi(
   ]);
 
   return { current, previous, percentChange: percentChange(current, previous) };
-}
-
-/**
- * Normalizes one subscription row to its monthly INR value, in paise.
- * There is no `billing_interval` column on `subscriptions`
- * (20261024000000) -- monthly vs. annual is inferred from the current
- * period's length, since Razorpay (not this app) owns period boundaries.
- * A period longer than 60 days is treated as annual and divided by 12;
- * anything shorter (or a trialing/no-period row) is treated as monthly.
- * This is a documented approximation, not a stored fact -- flagged here
- * rather than silently treated as exact so a future billing_interval
- * column can replace it outright.
- */
-function monthlyValuePaise(planKey: PlanKey, periodStartIso: string | null, periodEndIso: string | null): number {
-  const plan = PLANS[planKey];
-  if (!periodStartIso || !periodEndIso) return plan.monthlyPricePaise;
-  const periodDays = (new Date(periodEndIso).getTime() - new Date(periodStartIso).getTime()) / (24 * 60 * 60 * 1000);
-  return periodDays > 60 ? Math.round(plan.annualPricePaise / 12) : plan.monthlyPricePaise;
 }
 
 export type RevenueMetrics = {

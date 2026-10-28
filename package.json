@@ -24,6 +24,7 @@
     "test:eval-judges": "node --test scripts/run-eval-judges-tests.mjs",
     "test:answer-bank": "node --test scripts/run-answer-bank-tests.mjs",
     "test:platform-admin-rules": "node --test scripts/run-platform-admin-rules-tests.mjs",
+    "test:admin-billing-shared": "node --test scripts/run-admin-billing-shared-tests.mjs",
     "credit-note": "node --conditions=react-server --env-file=.env.local scripts/issue-credit-note.mjs",
     "eval": "node --env-file=.env.local scripts/run-evals.mjs",
     "eval:redteam": "node --env-file=.env.local scripts/run-evals.mjs --suite=redteam",
