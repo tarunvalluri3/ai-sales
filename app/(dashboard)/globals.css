@@ -110,6 +110,18 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Ambient homepage dot-grid drift -- very slow, one grid cell per loop. */
+  --animate-dot-drift: dot-drift 50s linear infinite;
+}
+
+@keyframes dot-drift {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 28px 28px;
+  }
 }
 
 body {

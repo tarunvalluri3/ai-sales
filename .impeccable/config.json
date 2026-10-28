@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "animate-bounce",
+        "files": [
+          "components/marketing/fragments/hero-conversation.tsx"
+        ],
+        "createdAt": "2026-10-27T19:55:08.793Z",
+        "reason": "typing-indicator dots are a domain-appropriate bounce convention (iMessage/WhatsApp/Slack), not decorative elastic easing"
+      }
+    ]
+  }
+}

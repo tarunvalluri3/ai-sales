@@ -21,7 +21,11 @@ export default function ContactPage() {
   return (
     <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
+            <span className="size-1.5 rounded-full bg-ds-accent" aria-hidden="true" />
+            Contact
+          </span>
           <h1 className="text-3xl font-semibold text-ds-text-primary">Contact Us</h1>
           <p className="text-sm text-ds-text-muted">
             We are a small, India-based team. A real person reads every message.
