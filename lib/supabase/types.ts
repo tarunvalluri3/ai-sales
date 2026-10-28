@@ -21,6 +21,12 @@ export type Business = {
   widget_suggested_questions: string[] | null;
   recommend_products_enabled: boolean;
   published_at: string | null;
+  onboarding_step: OnboardingStep;
+  onboarding_completed_at: string | null;
+  /** The agent_versions row the live runtime (widget/WhatsApp/Instagram) serves. Null until the first publish. Written only by the publish function. */
+  live_version_id: string | null;
+  /** businesses.answer_bank_version at the last publish -- stored instant answers are servable only at this version. */
+  live_answer_bank_version: number | string | null;
   appointments_enabled: boolean;
   appointment_slot_minutes: number;
   // Phase 33 Stop 2 (docs/phases.md): platform-admin tenant lifecycle.
@@ -35,6 +41,18 @@ export type Business = {
 
 export type WidgetPosition = "bottom-right" | "bottom-left";
 export type WidgetLanguage = "en" | "es" | "fr" | "de" | "pt" | "hi";
+export type OnboardingStep =
+  | "account"
+  | "verify"
+  | "business"
+  | "knowledge"
+  | "products"
+  | "faqs"
+  | "persona"
+  | "channels"
+  | "plan"
+  | "review"
+  | "live";
 
 export type BusinessHours = {
   business_id: string;

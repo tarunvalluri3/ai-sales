@@ -46,7 +46,7 @@ type ServiceClient = ReturnType<typeof createServiceSupabaseClient>;
 
 /** Every column the lifecycle reads. Explicit, so a new column is an opt-in. */
 const SUBSCRIPTION_COLUMNS =
-  "business_id, plan_key, status, trial_started_at, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, scheduled_plan_key, past_due_since, billing_interval, razorpay_subscription_id, razorpay_customer_id, razorpay_order_id";
+  "business_id, plan_key, status, trial_started_at, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, scheduled_plan_key, past_due_since, billing_interval, razorpay_subscription_id, razorpay_customer_id, razorpay_order_id, provider_event_at";
 
 /**
  * Validated on read, for the same reason lib/subscription.ts validates its
@@ -69,6 +69,7 @@ const billingRowSchema = z.object({
   razorpay_subscription_id: z.string().nullable(),
   razorpay_customer_id: z.string().nullable(),
   razorpay_order_id: z.string().nullable(),
+  provider_event_at: z.string().nullable().default(null),
 });
 
 function parseRow(data: unknown, context: string): BillingSubscriptionRow | null {

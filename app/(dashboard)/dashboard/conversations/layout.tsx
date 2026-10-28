@@ -1,4 +1,4 @@
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listConversationsForBusiness } from "@/lib/conversations";
 import { listLeadsForBusiness } from "@/lib/leads";
@@ -31,7 +31,7 @@ import { ChatListPane } from "./_components/chat-list-pane";
  * without any JS scroll lock.
  */
 export default async function ConversationsLayout({ children }: LayoutProps<"/dashboard/conversations">) {
-  const { businessId } = await requireBusinessContext();
+  const { businessId } = await requireLiveBusinessContext();
   const supabase = createServerSupabaseClient();
 
   const conversations = await listConversationsForBusiness(supabase, businessId);

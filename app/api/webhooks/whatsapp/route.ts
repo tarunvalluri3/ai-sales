@@ -16,6 +16,7 @@ import {
 } from "@/lib/conversations";
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
+import { canAgentServe } from "@/lib/agent-serving";
 import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
 import { resolveInputGuardrailAction } from "@/lib/guardrails/response-policy";
@@ -202,6 +203,15 @@ async function handleInboundMessage(
     return;
   }
 
+  // Billing hardening: a subscription that no longer lets the agent serve
+  // sends NO reply at all -- not the AI's, not a canned one. The inbound
+  // message above is already stored (and the conversation exists), so the
+  // owner still sees the lead in the dashboard and no lead is lost.
+  if (!(await canAgentServe(businessId))) {
+    logEvent("whatsapp_agent_not_serving", businessId, { conversationId: conversation.id });
+    return;
+  }
+
   if (!isText) {
     await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, NON_TEXT_REPLY);
     return;
@@ -250,6 +260,7 @@ async function handleInboundMessage(
     undefined,
     false,
     "webhook_whatsapp",
+    businessContext.liveSource,
   );
 
   const assistantMessageRow = await createMessage(

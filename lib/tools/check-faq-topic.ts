@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
 import { escapeLikePattern } from "@/lib/sql-escape";
+import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -46,6 +47,7 @@ export async function executeCheckFaqTopic(
   supabase: SupabaseClient,
   businessId: string,
   rawArgs: unknown,
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<CheckFaqTopicResult> {
   const parsed = CheckFaqTopicInputSchema.safeParse(rawArgs);
   if (!parsed.success) {
@@ -54,6 +56,20 @@ export async function executeCheckFaqTopic(
   }
 
   const { topic } = parsed.data;
+
+  // Draft -> Publish -> Live: a live turn matches against the published FAQs
+  // (substring, first by creation order -- the snapshot is stored in that
+  // order), never the editing table.
+  if (source.kind === "live") {
+    const wanted = topic.toLowerCase();
+    const faq = source.snapshot.faqs.find((item) => item.question.toLowerCase().includes(wanted));
+    if (!faq) {
+      logEvent("tool_invoked", businessId, { tool: "check_faq_topic", result: "not_found" });
+      return { found: false, reason: "not_found" };
+    }
+    logEvent("tool_invoked", businessId, { tool: "check_faq_topic", result: "found" });
+    return { found: true, question: faq.question, answer: faq.answer };
+  }
 
   const { data, error } = await supabase
     .from("faqs")

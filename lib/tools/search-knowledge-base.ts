@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
 import { logEvent } from "@/lib/logger";
+import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -68,6 +69,7 @@ export async function executeSearchKnowledgeBase(
   supabase: SupabaseClient,
   businessId: string,
   rawArgs: unknown,
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<SearchKnowledgeBaseResult> {
   const parsed = SearchKnowledgeBaseInputSchema.safeParse(rawArgs);
   if (!parsed.success) {
@@ -77,7 +79,15 @@ export async function executeSearchKnowledgeBase(
 
   let results: Awaited<ReturnType<typeof searchKnowledgeChunks>>;
   try {
-    results = await searchKnowledgeChunks(supabase, businessId, parsed.data.query, SEARCH_KNOWLEDGE_BASE_LIMIT);
+    results = await searchKnowledgeChunks(
+      supabase,
+      businessId,
+      parsed.data.query,
+      SEARCH_KNOWLEDGE_BASE_LIMIT,
+      undefined,
+      undefined,
+      source,
+    );
   } catch {
     logEvent("tool_invoked", businessId, { tool: "search_knowledge_base", result: "lookup_failed" }, "error");
     return { found: false, reason: "lookup_failed" };

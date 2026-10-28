@@ -140,7 +140,7 @@ test("wiring: the widget route runs the policy after the human-control check and
 
 test("wiring: the abuse strike count rides the existing parallel batch", () => {
   const route = read("app/api/chat/route.ts");
-  assert.match(route, /priorHistory, abuseStrikes\] = await Promise\.all\(/);
+  assert.match(route, /priorHistory, abuseStrikes(, \w+)*\] = await Promise\.all\(/);
   assert.match(route, /countAbuseStrikes\(supabase, business\.businessId, conversationRowId\)/);
   const events = read("lib/guardrails/events.ts");
   assert.match(events, /GUARDRAIL_MODES\.abuse !== "enforce"\) return 0/, "no query while the abuse check is log-only");

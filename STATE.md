@@ -2,7 +2,485 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-11-05 (Phase 33 Stop 5, Platform Tools -- Support/Announcements/Feature Flags/Settings/Audit Log UI, the FINAL stop of Phase 33 -- MERGED to `main` as PR #120, migration `20261105000000` promoted to production -- see the section just below). **Phase 33 (the whole 5-stop `/apache` platform admin panel) is now fully built**, though its whole-phase exit criteria are not yet live-verified (see that section's "Waiting on the user"). `main` is again the only branch, local and `origin` -- every Phase 33 stop branch (1-5) confirmed merged, then deleted. **Previous note:** Phase 33 Stop 4 MERGED to `main` (PR #119, CI green) -- this STATE.md entry was stale (said "PR not yet opened") until this update; confirmed merged via `git log` (`89cd130` merge commit) before starting Stop 5. See that section further down. **Previous note:** Phase 33 Stop 3 MERGED to `main` 2026-10-28 (PR #118, CI green first try) and verified via `npm test` (pgTAP 060 passed) -- see that section further down. **Previous note:** Phase 33 Stop 2 MERGED to `main` 2026-10-28 (PR #117, after one CI-caught pgTAP fixture bug fixed before merge) and verified via `npm test` (pgTAP 059 passed) -- see that section further down. **Previous note:** Phase 33 Stop 1 MERGED to `main` 2026-10-28 (PR #116) and live-verified by the owner -- see that section further down. **Previous note:** the token-burn audit + its 4-commit follow-up on branch `feat/gemini-usage-audit`, PR pending -- see that section further down. **Previous note:** the guardrails programme's final STATE.md note and the marketing homepage redesign both merged to `main` via PR #113 -- see the landing-page section. **Current state:** `main` is the only branch, local and `origin` -- every other branch (`docs/state-guardrails-merged`, `feat/answer-bank`, `feat/guardrails-phase-1..6`, a leftover worktree at `ai-sales-guardrails`) was confirmed fully merged, then deleted; no open PRs; chat latency Steps 1-4 merged 2026-10-27 but not yet measured in production, working tree otherwise clean, all 102 migrations applied to production (`migration list --linked`: no mismatches, last `20261029000200`). Most recent work, newest first: **Phase 32 abuse rate limiting Stages A-C** (log-only, MERGED as PR #96 / `a2bd5b3`; Stages D-E not built) and **widget token streaming** (MERGED as PR #95 / `fb16a29`; production TTFT and edge no-buffering now MEASURED -- see the streaming entry). **2026-10-27: supplier address and SAC `998314` filled in `lib/invoice-config.ts` (merged to `main` in the same PR as Phase 32 Stages D-E; deploys with it).** **2026-10-27: Phase 32 Stages D (tiered 429/soft response) and E (client `clientElapsedMs` bot signal) built, all still log-only/dormant; `new_conversation_ip` raised to 30/h.** **`Retry-After` now sent on `/api/chat` 429s (branch/PR pending merge); owner's CA confirmed SAC 998314.** Open items are listed in each entry's "Waiting on the user" and in the Backlog (§8). **Older per-change summaries that used to be stacked on this line ("Prior note: ...") are not lost -- every one has its own dated section below, and the full previous header is in git history (`git show a2bd5b3:STATE.md | head -5`).**
+Last updated: 2026-10-29 (billing hardening built, migration `20261108000000` not yet applied, code NOT committed -- see the first section below; **previous note:** Draft -> Publish -> Live agent versions built, migration `20261107000000` applied by the user, code NOT committed -- see the first section below; **previous note:** onboarding wizard: missing column grant fixed + applied via `db push`, plus 4 manual-testing bugfixes -- see the "Onboarding wizard: missing column grant + manual-testing bugfixes" section just below). **Previous note:** onboarding wizard UI rebuild, NOT committed -- see the "Onboarding wizard UI rebuild" section further below. **Previous note:** onboarding route guard + resume, NOT committed -- see the "Onboarding route guard + resume" section further below for files/migration/assumptions. **Previous note:** Phase 33 Stop 5, Platform Tools -- Support/Announcements/Feature Flags/Settings/Audit Log UI, the FINAL stop of Phase 33 -- MERGED to `main` as PR #120, migration `20261105000000` promoted to production -- see that section further down. **Phase 33 (the whole 5-stop `/apache` platform admin panel) is now fully built**, though its whole-phase exit criteria are not yet live-verified (see that section's "Waiting on the user"). `main` is again the only branch, local and `origin` -- every Phase 33 stop branch (1-5) confirmed merged, then deleted. **Previous note:** Phase 33 Stop 4 MERGED to `main` (PR #119, CI green) -- this STATE.md entry was stale (said "PR not yet opened") until this update; confirmed merged via `git log` (`89cd130` merge commit) before starting Stop 5. See that section further down. **Previous note:** Phase 33 Stop 3 MERGED to `main` 2026-10-28 (PR #118, CI green first try) and verified via `npm test` (pgTAP 060 passed) -- see that section further down. **Previous note:** Phase 33 Stop 2 MERGED to `main` 2026-10-28 (PR #117, after one CI-caught pgTAP fixture bug fixed before merge) and verified via `npm test` (pgTAP 059 passed) -- see that section further down. **Previous note:** Phase 33 Stop 1 MERGED to `main` 2026-10-28 (PR #116) and live-verified by the owner -- see that section further down. **Previous note:** the token-burn audit + its 4-commit follow-up on branch `feat/gemini-usage-audit`, PR pending -- see that section further down. **Previous note:** the guardrails programme's final STATE.md note and the marketing homepage redesign both merged to `main` via PR #113 -- see the landing-page section. **Current state:** `main` is the only branch, local and `origin` -- every other branch (`docs/state-guardrails-merged`, `feat/answer-bank`, `feat/guardrails-phase-1..6`, a leftover worktree at `ai-sales-guardrails`) was confirmed fully merged, then deleted; no open PRs; chat latency Steps 1-4 merged 2026-10-27 but not yet measured in production, working tree otherwise clean, all 102 migrations applied to production (`migration list --linked`: no mismatches, last `20261029000200`). Most recent work, newest first: **Phase 32 abuse rate limiting Stages A-C** (log-only, MERGED as PR #96 / `a2bd5b3`; Stages D-E not built) and **widget token streaming** (MERGED as PR #95 / `fb16a29`; production TTFT and edge no-buffering now MEASURED -- see the streaming entry). **2026-10-27: supplier address and SAC `998314` filled in `lib/invoice-config.ts` (merged to `main` in the same PR as Phase 32 Stages D-E; deploys with it).** **2026-10-27: Phase 32 Stages D (tiered 429/soft response) and E (client `clientElapsedMs` bot signal) built, all still log-only/dormant; `new_conversation_ip` raised to 30/h.** **`Retry-After` now sent on `/api/chat` 429s (branch/PR pending merge); owner's CA confirmed SAC 998314.** Open items are listed in each entry's "Waiting on the user" and in the Backlog (§8). **Older per-change summaries that used to be stacked on this line ("Prior note: ...") are not lost -- every one has its own dated section below, and the full previous header is in git history (`git show a2bd5b3:STATE.md | head -5`).**
+
+---
+
+## Billing hardening: subscription gates the live agent -- built, migration `20261108000000` NOT yet applied, code NOT committed (user instruction), 2026-10-29
+
+The Phase 17b/17c billing stack (Razorpay, webhook, `subscriptions`, GST invoices, `/dashboard/billing`) already did most of the brief; this closes the gaps. **No provider/library change.**
+
+**Already existed and was left alone:** signature-verified webhook with event-id ledger (`razorpay_webhook_events`), absolute (idempotent) period writes, the status set, grace logic (`Entitlement.serving`), invoices + download, change plan (upgrade now / downgrade at period end), cancel at period end behind a type-to-confirm.
+
+**Added:**
+- `lib/agent-serving.ts` -- `canAgentServe(agentId)` (agent == business id) = `Entitlement.serving` (trialing/active; past_due inside grace; cancelled to period end), cached 15s per instance, fails open like `getEntitlement`. `AGENT_UNAVAILABLE_MESSAGE` ("This assistant is temporarily unavailable.").
+- Runtime: `/api/chat` (visitor message stored, neutral message returned, no model call, no assistant row), WhatsApp and Instagram webhooks (inbound stored, NO reply of any kind). `lib/rag.ts` not-serving branch (dashboard sandbox only now) uses the neutral message and no longer escalates.
+- `publishBusinessForOrg` refuses with a clear reason when `!serving` (fresh read, not the cache).
+- Webhook: (1) events for a SUPERSEDED mandate that reduce access (`pending/halted/cancelled/completed`) are refused as `stale` -- before this, "Update payment method" (which cancels the old mandate) would have let the old id's late `subscription.cancelled` cancel the business via the `notes` fallback; (2) `subscriptions.provider_event_at` high-water mark: an older lifecycle event is not applied (a stale `charged` still issues its GST invoice); (3) hardcoded `5` in `handlePending` -> `PAST_DUE_GRACE_DAYS`.
+- `Entitlement.graceUntil` (derived from `past_due_since` + `PAST_DUE_GRACE_DAYS`, not stored -- no `grace_until` column).
+- UI: `SubscriptionBanner` in the dashboard layout (past_due -> "stays live until {date}", not serving -> "paused", CTA to billing; non-admins get "ask an admin"); billing page: next renewal + amount with GST breakdown, payment-method row, "Update payment method" (past_due only), `GstBreakdown` on every plan card; Checkout result is now confirmed by the server action (its result is awaited and toasted; the old code ignored it and toasted "received" regardless), page refreshed from server, onboarding plan step's Continue held while confirming.
+- New `updatePaymentMethodAction`; `/onboarding` revalidated after confirm.
+
+**Decisions / deviations from the pasted brief (kept the existing code's choice, per "choose what matches existing code"):**
+- **Prices stay GST-INCLUSIVE** (lib/plans.ts, decided 2026-10-21, published on /pricing, what Razorpay plans charge). The breakdown shows `taxable + GST 18% = total` derived from config. Switching to exclusive would change what customers are charged -- needs an explicit decision.
+- **Grace stays 5 days** (`PAST_DUE_GRACE_DAYS`, confirmed 2026-10-21; emails/admin settings read it). The brief said 3: change that one constant. Nothing else hardcodes it now.
+- "Update payment method" only for `past_due`: starting a mandate cancels the old one immediately, unsafe for a healthy mandate. Card swap on a healthy mandate is a TODO (needs provider flow). No card last4 shown (not stored).
+- Provider-hosted invoices NOT enabled: invoices are our own GST tax invoices (17c), already linked from the billing page.
+- Plan change unchanged: upgrade immediate (pro-rata), downgrade at period end.
+- Out-of-order guard resolution is whole seconds (Razorpay `created_at`); equal timestamps apply.
+
+**Migration** `20261108000000_subscription_provider_event_at.sql` (one nullable column). **Apply BEFORE deploying**: `billing-store` now selects it. `npx supabase db push`.
+
+**Checks (2026-10-29):** `npm run typecheck` clean, `npm run lint` clean, `node --test` razorpay-webhook + signature + plan-tax: 55/55 pass. **`npm run build` NOT run** -- `.next/lock` held by another next process; did not kill it. No new tests written (user instruction); no pgTAP/browser run. Not covered by any test: the stale-mandate and `provider_event_at` guards, `canAgentServe`.
+
+---
+
+## Draft -> Publish -> Live (agent versions) -- built, migration APPLIED by the user (2026-10-29, not independently verified by me), code NOT committed (user instruction), 2026-10-29
+
+Edits made after onboarding now save as a DRAFT; the live agent (website widget, WhatsApp, Instagram) serves only the last PUBLISHED version until the owner publishes. "Agent" == business (there is no agents table), so `agent_versions.business_id` is the agent id.
+
+**Model.** The editing tables are unchanged and are the draft. `agent_versions` holds immutable jsonb snapshots (config/persona/branding/capabilities, approved products/services/FAQs, published-knowledge references, content hash); `businesses.live_version_id` points at the live one. Knowledge chunks are COPIED (embeddings included, pure SQL, no Gemini call) into `live_knowledge_chunks` per version -- the one unavoidable duplication, because draft chunks are deleted/re-inserted on every edit and cascade-deleted with their document, so ids can't be pinned. Only the current + previous version's rows are kept. `has_unpublished_changes` is a hash comparison done in SQL (`agent_publish_status`), computed per dashboard request via one RPC; no dirty flag/triggers (they would miss write paths).
+
+**Publish.** `publishBusinessForOrg` (lib/business.ts) is still the one path: now validates readiness on EVERY publish (blocks with the same missing-items list; live agent untouched), then calls the `publish_agent` RPC -> `agent_publish_internal`: row lock, snapshot, hash, version insert, chunk copy, live-pointer flip, `ai_response_cache` purge, `live_answer_bank_version` stamp -- one transaction. Identical draft = no-op (`changed: false`). Refuses while included knowledge is still embedding (`AGENT_PUBLISH_PROCESSING`). Onboarding's "Publish agent" and the dashboard header's "Publish changes" both submit `publishBusinessAction`.
+
+**Runtime.** `lib/agent-runtime.ts` defines `AgentSource` (`draft` default | `live`). `widget-auth.ts` and `business-ai-context.ts` build their context from the live snapshot (snapshot cached in memory per instance keyed by business+version -- immutable, so no TTL; fail closed with no live version). `askSalesEmployee`/`streamSalesEmployee` take a trailing `source`; retrieval (`match_live_knowledge_chunks`), the five catalog/FAQ/knowledge tools, catalog prefetch, FAQ instant-match (post-filtered to the snapshot) and `loadCatalogNames` honor it. Response cache is keyed by live version and skipped entirely for draft. Instant (stored) answers are servable only at `live_answer_bank_version` (SQL `get_instant_answer`), so answers regenerated from unpublished edits are never served. The dashboard sandbox ("Testing draft" badge) uses the draft default.
+
+**UI.** Dashboard header: agent name + pill ("Live" / "Live · Unpublished changes"), "Publish changes (N)" -> review dialog grouped by area (counts + short labels), toast "Changes are live". `DraftNote` ("Changes save as a draft. Customers see them after you publish.") rendered from the dashboard layout on profile/products/services/faqs/knowledge/widget-settings. Knowledge page's per-document Publish/Unpublish relabelled Approve/Unapprove (it only controls inclusion in the draft) so there is one publish concept.
+
+**Files.** NEW: `supabase/migrations/20261107000000_agent_draft_publish.sql`, `lib/agent-snapshot.ts`, `lib/agent-runtime.ts`, `lib/agent-publish-status.ts`, `app/(dashboard)/dashboard/_components/{publish-bar,draft-note}.tsx`. CHANGED: `lib/{business,business-ai-context,widget-auth,retrieval,rag,response-cache,catalog-prefetch,knowledge}.ts`, `lib/supabase/types.ts`, `lib/tools/{check-faq-topic,check-product-details,list-offerings,recommend-products,search-knowledge-base}.ts`, `lib/answer-bank/store.ts`, `app/api/chat/route.ts`, `app/api/webhooks/{whatsapp,instagram}/route.ts`, dashboard `layout.tsx`, `_components/{dashboard-header,sandbox-chat/sandbox-chat-panel}.tsx`, `widget-settings/{actions,publish-button}`, knowledge `page.tsx` + `knowledge-list.tsx`.
+
+**Migration** `20261107000000_agent_draft_publish.sql` -- run `npx supabase db push` (after review; it backfills a v1 snapshot + live chunk copy for every business with `published_at` set, WITHOUT re-stamping `published_at` or changing any stored instant answer). **Apply it BEFORE deploying this code**: the runtime selects `businesses.live_version_id` and fails closed without a live version.
+
+**Checks (run 2026-10-29):** `npm run typecheck` clean, `npm run lint` clean, `npm run build` succeeded. NOT run: `npm test` (pgTAP hits the linked live DB), any live-Gemini script, any browser/E2E; the SQL has never been executed against a database -- review it before `db push`.
+
+**Assumptions / known gaps.**
+- WhatsApp/Instagram: a business with NO live version now gets no AI reply (previously an unpublished business with a connected channel still answered). Connection credentials/toggles are operational and unversioned.
+- Operational scheduling settings (appointment slot length, business hours, timezone, SLA) are NOT versioned and apply immediately; `book_appointment` still reads the business name from the draft row for its confirmation label.
+- "Discard changes" (optional in the spec) was NOT built: restoring deleted/edited rows with their original ids also needs per-type re-embedding via lib/products|services|faqs sync helpers.
+- The warm widget-context cache (15s TTL, per instance) can serve the previous version for up to 15s after a publish on that instance.
+- `scripts/run-evals.mjs` edits DRAFT rows then chats via the live widget path, so its price/FAQ mutation cases need a publish step before they assert anything (not touched; do not run without asking -- live Gemini).
+- pgTAP `056_answer_bank.sql` still holds: `get_instant_answer` falls back to `answer_bank_version` when `live_answer_bank_version` is null. No new pgTAP tests written (user instruction); tenant-isolation coverage for `agent_versions`/`live_knowledge_chunks` (RLS select-own-org only, no write grants) is still owed.
+- Dashboard header status is fail-soft: if `agent_publish_status` errors, the bar shows just the agent name.
+
+---
+
+## Onboarding wizard: missing column grant + manual-testing bugfixes -- migration APPLIED, code NOT committed (user instruction), 2026-10-29
+
+Found live while the owner manually tested the wizard rebuild just below. Three rounds of fixes, in order:
+
+**1. `contactPhone` missing from the new-business form.** `business-step.tsx` only rendered the hidden `contactPhone` input when editing an existing business (`!isNew`); for a brand-new business the field never mounted, so `formData.get("contactPhone")` came back `null`, which `z.string().optional()` rejects (it accepts `undefined`, not `null`) -- the whole submit failed validation on a field the form never showed, surfacing as "Fix the highlighted fields below" with nothing actually highlighted. Fixed: the hidden input now always renders.
+
+**2. Continue stuck on Knowledge/FAQs despite enough items added.** `lib/onboarding-readiness.ts`'s real readiness (`isFaqReady`/`isKnowledgeSourceReady`) requires each item's generated-doc embedding/ingestion to reach `"complete"` -- async, not instant. The wizard steps gated their own Continue button on raw row count, which goes true before ingestion finishes, so `advanceOnboarding`'s live server-side recheck correctly rejected it with a generic "Finish the X step first." Fixed in `train-faqs-step.tsx`/`train-knowledge-step.tsx` (and `train-products-step.tsx`, which had the same bug class for a different reason -- it checked row count, not the server's real 10+ char description requirement): both now show per-item Processing/Ready status, gate Continue on real per-item readiness, show an honest "Finishing processing -- this usually takes a few seconds" message instead of a misleading "add more" one, and poll (`router.refresh()` every 3s while anything is still processing) so Continue self-enables once ingestion completes.
+
+**3. Edit took the user out of the wizard entirely.** The wizard steps reused the dashboard's shared `FaqsList`/`ProductsList`/`KnowledgeList` components unchanged, which hardcode `Link`s to standalone `/dashboard/.../[id]/edit` pages. Since the business isn't published yet, landing there hits the dashboard's pre-publish guard, which bounces to `/dashboard/widget-settings` with no path back to `/onboarding` -- the user got stranded outside the wizard. Fixed: all three list components gained an optional `onEdit` prop (button instead of `Link` when provided; their existing dashboard callers are unchanged). Also discovered mid-fix that `updateFaqAction`/`updateProductAction`/`updateKnowledgeDocumentAction` all end in a hard `redirect("/dashboard/...")`, which would have reproduced the exact same bug if reused -- added non-redirecting siblings (`updateFaqInPlaceAction`, `updateProductInPlaceAction`, `updateKnowledgeDocumentInPlaceAction`) instead of touching the originals, so the dashboard's own edit pages are untouched. Each wizard step now tracks an `editingId` and swaps in the pre-filled form + Cancel in place of the add-new form.
+
+**4. FAQ question field not clearing after a chip-prefilled add.** `train-faqs-step.tsx` remounted `FaqForm` via `key={draftQuestion}`, so a clicked suggested-question chip became the input's `defaultValue`. `FaqForm` resets itself via native `form.reset()` on success, which restores `defaultValue` (the chip text), not empty -- the dashboard's own usage never hit this since its `initialQuestion` is always `""`. Fixed: `draftQuestion` now clears once the new FAQ actually appears in the server-refreshed `faqs` prop, not via native reset.
+
+**5. `saveOnboardingStep` failing on every call -- "Something went wrong saving your onboarding progress."** Root cause: `20261106000000_add_onboarding_step.sql` (below) added `onboarding_step`/`onboarding_completed_at` but never ran the matching `grant update (...) on public.businesses to authenticated` that every other business-owned column added after the `businesses_update_own_org` RLS policy existed has required (see `20260813130000`, `20260911000000`, `20261019000000`, etc.) -- RLS governs which *rows* a user may touch; Postgres's column-level GRANT is the separate mechanism for which *columns*, and this migration skipped it. `saveOnboardingStep()` runs as the authenticated user (Supabase's Clerk integration), never the service role, so every write was rejected. Confirmed via a direct read with the service-role key that the column existed and the migration had genuinely already been applied -- ruling out "migration not applied" before concluding it was the grant. **New migration `20261106000100_grant_onboarding_step_update.sql`** adds just the missing grant. **Applied by the user via `npx supabase db push` -- confirmed in `migration list` (local and remote both show `20261106000100`).**
+
+**6. FAQs (and products/services) stuck on "PROCESSING" forever, never reaching ready.** Separate from, and deeper than, #2's readiness-display fix above: `app/(dashboard)/dashboard/knowledge/actions.ts` has always kicked an immediate `after(() => processIngestionQueue("dashboard"))` right after enqueueing a knowledge document's ingestion (Phase 23) -- but `dashboard/faqs/actions.ts`, `dashboard/products/actions.ts`, and `dashboard/services/actions.ts` never did, despite all three calling the exact same `lib/knowledge-sync.ts#syncGeneratedDocument()` (which enqueues identically). Every FAQ/product/service ever created in this app has therefore relied solely on the daily Vercel Cron sweep (`app/api/cron/process-ingestion-queue`) to actually get embedded -- on the Hobby plan, up to ~24h. This almost certainly predates the onboarding wizard entirely (the publish-readiness checklist has required `faqs_ready`/real catalog completeness since it was built) and was likely masked because nothing before now hard-blocked forward progress on it in a way that made the delay this obvious. **Fixed**: all three action files now call the same `triggerIngestionProcessing()` pattern (create, update, and approve-AI-draft actions) -- copied as a local helper per file, matching this codebase's existing convention of not sharing one-liner request-scoped helpers across action modules. Not yet retroactively applied to FAQs/products/services created *before* this fix landed -- those still only have the daily cron behind them unless edited again (which now also re-triggers) or the queue is run manually. **Not run by me**: processing the queue calls the real Gemini embeddings API per job (`CLAUDE.md`: ask first, state the call count) -- did not run it un-asked.
+
+**7. The FAQ "Processing" badge never resolves for a too-short answer.** Found while diagnosing a user report of FAQs staying "stuck" after #6's fix -- confirmed via a direct, read-only DB query (service-role key, `knowledge_documents`/`faqs` tables) that the generated documents actually finished embedding (`ingestion_status: "complete"`) within ~6 seconds of creation; the real reason those specific test FAQs were "not ready" was `isFaqReady`'s separate, unrelated content-length requirement (`FAQ_ANSWER_MIN_LENGTH = 20`) -- their test answers ("Yes", "Hyderabad", "Pricing Differs") were too short. `faqs-list.tsx`'s badge and `train-faqs-step.tsx`'s `isFaqReady` boolean collapsed both "still embedding" and "content too short" into one "Processing" label/condition -- a too-short FAQ would show that badge forever, and the step's 3s poll loop (`stillProcessing`) would spin on a condition that could never clear. Fixed: `isFaqReady` replaced with `faqReadinessStatus()` returning `"ready" | "processing" | "too_short"`; `FaqsList` (new exported `FaqReadinessStatus` type) renders a distinct "Needs more detail" badge for the latter; the step's disabled-reason text now says `Lengthen the highlighted answer(s) to at least 20 characters` instead of the misleading "finishing processing"; and the poll loop only runs while something is genuinely `"processing"`, never for `"too_short"`.
+
+**8. `useToast() must be used within a ToastProvider` crash on the Plan & billing step.** `PlanStep` reuses `BillingPanel` (`dashboard/billing/billing-panel.tsx`) as-is, which calls `useToast()` for its copy-to-clipboard feedback (hit copying the widget embed snippet). `ToastProvider` is mounted in `dashboard/layout.tsx`, which only wraps `/dashboard/*` -- `/onboarding` renders its own shell (`WizardShell`) and never had it. New `app/(dashboard)/onboarding/layout.tsx`, mounting only `ToastProvider` (none of the rest of the dashboard chrome belongs here).
+
+Checks after each round: `npm run lint`, `npx tsc --noEmit`/`npm run typecheck` -- all clean (re-verified independently after rounds 6, 7, and 8, not just taken from the implementing fork's own report for rounds 1-4). A full `npm run build` was run after round 2 and again after round 8 (independently) -- both succeeded, all routes including `/onboarding` built. Nothing in this entry is committed except the migration, which only exists as applied DB state plus the uncommitted file on disk -- same as every other migration in this working tree right now.
+
+---
+
+## Onboarding wizard UI rebuild -- NOT committed (user instruction), 2026-10-29
+
+Replaces the single-field `/onboarding` form with a guided, 6-stage
+wizard shell (Your business -> Train your agent [knowledge/products/
+FAQs] -> Personality -> Channels -> Plan & billing -> Test & go live),
+all resuming at `?step=` via the real `onboarding_step` guard built the
+same day (see "Onboarding route guard + resume" just below -- that
+section's guard/resume/`advanceOnboarding` mechanics are unchanged by
+this entry, only `ROUTE_FOR_STEP`'s *targets* moved).
+
+**This deliberately REVERSES that section's own "no separate wizard UI"
+conclusion**, on the owner's explicit instruction (confirmed via
+`AskUserQuestion` before any code was written, since it undoes a
+same-day decision): setup now happens inside this one shell instead of
+on the existing dashboard pages. The dashboard pages themselves
+(`/dashboard/products`, `/dashboard/faqs`, `/dashboard/knowledge`,
+`/dashboard/whatsapp`, `/dashboard/instagram`, `/dashboard/billing`)
+are UNCHANGED and still work standalone after onboarding -- the wizard
+steps import and reuse their exact forms/lists/Server Actions rather
+than reimplementing any of them, so there is no second copy of any
+CRUD or billing logic.
+
+**Also confirmed via `AskUserQuestion`:** the pasted spec's "account"/
+"verify" sign-up stage (a custom Google button + 6-digit email OTP) was
+dropped entirely. Clerk's hosted sign-up already handles this before a
+user ever reaches `/onboarding`, and `lib/onboarding-steps.ts` already
+treats both steps as always-complete -- building a parallel custom auth
+UI would duplicate Clerk and violate AGENTS.md §2/§3. The rail has 6
+stages, not 7.
+
+**Files changed:**
+- `app/(dashboard)/onboarding/page.tsx` -- rewritten. Server component:
+  resolves the business (or renders the create-business step if none
+  exists), computes `?step=` resume via the unchanged
+  `computeOnboardingProgress`, fetches every step's data in one
+  `Promise.all`, and renders the matching step inside `WizardShell`.
+- `app/(dashboard)/onboarding/_components/` -- new: `wizard-config.ts`
+  (the 6-stage rail model + `OnboardingStep` <-> stage mapping),
+  `wizard-shell.tsx` (top bar, rail, mobile collapse, sticky-bottom
+  layout slot, collapsible preview panel), `preview-context.tsx` +
+  `preview-panel.tsx` (the live agent-preview mock), `step-footer.tsx`
+  (shared Back/Continue, unused by the final step components -- see
+  "Known deviation" below), and `steps/{business,train-knowledge,
+  train-products,train-faqs,persona,channels,plan,review}-step.tsx`.
+- `app/(dashboard)/onboarding/actions.ts` -- `createBusiness`'s redirect
+  target changed from the deleted `/onboarding/test` to
+  `/onboarding?step=knowledge`. No other logic touched.
+- `lib/onboarding-steps.ts` -- `ROUTE_FOR_STEP` values only (see
+  "ROUTE_FOR_STEP change" below). `ONBOARDING_STEPS`,
+  `computeOnboardingProgress`, and every completion rule are untouched.
+- `app/(dashboard)/_components/site-header.tsx` -- `/onboarding` moved
+  from the generic "auth flow" header (a centered logo, nothing else)
+  into the same "renders its own header" group as `/dashboard`/`/apache`,
+  since `WizardShell` now supplies its own top bar (logo, autosave
+  indicator, account menu) and the old one would have doubled up.
+- `app/(dashboard)/dashboard/widget-settings/page.tsx` -- removed the
+  "2. Go live" section (`ReadinessChecklist`+`PublishButton`+
+  `SandboxChatPanel`); replaced with a single notice + link to
+  `/onboarding?step=review` while unpublished, nothing extra once
+  published. Publishing now only happens from the wizard's last step.
+  `ReadinessChecklist`/`PublishButton`/`SandboxChatPanel` themselves are
+  UNCHANGED and still used -- by the new `review-step.tsx`.
+- `app/(dashboard)/dashboard/widget-settings/actions.ts` --
+  `revalidatePath("/onboarding/test")` (x2) -> `revalidatePath("/onboarding")`,
+  since the former route no longer exists.
+- Deleted: `app/(dashboard)/onboarding/onboarding-form.tsx`,
+  `app/(dashboard)/onboarding/test/page.tsx` -- superseded by the wizard
+  shell + `review-step.tsx` respectively. Nothing else referenced either
+  (grepped first).
+
+**ROUTE_FOR_STEP change (the one edit to otherwise-off-limits Part 1
+code, as instructed):** every setup step's route moved from its old
+dashboard page to `/onboarding?step=<step>` (`business` has no query
+param -- it's the default render with no business row yet).
+`account`/`verify` still point at bare `/onboarding`; `live` still
+points at `/dashboard`. This is a consequence of the approved scope
+change, not a readiness-rule or guard-logic change.
+
+**Known deviations/assumptions, all because `AskUserQuestion` wasn't
+used again mid-build per the "don't stop to ask" instruction -- each
+chosen to match existing code/data rather than invent new schema:**
+- **No persisted `tone` field.** `businesses` has no tone column, and
+  adding one is a schema change outside this UI task. The three tone
+  cards on the Personality step only reshape the greeting text they
+  prefill; the only thing actually saved is the greeting itself
+  (`widget_welcome_text`) and the widget language, via the existing
+  `updateWidgetBrandingAction` (every other branding field is passed
+  through unchanged via hidden inputs).
+- **Language is single-select, not multi-select.** `widget_language`
+  is a single `WidgetLanguage` column, not an array -- the pasted spec's
+  multi-select would need a schema change.
+- **"Industry: Other" has no free-text sub-field.** `business_type` is
+  a closed DB enum (`businesses_business_type_check`); "Other" is
+  already one of its values, not a free-text escape hatch.
+- **Plan & billing says "incl. GST", not "exclusive of GST".** Every
+  price in `lib/plans.ts` is GST-INCLUSIVE (confirmed 2026-10-21,
+  STATE.md) -- the pasted spec's wording would have been a fabricated
+  price (AGENTS.md §3 rule 4).
+- **No AI-drafted FAQ answers.** Grepped for an existing Gemini
+  "draft an FAQ answer" call and found none, so per the spec's own
+  stated fallback, the suggested-question chips only prefill the
+  question; the business still writes every answer.
+- **FAQs step requires >=3, Products step requires >=1, unconditionally.**
+  The real readiness rule (`lib/onboarding-readiness.ts`) makes the
+  catalog minimum conditional on business type for some types; this
+  step applies it uniformly, which is stricter than necessary for a few
+  business types but never wrong in the sense of letting an unready
+  business publish.
+- **No field-level debounced autosave.** Every field in this app
+  already persists only through a validated Server Action; the top bar's
+  "All changes saved" indicator is accurate because each step's Add/Save
+  button -- not a keystroke timer -- is what actually persists. The one
+  place this matters is the Business step's text fields: a browser
+  refresh *before* clicking Continue on that one step loses in-progress
+  typing (resume is only guaranteed for already-persisted data, which
+  matches what "resume" meant before this redesign too).
+- **No sticky bottom footer.** Each step renders its own Back/Continue
+  inline at the end of its own content instead of in a fixed
+  viewport-bottom bar (`step-footer.tsx` exists but ended up unused --
+  the step components each needed slightly different Continue
+  semantics). Still consistently placed, just not pinned.
+- **The right-hand live preview only reflects the CURRENT step's
+  in-progress fields**, not a cross-step draft: each wizard step is its
+  own server render (a real navigation on Continue, not a client-side
+  SPA step switch), so "live" means "updates as you type within this
+  one step," seeded from whatever's already saved for every other field.
+- **Channel order vs. plan gating:** the Channels step comes before
+  Plan & billing, but WhatsApp/Instagram require an entitled plan
+  (`lib/plans.ts`). This isn't a bug -- `ChannelUpgradeNotice` (existing,
+  unchanged) already handles "not entitled yet" gracefully, and the
+  website widget (always entitled) alone satisfies the "at least one
+  channel" requirement, so a Starter/trial business can still finish
+  onboarding and upgrade for WhatsApp afterward from the same page.
+- **Data is fetched broadly, not per-step.** `page.tsx` fetches
+  products/FAQs/knowledge/widget keys/WhatsApp/Instagram/entitlement/
+  readiness on every load regardless of which step is active (plan
+  identity/usage are fetched only for the Plan step). Fine for a
+  low-traffic, single-business admin page; would need trimming if this
+  page ever became hot.
+- **Pending-review FAQs/products** (AI-extracted-from-a-knowledge-
+  document drafts awaiting approval, `/dashboard/faqs` and
+  `/dashboard/products`'s existing "Pending review" sections) are not
+  surfaced in the wizard's Train step. A business that uploads a
+  knowledge document during onboarding can still review and approve
+  those from the dashboard afterward -- just not from inside the wizard.
+
+**Checks run:** `npm run lint` -- pass, zero errors/warnings.
+`npm run typecheck` (`next typegen && tsc --noEmit`) -- pass, after
+fixing two real bugs the type checker caught: (1) `channels-step.tsx`
+("use client") was importing `channelNotEntitledMessage`/`Entitlement`
+as values from `lib/subscription.ts`, a `server-only`-guarded module --
+moved that computation server-side in `page.tsx`, passed down as plain
+strings/booleans instead; (2) `business-step.tsx` shared one
+`useActionState` initial-state object typed as `CreateBusinessState`
+across both the create AND update actions, which are different
+Server Actions with different state shapes (`CreateBusinessState` has
+no `success` field; `updateBusinessProfileAction`'s `ProfileFormState`
+does) -- split into two correctly-typed initial states.
+`npm run build` -- pass (Turbopack), all 67 routes including `/onboarding`,
+`/onboarding/test` correctly gone from the route list. `npm test` was
+NOT run (not asked to, and no test files were added/changed).
+
+**Manual test checklist (none of this was run in a browser this
+session -- user instruction):**
+1. **Happy path:** sign up a fresh org -> business step -> knowledge (add
+   one source) -> products (add one) -> FAQs (add 3) -> persona (pick a
+   tone, edit greeting) -> channels (create a widget key) -> plan (pick
+   Starter, or confirm trial already satisfies it) -> review (run the
+   sandbox chat, click Publish) -> success screen with the embed
+   snippet -> Open dashboard.
+2. **Refresh mid-step:** reload on `/onboarding?step=products` after
+   adding one product but before clicking Continue -- the product list
+   should still show the saved product (it's in the DB); any half-typed
+   text in the "Add a product" form is expected to be gone (see
+   "no field-level autosave" above).
+3. **Disabled-CTA messages:** confirm each step's Continue shows the
+   exact "Add X to continue" text when invalid, and un-disables the
+   instant the missing condition is met (no page reload needed, since
+   each check is client-side state).
+4. **Google sign-in path:** sign up via Clerk's Google OAuth button on
+   the normal Clerk sign-up page (not inside this wizard, since that
+   stage was dropped) and confirm landing straight on the business step.
+5. **Mobile layout (<768px):** rail collapses to the thin progress bar +
+   stage name; the "Preview" button in the top bar opens the preview as
+   a right-side sheet; every step's fields and Continue button stay
+   usable at 375px width.
+6. **Publish with a missing item:** on the review step with, say, only 2
+   FAQs (bypass by deleting one after reaching review), confirm
+   `PublishButton` shows the existing readiness-blocked warning and stays
+   disabled, and the checklist row for FAQs is highlighted.
+7. **Publish success -> dashboard:** after a successful publish, confirm
+   the review step's own success screen appears without a manual reload
+   (Server Actions auto-refresh the invoking route's Server Components --
+   verify this actually happens; if it doesn't in practice, the fallback
+   is a manual `router.refresh()` in `review-step.tsx`, not yet added).
+
+**Environment/config:** none new. No migration (this is UI-only; it
+builds on the already-pending, not-yet-applied
+`20261106000000_add_onboarding_step.sql` from the Part 1 entry below,
+unchanged).
+
+
+
+Outside the phase numbering -- a targeted fix to a gap in the existing
+`feat/onboarding-readiness` work (business + readiness checklist +
+`publishBusinessForOrg` + `PublishButton`, all already shipped): a
+business could create its profile, skip "Try out your AI"
+(`/onboarding/test` -> "Skip for now"), and land on a fully-open dashboard
+without ever publishing. Nothing enforced the readiness gate; it was
+purely a checklist the owner could ignore forever.
+
+**Deliberately did NOT add a second `status` column.** The brief asked
+for `status` ('draft'/'live'); `businesses.status` already exists
+(`'active'/'suspended'`, Phase 33 Stop 2's platform-admin tenant
+lifecycle) -- a second column with different values on the same name
+would collide/confuse. `published_at` (already the single live/draft
+signal the Publish button reads) is reused instead.
+
+**Lock scope (owner's explicit choice over the literal brief):** only the
+*operational* dashboard pages redirect pre-publish, not every
+`/dashboard/*` route -- a literal "lock everything" would make it
+impossible to ever add the knowledge/products/FAQs a business needs to
+become publish-ready, since those live under `/dashboard/*` too, not in
+a separate onboarding wizard. Locked (new `requireLiveBusinessContext()`,
+`lib/business-context.ts`): dashboard overview (`/dashboard`),
+conversations, leads, customers, analytics, copilot, audit-log,
+answer-bank, workflows, appointments (bookings list; `appointments/availability`
+left unlocked). Unlocked (unchanged `requireBusinessContext()`): profile,
+products, services, faqs, knowledge, business-hours, widget-settings,
+billing, instagram, whatsapp, webhooks, notifications. Landing on a
+locked page pre-publish redirects to `/dashboard/widget-settings` (the
+existing readiness checklist + Publish button), never to `/onboarding`.
+
+**Resume:** `lib/onboarding-steps.ts`'s `computeOnboardingProgress()`
+derives real step completion from data that already exists elsewhere
+(the readiness report, subscription entitlement, whatsapp/instagram
+connections, widget keys) -- no new validation logic duplicated.
+`businesses.onboarding_step`/`onboarding_completed_at` (new migration) are
+a write-through CACHE of this for future platform-admin visibility, not
+the gate itself (the gate reads `published_at`, which can never drift
+from it). `account`/`verify` are always treated as complete -- Clerk's
+hosted sign-up already requires a verified email before a session exists,
+and there's no separate account-profile step in this app.
+
+**Files changed:**
+- `supabase/migrations/20261106000000_add_onboarding_step.sql` -- new
+  (not yet applied -- the agent harness never runs `db push`; the user
+  applies migrations, per every prior entry in this file).
+- `lib/supabase/types.ts` -- `Business.onboarding_step`/`onboarding_completed_at`, new `OnboardingStep` type.
+- `lib/onboarding-steps.ts` -- new (`ONBOARDING_STEPS`, `ROUTE_FOR_STEP`, `computeOnboardingProgress`).
+- `lib/business.ts` -- `publishBusinessForOrg` now also stamps `onboarding_step: 'live'` + `onboarding_completed_at` atomically with `published_at`; new `saveOnboardingStep()`.
+- `lib/business-context.ts` -- `BusinessContext.published`; new `requireLiveBusinessContext()`.
+- `app/(dashboard)/onboarding/actions.ts` -- new `advanceOnboarding(nextStep)` Server Action (validates server-side, rejects jumping past an incomplete step); `createBusiness` now advances the cached step to `'knowledge'` after creating the business row.
+- Swapped `requireBusinessContext` -> `requireLiveBusinessContext` in the 11 locked pages: `dashboard/page.tsx`, `dashboard/conversations/layout.tsx`, `dashboard/conversations/[id]/page.tsx`, `dashboard/leads/page.tsx`, `dashboard/customers/page.tsx`, `dashboard/customers/[id]/page.tsx`, `dashboard/analytics/page.tsx`, `dashboard/copilot/page.tsx`, `dashboard/audit-log/page.tsx`, `dashboard/answer-bank/page.tsx`, `dashboard/workflows/page.tsx`, `dashboard/appointments/page.tsx`.
+
+**Checks run:** `npm run typecheck` (clean) and `npm run lint` (clean).
+`npm run build` and `npm test` (pgTAP, needs a live DB) were NOT run --
+user instruction was no running/testing, manual verification only. No
+tenant-isolation test added for this change (none needed: no new table,
+no new tenant-scoped query -- the guard reads a column `getBusinessForOrg`
+already selects, still filtered by the caller's own `clerk_org_id`).
+
+**Not done, by explicit user instruction:** not committed, not pushed, no
+PR. Working tree has the changes above uncommitted.
+
+**Waiting on the user:** apply the migration (dev/staging first, per the
+usual flow -- not production), then manually verify per the test
+checklist below, then say if/when to commit.
+
+---
+
+## Onboarding wizard bugfixes (readiness staleness, inline edit, FAQ field clearing) -- NOT committed (user instruction), 2026-10-29
+
+Four real bugs found during the owner's first manual pass over the
+onboarding wizard rebuild above (not re-litigated here, fixed directly):
+
+**1. "Continue" on the Knowledge and FAQs steps failed with a generic
+"Finish the X step first" even after enough items were visibly added.**
+Root cause: both steps gated their own Continue button on raw row
+count, but the real readiness rule
+(`lib/onboarding-readiness.ts`'s `isFaqReady`/`isKnowledgeSourceReady`,
+which `advanceOnboarding` re-checks server-side) also requires the
+item's async embedding/ingestion to reach `"complete"` -- so a user
+could add exactly 3 FAQs or 1 knowledge source and click Continue
+before the pipeline actually finished, hitting a confusing rejection
+from code that was correct, just unexplained.
+- New `lib/onboarding-readiness-data.ts` export,
+  `getFaqGeneratedDocStatuses(businessId)`: the ingestion status of each
+  approved FAQ's generated knowledge document, keyed by FAQ id (same
+  `source_type='faq'`/`source_id` correlation `loadReadinessReport`
+  already does internally, now also exposed standalone). Fetched in
+  `page.tsx` alongside the other per-step data and passed to
+  `TrainFaqsStep` as `docStatusByFaqId`.
+- `train-faqs-step.tsx`: now computes real per-FAQ readiness
+  (question/answer length + `docStatusByFaqId[faq.id] === "complete"`,
+  mirroring `isFaqReady`) instead of trusting row count; gates Continue
+  on the ready count; shows a per-row "Ready"/"Processing" badge via a
+  new optional `readinessByFaqId` prop on `FaqsList`; and polls
+  (`router.refresh()` every 3s) while enough rows exist but aren't all
+  ready yet, so Continue enables itself without a manual reload.
+- `train-knowledge-step.tsx`: same idea, reusing the `status`/
+  `ingestion_status` fields already on each `KnowledgeDocument` row
+  (the same "live" definition `KnowledgeList`'s own live-count line
+  already used) -- no new data fetch needed. Also polls while settling.
+- Products step: confirmed NOT async (`isCatalogItemComplete` is pure,
+  no ingestion step) but had the same *class* of bug for a different
+  reason -- `valid` only checked `products.length >= 1`, not the
+  server's actual required description length, so a product added with
+  a blank/short description would pass the client check and still fail
+  `advanceOnboarding` for business types where a catalog is required.
+  Fixed the same way: gates on `isCatalogItemComplete`-equivalent
+  completeness, with an honest disabled-reason message.
+
+**2. "Edit" on an already-added FAQ/product/knowledge document took the
+user out of the wizard entirely**, with no way back. Root cause: the
+wizard steps reused the dashboard's shared list components
+(`FaqsList`/`ProductsList`/`KnowledgeList`) unmodified, which hardcode
+a `Link` to a standalone `/dashboard/{faqs,products,knowledge}/[id]/edit`
+page -- and since the business isn't published yet, landing on any
+`/dashboard/*` page bounces through the pre-publish guard straight to
+`/dashboard/widget-settings`, stranding the user outside `/onboarding`.
+- All three list components gained an optional `onEdit?: (id: string)
+  => void` prop: when provided, "Edit" renders a `<button>` calling it
+  instead of a `<Link>` to the dashboard edit route; when absent
+  (every existing dashboard caller), behavior is byte-for-byte
+  unchanged.
+- Each wizard step now tracks `editingId` locally and, while set,
+  swaps its "Add" form for the same `FaqForm`/`ProductForm`/
+  `KnowledgeForm` pre-filled with that item's values, wired to a
+  genuine in-place update, with a Cancel control.
+- The existing `updateFaqAction`/`updateProductAction`/
+  `updateKnowledgeDocumentAction` all end with an unconditional
+  `redirect("/dashboard/...")` on success -- correct for their one real
+  caller (the standalone edit pages) but would have reintroduced the
+  exact same "bounced out of the wizard" problem if reused as-is. Added
+  three sibling exports instead of branching the existing ones --
+  `updateFaqInPlaceAction`, `updateProductInPlaceAction`,
+  `updateKnowledgeDocumentInPlaceAction` (same validation/authorization/
+  update logic, `revalidatePath` on both `/dashboard/<x>` and
+  `/onboarding`, `return { success: true }` instead of `redirect()`) --
+  so the dashboard's existing edit pages are untouched and the wizard
+  gets a real non-navigating update path.
+- `FaqForm`/`ProductForm`/`KnowledgeForm` each gained an optional
+  `onSuccess?: () => void`, called after a successful submit regardless
+  of add/edit mode (existing reset-on-add-success behavior is
+  unchanged); the wizard steps use it to close edit mode automatically.
+
+**3. The FAQ question field didn't clear after adding an FAQ, when it
+had been prefilled from a suggested-question chip.** Root cause:
+`train-faqs-step.tsx` remounted `FaqForm` via `key={draftQuestion}`
+with `initialQuestion={draftQuestion}` as its `defaultValue`; `FaqForm`
+resets itself with `formRef.current?.reset()` on success, but native
+`<form>.reset()` restores `defaultValue`, not empty -- so after a
+chip-prefilled add, the field snapped back to the chip's text instead
+of clearing. Fixed by clearing `draftQuestion` in `train-faqs-step.tsx`
+once the just-added FAQ shows up in the `faqs` prop (a ref-tracked
+"did the count just increase" check), so the next remount's
+`defaultValue` is genuinely empty. `FaqForm` itself (and its one other,
+dashboard-page caller, where `initialQuestion` is always `""`) is
+unchanged.
+
+**Files changed:** `lib/onboarding-readiness-data.ts` (new
+`getFaqGeneratedDocStatuses`); `app/(dashboard)/onboarding/page.tsx`
+(fetches and passes it); `app/(dashboard)/onboarding/_components/steps/
+{train-faqs-step,train-knowledge-step,train-products-step}.tsx`
+(rewritten: real readiness gating, polling, inline edit, question-clear
+fix); `app/(dashboard)/dashboard/{faqs/faqs-list,products/products-list,
+knowledge/_components/knowledge-list}.tsx` (optional `onEdit` prop,
+`FaqsList` also gained optional `readinessByFaqId`);
+`app/(dashboard)/dashboard/{faqs,products,knowledge}/actions.ts` (new
+`update*InPlaceAction` siblings); `app/(dashboard)/dashboard/{faqs/
+faq-form,products/product-form,knowledge/knowledge-form}.tsx` (optional
+`onSuccess` callback).
+
+**Checks run:** `npm run lint` (clean) and `npm run typecheck` (`next
+typegen && tsc --noEmit`, clean). `npm run build`/`npm test` not run --
+no build-affecting or test-relevant surface beyond what typecheck
+already covers for this change, and the user's instruction for this
+pass was fix-and-report, not re-verify the whole build; flag to the
+user if a fresh `npm run build` is wanted before further testing.
+
+**Not done, by explicit user instruction:** not committed, not pushed,
+no PR. Working tree has the changes above uncommitted, alongside the
+wizard rebuild and its own prior bugfix (dead `step-footer.tsx` removed,
+empty sticky-footer-bar fixed, `business-step.tsx`'s missing
+`contactPhone` hidden field fixed for new businesses) from the same
+session.
+
+**Waiting on the user:** re-test the same flows -- add exactly 3 FAQs
+and 1 knowledge source and confirm Continue enables itself within a few
+seconds without a manual reload; confirm Edit on an FAQ/product/
+knowledge row now opens inline instead of leaving `/onboarding`; confirm
+a chip-prefilled FAQ question field is empty immediately after Add.
 
 ---
 

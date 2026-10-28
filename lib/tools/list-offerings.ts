@@ -2,6 +2,8 @@ import "server-only";
 import { z } from "zod";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
+import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
+import type { SnapshotCatalogItem } from "@/lib/agent-snapshot";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -51,8 +53,24 @@ const MAX_OFFERINGS_PER_TABLE = 30;
  * catalog pre-fetch (lib/catalog-prefetch.ts), so the two can never disagree
  * about what "the catalog" is. Returns null on a database error; logging
  * stays with the callers because each reports under its own name.
+ *
+ * `source` (Draft -> Publish -> Live): a `live` source is served from the
+ * published snapshot in memory, with the same ordering and cap as the table
+ * read below -- no database access at all.
  */
-export async function loadOfferings(supabase: SupabaseClient, businessId: string): Promise<OfferingSummary[] | null> {
+export async function loadOfferings(
+  supabase: SupabaseClient,
+  businessId: string,
+  source: AgentSource = DRAFT_SOURCE,
+): Promise<OfferingSummary[] | null> {
+  if (source.kind === "live") {
+    const { products, services } = source.snapshot;
+    return [
+      ...products.slice(0, MAX_OFFERINGS_PER_TABLE).map((item) => toOffering("product", item)),
+      ...services.slice(0, MAX_OFFERINGS_PER_TABLE).map((item) => toOffering("service", item)),
+    ];
+  }
+
   const [{ data: products, error: productError }, { data: services, error: serviceError }] = await Promise.all([
     supabase
       .from("products")
@@ -78,11 +96,21 @@ export async function loadOfferings(supabase: SupabaseClient, businessId: string
   ];
 }
 
+function toOffering(type: "product" | "service", item: SnapshotCatalogItem): OfferingSummary {
+  return {
+    type,
+    name: item.name,
+    description: item.description,
+    price: item.price === null ? null : String(item.price),
+  };
+}
+
 export async function executeListOfferings(
   supabase: SupabaseClient,
   businessId: string,
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<ListOfferingsResult> {
-  const offerings = await loadOfferings(supabase, businessId);
+  const offerings = await loadOfferings(supabase, businessId, source);
 
   if (offerings === null) {
     logEvent("tool_invoked", businessId, { tool: "list_products_and_services", result: "lookup_failed" }, "error");

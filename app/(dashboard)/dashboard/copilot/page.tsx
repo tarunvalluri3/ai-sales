@@ -1,4 +1,4 @@
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { listRecentlyHandled } from "@/lib/copilot";
 import { reconcileTodayCopilotActions, listUpcomingCopilotActions, listCompletedCopilotActions } from "@/lib/copilot-actions";
@@ -13,7 +13,7 @@ import { EmptyState } from "../_components/state-views";
 const TAB_KEYS: CopilotTabKey[] = ["today", "upcoming", "completed"];
 
 export default async function CopilotPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireLiveBusinessContext();
   const canManage = hasMinRole(orgRole, "org:sales_agent");
 
   const { tab: rawTab } = await searchParams;

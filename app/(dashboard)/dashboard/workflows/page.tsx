@@ -1,4 +1,4 @@
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { listWorkflowsForBusiness, listWorkflowRunsForBusiness } from "@/lib/workflows";
 import { listTagsForBusiness } from "@/lib/lead-tags";
@@ -10,7 +10,7 @@ import { TasksPanel } from "./tasks-panel";
 import { NotificationsPanel } from "./notifications-panel";
 
 export default async function WorkflowsPage() {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireLiveBusinessContext();
   const canManageWorkflows = hasMinRole(orgRole, "org:admin");
   const canManageTasks = hasMinRole(orgRole, "org:sales_agent");
 

@@ -261,6 +261,15 @@ export function formatPaiseAsInr(paise: number): string {
   return `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
 }
 
+/**
+ * 1,270.34 from 127_034, to the paisa. For the taxable value and the GST
+ * amount of a breakdown, which carry paise that `formatPaiseAsInr` would
+ * round away.
+ */
+export function formatPaiseExact(paise: number): string {
+  return `₹${(paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /** "1,000 AI replies / month" -- the quota as the pricing page sells it. */
 export function formatReplyQuota(quota: number): string {
   return `${quota.toLocaleString("en-IN")} AI replies / month`;

@@ -15,6 +15,7 @@ export function KnowledgeForm({
   initialContent = "",
   submitLabel,
   pendingLabel,
+  onSuccess,
 }: {
   action: (prevState: KnowledgeFormState, formData: FormData) => Promise<KnowledgeFormState>;
   id?: string;
@@ -22,15 +23,18 @@ export function KnowledgeForm({
   initialContent?: string;
   submitLabel: string;
   pendingLabel: string;
+  /** Called once after a successful submit, in addition to the existing reset-on-add behavior -- lets a caller editing in place (no navigation to a dedicated edit page) know when to exit edit mode. */
+  onSuccess?: () => void;
 }) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state.success && !id) {
-      formRef.current?.reset();
+    if (state.success) {
+      if (!id) formRef.current?.reset();
+      onSuccess?.();
     }
-  }, [state.success, id]);
+  }, [state.success, id, onSuccess]);
 
   return (
     <form ref={formRef} action={formAction} className="flex w-full flex-col gap-3">

@@ -1,4 +1,4 @@
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listProductsForBusiness } from "@/lib/products";
 import { listServicesForBusiness } from "@/lib/services";
@@ -17,7 +17,7 @@ import { QualificationDonut } from "./_components/charts/qualification-donut";
 const RECENT_LIMIT = 5;
 
 export default async function DashboardOverviewPage() {
-  const { businessId, businessName } = await requireBusinessContext();
+  const { businessId, businessName } = await requireLiveBusinessContext();
   const supabase = createServerSupabaseClient();
 
   const [

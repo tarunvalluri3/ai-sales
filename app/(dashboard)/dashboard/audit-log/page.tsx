@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { listAuditLogForBusiness } from "@/lib/audit-log";
 import type { AuditLogAction } from "@/lib/supabase/types";
 import { EmptyState } from "../_components/state-views";
@@ -71,7 +71,7 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
 };
 
 export default async function AuditLogPage() {
-  const { businessId } = await requireBusinessContext();
+  const { businessId } = await requireLiveBusinessContext();
   const entries = await listAuditLogForBusiness(businessId);
 
   return (

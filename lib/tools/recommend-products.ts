@@ -4,6 +4,9 @@ import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { escapeLikePattern } from "@/lib/sql-escape";
 import { logEvent } from "@/lib/logger";
 import { embedText } from "@/lib/embeddings";
+import { DRAFT_SOURCE, type AgentSource, type LiveAgentSource } from "@/lib/agent-runtime";
+import { searchLiveKnowledgeChunks } from "@/lib/retrieval";
+import type { SnapshotCatalogItem } from "@/lib/agent-snapshot";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -148,6 +151,63 @@ function matchesCategory(row: CatalogRow, category: string): boolean {
   return row.category !== null && row.category.toLowerCase().includes(category.toLowerCase());
 }
 
+function snapshotRow(item: SnapshotCatalogItem): CatalogRow {
+  return {
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    category: item.category,
+    price: item.price,
+    price_amount: item.priceAmount,
+    image_url: item.imageUrl,
+  };
+}
+
+/** Candidates per type from the published snapshot, for the budget/category-only path (no similarity). */
+function liveFallbackCandidates(live: LiveAgentSource, category: string | null) {
+  const keep = (row: CatalogRow) => (category ? matchesCategory(row, category) : true);
+  return [
+    ...live.snapshot.products.map(snapshotRow).filter(keep).map((row) => ({ ...row, type: "product" as const, similarity: null })),
+    ...live.snapshot.services.map(snapshotRow).filter(keep).map((row) => ({ ...row, type: "service" as const, similarity: null })),
+  ];
+}
+
+/**
+ * Semantic candidates for a live turn. The draft path ranks each row by its
+ * own `embedding` column, which belongs to the editing table; the live copy
+ * ranks by the best-matching chunk of the row's generated knowledge document
+ * instead (same text, embedded at the same save), then maps back to the
+ * snapshot row. Throws -- like the draft path -- when nothing can be ranked,
+ * so the caller falls back to the budget/category lookup.
+ */
+async function liveSemanticCandidates(
+  supabase: SupabaseClient,
+  businessId: string,
+  live: LiveAgentSource,
+  queryEmbedding: number[],
+) {
+  const chunks = await searchLiveKnowledgeChunks(supabase, businessId, live.versionId, queryEmbedding, MATCH_COUNT * 2, [
+    "product",
+    "service",
+  ]);
+  const best = new Map<string, number>();
+  for (const chunk of chunks) {
+    if (!chunk.source_id) continue;
+    const key = `${chunk.source_type}:${chunk.source_id}`;
+    best.set(key, Math.max(best.get(key) ?? -1, chunk.similarity));
+  }
+  const rank = (type: "product" | "service", items: SnapshotCatalogItem[]) =>
+    items.flatMap((item) => {
+      const similarity = best.get(`${type}:${item.id}`);
+      return similarity === undefined ? [] : [{ ...snapshotRow(item), type, similarity }];
+    });
+  const combined = [...rank("product", live.snapshot.products), ...rank("service", live.snapshot.services)];
+  if (combined.length === 0) {
+    throw new Error("no live catalog chunks matched");
+  }
+  return combined;
+}
+
 /**
  * Authorized executor for the `recommend_products` tool. `businessId`
  * comes from `askSalesEmployee`'s own already-trusted parameter, never
@@ -158,6 +218,7 @@ export async function executeRecommendProducts(
   supabase: SupabaseClient,
   businessId: string,
   rawArgs: unknown,
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<RecommendProductsResult> {
   const parsed = RecommendProductsInputSchema.safeParse(rawArgs);
   if (!parsed.success) {
@@ -173,29 +234,37 @@ export async function executeRecommendProducts(
 
   try {
     const queryEmbedding = await embedText(parsed.data.needs);
-    const [productRows, serviceRows] = await Promise.all([
-      matchTable(supabase, "match_products", businessId, queryEmbedding),
-      matchTable(supabase, "match_services", businessId, queryEmbedding),
-    ]);
+    if (source.kind === "live") {
+      combined = await liveSemanticCandidates(supabase, businessId, source, queryEmbedding);
+    } else {
+      const [productRows, serviceRows] = await Promise.all([
+        matchTable(supabase, "match_products", businessId, queryEmbedding),
+        matchTable(supabase, "match_services", businessId, queryEmbedding),
+      ]);
 
-    combined = [
-      ...productRows.map((row) => ({ ...row, type: "product" as const })),
-      ...serviceRows.map((row) => ({ ...row, type: "service" as const })),
-    ];
+      combined = [
+        ...productRows.map((row) => ({ ...row, type: "product" as const })),
+        ...serviceRows.map((row) => ({ ...row, type: "service" as const })),
+      ];
+    }
     usedSemanticMatch = true;
   } catch {
     // Embedding/RPC failure (rate limit, transient outage, or nothing in
     // the catalog has an embedding yet) -- degrade to the prior
     // budget/category-only lookup rather than a hard failure.
     try {
-      const [productRows, serviceRows] = await Promise.all([
-        queryTable(supabase, "products", businessId, category),
-        queryTable(supabase, "services", businessId, category),
-      ]);
-      combined = [
-        ...productRows.map((row) => ({ ...row, type: "product" as const, similarity: null })),
-        ...serviceRows.map((row) => ({ ...row, type: "service" as const, similarity: null })),
-      ];
+      if (source.kind === "live") {
+        combined = liveFallbackCandidates(source, category);
+      } else {
+        const [productRows, serviceRows] = await Promise.all([
+          queryTable(supabase, "products", businessId, category),
+          queryTable(supabase, "services", businessId, category),
+        ]);
+        combined = [
+          ...productRows.map((row) => ({ ...row, type: "product" as const, similarity: null })),
+          ...serviceRows.map((row) => ({ ...row, type: "service" as const, similarity: null })),
+        ];
+      }
       usedSemanticMatch = false;
     } catch {
       logEvent("tool_invoked", businessId, { tool: "recommend_products", result: "lookup_failed" }, "error");

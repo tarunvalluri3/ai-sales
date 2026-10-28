@@ -3,9 +3,11 @@
 import { z } from "zod";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createService, updateService, deleteService, approveServiceDraft, rejectServiceDraft } from "@/lib/services";
+import { processIngestionQueue } from "@/lib/ingestion-queue";
 import {
   catalogNameSchema,
   catalogDescriptionSchema,
@@ -28,6 +30,11 @@ const serviceFieldsSchema = z.object({
 const updateServiceSchema = serviceFieldsSchema.extend({
   id: z.string().uuid(),
 });
+
+/** Same fix as dashboard/faqs/actions.ts's triggerIngestionProcessing() -- see its doc comment (2026-10-29 bugfix, STATE.md). */
+function triggerIngestionProcessing(): void {
+  after(() => processIngestionQueue("dashboard"));
+}
 
 export type ServiceFormState = {
   error?: string;
@@ -62,6 +69,7 @@ export async function createServiceAction(
     return { error: logAndGetUserMessage(error) };
   }
 
+  triggerIngestionProcessing();
   revalidatePath("/dashboard/services");
   return { success: true };
 }
@@ -102,6 +110,7 @@ export async function updateServiceAction(
     return { error: "This service no longer exists." };
   }
 
+  triggerIngestionProcessing();
   revalidatePath("/dashboard/services");
   redirect("/dashboard/services");
 }
@@ -168,6 +177,7 @@ export async function approveServiceAction(
     return { error: "This service is no longer awaiting review." };
   }
 
+  triggerIngestionProcessing();
   revalidatePath("/dashboard/services");
   return { success: true };
 }

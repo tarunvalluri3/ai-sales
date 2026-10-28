@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { embedText } from "@/lib/embeddings";
 import { loadOfferings } from "@/lib/tools/list-offerings";
+import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 import { logEvent } from "@/lib/logger";
 import type { FaqCandidate, StoredEntry } from "@/lib/answer-bank/decision";
 import { MAX_INSTANT_MESSAGE_CHARS, normalizeQuestionKey } from "@/lib/answer-bank/normalize";
@@ -43,6 +44,7 @@ export async function matchFaqCandidates(
   supabase: SupabaseClient,
   businessId: string,
   queryEmbedding: number[],
+  source: AgentSource = DRAFT_SOURCE,
 ): Promise<FaqCandidate[]> {
   const { data, error } = await supabase.rpc("match_faq_questions", {
     p_business_id: businessId,
@@ -53,18 +55,37 @@ export async function matchFaqCandidates(
     logEvent("answer_bank_faq_match_failed", businessId, {}, "error");
     return [];
   }
-  return ((data ?? []) as { faq_id: string; question: string; answer: string; similarity: number }[]).map((row) => ({
+  const rows = (data ?? []) as { faq_id: string; question: string; answer: string; similarity: number }[];
+  const candidates = rows.map((row) => ({
     faqId: row.faq_id,
     question: row.question,
     answer: row.answer,
     similarity: row.similarity,
   }));
+  if (source.kind !== "live") return candidates;
+
+  // Draft -> Publish -> Live: the match above ran over the DRAFT question
+  // embeddings. Serve a FAQ only if it is also in the published snapshot with
+  // the SAME question, and answer with the PUBLISHED wording -- an edited,
+  // added or deleted FAQ is invisible here until it is published (the turn then
+  // falls through to the normal AI path, which reads the live snapshot).
+  const liveById = new Map(source.snapshot.faqs.map((faq) => [faq.id, faq]));
+  return candidates.flatMap((candidate) => {
+    const live = liveById.get(candidate.faqId);
+    return live && live.question === candidate.question
+      ? [{ ...candidate, question: live.question, answer: live.answer }]
+      : [];
+  });
 }
 
 /** Product and service names for the "message names an item the answer does not contain" guard. Empty on error (the other guards still apply). */
-export async function loadCatalogNames(supabase: SupabaseClient, businessId: string): Promise<string[]> {
+export async function loadCatalogNames(
+  supabase: SupabaseClient,
+  businessId: string,
+  source: AgentSource = DRAFT_SOURCE,
+): Promise<string[]> {
   try {
-    const offerings = await loadOfferings(supabase, businessId);
+    const offerings = await loadOfferings(supabase, businessId, source);
     return (offerings ?? []).map((offering) => offering.name);
   } catch {
     return [];

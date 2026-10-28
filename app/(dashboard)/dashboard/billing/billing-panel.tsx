@@ -1,15 +1,18 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useToast } from "../_components/toast";
 import { BillingDetailsFields, type BillingIdentityValues } from "./billing-details";
+import { GstBreakdown } from "./gst-breakdown";
 import {
   cancelSubscriptionAction,
   changePlanAction,
   confirmOrderCheckoutAction,
   confirmSubscriptionCheckoutAction,
   startCheckoutAction,
+  updatePaymentMethodAction,
   type BillingActionState,
 } from "./actions";
 
@@ -69,6 +72,7 @@ type EntitlementSummary = {
   billingInterval: "monthly" | "annual" | null;
   hasPaymentMethod: boolean;
   pastDueSince: string | null;
+  graceUntil: string | null;
 };
 
 type RazorpayCheckoutResponse = {
@@ -108,6 +112,7 @@ export function BillingPanel({
   plans,
   gstRatePercent,
   supplierStateName,
+  onConfirmingChange,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -116,8 +121,12 @@ export function BillingPanel({
   plans: PlanSummary[];
   gstRatePercent: number;
   supplierStateName: string;
+  /** Lets a host (the onboarding plan step) hold its Continue button while the server verifies a payment. */
+  onConfirmingChange?: (confirming: boolean) => void;
 }) {
+  const router = useRouter();
   const { toast } = useToast();
+  const [confirming, setConfirming] = useState(false);
   const [interval, setInterval] = useState<"monthly" | "annual">(entitlement.billingInterval ?? "monthly");
   const [selectedPlan, setSelectedPlan] = useState(entitlement.planKey);
   const [scriptReady, setScriptReady] = useState(false);
@@ -137,11 +146,43 @@ export function BillingPanel({
     cancelSubscriptionAction,
     {},
   );
-  const [, confirmSubscriptionAction] = useActionState<BillingActionState, FormData>(
-    confirmSubscriptionCheckoutAction,
-    {},
+  const [paymentMethodState, paymentMethodFormAction, paymentMethodPending] = useActionState<
+    BillingActionState,
+    FormData
+  >(updatePaymentMethodAction, {});
+
+  /**
+   * Hands the Checkout result to the server and waits for the server's verdict
+   * before saying anything is done. Razorpay's browser callback is only a
+   * claim: the Server Action verifies its signature against the id WE stored,
+   * and the plan, status and period still change only through the webhook.
+   * The page is refreshed from the server afterwards, so what the customer
+   * sees (and what the onboarding step's Continue is gated on) is server state.
+   */
+  const confirmOnServer = useCallback(
+    async (run: () => Promise<BillingActionState>) => {
+      setConfirming(true);
+      onConfirmingChange?.(true);
+      try {
+        const result = await run();
+        if (result.error) {
+          toast({ title: result.error, variant: "error" });
+        } else {
+          toast({ title: result.notice ?? "Payment confirmed.", variant: "success" });
+        }
+      } catch {
+        toast({
+          title: "We could not confirm your payment yet. It may still be processing — refresh in a moment.",
+          variant: "error",
+        });
+      } finally {
+        setConfirming(false);
+        onConfirmingChange?.(false);
+        router.refresh();
+      }
+    },
+    [onConfirmingChange, router, toast],
   );
-  const [, confirmOrderAction] = useActionState<BillingActionState, FormData>(confirmOrderCheckoutAction, {});
 
   const openCheckout = useCallback(
     (session: NonNullable<BillingActionState["session"]>) => {
@@ -181,16 +222,16 @@ export function BillingPanel({
           if (session.kind === "subscription") {
             formData.set("paymentId", response.razorpay_payment_id ?? "");
             formData.set("signature", response.razorpay_signature ?? "");
-            confirmSubscriptionAction(formData);
+            void confirmOnServer(() => confirmSubscriptionCheckoutAction({}, formData));
           } else {
             formData.set("orderId", session.orderId);
             formData.set("paymentId", response.razorpay_payment_id ?? "");
             formData.set("signature", response.razorpay_signature ?? "");
             formData.set("planKey", session.planKey);
             formData.set("purpose", session.purpose);
-            confirmOrderAction(formData);
+            void confirmOnServer(() => confirmOrderCheckoutAction({}, formData));
           }
-          toast({ title: "Payment received. Updating your plan…", variant: "success" });
+          toast({ title: "Confirming your payment…", variant: "info" });
         },
         modal: {
           ondismiss: () => {
@@ -206,33 +247,48 @@ export function BillingPanel({
 
       new window.Razorpay(options).open();
     },
-    [confirmOrderAction, confirmSubscriptionAction, toast],
+    [confirmOnServer, toast],
   );
 
   // One effect per action state, so a session returned by either the
   // subscribe form or the change-plan form opens the sheet.
   const openedRef = useRef<string | null>(null);
   useEffect(() => {
-    const session = startState.session ?? changeState.session;
+    const session = startState.session ?? changeState.session ?? paymentMethodState.session;
     if (!session || !scriptReady) return;
     const token = session.kind === "subscription" ? session.subscriptionId : session.orderId;
     if (openedRef.current === token) return;
     openedRef.current = token;
     openCheckout(session);
-  }, [startState.session, changeState.session, scriptReady, openCheckout]);
+  }, [startState.session, changeState.session, paymentMethodState.session, scriptReady, openCheckout]);
 
   useEffect(() => {
-    for (const state of [startState, changeState, cancelState]) {
+    for (const state of [startState, changeState, cancelState, paymentMethodState]) {
       if (state.error) toast({ title: state.error, variant: "error" });
       else if (state.notice) toast({ title: state.notice, variant: "success" });
     }
     // Toasting once per state transition is the intent; the action states
     // only change when an action returns.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startState, changeState, cancelState]);
+  }, [startState, changeState, cancelState, paymentMethodState]);
 
   const percentUsed =
     usage.replyQuota > 0 ? Math.min(Math.round((usage.repliesUsed / usage.replyQuota) * 100), 100) : 0;
+
+  // What the next charge will be: the current plan at the current interval
+  // (config prices, GST-inclusive). Null when nothing will renew.
+  const currentPlanSummary = plans.find((p) => p.key === entitlement.planKey);
+  const nextChargePaise =
+    currentPlanSummary &&
+    isSubscribed &&
+    !entitlement.cancelAtPeriodEnd &&
+    entitlement.billingInterval !== null &&
+    entitlement.status !== "expired" &&
+    entitlement.status !== "cancelled"
+      ? entitlement.billingInterval === "annual"
+        ? currentPlanSummary.annualPricePaise
+        : currentPlanSummary.monthlyPricePaise
+      : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -255,7 +311,24 @@ export function BillingPanel({
         />
       ) : null}
 
-      <CurrentPlanCard entitlement={entitlement} usage={usage} percentUsed={percentUsed} />
+      {confirming ? (
+        <p role="status" className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary">
+          Confirming your payment with our server… this usually takes a few seconds.
+        </p>
+      ) : null}
+
+      <CurrentPlanCard
+        entitlement={entitlement}
+        usage={usage}
+        percentUsed={percentUsed}
+        nextChargePaise={nextChargePaise}
+        gstRatePercent={gstRatePercent}
+        updatePaymentMethod={{
+          action: paymentMethodFormAction,
+          pending: paymentMethodPending || confirming || checkoutOpen,
+          ready: configured && scriptReady,
+        }}
+      />
 
       <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
         <div className="flex flex-col gap-1">
@@ -321,6 +394,7 @@ export function BillingPanel({
                       / {interval === "annual" ? "year" : "month"}, incl. GST
                     </span>
                   </span>
+                  <GstBreakdown grossPaise={pricePaise} gstRatePercent={gstRatePercent} />
                   <span className="text-2xs text-ds-text-secondary">
                     {plan.monthlyReplyQuota.toLocaleString("en-IN")} AI replies / month ·{" "}
                     {plan.seatsLabel}
@@ -387,12 +461,22 @@ function CurrentPlanCard({
   entitlement,
   usage,
   percentUsed,
+  nextChargePaise,
+  gstRatePercent,
+  updatePaymentMethod,
 }: {
   entitlement: EntitlementSummary;
   usage: { repliesUsed: number; replyQuota: number; degraded: boolean };
   percentUsed: number;
+  nextChargePaise: number | null;
+  gstRatePercent: number;
+  updatePaymentMethod: { action: (formData: FormData) => void; pending: boolean; ready: boolean };
 }) {
   const statusLabel = describeStatus(entitlement);
+  // Re-authorising is the fix only for a mandate that is failing (past_due);
+  // an expired plan goes through "Choose a plan" below. A healthy mandate's
+  // card cannot be swapped self-serve yet (see updatePaymentMethodAction).
+  const canUpdatePaymentMethod = entitlement.status === "past_due" && entitlement.billingInterval === "monthly";
 
   return (
     <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
@@ -411,7 +495,7 @@ function CurrentPlanCard({
         ) : null}
       </div>
 
-      <dl className="grid gap-4 sm:grid-cols-3">
+      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Fact
           label="Replies this period"
           value={
@@ -421,20 +505,46 @@ function CurrentPlanCard({
           }
         />
         <Fact
-          label={entitlement.isTrial ? "Trial ends" : entitlement.cancelAtPeriodEnd ? "Access until" : "Next charge"}
+          label={entitlement.isTrial ? "Trial ends" : entitlement.cancelAtPeriodEnd ? "Access until" : "Next renewal"}
           value={formatDate(entitlement.trialEndsAt ?? entitlement.periodEnd)}
         />
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-2xs font-medium uppercase tracking-wide text-ds-text-muted">Amount</dt>
+          <dd className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-ds-text-primary">
+              {nextChargePaise !== null ? formatInr(nextChargePaise) : "Nothing due"}
+            </span>
+            {nextChargePaise !== null ? (
+              <GstBreakdown grossPaise={nextChargePaise} gstRatePercent={gstRatePercent} />
+            ) : null}
+          </dd>
+        </div>
         <Fact
-          label="Billing"
+          label="Payment method"
           value={
-            entitlement.billingInterval === "annual"
-              ? "Yearly, paid in advance"
-              : entitlement.billingInterval === "monthly"
-                ? "Monthly, automatic"
-                : "Not set up yet"
+            entitlement.grandfathered || !entitlement.hasPaymentMethod
+              ? "None on file"
+              : entitlement.billingInterval === "annual"
+                ? "Card, paid for the year"
+                : "Card, charged automatically"
           }
         />
       </dl>
+
+      {canUpdatePaymentMethod ? (
+        <form action={updatePaymentMethod.action} className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={updatePaymentMethod.pending || !updatePaymentMethod.ready}
+            className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          >
+            {updatePaymentMethod.pending ? "Opening payment…" : "Update payment method"}
+          </button>
+          <span className="text-2xs text-ds-text-muted">
+            Authorise a card again and we retry the payment straight away.
+          </span>
+        </form>
+      ) : null}
 
       {!usage.degraded && usage.replyQuota > 0 ? (
         <div className="flex flex-col gap-1">
@@ -479,7 +589,10 @@ function describeStatus(entitlement: EntitlementSummary): string {
       : `Free trial, with no payment method yet. It will stop on ${formatDate(entitlement.periodEnd)} unless you choose a plan.`;
   }
   if (entitlement.status === "past_due") {
-    return `A payment did not go through${entitlement.pastDueSince ? ` on ${formatDate(entitlement.pastDueSince)}` : ""}. You keep full access while we retry — update your payment method to clear it.`;
+    const failed = entitlement.pastDueSince ? ` on ${formatDate(entitlement.pastDueSince)}` : "";
+    return entitlement.serving && entitlement.graceUntil
+      ? `A payment did not go through${failed}. Your agent stays live until ${formatDate(entitlement.graceUntil)} while we retry — update your payment method to clear it.`
+      : `A payment did not go through${failed} and the grace period has ended, so your agent is paused. Update your payment method to bring it back.`;
   }
   if (entitlement.status === "cancelled") {
     return `Cancelled. You keep full access until ${formatDate(entitlement.periodEnd)}.`;

@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
@@ -8,11 +9,7 @@ import { CreateWidgetKeyForm } from "./create-widget-key-form";
 import { WidgetBrandingForm } from "./widget-branding-form";
 import { SuggestedQuestionsForm } from "./suggested-questions-form";
 import { AiCapabilitiesForm } from "./ai-capabilities-form";
-import { PublishButton } from "./publish-button";
-import { ReadinessChecklist } from "./readiness-checklist";
-import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
 import { WidgetInstallGuide } from "./widget-install-guide";
-import { SandboxChatPanel } from "../_components/sandbox-chat/sandbox-chat-panel";
 import { PermissionNotice } from "../_components/state-views";
 
 export default async function WidgetSettingsPage() {
@@ -28,8 +25,6 @@ export default async function WidgetSettingsPage() {
   // NEXT_PUBLIC_APP_URL) so both the guide and the key list can render it
   // without a client-only effect or a hydration mismatch.
   const appOrigin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
-  const hasActiveKey = widgetKeys.some((key) => key.status !== "revoked");
-  const readiness = business ? await loadReadinessReport(businessId, business) : null;
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -67,22 +62,23 @@ export default async function WidgetSettingsPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
-        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">2. Go live</h2>
-        {readiness ? <ReadinessChecklist report={readiness} canEdit={canEdit} /> : null}
-        <PublishButton
-          isPublished={business?.published_at != null}
-          hasActiveKey={hasActiveKey}
-          hasPrivacyPolicyUrl={Boolean(business?.privacy_policy_url)}
-          readinessBlocked={readiness ? readiness.gateApplies && !readiness.canPublish : false}
-          blockingCount={readiness ? readiness.blockingItems.length : 0}
-          canEdit={canEdit}
-        />
-        <SandboxChatPanel />
-      </section>
+      {business?.published_at == null ? (
+        <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+          <p className="text-sm font-medium text-ds-text-primary">Not published yet</p>
+          <p className="max-w-xl text-sm text-ds-text-secondary">
+            Readiness, testing and publishing now happen in the guided setup wizard, not here.
+          </p>
+          <Link
+            href="/onboarding?step=review"
+            className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          >
+            Go to Test &amp; go live
+          </Link>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
-        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">3. Customize</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">2. Customize</h2>
         <WidgetBrandingForm
           initialAccentColor={business?.widget_accent_color ?? ""}
           initialLogoUrl={business?.widget_logo_url ?? ""}

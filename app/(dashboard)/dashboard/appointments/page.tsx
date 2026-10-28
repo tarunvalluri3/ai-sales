@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
 import { listAppointmentsForBusiness } from "@/lib/appointments";
@@ -24,7 +24,7 @@ export default async function AppointmentsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const { businessId, orgId, orgRole } = await requireBusinessContext();
+  const { businessId, orgId, orgRole } = await requireLiveBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:member");
   const supabase = createServerSupabaseClient();
   const [business, allAppointments] = await Promise.all([

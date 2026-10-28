@@ -5,8 +5,12 @@ import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import {
   createBusinessForOrg,
+  getBusinessForOrg,
+  saveOnboardingStep,
   BusinessAlreadyExistsError,
 } from "@/lib/business";
+import { computeOnboardingProgress, ONBOARDING_STEPS } from "@/lib/onboarding-steps";
+import type { OnboardingStep } from "@/lib/supabase/types";
 import {
   businessNameSchema,
   businessTypeSchema,
@@ -94,5 +98,48 @@ export async function createBusiness(
     return { error: errorMessage };
   }
 
-  redirect("/onboarding/test");
+  // Onboarding route guard + resume: the "business" step is done the
+  // moment the row exists with these fields, so advance the cached step
+  // past it. Best-effort -- a failure here must never block the redirect
+  // that already created the business.
+  await saveOnboardingStep(context.orgId, "knowledge").catch(() => {});
+
+  redirect("/onboarding?step=knowledge");
+}
+
+export type AdvanceOnboardingResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Onboarding route guard + resume. Moves the cached `onboarding_step`
+ * forward (or back) to `nextStep`, but only after re-checking server-side
+ * that every step up to it is genuinely complete -- a caller can never
+ * jump the business past a step it hasn't actually finished. "live" is
+ * reachable only through `publishBusinessForOrg` (the Publish button),
+ * never through this action.
+ */
+export async function advanceOnboarding(nextStep: OnboardingStep): Promise<AdvanceOnboardingResult> {
+  const context = await requireAuthContext({ role: "org:admin" });
+  if (!context.orgId) {
+    return { ok: false, error: "Select or create an organization first." };
+  }
+
+  if (nextStep === "live") {
+    return { ok: false, error: "Publish your AI to go live." };
+  }
+
+  const business = await getBusinessForOrg(context.orgId);
+  if (!business) {
+    return { ok: false, error: "Set up your business first." };
+  }
+
+  const { currentStep } = await computeOnboardingProgress(business);
+  const nextIndex = ONBOARDING_STEPS.indexOf(nextStep);
+  const currentIndex = ONBOARDING_STEPS.indexOf(currentStep);
+
+  if (nextIndex > currentIndex) {
+    return { ok: false, error: `Finish the "${currentStep}" step first.` };
+  }
+
+  await saveOnboardingStep(context.orgId, nextStep);
+  return { ok: true };
 }

@@ -1,4 +1,4 @@
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { countConversationsNeedingAttention } from "@/lib/conversations";
 import {
@@ -26,7 +26,7 @@ import { FunnelChart } from "./funnel-chart";
 import { ChannelPerformanceTable } from "./channel-performance-table";
 
 export default async function AnalyticsPage() {
-  const { businessId, businessName } = await requireBusinessContext();
+  const { businessId, businessName } = await requireLiveBusinessContext();
   const supabase = createServerSupabaseClient();
 
   const [

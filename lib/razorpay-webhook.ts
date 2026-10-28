@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PLAN_KEYS, type PlanKey } from "@/lib/plans";
+import { PAST_DUE_GRACE_DAYS, PLAN_KEYS, type PlanKey } from "@/lib/plans";
 import type { BillingNoticeKind } from "@/lib/billing-notices";
 import type { CreditNoteReason, PaymentForInvoice } from "@/lib/invoice-core";
 import type { IssueCreditNoteOutcome, IssueInvoiceOutcome } from "@/lib/invoice-service";
@@ -177,6 +177,12 @@ export type BillingSubscriptionRow = {
   razorpay_subscription_id: string | null;
   razorpay_customer_id: string | null;
   razorpay_order_id: string | null;
+  /**
+   * Provider timestamp of the newest lifecycle event already applied; an
+   * older event is not applied. Optional so a row read before the column
+   * existed (or a test fixture) behaves as "nothing applied yet".
+   */
+  provider_event_at?: string | null;
 };
 
 /** Only the columns a transition actually changes are ever written. */
@@ -194,6 +200,7 @@ export type BillingSubscriptionPatch = Partial<
     | "razorpay_subscription_id"
     | "razorpay_customer_id"
     | "razorpay_order_id"
+    | "provider_event_at"
   >
 >;
 
@@ -264,6 +271,12 @@ export type WebhookOutcome =
   | "duplicate"
   /** A verified event type this app does not act on. */
   | "ignored"
+  /**
+   * Verified and understood, but not applied: it belongs to a mandate this
+   * business has since replaced, or it is older than a lifecycle event
+   * already applied (Razorpay does not guarantee delivery order).
+   */
+  | "stale"
   /** Verified, but we could not tell which business it belongs to. */
   | "unresolved";
 
@@ -463,6 +476,88 @@ async function dispatch(
   }
 
   const { row, matchedBy } = resolved;
+
+  // A mandate this business has since replaced (a re-authorised card, an
+  // abandoned checkout) resolves here only through the `notes` fallback. Its
+  // wind-down events -- we cancel the old mandate ourselves when a new one is
+  // started -- must not touch the current subscription: a late
+  // `subscription.cancelled` for the OLD id would otherwise cancel a business
+  // that has just paid on the NEW one, and the repair below would overwrite
+  // the stored id with the dead one. Only events that REMOVE access are
+  // refused; `activated`/`charged` still adopt the id, so money that moved is
+  // never ignored.
+  if (
+    matchedBy === "notes" &&
+    row.razorpay_subscription_id !== null &&
+    row.razorpay_subscription_id !== subscriptionEntity.id &&
+    REMOVES_ACCESS_EVENTS.has(event)
+  ) {
+    deps.log("razorpay_webhook_superseded_mandate", row.business_id, { event }, "error");
+    return "stale";
+  }
+
+  // Ordering: Razorpay does not guarantee delivery order, so an event older
+  // than the newest one already applied must not overwrite newer state (a late
+  // `pending` after the `charged` that recovered the payment, an older
+  // `charged` moving the period backwards). Equal timestamps apply: the clock
+  // is whole seconds and the writes are absolute, so re-applying is harmless.
+  const eventAtIso = unixToIso(body.created_at);
+  const appliedAtMs = row.provider_event_at ? Date.parse(row.provider_event_at) : null;
+  const stale = eventAtIso !== null && appliedAtMs !== null && Date.parse(eventAtIso) < appliedAtMs;
+  if (stale) {
+    deps.log("razorpay_webhook_out_of_order", row.business_id, { event }, "error");
+  }
+
+  const outcome = await applySubscriptionEvent(deps, event, row, matchedBy, subscriptionEntity, body, now, stale);
+
+  // Advance the high-water mark only after the transition itself succeeded; a
+  // throw above releases the event claim and the retry re-applies it.
+  if (outcome === "processed" && eventAtIso !== null && !stale) {
+    await deps.updateSubscription(row.business_id, { provider_event_at: eventAtIso });
+  }
+  return outcome;
+}
+
+/** Events that take access away; refused when they belong to a replaced mandate. */
+const REMOVES_ACCESS_EVENTS: ReadonlySet<HandledRazorpayEvent> = new Set<HandledRazorpayEvent>([
+  "subscription.pending",
+  "subscription.halted",
+  "subscription.cancelled",
+  "subscription.completed",
+]);
+
+async function applySubscriptionEvent(
+  deps: RazorpayWebhookDeps,
+  event: HandledRazorpayEvent,
+  row: BillingSubscriptionRow,
+  matchedBy: "stored_id" | "notes",
+  subscriptionEntity: SubscriptionEntity,
+  body: RazorpayWebhookBody,
+  now: Date,
+  stale: boolean,
+): Promise<WebhookOutcome> {
+  // An out-of-order `charged` is the one stale event with a side effect that
+  // is still owed: the money moved, so its GST invoice must exist (idempotent
+  // on the payment id). No state is written.
+  if (stale) {
+    if (event === "subscription.charged") {
+      const period = periodFrom(subscriptionEntity);
+      if (period) {
+        await issueInvoiceFor(deps, row.business_id, {
+          payment: body.payload.payment?.entity,
+          eventCreatedAt: body.created_at,
+          now,
+          purpose: "subscription_charge",
+          planKey: row.plan_key,
+          period,
+          orderId: null,
+          subscriptionId: subscriptionEntity.id,
+        });
+      }
+    }
+    return "stale";
+  }
+
   if (matchedBy === "notes") {
     // Worth knowing about: it means our stored id is missing, so the
     // primary correlation path is broken for this tenant.
@@ -486,6 +581,10 @@ async function dispatch(
       return handleCancelled(deps, row, now);
     case "subscription.completed":
       return handleCompleted(deps, row, now);
+    default:
+      // Payment/order/refund events never reach here (dispatch handles them
+      // before a subscription row is resolved).
+      return "ignored";
   }
 }
 
@@ -715,7 +814,7 @@ async function handlePending(
   now: Date,
 ): Promise<WebhookOutcome> {
   const pastDueSince = row.past_due_since ?? now.toISOString();
-  const graceEnds = addDaysIso(pastDueSince, 5);
+  const graceEnds = addDaysIso(pastDueSince, PAST_DUE_GRACE_DAYS);
 
   await deps.updateSubscription(row.business_id, {
     status: "past_due",

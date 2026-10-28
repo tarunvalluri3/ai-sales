@@ -36,7 +36,7 @@ type StatusFilter = "all" | "published" | "draft" | "failed";
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "published", label: "Published" },
+  { id: "published", label: "Approved" },
   { id: "draft", label: "Draft" },
   { id: "failed", label: "Needs attention" },
 ];
@@ -56,7 +56,16 @@ const bulkInitialState: BulkActionState = {};
  * because a checkbox column, live-state accent border, and multi-select
  * state all need to live at the same level as the rows they touch.
  */
-export function KnowledgeList({ documents, canEdit }: { documents: KnowledgeDocument[]; canEdit: boolean }) {
+export function KnowledgeList({
+  documents,
+  canEdit,
+  onEdit,
+}: {
+  documents: KnowledgeDocument[];
+  canEdit: boolean;
+  /** When set, "Edit" calls this instead of navigating to /dashboard/knowledge/[id]/edit -- used by the onboarding wizard to keep editing inline. */
+  onEdit?: (id: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -210,7 +219,7 @@ export function KnowledgeList({ documents, canEdit }: { documents: KnowledgeDocu
                       disabled={isBulkPublishing}
                       className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
                     >
-                      {isBulkPublishing ? "Publishing…" : "Publish selected"}
+                      {isBulkPublishing ? "Approving…" : "Approve selected"}
                     </button>
                   </form>
                   {bulkDeleteConfirming ? (
@@ -260,7 +269,7 @@ export function KnowledgeList({ documents, canEdit }: { documents: KnowledgeDocu
                 </span>
               ) : bulkPublishState.success ? (
                 <span className="text-xs text-ds-success">
-                  Published {bulkPublishState.count} document{bulkPublishState.count === 1 ? "" : "s"}.
+                  Approved {bulkPublishState.count} document{bulkPublishState.count === 1 ? "" : "s"}.
                 </span>
               ) : null}
               {bulkDeleteState.error ? (
@@ -293,6 +302,7 @@ export function KnowledgeList({ documents, canEdit }: { documents: KnowledgeDocu
                     canEdit={canEdit}
                     selected={selectedIds.has(document.id)}
                     onToggleSelected={() => toggleSelected(document.id)}
+                    onEdit={onEdit}
                   />
                 )}
               />
@@ -309,11 +319,13 @@ function KnowledgeRow({
   canEdit,
   selected,
   onToggleSelected,
+  onEdit,
 }: {
   document: KnowledgeDocument;
   canEdit: boolean;
   selected: boolean;
   onToggleSelected: () => void;
+  onEdit?: (id: string) => void;
 }) {
   // 2026-09-08 distill pass: exactly one primary action per row (a solid
   // accent button) plus a single overflow menu for everything else. A
@@ -345,15 +357,15 @@ function KnowledgeRow({
         <div className="flex items-center gap-2">
           {isLive ? (
             <span
-              title="Live: published and answering prospects"
-              aria-label="Live: published and answering prospects"
+              title="Approved and processed: goes live with your next Publish changes"
+              aria-label="Approved and processed: goes live with your next Publish changes"
               className="h-2 w-2 shrink-0 rounded-full bg-ds-success"
             />
           ) : null}
           <span className="truncate font-medium text-ds-text-primary">{document.title}</span>
           <IngestionStatusPill status={document.ingestion_status} />
           <Badge tone={isPublished ? "success" : "muted"} size="sm">
-            {document.status}
+            {isPublished ? "approved" : "draft"}
           </Badge>
         </div>
         <span className="line-clamp-2 text-sm text-ds-text-secondary">{document.content}</span>
@@ -378,28 +390,49 @@ function KnowledgeRow({
           <PublishToggleButton
             action={publishKnowledgeDocumentAction}
             id={document.id}
-            label="Publish"
-            pendingLabel="Publishing…"
+            label="Approve"
+            pendingLabel="Approving…"
             canEdit={canEdit}
             variant="primary"
           />
         ) : primaryIsEdit && canEdit ? (
-          <Link
-            href={`/dashboard/knowledge/${document.id}/edit`}
-            className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-          >
-            Edit
-          </Link>
-        ) : null}
-        <RowActionsMenu label={`More actions for ${document.title}`}>
-          {!primaryIsEdit && canEdit ? (
+          onEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit(document.id)}
+              className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            >
+              Edit
+            </button>
+          ) : (
             <Link
               href={`/dashboard/knowledge/${document.id}/edit`}
-              role="menuitem"
-              className="block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
+              className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
             >
               Edit
             </Link>
+          )
+        ) : null}
+        <RowActionsMenu label={`More actions for ${document.title}`}>
+          {!primaryIsEdit && canEdit ? (
+            onEdit ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => onEdit(document.id)}
+                className="block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
+              >
+                Edit
+              </button>
+            ) : (
+              <Link
+                href={`/dashboard/knowledge/${document.id}/edit`}
+                role="menuitem"
+                className="block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
+              >
+                Edit
+              </Link>
+            )
           ) : null}
           {/*
             2026-09-08 harden pass, from the second critique: Publish used
@@ -415,10 +448,10 @@ function KnowledgeRow({
             <PublishToggleButton
               action={unpublishKnowledgeDocumentAction}
               id={document.id}
-              label="Unpublish"
-              pendingLabel="Unpublishing…"
+              label="Unapprove"
+              pendingLabel="Unapproving…"
               canEdit={canEdit}
-              confirmMessage="Your AI will stop using this document immediately."
+              confirmMessage="This moves the document back to draft. Customers keep seeing it until you publish."
               variant="menuitem"
             />
           ) : null}
@@ -430,7 +463,9 @@ function KnowledgeRow({
             canEdit={canEdit}
             variant="menuitem"
             confirmMessage={
-              isPublished ? "Your AI is using this in live conversations. Delete anyway?" : "Delete this document?"
+              isPublished
+                ? "Customers keep seeing this until you publish the deletion. Delete anyway?"
+                : "Delete this document?"
             }
           />
         </RowActionsMenu>

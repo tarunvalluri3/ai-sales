@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
+import { loadLiveAgentSourceByVersion, type LiveAgentSource } from "@/lib/agent-runtime";
 import type { WidgetLanguage } from "@/lib/supabase/types";
 
 /**
@@ -24,22 +25,14 @@ export type BusinessAiContext = {
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
   appointmentsEnabled: boolean;
+  /** The published version every field above was read from, and the source lib/rag.ts must read knowledge/catalog/FAQs from (Draft -> Publish -> Live, 2026-10-29). */
+  liveSource: LiveAgentSource;
 };
 
-export const BUSINESS_AI_CONTEXT_COLUMNS =
-  "id, clerk_org_id, name, description, contact_email, contact_phone, website, widget_language, recommend_products_enabled, appointments_enabled";
-
-type BusinessAiContextRow = {
+type BusinessIdentityRow = {
   id: string;
   clerk_org_id: string;
-  name: string;
-  description: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  website: string | null;
-  widget_language: WidgetLanguage;
-  recommend_products_enabled: boolean;
-  appointments_enabled: boolean;
+  live_version_id: string | null;
 };
 
 /**
@@ -47,33 +40,45 @@ type BusinessAiContextRow = {
  * `businessId` -- never resolves or validates tenant identity itself,
  * that's the caller's job (resolveBusinessFromWidgetKey() for the
  * widget, resolveBusinessFromWhatsappPhoneNumberId() for WhatsApp).
- * Returns null for a deleted/nonexistent business id rather than
- * throwing, matching getConversationForBusiness()'s not-found contract.
+ *
+ * Content comes from the business's LIVE snapshot only. Returns null for a
+ * deleted/nonexistent business id AND for one that has never been published
+ * (no live version) rather than throwing, matching
+ * getConversationForBusiness()'s not-found contract -- the callers already
+ * log and skip the reply in that case, so an unpublished draft is never
+ * served to a prospect.
  */
 export async function loadBusinessAiContext(businessId: string): Promise<BusinessAiContext | null> {
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
-    .select(BUSINESS_AI_CONTEXT_COLUMNS)
+    .select("id, clerk_org_id, live_version_id")
     .eq("id", businessId)
-    .maybeSingle<BusinessAiContextRow>();
+    .maybeSingle<BusinessIdentityRow>();
 
-  if (error || !data) {
+  if (error || !data || !data.live_version_id) {
     return null;
   }
 
+  const liveSource = await loadLiveAgentSourceByVersion(data.id, data.live_version_id);
+  if (!liveSource) {
+    return null;
+  }
+  const config = liveSource.snapshot.config;
+
   return {
     businessId: data.id,
-    businessName: data.name,
+    businessName: config.name,
     clerkOrgId: data.clerk_org_id,
     businessProfile: {
-      description: data.description,
-      contactEmail: data.contact_email,
-      contactPhone: data.contact_phone,
-      website: data.website,
+      description: config.description,
+      contactEmail: config.contactEmail,
+      contactPhone: config.contactPhone,
+      website: config.website,
     },
-    language: data.widget_language,
-    recommendProductsEnabled: data.recommend_products_enabled,
-    appointmentsEnabled: data.appointments_enabled,
+    language: config.language,
+    recommendProductsEnabled: config.capabilities.recommendProducts,
+    appointmentsEnabled: config.capabilities.appointments,
+    liveSource,
   };
 }

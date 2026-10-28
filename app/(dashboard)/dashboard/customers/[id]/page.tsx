@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireBusinessContext } from "@/lib/business-context";
+import { requireLiveBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { getCustomerProfile } from "@/lib/customers";
 import { listTagsForBusiness } from "@/lib/lead-tags";
@@ -35,7 +35,7 @@ function formatDate(iso: string): string {
 
 export default async function CustomerProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await requireLiveBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:sales_agent");
 
   const [profile, allTags] = await Promise.all([getCustomerProfile(businessId, id), listTagsForBusiness(businessId)]);
