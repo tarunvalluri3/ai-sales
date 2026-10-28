@@ -83,7 +83,10 @@ async function syncFaqEmbeddings(supabase: SupabaseClient, businessId: string): 
   let written = 0;
   for (let start = 0; start < todo.length; start += EMBED_BATCH) {
     const batch = todo.slice(start, start + EMBED_BATCH) as { id: string; question: string }[];
-    const embeddings = await embedTexts(batch.map((faq) => faq.question));
+    const embeddings = await embedTexts(
+      batch.map((faq) => faq.question),
+      { feature: "answer_bank", trigger: "cron", businessId },
+    );
     const { error } = await supabase.from("faq_question_embeddings").upsert(
       batch.map((faq, index) => ({
         faq_id: faq.id,

@@ -33,7 +33,7 @@ import { extractCatalogFromDocument, extractCatalogFromPdfDocument } from "@/lib
  * backstop for whatever this misses.
  */
 function triggerIngestionProcessing(): void {
-  after(() => processIngestionQueue());
+  after(() => processIngestionQueue("dashboard"));
 }
 
 /** Phase B2 (STATE.md): the only signal this project keeps for "was this file a PDF" -- the original filename, preserved as the tail of storage_path (lib/file-ingestion.ts). No dedicated mime-type column exists; adding one for this alone was judged unnecessary scope. */

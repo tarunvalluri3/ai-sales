@@ -193,7 +193,9 @@ export async function executeRequestCallback(
   // configured threshold).
   const workflowTarget = { type: "lead" as const, id: result.leadId, customerId: result.customerId, leadId: result.leadId, conversationId };
   if (result.created) {
-    await dispatchWorkflowTrigger(supabase, businessId, "lead_created", workflowTarget);
+    // "user": this tool runs inside a live chat turn on any channel; see
+    // the matching comment in lib/tools/book-appointment.ts.
+    await dispatchWorkflowTrigger(supabase, businessId, "lead_created", workflowTarget, {}, "user");
     // In-app only by default (digest tier) -- see the matching call in
     // lib/tools/book-appointment.ts for why this carries no email payload.
     after(() =>
@@ -206,10 +208,17 @@ export async function executeRequestCallback(
       }),
     );
   }
-  await dispatchWorkflowTrigger(supabase, businessId, "lead_score_threshold", workflowTarget, {
-    previousScore: result.previousScore,
-    newScore: result.newScore,
-  });
+  await dispatchWorkflowTrigger(
+    supabase,
+    businessId,
+    "lead_score_threshold",
+    workflowTarget,
+    {
+      previousScore: result.previousScore,
+      newScore: result.newScore,
+    },
+    "user",
+  );
 
   // Phase 24: outbound webhook on a new qualified lead. Never fired on
   // the update branch (an existing lead getting a repeat callback

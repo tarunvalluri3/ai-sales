@@ -246,6 +246,10 @@ async function handleInboundMessage(
     // read twice (same net reads as before Phase 32).
     undefined,
     quota,
+    undefined,
+    undefined,
+    false,
+    "webhook_whatsapp",
   );
 
   const assistantMessageRow = await createMessage(

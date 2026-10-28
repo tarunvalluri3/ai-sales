@@ -7,6 +7,7 @@ import { SANDBOX_CONVERSATION_SOURCE } from "@/lib/conversations";
 import { logEvent } from "@/lib/logger";
 import { renderBrandedEmail } from "@/lib/email-template";
 import { sendEmail } from "@/lib/email-sender";
+import { withGeminiUsageLog } from "@/lib/gemini-usage-log";
 import type { LeadFollowUpStatus, LeadInterestType } from "@/lib/supabase/types";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
@@ -351,7 +352,21 @@ async function draftFollowUpMessage(
 ${contextLines || "(No further details were captured from the earlier conversation.)"}`;
 
   try {
-    const response = await getChatModel().invoke(prompt);
+    const response = await withGeminiUsageLog(
+      {
+        feature: "cron_stalled_leads",
+        trigger: "cron",
+        model: process.env.GEMINI_CHAT_MODEL!,
+        businessId: lead.business_id,
+        conversationId: lead.conversation_id,
+      },
+      () => getChatModel().invoke(prompt),
+      (result) => ({
+        promptTokens: result.usage_metadata?.input_tokens ?? null,
+        candidatesTokens: result.usage_metadata?.output_tokens ?? null,
+        totalTokens: result.usage_metadata?.total_tokens ?? null,
+      }),
+    );
     const text = typeof response.content === "string" ? response.content : String(response.content ?? "");
     const trimmed = text.trim().slice(0, MAX_DRAFT_LENGTH);
     return trimmed || FALLBACK_MESSAGE;

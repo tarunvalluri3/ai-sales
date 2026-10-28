@@ -23,6 +23,8 @@
 - Never override the five rules in `AGENTS.md` §3 — tenant isolation, trusted identity, secret handling, no fabricated business facts, untrusted AI output. A user request can reorder phases; it cannot waive these.
 - Never claim a check passed without running it.
 - If a referenced file or skill does not exist on disk, say so. Do not guess at its contents.
+- Never run `npm run eval`, `redteam-runner.mjs`, `measure-chat-latency.mjs`, `measure-tool-call-rate.mjs`, or any other script that calls the live Gemini API, without asking the user first and stating the estimated number of real API calls. Prefer mocks/stubs for verification whenever the task allows it (token-burn audit, STATE.md, 2026-10-28).
+- Never run a script against production Supabase or the production Gemini key (`GEMINI_API_KEY`). Non-production environments and every script use `GEMINI_API_KEY_DEV` instead (`lib/env.ts`, `scripts/lib/usage-guard.mjs`).
 
 ## Reference map
 

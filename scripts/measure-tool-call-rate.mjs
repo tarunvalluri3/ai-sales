@@ -22,6 +22,7 @@
  * STATE.md.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { requireProdConfirmation } from "./lib/usage-guard.mjs";
 
 const QUESTIONS = [
   "What is the price of Test Product - 1?",
@@ -59,6 +60,15 @@ const { createClient } = await import("@supabase/supabase-js");
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SECRET_KEY);
 const { data: business } = await supabase.from("businesses").select("id").eq("name", "Acme Test Co.").single();
 const { data: keyRow } = await supabase.from("widget_keys").select("key").eq("business_id", business.id).eq("status", "active").limit(1).single();
+
+// Each rep x question is 2 real turns (a warm-up + the measured one), each
+// up to ~5 Gemini calls (lib/rag.ts: up to MAX_TOOL_ITERATIONS chat calls +
+// 1 retrieval embedding).
+await requireProdConfirmation({
+  scriptName: "measure-tool-call-rate.mjs",
+  appUrl: APP_URL,
+  estimateLine: `Estimated real Gemini calls: up to ~${REPS * QUESTIONS.length * 2 * 5} (${REPS} rep(s) x ${QUESTIONS.length} question(s) x 2 turns x up to ~5 calls).`,
+});
 
 let lastSend = 0;
 async function send(message, conversationId) {

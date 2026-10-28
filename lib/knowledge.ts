@@ -4,6 +4,7 @@ import type { KnowledgeChunk, KnowledgeDocument, KnowledgeSourceType } from "@/l
 import { AppError } from "@/lib/errors";
 import { chunkText } from "@/lib/chunking";
 import { embedTexts } from "@/lib/embeddings";
+import type { GeminiUsageTrigger } from "@/lib/gemini-usage-log";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -191,6 +192,10 @@ export async function regenerateChunksForDocument(
   businessId: string,
   documentId: string,
   content: string,
+  // Token-burn audit (2026-10-28): defaults to "cron" because the daily
+  // sweep is this function's backstop trigger; lib/ingestion-queue.ts's
+  // immediate after()-triggered call passes "dashboard" through instead.
+  trigger: GeminiUsageTrigger = "cron",
 ): Promise<void> {
   const { error: deleteError } = await supabase
     .from("knowledge_chunks")
@@ -211,7 +216,10 @@ export async function regenerateChunksForDocument(
     return;
   }
 
-  const embeddings = await embedTexts(chunks.map((chunk) => chunk.content));
+  const embeddings = await embedTexts(
+    chunks.map((chunk) => chunk.content),
+    { feature: "embed_ingest", trigger, businessId },
+  );
 
   const { error: insertError } = await supabase.from("knowledge_chunks").insert(
     chunks.map((chunk, index) => ({

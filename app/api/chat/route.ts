@@ -564,13 +564,20 @@ export async function POST(request: NextRequest) {
         }
 
         await timer.time("workflow_trigger", () =>
-          dispatchWorkflowTrigger(supabase, business.businessId, "conversation_needs_attention", {
-            type: "conversation",
-            id: conversationRowId,
-            customerId: conversation.customer_id,
-            leadId: null,
-            conversationId: conversationRowId,
-          }),
+          dispatchWorkflowTrigger(
+            supabase,
+            business.businessId,
+            "conversation_needs_attention",
+            {
+              type: "conversation",
+              id: conversationRowId,
+              customerId: conversation.customer_id,
+              leadId: null,
+              conversationId: conversationRowId,
+            },
+            {},
+            "widget",
+          ),
         );
       }
 
@@ -767,6 +774,7 @@ export async function POST(request: NextRequest) {
         queryEmbedding,
         instant,
         partB,
+        "widget",
       );
     } catch (error) {
       const userMessage = logAndGetUserMessage(error);

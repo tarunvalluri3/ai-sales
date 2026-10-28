@@ -268,7 +268,10 @@ export async function executeBookAppointment(
       conversationId,
     };
     if (leadResult.created) {
-      await dispatchWorkflowTrigger(supabase, businessId, "lead_created", leadWorkflowTarget);
+      // "user": this tool runs inside a live chat turn on any channel, and
+      // the channel isn't threaded this deep (lib/gemini-usage-log.ts's
+      // GeminiUsageTrigger) -- see the token-burn audit's report for why.
+      await dispatchWorkflowTrigger(supabase, businessId, "lead_created", leadWorkflowTarget, {}, "user");
       // In-app only by default (digest tier): the lead is captured and on the
       // leads page, so it doesn't warrant interrupting anyone. No email payload
       // at all here -- the daily digest already counts new leads.
@@ -282,10 +285,17 @@ export async function executeBookAppointment(
         }),
       );
     }
-    await dispatchWorkflowTrigger(supabase, businessId, "lead_score_threshold", leadWorkflowTarget, {
-      previousScore: leadResult.previousScore,
-      newScore: leadResult.newScore,
-    });
+    await dispatchWorkflowTrigger(
+      supabase,
+      businessId,
+      "lead_score_threshold",
+      leadWorkflowTarget,
+      {
+        previousScore: leadResult.previousScore,
+        newScore: leadResult.newScore,
+      },
+      "user",
+    );
 
     if (leadResult.created) {
       await enqueueLeadQualifiedWebhooks(supabase, businessId, {
@@ -316,6 +326,7 @@ export async function executeBookAppointment(
       conversationId,
     },
     { status: "pending" },
+    "user",
   );
 
   return { success: true, appointmentId: appointment.id, label };

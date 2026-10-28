@@ -265,6 +265,10 @@ async function handleInboundMessage(
     // read twice (same net reads as before Phase 32).
     undefined,
     quota,
+    undefined,
+    undefined,
+    false,
+    "webhook_instagram",
   );
 
   const assistantMessageRow = await createMessage(

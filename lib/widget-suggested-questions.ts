@@ -5,6 +5,7 @@ import { listProductsForBusiness } from "@/lib/products";
 import { listServicesForBusiness } from "@/lib/services";
 import { listFaqsForBusiness } from "@/lib/faqs";
 import { AppError } from "@/lib/errors";
+import { withGeminiUsageLog } from "@/lib/gemini-usage-log";
 
 const MIN_QUESTIONS = 3;
 const MAX_QUESTIONS = 6;
@@ -83,7 +84,12 @@ Write ${MIN_QUESTIONS}-${MAX_QUESTIONS} short questions a real prospective custo
   });
 
   try {
-    const result = await model.invoke([["human", prompt]]);
+    // No includeRaw -- this gemini_api_calls row carries duration/success only.
+    const result = await withGeminiUsageLog(
+      { feature: "suggested_questions", trigger: "dashboard", model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId: null },
+      () => model.invoke([["human", prompt]]),
+      () => ({}),
+    );
     return result.questions.slice(0, MAX_QUESTIONS);
   } catch (error) {
     throw new AppError(

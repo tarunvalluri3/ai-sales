@@ -117,7 +117,8 @@ Core set:
 | `NEXT_PUBLIC_SUPABASE_URL` | yes |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes |
 | `SUPABASE_SECRET_KEY` | **no — bypasses RLS** |
-| `GEMINI_API_KEY` | **no** |
+| `GEMINI_API_KEY` | **no — production only** (lib/env.ts requires it when `VERCEL_ENV=production`, ignores it otherwise) |
+| `GEMINI_API_KEY_DEV` | **no — every non-production environment and every `scripts/*.mjs` run** (local dev, Vercel Preview; required there instead of `GEMINI_API_KEY` — token-burn audit, STATE.md) |
 | `GEMINI_CHAT_MODEL` | config |
 | `GEMINI_EMBEDDING_MODEL` | config |
 | `SENTRY_DSN` | yes (not a secret in the traditional sense, but not marked `NEXT_PUBLIC_*`) |

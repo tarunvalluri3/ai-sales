@@ -38,6 +38,7 @@ import type { WidgetLanguage } from "@/lib/supabase/types";
 import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
 import { TurnTimer } from "@/lib/turn-timings";
 import { recordTurnMetrics, type DeferredTurnMetrics } from "@/lib/ai-response-metrics";
+import { recordGeminiUsage, withGeminiUsageLog, type GeminiUsageTrigger } from "@/lib/gemini-usage-log";
 import { isRedundantSearch } from "@/lib/chat-query-dedupe";
 import { findDuplicateSubmitReply } from "@/lib/duplicate-submit";
 import {
@@ -1113,6 +1114,11 @@ export async function askSalesEmployee(
   // Part B: true only for the widget route, which writes the metrics row from
   // after() (recordTurnMetrics). Every other caller keeps the inline insert.
   deferMetrics = false,
+  // Token-burn audit (2026-10-28): which channel started this turn, logged
+  // on every Gemini call this turn makes (lib/gemini-usage-log.ts). Callers
+  // should always pass the real one; "user" is only a fallback for any
+  // caller this change missed.
+  trigger: GeminiUsageTrigger = "user",
 ): Promise<SalesEmployeeResponse> {
   // Honest end-state when the AI deadline (lib/chat-timeouts.ts) is hit
   // before a reply exists: escalate so a human follows up, write no
@@ -1245,6 +1251,7 @@ export async function askSalesEmployee(
         break;
       }
       let aiMessage: Awaited<ReturnType<typeof toolModel.invoke>>;
+      const modelCallStartedAt = Date.now();
       try {
         aiMessage = await timer.time(`model_call_${iteration + 1}`, () =>
           toolModel.invoke([loopSystemMessage, ...messages.slice(1)], {
@@ -1252,12 +1259,36 @@ export async function askSalesEmployee(
           }),
         );
       } catch (error) {
+        recordGeminiUsage({
+          feature: iteration === 0 ? "chat_json" : "tool_iteration",
+          trigger,
+          model: process.env.GEMINI_CHAT_MODEL!,
+          durationMs: Date.now() - modelCallStartedAt,
+          success: false,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          businessId,
+          conversationId,
+        });
         if (isAbortError(error)) {
           timedOut = true;
           break;
         }
         throw error;
       }
+      recordGeminiUsage({
+        feature: iteration === 0 ? "chat_json" : "tool_iteration",
+        trigger,
+        model: process.env.GEMINI_CHAT_MODEL!,
+        durationMs: Date.now() - modelCallStartedAt,
+        success: true,
+        businessId,
+        conversationId,
+        promptTokens: aiMessage.usage_metadata?.input_tokens ?? null,
+        candidatesTokens: aiMessage.usage_metadata?.output_tokens ?? null,
+        thoughtsTokens: thinkingTokensOf(aiMessage.usage_metadata),
+        cachedContentTokens: cachedTokensOf(aiMessage.usage_metadata),
+        totalTokens: aiMessage.usage_metadata?.total_tokens ?? null,
+      });
       totalInputTokens += aiMessage.usage_metadata?.input_tokens ?? 0;
       totalOutputTokens += aiMessage.usage_metadata?.output_tokens ?? 0;
       totalThinkingTokens += thinkingTokensOf(aiMessage.usage_metadata);
@@ -1400,6 +1431,7 @@ export async function askSalesEmployee(
       });
       let raw: BaseMessage;
       let parsed: z.infer<typeof SalesEmployeeResponseSchema>;
+      const fallbackCallStartedAt = Date.now();
       try {
         ({ raw, parsed } = await timer.time("final_structured_call", () =>
           model.invoke([plainSystemMessage, ...messages.slice(1)], {
@@ -1407,6 +1439,16 @@ export async function askSalesEmployee(
           }),
         ));
       } catch (error) {
+        recordGeminiUsage({
+          feature: "chat_json",
+          trigger,
+          model: process.env.GEMINI_CHAT_MODEL!,
+          durationMs: Date.now() - fallbackCallStartedAt,
+          success: false,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          businessId,
+          conversationId,
+        });
         if (isAbortError(error)) {
           logEvent(
             "ai_response_timeout",
@@ -1422,6 +1464,20 @@ export async function askSalesEmployee(
       // model's raw output is always an AIMessage with usage_metadata at
       // runtime -- confirmed against @langchain/core's own AIMessage type.
       const rawUsage = (raw as AIMessage).usage_metadata;
+      recordGeminiUsage({
+        feature: "chat_json",
+        trigger,
+        model: process.env.GEMINI_CHAT_MODEL!,
+        durationMs: Date.now() - fallbackCallStartedAt,
+        success: true,
+        businessId,
+        conversationId,
+        promptTokens: rawUsage?.input_tokens ?? null,
+        candidatesTokens: rawUsage?.output_tokens ?? null,
+        thoughtsTokens: thinkingTokensOf(rawUsage),
+        cachedContentTokens: cachedTokensOf(rawUsage),
+        totalTokens: rawUsage?.total_tokens ?? null,
+      });
       totalInputTokens += rawUsage?.input_tokens ?? 0;
       totalOutputTokens += rawUsage?.output_tokens ?? 0;
       totalThinkingTokens += thinkingTokensOf(rawUsage);
@@ -1573,6 +1629,10 @@ export async function* streamSalesEmployee(
   queryEmbedding?: Promise<number[]>,
   instant?: InstantContext,
   deferMetrics = false,
+  // Token-burn audit (2026-10-28): see askSalesEmployee()'s matching
+  // parameter. Defaults to "widget" because this generator currently has
+  // exactly one caller (the widget route's streaming branch).
+  trigger: GeminiUsageTrigger = "widget",
 ): AsyncGenerator<StreamChunk, void, unknown> {
   const buildTimeoutResponse = (quota: ReplyQuotaStatus): SalesEmployeeResponse => ({
     answer: RESPONSE_TIMEOUT_MESSAGE,
@@ -1654,17 +1714,42 @@ export async function* streamSalesEmployee(
         includeRaw: true,
       });
       return timer.time("metadata_call", async (): Promise<TurnMetadata | null> => {
+        const metadataCallStartedAt = Date.now();
         try {
           const { raw, parsed } = await metaModel.invoke([plainSystemMessage, ...messages.slice(1)], {
             signal: callAbortSignal(clientSignal, Math.min(CHAT_MODEL_CALL_TIMEOUT_MS, Math.max(budgetMs, MIN_MODEL_CALL_BUDGET_MS))),
           });
           const rawUsage = (raw as AIMessage).usage_metadata;
+          recordGeminiUsage({
+            feature: "chat_stream_metadata",
+            trigger,
+            model: process.env.GEMINI_CHAT_MODEL!,
+            durationMs: Date.now() - metadataCallStartedAt,
+            success: true,
+            businessId,
+            conversationId,
+            promptTokens: rawUsage?.input_tokens ?? null,
+            candidatesTokens: rawUsage?.output_tokens ?? null,
+            thoughtsTokens: thinkingTokensOf(rawUsage),
+            cachedContentTokens: cachedTokensOf(rawUsage),
+            totalTokens: rawUsage?.total_tokens ?? null,
+          });
           totalInputTokens += rawUsage?.input_tokens ?? 0;
           totalOutputTokens += rawUsage?.output_tokens ?? 0;
           totalThinkingTokens += thinkingTokensOf(rawUsage);
           totalCachedTokens += cachedTokensOf(rawUsage);
           return parsed as TurnMetadata;
         } catch (error) {
+          recordGeminiUsage({
+            feature: "chat_stream_metadata",
+            trigger,
+            model: process.env.GEMINI_CHAT_MODEL!,
+            durationMs: Date.now() - metadataCallStartedAt,
+            success: false,
+            errorMessage: error instanceof Error ? error.message : String(error),
+            businessId,
+            conversationId,
+          });
           if (isAbortError(error)) return null;
           throw error;
         }
@@ -1713,6 +1798,16 @@ export async function* streamSalesEmployee(
         }
       } catch (error) {
         timer.record(`model_call_${iteration + 1}`, Date.now() - iterStart);
+        recordGeminiUsage({
+          feature: iteration === 0 ? "chat_stream" : "tool_iteration",
+          trigger,
+          model: process.env.GEMINI_CHAT_MODEL!,
+          durationMs: Date.now() - iterStart,
+          success: false,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          businessId,
+          conversationId,
+        });
         if (isAbortError(error)) {
           if (clientSignal?.aborted) interruptedByClient = true;
           else timedOut = true;
@@ -1721,6 +1816,20 @@ export async function* streamSalesEmployee(
         throw error;
       }
       timer.record(`model_call_${iteration + 1}`, Date.now() - iterStart);
+      recordGeminiUsage({
+        feature: iteration === 0 ? "chat_stream" : "tool_iteration",
+        trigger,
+        model: process.env.GEMINI_CHAT_MODEL!,
+        durationMs: Date.now() - iterStart,
+        success: true,
+        businessId,
+        conversationId,
+        promptTokens: gathered?.usage_metadata?.input_tokens ?? null,
+        candidatesTokens: gathered?.usage_metadata?.output_tokens ?? null,
+        thoughtsTokens: thinkingTokensOf(gathered?.usage_metadata),
+        cachedContentTokens: cachedTokensOf(gathered?.usage_metadata),
+        totalTokens: gathered?.usage_metadata?.total_tokens ?? null,
+      });
       totalInputTokens += gathered?.usage_metadata?.input_tokens ?? 0;
       totalOutputTokens += gathered?.usage_metadata?.output_tokens ?? 0;
       totalThinkingTokens += thinkingTokensOf(gathered?.usage_metadata);
@@ -1926,6 +2035,7 @@ export async function* streamSalesEmployee(
     });
     let raw: BaseMessage;
     let parsed: z.infer<typeof SalesEmployeeResponseSchema>;
+    const streamFallbackCallStartedAt = Date.now();
     try {
       ({ raw, parsed } = await timer.time("final_structured_call", () =>
         model.invoke([plainSystemMessage, ...messages.slice(1)], {
@@ -1933,6 +2043,16 @@ export async function* streamSalesEmployee(
         }),
       ));
     } catch (error) {
+      recordGeminiUsage({
+        feature: "chat_stream",
+        trigger,
+        model: process.env.GEMINI_CHAT_MODEL!,
+        durationMs: Date.now() - streamFallbackCallStartedAt,
+        success: false,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        businessId,
+        conversationId,
+      });
       if (isAbortError(error)) {
         if (clientSignal?.aborted) {
           logEvent("ai_response_stream_interrupted", businessId, { conversationId, stage: "fallback" }, "error");
@@ -1967,6 +2087,20 @@ export async function* streamSalesEmployee(
       throw error;
     }
     const rawUsage = (raw as AIMessage).usage_metadata;
+    recordGeminiUsage({
+      feature: "chat_stream",
+      trigger,
+      model: process.env.GEMINI_CHAT_MODEL!,
+      durationMs: Date.now() - streamFallbackCallStartedAt,
+      success: true,
+      businessId,
+      conversationId,
+      promptTokens: rawUsage?.input_tokens ?? null,
+      candidatesTokens: rawUsage?.output_tokens ?? null,
+      thoughtsTokens: thinkingTokensOf(rawUsage),
+      cachedContentTokens: cachedTokensOf(rawUsage),
+      totalTokens: rawUsage?.total_tokens ?? null,
+    });
     totalInputTokens += rawUsage?.input_tokens ?? 0;
     totalOutputTokens += rawUsage?.output_tokens ?? 0;
     totalThinkingTokens += thinkingTokensOf(rawUsage);
@@ -2025,7 +2159,12 @@ export async function generateBankAnswer(
   language: WidgetLanguage,
 ): Promise<BankAnswerResult> {
   const timer = new TurnTimer();
-  const retriever = new KnowledgeRetriever({ supabase, businessId, timer, queryEmbedding: embedText(question) });
+  const retriever = new KnowledgeRetriever({
+    supabase,
+    businessId,
+    timer,
+    queryEmbedding: embedText(question, { feature: "answer_bank", trigger: "cron", businessId }),
+  });
   const [documents, catalogOfferings] = await Promise.all([
     retriever.invoke(question),
     prefetchSmallCatalog(supabase, businessId),
@@ -2045,9 +2184,17 @@ export async function generateBankAnswer(
     tags,
   );
   const model = getChatModel().withStructuredOutput(SalesEmployeeResponseSchema, { name: "SalesEmployeeResponse" });
-  const result = await model.invoke([plainSystemMessage, ...messages.slice(1)], {
-    signal: AbortSignal.timeout(BANK_ANSWER_TIMEOUT_MS),
-  });
+  // No includeRaw here (unlike the live chat paths), so usage_metadata isn't
+  // available to log -- this call's row in gemini_api_calls carries
+  // duration/success only, no token counts.
+  const result = await withGeminiUsageLog(
+    { feature: "answer_bank", trigger: "cron", model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId: null },
+    () =>
+      model.invoke([plainSystemMessage, ...messages.slice(1)], {
+        signal: AbortSignal.timeout(BANK_ANSWER_TIMEOUT_MS),
+      }),
+    () => ({}),
+  );
 
   if (result.escalate) return { ok: false, reason: "model_wants_escalation" };
   if (!result.usedContext) return { ok: false, reason: "not_grounded_in_context" };

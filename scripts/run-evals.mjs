@@ -23,9 +23,36 @@ import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
 import { inventedPriceForUnknownProduct } from "./eval-judges.mjs";
 import { runRedTeam } from "./redteam-runner.mjs";
+import { requireProdConfirmation, resolveGeminiKey } from "./lib/usage-guard.mjs";
 
 const APP_URL = process.env.EVAL_APP_URL || "http://localhost:3000";
 const ACME_BUSINESS_NAME = "Acme Test Co.";
+
+/**
+ * Minimal, same-schema insert into `gemini_api_calls` (lib/gemini-usage-log.ts),
+ * duplicated here rather than imported: that module has `import "server-only"`,
+ * which throws under plain Node without `--conditions=react-server` (see
+ * scripts/run-tool-scope-tests.mjs for the one place this project already
+ * needs that flag) -- and this script is plain Node ESM with no path
+ * aliases anyway (see embedForEval's own comment below). Fire-and-forget,
+ * swallows its own errors, exactly like the real module.
+ */
+function logScriptGeminiCall({ feature, model, durationMs, success, errorMessage, totalTokens }) {
+  supabase
+    .from("gemini_api_calls")
+    .insert({
+      feature,
+      trigger: "script",
+      environment: "development",
+      model,
+      total_tokens: totalTokens ?? null,
+      duration_ms: durationMs,
+      success,
+      error_message: errorMessage ? errorMessage.slice(0, 500) : null,
+    })
+    .then(() => {})
+    .catch(() => {});
+}
 
 /**
  * Minimal reimplementation of lib/embeddings.ts's embedText, inlined here
@@ -36,19 +63,33 @@ const ACME_BUSINESS_NAME = "Acme Test Co.";
  * won't rank near the top of a real similarity search.
  */
 async function embedForEval(text) {
-  const client = new GoogleGenAI({ apiKey: requireEnv("GEMINI_API_KEY") });
+  const apiKey = resolveGeminiKey() ?? requireEnv("GEMINI_API_KEY");
+  const client = new GoogleGenAI({ apiKey });
   const dimension = Number.parseInt(requireEnv("GEMINI_EMBEDDING_DIMENSION"), 10);
-  const response = await client.models.embedContent({
-    model: requireEnv("GEMINI_EMBEDDING_MODEL"),
-    contents: [text],
-    config: { outputDimensionality: dimension },
-  });
-  const values = response.embeddings?.[0]?.values;
-  if (!values || values.length !== dimension) {
-    throw new Error(`embedForEval: expected ${dimension} dimensions, got ${values?.length ?? "undefined"}`);
+  const startedAt = Date.now();
+  try {
+    const response = await client.models.embedContent({
+      model: requireEnv("GEMINI_EMBEDDING_MODEL"),
+      contents: [text],
+      config: { outputDimensionality: dimension },
+    });
+    const values = response.embeddings?.[0]?.values;
+    if (!values || values.length !== dimension) {
+      throw new Error(`embedForEval: expected ${dimension} dimensions, got ${values?.length ?? "undefined"}`);
+    }
+    logScriptGeminiCall({ feature: "eval_script", model: requireEnv("GEMINI_EMBEDDING_MODEL"), durationMs: Date.now() - startedAt, success: true });
+    const norm = Math.sqrt(values.reduce((sum, value) => sum + value * value, 0));
+    return norm === 0 ? values : values.map((value) => value / norm);
+  } catch (error) {
+    logScriptGeminiCall({
+      feature: "eval_script",
+      model: requireEnv("GEMINI_EMBEDDING_MODEL"),
+      durationMs: Date.now() - startedAt,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
-  const norm = Math.sqrt(values.reduce((sum, value) => sum + value * value, 0));
-  return norm === 0 ? values : values.map((value) => value / norm);
 }
 
 function requireEnv(name) {
@@ -514,6 +555,17 @@ async function main() {
       : [...buildCases(businessId), ...buildInstantAnswerCases(businessId)].filter(
           (c) => !only || only.split("|").some((part) => c.name.toLowerCase().includes(part)),
         );
+
+  // Each JSON-path case is up to MAX_TOOL_ITERATIONS (4) chat calls + 1
+  // retrieval embedding (lib/rag.ts); the red-team suite is ~100 real
+  // model calls on its own, per redteam-runner.mjs's header comment.
+  const mainEstimate = cases.length * 5;
+  const redteamEstimate = suite === "main" ? 0 : 100;
+  await requireProdConfirmation({
+    scriptName: "run-evals.mjs",
+    appUrl: APP_URL,
+    estimateLine: `Estimated real Gemini calls: up to ~${mainEstimate + redteamEstimate} (main suite: ${cases.length} case(s) x up to ~5 calls each${redteamEstimate ? `; red-team suite: ~${redteamEstimate}` : ""}).`,
+  });
 
   if (suite !== "redteam") {
     console.log(`Running ${cases.length} eval case(s) against ${APP_URL}, business "${ACME_BUSINESS_NAME}"...\n`);

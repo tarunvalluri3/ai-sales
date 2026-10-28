@@ -9,6 +9,7 @@ import { listServicesByIds } from "@/lib/services";
 import { channelLabel } from "@/lib/conversation-channel";
 import { MAX_LEAD_SCORE } from "@/lib/lead-scoring";
 import { AppError } from "@/lib/errors";
+import { withGeminiUsageLog } from "@/lib/gemini-usage-log";
 import type { Message, CopilotDismissal } from "@/lib/supabase/types";
 import {
   computePriority,
@@ -328,7 +329,15 @@ ${transcript}`;
 
   let narrative: string;
   try {
-    const response = await getChatModel().invoke(prompt);
+    const response = await withGeminiUsageLog(
+      { feature: "copilot", trigger: "dashboard", model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId: latestConversation.id },
+      () => getChatModel().invoke(prompt),
+      (result) => ({
+        promptTokens: result.usage_metadata?.input_tokens ?? null,
+        candidatesTokens: result.usage_metadata?.output_tokens ?? null,
+        totalTokens: result.usage_metadata?.total_tokens ?? null,
+      }),
+    );
     const text = typeof response.content === "string" ? response.content : String(response.content ?? "");
     narrative = text.trim().slice(0, MAX_BRIEF_LENGTH);
   } catch (error) {

@@ -40,7 +40,7 @@ function buildKnowledgeContent(input: ProductInput): string {
  */
 async function computeEmbeddingBestEffort(businessId: string, text: string): Promise<number[] | null> {
   try {
-    return await embedText(text);
+    return await embedText(text, { feature: "embed_ingest", trigger: "dashboard", businessId });
   } catch {
     logEvent("product_embedding_failed", businessId, {}, "error");
     return null;
