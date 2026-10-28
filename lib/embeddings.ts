@@ -2,6 +2,22 @@ import "server-only";
 import { Embeddings } from "@langchain/core/embeddings";
 import { GoogleGenAI } from "@google/genai";
 import { AppError } from "@/lib/errors";
+import { recordGeminiUsage, type GeminiUsageTrigger } from "@/lib/gemini-usage-log";
+
+/**
+ * Who/why this embedding call happened, for the token-burn audit's usage
+ * log. Optional and defaulting to "a live chat-turn query embedding"
+ * (feature "embed_query", trigger "user") because that is by far the most
+ * common caller (every retrieval call embeds the prospect's question);
+ * ingestion call sites (knowledge chunking, product/service catalog saves,
+ * answer-bank generation) pass their own explicit context instead.
+ */
+export type GeminiEmbeddingCallContext = {
+  feature?: string;
+  trigger?: GeminiUsageTrigger;
+  businessId?: string | null;
+  conversationId?: string | null;
+};
 
 /**
  * Fallback path from Phase 7's Implementation Requirement 1: the current
@@ -142,15 +158,29 @@ function getEmbeddingsClient(): TruncatedGeminiEmbeddings {
 }
 
 /** Embeds and L2-normalizes a batch of texts. Run concurrently by the underlying client's own batching (a single embedContent call covers the whole array). */
-export async function embedTexts(texts: string[]): Promise<number[][]> {
+export async function embedTexts(texts: string[], context: GeminiEmbeddingCallContext = {}): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
   }
 
+  const startedAt = Date.now();
   let raw: number[][];
   try {
     raw = await getEmbeddingsClient().embedDocuments(texts);
   } catch (error) {
+    // The embedding API never returns token counts (confirmed against the
+    // installed @google/genai's EmbedContentResponse type), so this row
+    // carries duration/success only.
+    recordGeminiUsage({
+      feature: context.feature ?? "embed_query",
+      trigger: context.trigger ?? "user",
+      model: process.env.GEMINI_EMBEDDING_MODEL!,
+      durationMs: Date.now() - startedAt,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      businessId: context.businessId ?? null,
+      conversationId: context.conversationId ?? null,
+    });
     if (error instanceof AppError) {
       throw error;
     }
@@ -161,11 +191,20 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
     );
   }
 
+  recordGeminiUsage({
+    feature: context.feature ?? "embed_query",
+    trigger: context.trigger ?? "user",
+    model: process.env.GEMINI_EMBEDDING_MODEL!,
+    durationMs: Date.now() - startedAt,
+    success: true,
+    businessId: context.businessId ?? null,
+    conversationId: context.conversationId ?? null,
+  });
   return raw.map(l2Normalize);
 }
 
 /** Embeds and L2-normalizes a single text (e.g. a retrieval query). */
-export async function embedText(text: string): Promise<number[]> {
-  const [embedding] = await embedTexts([text]);
+export async function embedText(text: string, context?: GeminiEmbeddingCallContext): Promise<number[]> {
+  const [embedding] = await embedTexts([text], context);
   return embedding;
 }

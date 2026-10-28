@@ -8,6 +8,7 @@ import { customerMatchesSegment } from "@/lib/segments";
 import { getCustomerSnapshotForWorkflow } from "@/lib/customers";
 import { logEvent } from "@/lib/logger";
 import { assignNextTeamMember } from "@/lib/team-assignment";
+import { withGeminiUsageLog, type GeminiUsageTrigger } from "@/lib/gemini-usage-log";
 import type {
   Workflow,
   WorkflowActionStep,
@@ -107,6 +108,11 @@ export async function dispatchWorkflowTrigger(
   triggerType: WorkflowTriggerType,
   target: WorkflowTarget,
   triggerContext: Record<string, string | number | null> = {},
+  // Token-burn audit (2026-10-28): which channel ultimately caused this
+  // dispatch, logged on any Gemini call a "generate_followup_draft" step
+  // makes. Named usageTrigger, not trigger, to stay distinct from this
+  // function's own triggerType (the workflow trigger event).
+  usageTrigger: GeminiUsageTrigger = "dashboard",
 ): Promise<void> {
   try {
     const { data: workflows } = await supabase
@@ -129,7 +135,7 @@ export async function dispatchWorkflowTrigger(
 
       if (!matches) continue;
 
-      await createAndAdvanceWorkflowRun(supabase, businessId, workflow, triggerType, target);
+      await createAndAdvanceWorkflowRun(supabase, businessId, workflow, triggerType, target, usageTrigger);
     }
   } catch {
     logEvent("workflow_dispatch_failed", businessId, { triggerType }, "error");
@@ -142,6 +148,7 @@ export async function createAndAdvanceWorkflowRun(
   workflow: Workflow,
   triggerType: WorkflowTriggerType,
   target: WorkflowTarget,
+  usageTrigger: GeminiUsageTrigger = "cron",
 ): Promise<void> {
   const steps = workflow.steps.slice(0, MAX_RUN_STEPS);
 
@@ -166,7 +173,7 @@ export async function createAndAdvanceWorkflowRun(
 
   if (error || !run) return;
 
-  await advanceWorkflowRun(supabase, run as WorkflowRun);
+  await advanceWorkflowRun(supabase, run as WorkflowRun, usageTrigger);
 }
 
 function waitMs(step: Extract<WorkflowStep, { type: "wait" }>): number {
@@ -188,7 +195,11 @@ type ActionResult = { success: true } | { success: false; reason: string };
  * calling request's own next chance (none exists for a wait) or, in
  * practice, always by the cron sweep's `claim_due_workflow_runs()`.
  */
-export async function advanceWorkflowRun(supabase: SupabaseClient, run: WorkflowRun): Promise<void> {
+export async function advanceWorkflowRun(
+  supabase: SupabaseClient,
+  run: WorkflowRun,
+  usageTrigger: GeminiUsageTrigger = "cron",
+): Promise<void> {
   let index = run.next_step_index;
   const steps = run.steps;
 
@@ -205,7 +216,7 @@ export async function advanceWorkflowRun(supabase: SupabaseClient, run: Workflow
       return;
     }
 
-    const result = await executeWorkflowAction(supabase, run, step, index);
+    const result = await executeWorkflowAction(supabase, run, step, index, usageTrigger);
 
     if (!result.success) {
       await supabase
@@ -228,7 +239,13 @@ export async function advanceWorkflowRun(supabase: SupabaseClient, run: Workflow
     .eq("business_id", run.business_id);
 }
 
-async function executeWorkflowAction(supabase: SupabaseClient, run: WorkflowRun, step: WorkflowActionStep, stepIndex: number): Promise<ActionResult> {
+async function executeWorkflowAction(
+  supabase: SupabaseClient,
+  run: WorkflowRun,
+  step: WorkflowActionStep,
+  stepIndex: number,
+  usageTrigger: GeminiUsageTrigger,
+): Promise<ActionResult> {
   switch (step.type) {
     case "add_tag": {
       if (!run.lead_id && !run.conversation_id) return { success: false, reason: "No lead or conversation to tag." };
@@ -317,7 +334,7 @@ async function executeWorkflowAction(supabase: SupabaseClient, run: WorkflowRun,
 
     case "generate_followup_draft": {
       if (!run.lead_id) return { success: false, reason: "No lead to draft a follow-up for." };
-      return generateFollowUpDraft(supabase, run.business_id, run.lead_id);
+      return generateFollowUpDraft(supabase, run.business_id, run.lead_id, usageTrigger);
     }
 
     default:
@@ -334,7 +351,12 @@ async function executeWorkflowAction(supabase: SupabaseClient, run: WorkflowRun,
  * rather than reaching into stalled-leads.ts's own private, differently-typed
  * helper. Idempotent: does nothing (still succeeds) if a draft already exists.
  */
-async function generateFollowUpDraft(supabase: SupabaseClient, businessId: string, leadId: string): Promise<ActionResult> {
+async function generateFollowUpDraft(
+  supabase: SupabaseClient,
+  businessId: string,
+  leadId: string,
+  usageTrigger: GeminiUsageTrigger,
+): Promise<ActionResult> {
   const { data: lead } = await supabase
     .from("leads")
     .select("id, contact_name, notes, follow_up_message")
@@ -356,7 +378,15 @@ async function generateFollowUpDraft(supabase: SupabaseClient, businessId: strin
   const prompt = `You are drafting one short follow-up message on behalf of "${business?.name ?? "the business"}" to a prospect from an earlier conversation. Write 2-3 warm, natural sentences using ONLY the facts given below -- never invent a price, discount, availability, or promise that isn't stated. End with a soft, low-pressure question. No greeting, no sign-off. Plain text only.\n\n${contextLines || "No further context is available -- keep the message generic but warm."}`;
 
   try {
-    const response = await getChatModel().invoke(prompt);
+    const response = await withGeminiUsageLog(
+      { feature: "workflow_engine", trigger: usageTrigger, model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId: null },
+      () => getChatModel().invoke(prompt),
+      (result) => ({
+        promptTokens: result.usage_metadata?.input_tokens ?? null,
+        candidatesTokens: result.usage_metadata?.output_tokens ?? null,
+        totalTokens: result.usage_metadata?.total_tokens ?? null,
+      }),
+    );
     const message = typeof response.content === "string" ? response.content.trim() : "";
     if (!message) return { success: false, reason: "Model returned no draft." };
 

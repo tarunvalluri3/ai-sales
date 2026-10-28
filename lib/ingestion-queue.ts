@@ -5,6 +5,7 @@ import { regenerateChunksForDocument } from "@/lib/knowledge";
 import { logEvent } from "@/lib/logger";
 import { AppError } from "@/lib/errors";
 import type { KnowledgeDocument } from "@/lib/supabase/types";
+import type { GeminiUsageTrigger } from "@/lib/gemini-usage-log";
 
 /**
  * Phase 23's background knowledge-ingestion queue. A knowledge document's
@@ -72,7 +73,11 @@ function safeIngestionErrorMessage(error: unknown): string {
  * Safe to call concurrently (the claim itself is what prevents
  * double-processing, not a lock held by this function).
  */
-export async function processIngestionQueue(): Promise<ProcessQueueResult> {
+export async function processIngestionQueue(
+  // Token-burn audit (2026-10-28): "cron" by default (the daily sweep);
+  // the dashboard's immediate after() trigger passes "dashboard".
+  trigger: GeminiUsageTrigger = "cron",
+): Promise<ProcessQueueResult> {
   const supabase = createServiceSupabaseClient();
 
   const { data: jobs, error: claimError } = await supabase.rpc("claim_knowledge_ingestion_jobs", {
@@ -91,7 +96,7 @@ export async function processIngestionQueue(): Promise<ProcessQueueResult> {
 
   for (const document of claimed) {
     try {
-      await regenerateChunksForDocument(supabase, document.business_id, document.id, document.content);
+      await regenerateChunksForDocument(supabase, document.business_id, document.id, document.content, trigger);
 
       await supabase
         .from("knowledge_documents")

@@ -4,6 +4,7 @@ import { getChatModel } from "@/lib/rag";
 import { listMessagesForConversation } from "@/lib/messages";
 import { listTagsForBusiness } from "@/lib/lead-tags";
 import { AppError } from "@/lib/errors";
+import { withGeminiUsageLog } from "@/lib/gemini-usage-log";
 import type { Message } from "@/lib/supabase/types";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
@@ -69,7 +70,15 @@ ${transcript}`;
 
   let raw: string;
   try {
-    const response = await getChatModel().invoke(prompt);
+    const response = await withGeminiUsageLog(
+      { feature: "tag_suggestion", trigger: "dashboard", model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId },
+      () => getChatModel().invoke(prompt),
+      (result) => ({
+        promptTokens: result.usage_metadata?.input_tokens ?? null,
+        candidatesTokens: result.usage_metadata?.output_tokens ?? null,
+        totalTokens: result.usage_metadata?.total_tokens ?? null,
+      }),
+    );
     raw = typeof response.content === "string" ? response.content : String(response.content ?? "");
   } catch (error) {
     throw new AppError(

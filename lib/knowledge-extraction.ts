@@ -5,6 +5,7 @@ import { getChatModel } from "@/lib/rag";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { renderPdfPageToPng } from "@/lib/pdf-page-images";
 import { logEvent } from "@/lib/logger";
+import { withGeminiUsageLog } from "@/lib/gemini-usage-log";
 
 /**
  * Stage 2 of "generalize the AI's business understanding" (STATE.md): pulls
@@ -105,22 +106,33 @@ function normalizeForDedup(value: string): string {
   return value.trim().toLowerCase();
 }
 
-async function extractStructuredCatalog(title: string, content: string): Promise<ExtractionResult> {
+// Neither extraction call below sets includeRaw, so usage_metadata isn't
+// available -- their gemini_api_calls rows carry duration/success only.
+async function extractStructuredCatalog(businessId: string, title: string, content: string): Promise<ExtractionResult> {
   const model = getChatModel().withStructuredOutput(ExtractionResultSchema, { name: "CatalogExtraction" });
   const prompt = EXTRACTION_PROMPT.replace("{title}", title).replace("{content}", content);
-  return model.invoke([new HumanMessage(prompt)]);
+  return withGeminiUsageLog(
+    { feature: "knowledge_extraction", trigger: "dashboard", model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId: null },
+    () => model.invoke([new HumanMessage(prompt)]),
+    () => ({}),
+  );
 }
 
 /** `pdfBase64` is the raw PDF bytes, base64-encoded, sent as a native multimodal file part -- exact shape confirmed against the installed @langchain/google-genai package's own documented example ("Document Messages"), not assumed from memory. */
-async function extractStructuredCatalogFromPdf(title: string, pdfBase64: string): Promise<ExtractionResult> {
+async function extractStructuredCatalogFromPdf(businessId: string, title: string, pdfBase64: string): Promise<ExtractionResult> {
   const model = getChatModel().withStructuredOutput(ExtractionResultSchema, { name: "CatalogExtraction" });
   const prompt = PDF_EXTRACTION_PROMPT.replace("{title}", title);
-  return model.invoke([
-    ["user", [
-      { type: "application/pdf", data: pdfBase64 },
-      { type: "text", text: prompt },
-    ]],
-  ]);
+  return withGeminiUsageLog(
+    { feature: "knowledge_extraction", trigger: "dashboard", model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId: null },
+    () =>
+      model.invoke([
+        ["user", [
+          { type: "application/pdf", data: pdfBase64 },
+          { type: "text", text: prompt },
+        ]],
+      ]),
+    () => ({}),
+  );
 }
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
@@ -224,7 +236,7 @@ export async function extractCatalogFromDocument(
   const supabase = createServiceSupabaseClient();
 
   try {
-    const result = await extractStructuredCatalog(title, content);
+    const result = await extractStructuredCatalog(businessId, title, content);
     const counts = await insertExtractionResult(supabase, businessId, documentId, result, new Map());
     if (!counts) return;
 
@@ -270,7 +282,7 @@ export async function extractCatalogFromPdfDocument(
     const pdfBytes = new Uint8Array(await pdfFile.arrayBuffer());
     const pdfBase64 = Buffer.from(pdfBytes).toString("base64");
 
-    const result = await extractStructuredCatalogFromPdf(title, pdfBase64);
+    const result = await extractStructuredCatalogFromPdf(businessId, title, pdfBase64);
 
     const pageNumbers = [
       ...new Set(

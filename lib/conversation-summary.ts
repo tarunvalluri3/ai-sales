@@ -3,6 +3,7 @@ import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getChatModel } from "@/lib/rag";
 import { listMessagesForConversation } from "@/lib/messages";
 import { AppError } from "@/lib/errors";
+import { withGeminiUsageLog } from "@/lib/gemini-usage-log";
 import type { Message } from "@/lib/supabase/types";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
@@ -60,7 +61,15 @@ ${transcript}`;
 
   let summary: string;
   try {
-    const response = await getChatModel().invoke(prompt);
+    const response = await withGeminiUsageLog(
+      { feature: "summary", trigger: "dashboard", model: process.env.GEMINI_CHAT_MODEL!, businessId, conversationId },
+      () => getChatModel().invoke(prompt),
+      (result) => ({
+        promptTokens: result.usage_metadata?.input_tokens ?? null,
+        candidatesTokens: result.usage_metadata?.output_tokens ?? null,
+        totalTokens: result.usage_metadata?.total_tokens ?? null,
+      }),
+    );
     const text = typeof response.content === "string" ? response.content : String(response.content ?? "");
     summary = text.trim().slice(0, MAX_SUMMARY_LENGTH);
   } catch (error) {
