@@ -115,6 +115,16 @@ jobs:
         # are pgTAP file 059, run against staging below.)
         run: npm run test:admin-billing-shared
 
+      - name: Admin PII masking tests
+        # Phase 33 Stop 4 (docs/phases.md): maskEmail()/maskPhone()
+        # (lib/admin-pii-mask.ts), the display masking for /apache's
+        # cross-tenant Conversations & Leads pages. Pure module, no
+        # database and no secrets. No new tables this stop (Stop 4 reads
+        # and acts on existing conversations/leads/messages/connections/
+        # queue tables only), so there is no new pgTAP file to run against
+        # staging below.
+        run: npm run test:admin-pii-mask
+
       - name: Chat pipeline latency-pass tests
         # 2026-10-22 latency pass (STATE.md): the search-dedupe guard
         # (lib/chat-query-dedupe.ts) and the AI deadline ordering invariants
