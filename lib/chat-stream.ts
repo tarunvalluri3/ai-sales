@@ -49,6 +49,8 @@ export type ChatStreamErrorKind = "failure" | "unauthorized" | "rate_limited";
 export type ChatStreamEvent =
   | { type: "meta"; conversationId: string; asOf: string | null }
   | { type: "delta"; text: string }
+  /** Guardrails Phase 4: replace everything shown so far with `text` (the safe reply). */
+  | { type: "retract"; text: string }
   | { type: "final"; escalate: boolean; recommendedProducts: StreamRecommendedProduct[]; asOf: string | null }
   | { type: "error"; kind: ChatStreamErrorKind };
 

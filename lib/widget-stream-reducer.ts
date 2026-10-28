@@ -21,6 +21,15 @@ export function appendStreamDelta<T extends { id: string; content: string }>(
 }
 
 /** Merges terminal fields (e.g. escalate, recommendedProducts) onto one message by id -- the clean end of a stream. The accumulated content is left exactly as the deltas built it. */
+/**
+ * Guardrails Phase 4: replaces the whole content of a streaming message with
+ * `text` -- the server found a problem after some of the answer was already
+ * shown, so the partial text is swapped for the safe reply.
+ */
+export function retractStreamMessage<T extends { id: string; content: string }>(messages: T[], id: string, text: string): T[] {
+  return messages.map((message) => (message.id === id ? { ...message, content: text } : message));
+}
+
 export function finalizeStreamMessage<T extends { id: string }>(messages: T[], id: string, patch: Partial<T>): T[] {
   return messages.map((message) => (message.id === id ? { ...message, ...patch } : message));
 }

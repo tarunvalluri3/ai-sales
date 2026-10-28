@@ -3,7 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
 import type { GuardrailSignal } from "@/lib/guardrails/prepare-message";
 
-export type GuardrailChannel = "chat_widget" | "whatsapp" | "instagram" | "sandbox";
+export type GuardrailChannel = "chat_widget" | "whatsapp" | "instagram" | "sandbox" | "reply" | "tool";
 
 /**
  * Logs each signal as a structured `guardrail_signal` event and persists it to

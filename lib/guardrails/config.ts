@@ -18,9 +18,20 @@
  */
 export type GuardrailMode = "log_only" | "enforce";
 
-export const GUARDRAIL_MODES = {
+export type GuardrailCheck = "injection" | "abuse" | "output_contacts" | "output_promise";
+
+// Typed as Record<..., GuardrailMode> (not `as const`) on purpose: flipping a value
+// to "enforce" must type-check at every `=== "enforce"` branch, not be narrowed away.
+export const GUARDRAIL_MODES: Record<GuardrailCheck, GuardrailMode> = {
   injection: "log_only",
   abuse: "log_only",
-} as const satisfies Record<string, GuardrailMode>;
+  // Output checks (guardrails Phase 4). A link, email or phone number in a reply
+  // that appears nowhere in this turn's evidence is removed; an affirmative
+  // discount/refund/guarantee/free promise with no support in the business's
+  // data swaps the reply for the safe one. Both log-only until reviewed.
+  // NOT listed here because they enforce from day one: the canary-leak and
+  // verbatim-prompt-leak block (lib/guardrails/output-check.ts detectLeak).
+  output_contacts: "log_only",
+  output_promise: "log_only",
+};
 
-export type GuardrailCheck = keyof typeof GUARDRAIL_MODES;

@@ -45,6 +45,7 @@ export function InfoPanel({
   catalogTags,
   canEditTags,
   recommendedAction,
+  guardrailFlags,
 }: {
   conversation: Conversation;
   lead: Lead | null;
@@ -57,6 +58,8 @@ export function InfoPanel({
   canEditTags: boolean;
   /** Phase 30: a deterministic Sales Copilot hint -- untrusted only in the sense that priority weighting is a product judgment call, never fabricated (every input is a real stored field). Null when this conversation has no linked customer yet. */
   recommendedAction: string | null;
+  /** Guardrails Phase 5: what the guardrails caught in this conversation, e.g. "2 prompt-injection attempts". Empty = nothing flagged, and nothing is rendered. */
+  guardrailFlags: string[];
 }) {
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
@@ -139,6 +142,23 @@ export function InfoPanel({
           >
             View in Appointments
           </Link>
+        </div>
+      ) : null}
+
+      {guardrailFlags.length > 0 ? (
+        <div className="flex flex-col gap-1.5 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-medium text-ds-text-primary">Flagged by guardrails</h3>
+            <Badge tone="warning">Review</Badge>
+          </div>
+          <ul className="flex flex-col gap-0.5">
+            {guardrailFlags.map((flag) => (
+              <li key={flag} className="text-xs text-ds-text-secondary">
+                {flag}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-ds-text-muted">The AI&apos;s safety checks caught these in this conversation. Check the transcript before replying.</p>
         </div>
       ) : null}
 

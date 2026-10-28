@@ -146,6 +146,37 @@ jobs:
         # against staging below.)
         run: npm run test:answer-bank
 
+      - name: Tool scope and write-cap tests
+        # Guardrails Phase 3 (STATE.md): every AI tool is scoped to its business,
+        # no tool can fetch a URL, contacts passed to write tools are verified
+        # against what the visitor typed, and the write caps are wired before
+        # each write. Needs --conditions=react-server (the executors are
+        # server-only). No database and no secrets.
+        run: npm run test:tool-scope
+
+      - name: Output guardrail tests
+        # Guardrails Phase 4 (STATE.md): the canary / verbatim-prompt leak block,
+        # the unlisted link/email/phone filter, the unbacked-promise detector and
+        # the StreamOutputGuard (hold-back, mid-stream retract), plus the widget
+        # retract wiring. Pure modules, no network and no secrets.
+        run: npm run test:output-guard
+
+      - name: Guardrail response-path tests
+        # Guardrails Phase 5 (STATE.md): the enforcing response policy (fixed safe
+        # reply + handover, repeated-abuse cut-off), the owner-facing flag labels,
+        # and the wiring in the widget route, WhatsApp and Instagram. Pure modules,
+        # no database and no secrets.
+        run: npm run test:guardrail-response
+
+      - name: Eval judge tests
+        # Guardrails Phase 6 (STATE.md): the red-team eval catalog and judges
+        # (scripts/eval-judges.mjs). Proves each judge FAILS the reply an attacker
+        # wanted (several are replies the real model gave in the Phase 0 red-team)
+        # and passes a correct refusal, so the red-team score cannot silently pass
+        # everything. Pure and free: no model, no database. The live red-team run
+        # itself is `npm run eval:redteam` (manual, like npm run eval).
+        run: npm run test:eval-judges
+
       - name: Build
         run: npm run build
 

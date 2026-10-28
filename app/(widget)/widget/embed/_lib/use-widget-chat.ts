@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { parseFromParentMessage, postToParent, type WidgetErrorKind, type WidgetRecommendedProduct } from "./post-message";
 import type { WidgetStrings } from "@/lib/widget-i18n";
 import { CHAT_CLIENT_TIMEOUT_MS } from "@/lib/chat-timeouts";
-import { appendStreamDelta, finalizeStreamMessage, finalizeAbortedStream } from "@/lib/widget-stream-reducer";
+import { appendStreamDelta, finalizeStreamMessage, finalizeAbortedStream, retractStreamMessage } from "@/lib/widget-stream-reducer";
 
 export type ChatMessage = {
   id: string;
@@ -116,6 +116,17 @@ export function useWidgetChat(strings: WidgetStrings) {
           setIsAwaitingResponse(false);
         }
         setMessages((prev) => appendStreamDelta(prev, pending.assistantPlaceholderId, message.text));
+      } else if (message.type === "widget:stream_retract") {
+        const pending = pendingRef.current.get(message.requestId);
+        if (!pending) return;
+        // The retract may be the first visible text of the turn (nothing had been
+        // released yet), so it also ends the typing indicator like a first delta.
+        if (!pending.sawDelta) {
+          pending.sawDelta = true;
+          if (pending.timeoutId) clearTimeout(pending.timeoutId);
+          setIsAwaitingResponse(false);
+        }
+        setMessages((prev) => retractStreamMessage(prev, pending.assistantPlaceholderId, message.text));
       } else if (message.type === "widget:stream_end") {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
