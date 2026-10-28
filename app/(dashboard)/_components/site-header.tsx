@@ -35,7 +35,11 @@ export function SiteHeader() {
   const [menuOpenedAt, setMenuOpenedAt] = useState<string | null>(null);
   const isMenuOpen = menuOpenedAt !== null && menuOpenedAt === pathname;
 
-  const isDashboard = pathname?.startsWith("/dashboard");
+  // Phase 33 (docs/phases.md): /apache (the platform-admin panel) renders
+  // its own header (app/(dashboard)/apache/_components/header.tsx) exactly
+  // like /dashboard does, for the same reason -- grouped here so neither
+  // branch below needs to know it exists twice.
+  const isDashboard = pathname?.startsWith("/dashboard") || pathname?.startsWith("/apache");
   const isAuthFlow =
     pathname?.startsWith("/sign-in") ||
     pathname?.startsWith("/sign-up") ||

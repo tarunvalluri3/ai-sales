@@ -97,6 +97,16 @@ jobs:
         # file 052, run against staging below.)
         run: npm run test:onboarding-readiness
 
+      - name: Platform-admin gate rule tests
+        # Phase 33 (docs/phases.md): the pure role-ranking and MFA-freshness
+        # rules behind the /apache platform-admin gate (lib/platform-admin-rules.ts).
+        # A regression here could let a stale or missing second factor pass
+        # as "fresh", or let a viewer-ranked admin pass a higher-role check.
+        # Pure module, no database and no secrets. (platform_admins'/
+        # admin_audit_log's zero-grant posture and immutability trigger are
+        # pgTAP file 058, run against staging below.)
+        run: npm run test:platform-admin-rules
+
       - name: Chat pipeline latency-pass tests
         # 2026-10-22 latency pass (STATE.md): the search-dedupe guard
         # (lib/chat-query-dedupe.ts) and the AI deadline ordering invariants

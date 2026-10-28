@@ -17,7 +17,12 @@ export type RateLimitScope =
   // fail OPEN -- see lib/abuse-limits.ts (LOG_ONLY_SCOPES / FAIL_OPEN_SCOPES).
   | "business_burst"
   | "new_conversation_ip"
-  | "ip_subnet";
+  | "ip_subnet"
+  // Phase 33 (docs/phases.md): /apache platform-admin scopes. Both are
+  // enforcing (not log-only/fail-open -- see lib/abuse-limits.ts), keyed on
+  // the acting admin's Clerk user_id, not an IP or tenant.
+  | "admin_mutation"
+  | "admin_pii_reveal";
 
 /**
  * Raw fixed-window increment: bumps the (scope, identifier) counter via
