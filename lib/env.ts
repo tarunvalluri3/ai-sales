@@ -16,7 +16,11 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   SUPABASE_SECRET_KEY: z.string().min(1),
-  GEMINI_API_KEY: z.string().min(1),
+  // Token-burn audit (STATE.md, 2026-10-28): both optional here because
+  // which one is actually required depends on the environment -- resolved
+  // just below, immediately after this schema validates.
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_KEY_DEV: z.string().min(1).optional(),
   GEMINI_CHAT_MODEL: z.string().min(1),
   GEMINI_EMBEDDING_MODEL: z.string().min(1),
   GEMINI_EMBEDDING_DIMENSION: z.string().regex(/^\d+$/, "must be a positive integer"),
@@ -68,4 +72,32 @@ if (!parsed.success) {
   );
 }
 
-export const env = parsed.data;
+/**
+ * Which Gemini key this process actually uses -- production (Vercel's own
+ * VERCEL_ENV, set on every deploy) uses GEMINI_API_KEY; every other
+ * environment (local dev, Vercel preview) uses GEMINI_API_KEY_DEV. Missing
+ * the one this environment needs fails loudly here, at startup, rather
+ * than silently falling back to the production key (the exact accidental
+ * spend the token-burn audit, STATE.md, found no safeguard against).
+ *
+ * `process.env.GEMINI_API_KEY` is reassigned to the resolved value so
+ * every existing `process.env.GEMINI_API_KEY!` read elsewhere (lib/rag.ts's
+ * getChatModel(), lib/embeddings.ts's getEmbeddingsClient()) keeps working
+ * unchanged -- this is wiring, not a call-site rewrite. Those two files
+ * only ever run after instrumentation.ts's register() has already imported
+ * this module (Next.js's documented startup order), so the reassignment
+ * below always happens first.
+ */
+const isProductionEnvironment = process.env.VERCEL_ENV === "production";
+const resolvedGeminiApiKey = isProductionEnvironment ? parsed.data.GEMINI_API_KEY : parsed.data.GEMINI_API_KEY_DEV;
+
+if (!resolvedGeminiApiKey) {
+  throw new Error(
+    isProductionEnvironment
+      ? "Missing required environment variable: GEMINI_API_KEY (production). See .env.example and docs/security.md §5."
+      : "Missing required environment variable: GEMINI_API_KEY_DEV. Every non-production environment (local dev, Vercel preview) uses this, never GEMINI_API_KEY -- see .env.example and docs/security.md §5.",
+  );
+}
+process.env.GEMINI_API_KEY = resolvedGeminiApiKey;
+
+export const env = { ...parsed.data, GEMINI_API_KEY: resolvedGeminiApiKey };
