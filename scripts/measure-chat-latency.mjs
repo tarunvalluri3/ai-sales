@@ -22,6 +22,7 @@
  * clearly separate in the report.
  */
 import { createClient } from "@supabase/supabase-js";
+import { requireProdConfirmation } from "./lib/usage-guard.mjs";
 
 const APP_URL = process.env.EVAL_APP_URL || "http://localhost:3000";
 const ORIGIN = process.env.EVAL_ORIGIN || APP_URL;
@@ -148,6 +149,16 @@ function pct(sorted, p) {
 }
 
 async function main() {
+  // Each run is 2 real turns (an unmeasured warm-up + the measured 2nd
+  // turn), each up to ~5 Gemini calls (lib/rag.ts: up to MAX_TOOL_ITERATIONS
+  // chat calls + 1 retrieval embedding; stream mode also fires the
+  // concurrent metadata call).
+  await requireProdConfirmation({
+    scriptName: "measure-chat-latency.mjs",
+    appUrl: APP_URL,
+    estimateLine: `Estimated real Gemini calls: up to ~${RUNS * 2 * 5} (${RUNS} run(s) x 2 turns x up to ~5 calls, MODE=${MODE}).`,
+  });
+
   const widgetKey = await getAcmeWidgetKey();
   console.log(`MODE=${MODE} against ${APP_URL}, ${RUNS} measured turns (each a 2nd turn), business "${ACME_BUSINESS_NAME}"\n`);
   const ttfts = [];
