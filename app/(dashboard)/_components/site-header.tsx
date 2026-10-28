@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
@@ -53,6 +53,34 @@ export function SiteHeader() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isMenuOpen]);
 
+  // Marketing pages only: the header is solid at every scroll position --
+  // a fully transparent top state was tried and reverted (2026-10-28) after
+  // it left the logo and nav links sitting directly on the ambient dot-grid
+  // background with no solid surface behind them, reading as washed-out and
+  // low-contrast against the rest of the page. Scrolling now only adds a
+  // slightly stronger border and a soft shadow, never changes the fill.
+  //
+  // The initial value must still be `false` on both server and client --
+  // reading `window.scrollY` in the `useState` initializer diverges between
+  // the server render (always 0, no window) and a client mount that starts
+  // already scrolled (back/forward navigation, an anchor link, scroll
+  // restoration), which React flags as a hydration mismatch. A
+  // `useLayoutEffect` instead corrects the value synchronously before the
+  // browser paints, so a page opened mid-scroll never shows the wrong state
+  // even for one frame.
+  const [scrolled, setScrolled] = useState(false);
+
+  useLayoutEffect(() => {
+    if (isDashboard || isAuthFlow) return;
+
+    function handleScroll() {
+      setScrolled(window.scrollY > 8);
+    }
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isDashboard, isAuthFlow]);
+
   // The dashboard renders its own header from dashboard/layout.tsx
   // (dashboard-header.tsx), so that the notification bell sits inside
   // AttentionProvider and can read the unread count from the existing poll.
@@ -76,7 +104,11 @@ export function SiteHeader() {
   }
 
   return (
-    <header className="border-b border-ds-border bg-ds-bg">
+    <header
+      className={`sticky top-0 z-40 border-b bg-ds-bg transition-shadow duration-200 ${
+        scrolled ? "border-ds-border-strong shadow-[0_8px_24px_-16px_rgba(0,0,0,0.5)]" : "border-ds-border"
+      }`}
+    >
       <div className="flex items-center gap-7 px-6 py-4">
         {/* The nav and the auth pair compete for width here, so the name
             drops out below 480px per the logo system's navbar rule. */}

@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://ai-sales-ashy-eight.vercel.app"),
   title: "Waves AI Pilot",
   description: "An AI sales employee grounded in your business's own knowledge.",
 };

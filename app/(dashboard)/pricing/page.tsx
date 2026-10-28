@@ -5,6 +5,7 @@ import {
   formatPaiseAsInr,
   formatReplyQuota,
 } from "@/lib/plans";
+import { MicroChip } from "@/components/marketing/fragments/_shared";
 
 export const metadata = {
   title: "Pricing | Waves AI Pilot",
@@ -56,7 +57,11 @@ export default function PricingPage() {
   return (
     <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        <div className="mx-auto flex max-w-2xl flex-col gap-3 text-center">
+        <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 text-center">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
+            <span className="size-1.5 rounded-full bg-ds-accent" aria-hidden="true" />
+            Pricing
+          </span>
           <h1 className="text-3xl font-semibold text-ds-text-primary">Pricing</h1>
           <p className="text-sm leading-relaxed text-ds-text-secondary">
             One AI sales employee, grounded in your own business. Start with a 14-day free trial — no
@@ -81,11 +86,7 @@ export default function PricingPage() {
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="text-lg font-semibold text-ds-text-primary">{plan.name}</h2>
-                  {plan.featured ? (
-                    <span className="rounded-ds-sm bg-ds-accent-soft-bg px-2 py-0.5 text-2xs font-semibold text-ds-accent">
-                      Most popular
-                    </span>
-                  ) : null}
+                  {plan.featured ? <MicroChip tone="accent">Most popular</MicroChip> : null}
                 </div>
                 <p className="text-sm leading-relaxed text-ds-text-secondary">{plan.tagline}</p>
               </div>
