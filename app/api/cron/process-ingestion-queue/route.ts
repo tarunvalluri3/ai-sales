@@ -12,6 +12,7 @@ import { runStalledLeadFollowUpSweep } from "@/lib/stalled-leads";
 import { processWorkflowRuns, runNoActivityWorkflowSweep } from "@/lib/workflow-engine";
 import { runBillingLifecycleSweep } from "@/lib/billing-lifecycle";
 import { processAnswerBankJobs } from "@/lib/answer-bank/generate";
+import { computeDailyRollup } from "@/lib/analytics-rollup";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
       workflowNoActivitySweep,
       billingLifecycle,
       answerBank,
+      analyticsRollup,
     ] = await Promise.all([
       processIngestionQueue(),
       processWebhookDeliveries(),
@@ -95,6 +97,11 @@ export async function GET(request: NextRequest) {
       // change (lib/answer-bank/generate.ts) -- regenerates stale stored
       // answers and purges expired cached query embeddings.
       processAnswerBankJobs(),
+      // Phase 33 Stop 3: yesterday's (IST) per-business analytics rollup
+      // for the /apache Analytics page -- folded in here for the same
+      // "one shared route, not one cron per queue" reason as everything
+      // else above.
+      computeDailyRollup(),
     ]);
     return jsonSuccess({
       ingestion,
@@ -110,6 +117,7 @@ export async function GET(request: NextRequest) {
       workflowNoActivitySweep,
       billingLifecycle,
       answerBank,
+      analyticsRollup,
     });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);

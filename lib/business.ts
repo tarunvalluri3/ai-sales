@@ -6,6 +6,7 @@ import type { BusinessProfileInput, WidgetBrandingInput } from "@/lib/schemas/bu
 import { AppError } from "@/lib/errors";
 import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
 import { describeBlockingItems, type ReadinessItem } from "@/lib/onboarding-readiness";
+import { track } from "@/lib/analytics-events";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -100,6 +101,8 @@ export async function createBusinessForOrg(
       error,
     );
   }
+
+  track(supabase, data.id, "business.signed_up", { businessType: input.businessType });
 
   return data;
 }
@@ -286,7 +289,11 @@ export async function publishBusinessForOrg(orgId: string): Promise<Business> {
 
   // The gate applies only to the first publish. An already-live business
   // republishes freely, so enforcing a new rule never switches it off.
-  if (business.published_at == null) {
+  // Captured before the update below (which unconditionally re-stamps
+  // published_at on every call) -- this is the only point that can tell
+  // "first publish" from "republish".
+  const isFirstPublish = business.published_at == null;
+  if (isFirstPublish) {
     const report = await loadReadinessReport(business.id, business);
     if (!report.canPublish) {
       throw new BusinessNotReadyError(
@@ -310,6 +317,10 @@ export async function publishBusinessForOrg(orgId: string): Promise<Business> {
       "publishBusinessForOrg failed",
       error,
     );
+  }
+
+  if (isFirstPublish) {
+    track(supabase, data.id, "business.first_published");
   }
 
   return data;
