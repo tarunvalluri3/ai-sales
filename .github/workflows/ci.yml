@@ -125,6 +125,22 @@ jobs:
         # staging below.
         run: npm run test:admin-pii-mask
 
+      - name: Feature flag resolution rule tests
+        # Phase 33 Stop 5 (docs/phases.md): flag-key validation and the
+        # global-default/per-tenant-override resolution order
+        # (lib/feature-flags-rules.ts) behind /apache's Feature Flags
+        # section. Pure module, no database and no secrets. (The new
+        # feature_flags/feature_flag_overrides tables' zero-grant posture
+        # is pgTAP file 061, run against staging below.)
+        run: npm run test:feature-flags-rules
+
+      - name: Impersonation expiry rule tests
+        # Phase 33 Stop 5 (docs/phases.md): the 30-minute expiry/countdown
+        # math (lib/admin-impersonation-rules.ts) behind Support Tools'
+        # time-boxed impersonation banner. Pure module, no database and no
+        # secrets -- the session itself is a signed cookie, not a table.
+        run: npm run test:admin-impersonation-rules
+
       - name: Chat pipeline latency-pass tests
         # 2026-10-22 latency pass (STATE.md): the search-dedupe guard
         # (lib/chat-query-dedupe.ts) and the AI deadline ordering invariants

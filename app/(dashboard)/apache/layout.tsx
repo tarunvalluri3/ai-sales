@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/platform-admin";
+import { getActiveImpersonationSession } from "@/lib/admin-impersonation";
 import { AdminSidebar } from "./_components/sidebar";
 import { AdminMobileNav } from "./_components/mobile-nav";
 import { AdminHeader } from "./_components/header";
+import { ImpersonationBanner } from "./_components/impersonation-banner";
 
 /**
  * Phase 33 (docs/phases.md): the /apache platform-admin panel's root
@@ -24,9 +26,13 @@ export const metadata: Metadata = {
 
 export default async function ApacheLayout({ children }: LayoutProps<"/apache">) {
   const { admin } = await requirePlatformAdmin("viewer");
+  const impersonation = await getActiveImpersonationSession();
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {impersonation ? (
+        <ImpersonationBanner businessName={impersonation.businessName} expiresAtIso={impersonation.expiresAt} />
+      ) : null}
       <AdminHeader />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <AdminSidebar role={admin.role} />

@@ -26,6 +26,8 @@
     "test:platform-admin-rules": "node --test scripts/run-platform-admin-rules-tests.mjs",
     "test:admin-billing-shared": "node --test scripts/run-admin-billing-shared-tests.mjs",
     "test:admin-pii-mask": "node --test scripts/run-admin-pii-mask-tests.mjs",
+    "test:feature-flags-rules": "node --test scripts/run-feature-flags-rules-tests.mjs",
+    "test:admin-impersonation-rules": "node --test scripts/run-admin-impersonation-rules-tests.mjs",
     "credit-note": "node --conditions=react-server --env-file=.env.local scripts/issue-credit-note.mjs",
     "eval": "node --env-file=.env.local scripts/run-evals.mjs",
     "eval:redteam": "node --env-file=.env.local scripts/run-evals.mjs --suite=redteam",

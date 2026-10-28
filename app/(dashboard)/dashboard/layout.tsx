@@ -1,18 +1,22 @@
 import { requireBusinessContext } from "@/lib/business-context";
+import { listActiveAnnouncementsForCurrentBusiness } from "@/lib/announcements";
 import { Sidebar } from "./_components/sidebar";
 import { MobileNav } from "./_components/mobile-nav";
 import { AttentionProvider } from "./_components/attention-provider";
 import { ToastProvider } from "./_components/toast";
 import { DashboardHeader } from "./_components/dashboard-header";
 import { ContactEmailGate } from "./_components/contact-email-gate";
+import { AnnouncementBanner } from "./_components/announcement-banner";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
   const { businessName, contactEmail } = await requireBusinessContext();
+  const announcements = await listActiveAnnouncementsForCurrentBusiness();
 
   return (
     <ToastProvider>
       <AttentionProvider>
         <div className="flex min-h-0 flex-1 flex-col">
+          <AnnouncementBanner announcements={announcements} />
           <DashboardHeader />
           <div className="flex min-h-0 flex-1 flex-col md:flex-row">
             <Sidebar businessName={businessName} />
