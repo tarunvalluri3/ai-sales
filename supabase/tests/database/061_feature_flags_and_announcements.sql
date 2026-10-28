@@ -65,7 +65,7 @@ insert into public.platform_announcements (id, message, active, target_type, tar
 values ('00000000-0000-0000-0000-0000000000a3', 'Inactive, selected for A', false, 'selected', array['00000000-0000-0000-0000-00000000000a']::uuid[], 'user_test_pgtap');
 
 insert into _tap_results select throws_ok(
-  $$insert into public.platform_announcements (message, target_type) values ('bad', 'selected')$$,
+  $$insert into public.platform_announcements (message, target_type, created_by) values ('bad', 'selected', 'user_test_pgtap')$$,
   '23514',
   null,
   'platform_announcements: target_type = selected requires a non-empty target_business_ids'

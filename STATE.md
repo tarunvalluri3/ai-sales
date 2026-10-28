@@ -6,7 +6,9 @@ Last updated: 2026-11-05 (Phase 33 Stop 5, Platform Tools -- Support/Announcemen
 
 ---
 
-## Phase 33 Stop 5 -- Platform Tools (Support/Announcements/Feature Flags/Settings/Audit Log UI) -- branch `feat/apache-admin-panel-stop5`, PR not yet opened, 2026-11-05
+## Phase 33 Stop 5 -- Platform Tools (Support/Announcements/Feature Flags/Settings/Audit Log UI) -- branch `feat/apache-admin-panel-stop5`, PR #120 open, 2026-11-05
+
+**Update, CI run 1:** `build-and-test`'s pgTAP job (which runs against the live staging project, applying the new migration first) caught a real bug in the new test file itself, not the migration: pgTAP 061's check-constraint assertion (`target_type = 'selected'` needs a non-empty `target_business_ids`) omitted the required `created_by` column, so the insert failed on the NOT NULL constraint (`23502`) before ever reaching the check constraint (`23514`) -- `throws_ok` correctly failed because the wrong error code came back. Fixed by adding `created_by` to that one insert; the migration itself was proven fine (every other assertion, including the real tenant-isolation ones, passed on the first run). Same category of CI-caught fixture bug as Stop 2's pgTAP 059, not a code issue.
 
 **Final stop of Phase 33** (docs/phases.md). Built on Stops 1-4; no change to the access gate.
 
