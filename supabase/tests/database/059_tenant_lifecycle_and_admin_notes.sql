@@ -40,8 +40,16 @@ insert into _tap_results select lives_ok(
   'businesses: suspend/soft-delete columns accept a real update'
 );
 
-insert into public.subscriptions (business_id, plan_key, status, current_period_start, current_period_end)
-values ('00000000-0000-0000-0000-00000000000a', 'starter', 'active', now(), now() + interval '30 days');
+-- UPDATE, not INSERT: `businesses_create_trial_subscription` already
+-- created a trialing subscriptions row for this business in the same
+-- transaction as the businesses insert above (same precedent as
+-- 048_subscriptions_tenant_isolation.sql's own setup) -- an INSERT here
+-- collides on the primary key (business_id), which is what broke this
+-- file's first CI run.
+update public.subscriptions
+   set plan_key = 'starter', status = 'active',
+       current_period_start = now(), current_period_end = now() + interval '30 days'
+ where business_id = '00000000-0000-0000-0000-00000000000a';
 
 -- 4-5. subscriptions.reply_quota_override: nullable, positive-only
 insert into _tap_results select lives_ok(
