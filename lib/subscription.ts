@@ -80,11 +80,16 @@ const subscriptionRowSchema = z.object({
   scheduled_plan_key: z.enum(PLAN_KEYS).nullable().default(null),
   past_due_since: z.string().nullable().default(null),
   razorpay_order_id: z.string().nullable().default(null),
+  // Phase 33 Stop 2 (docs/phases.md): an admin-set override of this
+  // business's reply quota, independent of plan/trial status. Nullable,
+  // same precedent as every other post-17a column here -- null changes
+  // nothing about the existing plan-based resolution below.
+  reply_quota_override: z.number().int().positive().nullable().default(null),
 });
 
 /** The columns every entitlement read needs. Kept next to the schema that parses them. */
 const ENTITLEMENT_COLUMNS =
-  "plan_key, status, trial_started_at, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, razorpay_subscription_id, billing_interval, scheduled_plan_key, past_due_since, razorpay_order_id";
+  "plan_key, status, trial_started_at, trial_ends_at, current_period_start, current_period_end, cancel_at_period_end, razorpay_subscription_id, billing_interval, scheduled_plan_key, past_due_since, razorpay_order_id, reply_quota_override";
 
 export type Entitlement = {
   planKey: PlanKey;
@@ -229,7 +234,10 @@ export function entitlementFromRow(row: z.infer<typeof subscriptionRowSchema>, n
     return {
       ...base,
       isTrial: true,
-      replyQuota: TRIAL_REPLY_QUOTA,
+      // Phase 33 Stop 2: an admin override replaces the trial's 200-reply
+      // cap too -- a support action to temporarily raise a specific
+      // tenant's ceiling, independent of plan/trial status.
+      replyQuota: row.reply_quota_override ?? TRIAL_REPLY_QUOTA,
       periodStart: trialStart,
       periodEnd: trialEnd,
       serving: !expired,
@@ -269,7 +277,8 @@ export function entitlementFromRow(row: z.infer<typeof subscriptionRowSchema>, n
   return {
     ...base,
     isTrial: false,
-    replyQuota: plan.monthlyReplyQuota,
+    // Phase 33 Stop 2: see the trialing branch above.
+    replyQuota: row.reply_quota_override ?? plan.monthlyReplyQuota,
     periodStart,
     periodEnd,
     serving,

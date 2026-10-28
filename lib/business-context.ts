@@ -33,6 +33,14 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
     redirect("/onboarding");
   }
 
+  // Phase 33 Stop 2 (docs/phases.md): a platform admin's suspend/soft-delete
+  // action must actually block dashboard access, not just mark a column.
+  // Checked here (the one place every dashboard page/Server Action already
+  // resolves businessId through) rather than per-page.
+  if (business.deleted_at || business.status === "suspended") {
+    redirect("/suspended");
+  }
+
   return {
     userId: context.userId,
     orgId: context.orgId,

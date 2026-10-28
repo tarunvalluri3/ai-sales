@@ -107,6 +107,14 @@ jobs:
         # pgTAP file 058, run against staging below.)
         run: npm run test:platform-admin-rules
 
+      - name: Admin billing normalization tests
+        # Phase 33 Stop 2 (docs/phases.md): monthlyValuePaise()
+        # (lib/admin-billing-shared.ts), shared by the Overview and
+        # Subscriptions & Billing pages' MRR/ARR math. Pure module, no
+        # database and no secrets. (Tenant-lifecycle columns' shape/grants
+        # are pgTAP file 059, run against staging below.)
+        run: npm run test:admin-billing-shared
+
       - name: Chat pipeline latency-pass tests
         # 2026-10-22 latency pass (STATE.md): the search-dedupe guard
         # (lib/chat-query-dedupe.ts) and the AI deadline ordering invariants
