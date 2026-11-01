@@ -105,6 +105,13 @@ jobs:
         # every "is it live?" surface use the one signal. Pure, no database.
         run: npm run test:widget-access
 
+      - name: Suspension gate tests (every AI channel)
+        # 2026-11-01: a suspended/soft-deleted business must get no AI reply on
+        # the widget, WhatsApp or Instagram. Covers the shared lifecycle
+        # helper, that each webhook refuses before any reply, and that every
+        # askSalesEmployee/streamSalesEmployee caller uses a gated loader.
+        run: npm run test:business-lifecycle
+
       - name: Platform-admin gate rule tests
         # Phase 33 (docs/phases.md): the pure role-ranking and MFA-freshness
         # rules behind the /apache platform-admin gate (lib/platform-admin-rules.ts).

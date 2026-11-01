@@ -4,7 +4,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { selectBurstLimit } from "@/lib/abuse-limits";
 import { checkReplyQuota } from "@/lib/usage-limit";
-import { loadBusinessAiContext } from "@/lib/business-ai-context";
+import { isExpectedRefusal, loadBusinessAiContext } from "@/lib/business-ai-context";
 import {
   getOrCreateInstagramConversation,
   resolveBusinessFromInstagramAccountId,
@@ -230,14 +230,24 @@ async function handleInboundMessage(
     return;
   }
 
-  if (!isText) {
-    await sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, event.sender.id, NON_TEXT_REPLY);
+  // The shared channel gate (lib/business-ai-context.ts): a suspended,
+  // soft-deleted or unpublished business sends NO reply of any kind -- checked
+  // before the canned non-text reply too. The inbound message is stored above.
+  const contextResult = await loadBusinessAiContext(businessId);
+  if (!contextResult.ok) {
+    const expected = isExpectedRefusal(contextResult.reason);
+    logEvent(
+      expected ? "instagram_agent_not_serving" : "instagram_business_context_missing",
+      businessId,
+      { conversationId: conversation.id, reason: contextResult.reason },
+      expected ? "info" : "error",
+    );
     return;
   }
+  const businessContext = contextResult.context;
 
-  const businessContext = await loadBusinessAiContext(businessId);
-  if (!businessContext) {
-    logEvent("instagram_business_context_missing", businessId, {}, "error");
+  if (!isText) {
+    await sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, event.sender.id, NON_TEXT_REPLY);
     return;
   }
 
