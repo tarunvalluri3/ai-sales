@@ -2,6 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
+import { isAgentPublished } from "@/lib/agent-published";
 
 export type BusinessContext = {
   userId: string;
@@ -11,7 +12,7 @@ export type BusinessContext = {
   businessName: string;
   /** Where every business-facing email goes. Null means the business receives none -- the dashboard gates on this. Free to expose: `getBusinessForOrg` already fetches the whole row. */
   contactEmail: string | null;
-  /** True once the business has published its AI (`published_at` is set) -- the single "live" signal. Gates the operational dashboard pages via `requireLiveBusinessContext` below. */
+  /** True once the business has published its AI -- `isAgentPublished` (lib/agent-published.ts), the single "live" signal the widget API also uses. Gates the operational dashboard pages via `requireLiveBusinessContext` below. */
   published: boolean;
 };
 
@@ -50,7 +51,7 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
     businessId: business.id,
     businessName: business.name,
     contactEmail: business.contact_email,
-    published: business.published_at != null,
+    published: isAgentPublished(business),
   };
 }
 
@@ -59,19 +60,21 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
  * (conversations, leads, customers, analytics, copilot, audit log,
  * answer bank, workflows, appointments) that only make sense once the AI
  * is actually facing prospects. A business that exists but hasn't
- * published yet is sent to the readiness checklist + publish button
- * (`/dashboard/widget-settings`) instead -- never to `/onboarding`, since
- * the setup pages (profile, products, services, faqs, knowledge,
- * business-hours, widget-settings, billing, instagram, whatsapp,
- * webhooks) that a business needs to actually become ready stay
- * reachable through `requireBusinessContext` the whole time. Reuses the
- * same `getBusinessForOrg` call `requireBusinessContext` already makes
- * (memoized via `cache()`), so this adds no extra query per navigation.
+ * published yet is sent to the setup wizard, where readiness, testing and
+ * publishing live (2026-10-29 redesign) -- `/onboarding` resumes at the
+ * right step and itself redirects back here once published. Both sides read
+ * the same `published` flag (lib/agent-published.ts), so they can never
+ * bounce between each other. The setup pages (profile, products, services,
+ * faqs, knowledge, business-hours, widget-settings, billing, instagram,
+ * whatsapp, webhooks) stay reachable through `requireBusinessContext` the
+ * whole time. Reuses the same `getBusinessForOrg` call
+ * `requireBusinessContext` already makes (memoized via `cache()`), so this
+ * adds no extra query per navigation.
  */
 export async function requireLiveBusinessContext(): Promise<BusinessContext> {
   const context = await requireBusinessContext();
   if (!context.published) {
-    redirect("/dashboard/widget-settings");
+    redirect("/onboarding");
   }
   return context;
 }

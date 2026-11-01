@@ -5,6 +5,7 @@ import { AppError } from "@/lib/errors";
 import { listFaqsForBusiness } from "@/lib/faqs";
 import { listProductsForBusiness } from "@/lib/products";
 import { listServicesForBusiness } from "@/lib/services";
+import { isAgentPublished } from "@/lib/agent-published";
 import {
   evaluateReadiness,
   type ReadinessInput,
@@ -67,7 +68,7 @@ export async function loadReadinessReport(businessId: string, business: Business
     website: business.website,
     privacyPolicyUrl: business.privacy_policy_url,
     appointmentsEnabled: business.appointments_enabled,
-    alreadyPublished: business.published_at != null,
+    alreadyPublished: isAgentPublished(business),
     knowledgeSources,
     faqs: faqs.map((faq) => ({
       question: faq.question,

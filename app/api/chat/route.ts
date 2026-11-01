@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { z } from "zod";
+import { chatRequestBodySchema } from "@/lib/schemas/widget-chat-request";
 import { jsonError, jsonSuccess, jsonTooManyRequests } from "@/lib/api-response";
 import { logAndGetUserMessage, AppError } from "@/lib/errors";
 import { embedQueryWithCache } from "@/lib/answer-bank/store";
 import { kickAnswerBankRefresh } from "@/lib/answer-bank/generate";
 import type { InstantContext } from "@/lib/answer-bank/decision";
-import { resolveBusinessFromWidgetKey, WidgetAuthError, type WidgetBusinessContext } from "@/lib/widget-auth";
+import { logWidgetRejection, resolveBusinessFromWidgetKey, WidgetAuthError, type WidgetBusinessContext } from "@/lib/widget-auth";
 import {
   checkAndIncrementRateLimit,
   incrementRateLimitCounter,
@@ -90,7 +90,6 @@ const IP_LIMIT = 30;
 const KEY_LIMIT = 120;
 const CONVERSATION_LIMIT = 20;
 const HISTORY_LIMIT = 20;
-const MESSAGE_MAX_LENGTH = 2000;
 
 /**
  * Returned when a conversation is human-controlled (Phase 15a) instead of
@@ -101,34 +100,6 @@ const MESSAGE_MAX_LENGTH = 2000;
  */
 const HUMAN_CONTROL_MESSAGE =
   "Thanks for your message — a member of our team has this conversation and will reply here shortly.";
-
-const bodySchema = z.object({
-  widgetKey: z.string().uuid(),
-  conversationId: z.string().uuid().optional(),
-  message: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
-  consentGiven: z.boolean().optional(),
-  pageUrl: z.string().max(2048).optional(),
-  // Phase 25d "recent chats": a client-generated, unauthenticated
-  // correlation id (public/widget-loader.js localStorage), stamped onto
-  // a newly created conversation so app/api/chat/recent/route.ts can
-  // later list this visitor's own past conversations. Never an identity
-  // or authorization signal -- see lib/conversations.ts's
-  // listRecentConversationsForVisitor() doc comment.
-  visitorId: z.string().trim().min(1).max(100).optional(),
-  // feat/chat-streaming: an explicit opt-in to the streamed (SSE) response,
-  // alongside the `Accept: text/event-stream` header the widget-loader also
-  // sends. Absent (every currently-live loader) means the byte-identical
-  // buffered JSON response, so this changes nothing for an old embed.
-  stream: z.boolean().optional(),
-  // Phase 32 Stage E: ms between the widget loader starting and this send.
-  // Client-supplied, so it can only ever TIGHTEN a limit (see
-  // lib/abuse-limits.ts classifyClientSignal); absent from older embeds.
-  clientElapsedMs: z.number().int().min(0).max(86_400_000).optional(),
-  // Instant answers: the widget sets this when the message came from a
-  // suggested-question chip. Client-supplied, so it is analytics only -- the
-  // server decides what to serve from the message text itself, never from this.
-  suggested: z.boolean().optional(),
-});
 
 /**
  * Phase 25b "source/page attribution": reduces an arbitrary client-supplied
@@ -168,7 +139,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const parsed = bodySchema.safeParse(body);
+  const parsed = chatRequestBodySchema.safeParse(body);
   if (!parsed.success) {
     return withCors(jsonError("Invalid request.", 400));
   }
@@ -254,7 +225,10 @@ export async function POST(request: NextRequest) {
     business = await timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin, { useWarmCache: true }));
   } catch (error) {
     if (error instanceof WidgetAuthError) {
-      return withCors(jsonError("Invalid request.", 401));
+      // Generic body to the browser (docs/security.md §10); the real reason,
+      // business id and key id go to the logs and Sentry.
+      logWidgetRejection(error, "chat");
+      return withCors(jsonError("Invalid request.", error.status));
     }
     const userMessage = logAndGetUserMessage(error);
     return withCors(jsonError(userMessage, 500));

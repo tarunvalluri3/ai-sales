@@ -13,6 +13,7 @@
     "test:plan-tax": "node --test scripts/run-plan-tax-tests.mjs",
     "test:invoices": "node --test scripts/run-invoice-tests.mjs",
     "test:onboarding-readiness": "node --test scripts/run-onboarding-readiness-tests.mjs",
+    "test:widget-access": "node --test scripts/run-widget-access-tests.mjs",
     "test:razorpay": "node --test scripts/run-razorpay-signature-tests.mjs scripts/run-razorpay-webhook-tests.mjs",
     "test:chat-perf": "node --test scripts/run-chat-perf-tests.mjs",
     "test:chat-streaming": "node --test scripts/run-chat-streaming-tests.mjs",

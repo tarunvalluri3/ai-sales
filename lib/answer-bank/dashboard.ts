@@ -2,6 +2,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
 import { servableFormatRefusal } from "@/lib/answer-bank/output-check";
+import { isAgentPublished } from "@/lib/agent-published";
 
 /**
  * Dashboard-side access to stored instant answers. Runs under the owner's
@@ -50,13 +51,13 @@ async function currentVersionOf(businessId: string): Promise<{ version: number; 
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
-    .select("answer_bank_version, published_at")
+    .select("answer_bank_version, live_version_id")
     .eq("id", businessId)
     .maybeSingle();
   if (error || !data) {
     throw new AppError("Something went wrong loading your instant answers. Please try again.", "currentVersionOf failed", error);
   }
-  return { version: Number(data.answer_bank_version), published: data.published_at !== null };
+  return { version: Number(data.answer_bank_version), published: isAgentPublished(data) };
 }
 
 export async function getAnswerBankView(businessId: string): Promise<AnswerBankView> {

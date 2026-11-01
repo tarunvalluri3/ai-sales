@@ -29,6 +29,7 @@ import { PersonaStep } from "./_components/steps/persona-step";
 import { ChannelsStep } from "./_components/steps/channels-step";
 import { PlanStep } from "./_components/steps/plan-step";
 import { ReviewStep } from "./_components/steps/review-step";
+import { isAgentPublished } from "@/lib/agent-published";
 
 /**
  * The guided `/onboarding` wizard (2026-10-29 redesign, STATE.md). Every
@@ -48,8 +49,13 @@ export default async function OnboardingPage({
   }
 
   const business = await getBusinessForOrg(context.orgId);
+  const { step: stepParam } = await searchParams;
 
-  if (business?.published_at) {
+  // A published agent belongs on the dashboard -- except on the review step,
+  // which shows the "Your agent is live" confirmation right after Publish
+  // (the publish action re-renders this page) and then continues to the
+  // dashboard on its own (ReviewStep).
+  if (business && isAgentPublished(business) && stepParam !== "review") {
     redirect("/dashboard");
   }
 
@@ -100,7 +106,6 @@ export default async function OnboardingPage({
   const businessId = business.id;
   const progress = await computeOnboardingProgress(business);
 
-  const { step: stepParam } = await searchParams;
   const requested = isOnboardingStep(stepParam) ? stepParam : null;
   const activeStep: OnboardingStep =
     requested && stepIndexAllowed(requested, progress.currentStep) ? requested : progress.currentStep;
@@ -213,7 +218,7 @@ export default async function OnboardingPage({
               widgetKeys={widgetKeys}
               appOrigin={appOrigin}
               widgetLanguage={business.widget_language}
-              publishedAt={business.published_at}
+              isPublished={isAgentPublished(business)}
               whatsapp={whatsapp}
               instagram={instagram}
               whatsappEntitled={entitlement.channels.whatsapp}
@@ -240,14 +245,15 @@ export default async function OnboardingPage({
           whatsapp ? "WhatsApp" : null,
           instagram ? "Instagram" : null,
         ].filter((v): v is string => v != null);
+        const live = isAgentPublished(business);
         return {
           eyebrow: "Step 6 of 6 · Test & go live",
-          heading: "Ready to go live?",
-          description: "Review what's set up, test your agent, then publish.",
+          heading: live ? "You're live" : "Ready to go live?",
+          description: live ? "Your agent is answering prospects now." : "Review what's set up, test your agent, then publish.",
           content: (
             <ReviewStep
               report={readiness}
-              isPublished={business.published_at != null}
+              isPublished={live}
               hasActiveKey={widgetKeys.some((k) => k.status !== "revoked")}
               hasPrivacyPolicyUrl={Boolean(business.privacy_policy_url)}
               businessName={business.name}

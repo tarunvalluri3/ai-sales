@@ -434,7 +434,10 @@
       return;
     }
     var kind = "failure";
-    if (response.status === 401) kind = "unauthorized";
+    // 401 = bad key, 403 = valid key but this site/agent may not use it
+    // (origin not allowed, agent not published). Both mean "this chat isn't
+    // available" -- the reason is logged server-side, never sent here.
+    if (response.status === 401 || response.status === 403) kind = "unauthorized";
     else if (response.status === 429) kind = "rate_limited";
     postError(requestId, kind);
   }

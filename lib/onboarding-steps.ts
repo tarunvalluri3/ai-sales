@@ -5,6 +5,7 @@ import { getEntitlementForBusiness } from "@/lib/subscription";
 import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
 import { getInstagramConnectionForBusiness } from "@/lib/instagram";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
+import { isAgentPublished } from "@/lib/agent-published";
 
 /**
  * Onboarding route guard + resume. `ONBOARDING_STEPS` is the sequence a
@@ -97,7 +98,7 @@ export async function computeOnboardingProgress(business: Business): Promise<Onb
     channels: hasChannel,
     plan: entitlement.serving,
     review: report.canPublish,
-    live: business.published_at != null,
+    live: isAgentPublished(business),
   };
 
   const currentStep = ONBOARDING_STEPS.find((step) => !completion[step]) ?? "live";

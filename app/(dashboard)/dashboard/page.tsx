@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { buildWidgetSnippet } from "./widget-settings/build-widget-snippet";
 import { LaunchCard } from "./_components/launch-card";
+import { InstallWidgetBanner } from "./_components/install-widget-banner";
 import { requireLiveBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listProductsForBusiness } from "@/lib/products";
@@ -29,13 +30,16 @@ export default async function DashboardOverviewPage({
   const supabase = createServerSupabaseClient();
 
   const { welcome } = await searchParams;
+  const widgetKeys = await listWidgetKeysForBusiness(businessId);
+  const activeKeys = widgetKeys.filter((k) => k.status !== "revoked");
   let launchSnippet: string | null = null;
   if (welcome === "1") {
-    const [widgetKeys, requestHeaders] = await Promise.all([listWidgetKeysForBusiness(businessId), headers()]);
-    const activeKey = widgetKeys.find((k) => k.status !== "revoked")?.key ?? null;
+    const requestHeaders = await headers();
     const origin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
-    launchSnippet = activeKey ? buildWidgetSnippet(activeKey, origin) : null;
+    launchSnippet = activeKeys[0] ? buildWidgetSnippet(activeKeys[0].key, origin) : null;
   }
+  // Prompt (not a redirect) until the widget has served its first real chat.
+  const showInstallBanner = welcome !== "1" && !activeKeys.some((k) => k.last_used_at != null);
 
   const [
     products,
@@ -65,6 +69,7 @@ export default async function DashboardOverviewPage({
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       {welcome === "1" ? <LaunchCard snippet={launchSnippet} /> : null}
+      {showInstallBanner ? <InstallWidgetBanner hasActiveKey={activeKeys.length > 0} /> : null}
 
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-ds-text-primary">{businessName}</h1>

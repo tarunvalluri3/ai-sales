@@ -8,6 +8,7 @@ import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
 import { describeBlockingItems, type ReadinessItem } from "@/lib/onboarding-readiness";
 import { track } from "@/lib/analytics-events";
 import { getEntitlementForBusiness } from "@/lib/subscription";
+import { isAgentPublished } from "@/lib/agent-published";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -355,7 +356,7 @@ export async function publishBusinessForOrg(orgId: string): Promise<PublishAgent
   // blockingItems for the audit view" -- lib/onboarding-readiness.ts); the
   // report's `canPublish`/`gateApplies` still describe the old first-publish-
   // only rule, so they are deliberately not used here.
-  const isFirstPublish = business.published_at == null;
+  const isFirstPublish = !isAgentPublished(business);
   const report = await loadReadinessReport(business.id, business);
   if (report.blockingItems.length > 0) {
     throw new BusinessNotReadyError(describeBlockingItems(report.blockingItems), report.blockingItems);
