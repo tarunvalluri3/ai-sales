@@ -70,7 +70,8 @@ export const businessWebsiteSchema = optionalTrimmed
  * Business type/industry (2026-09-11) -- descriptive/display-only, same
  * category as description/contact/website: not read by lib/rag.ts or any AI
  * behavior. Closed enum matching the businesses_business_type_check DB
- * constraint (20260911000000) -- keep both in sync if this list changes.
+ * constraint (20260911000000, widened by 20261109000000 to add
+ * "manufacturing") -- keep both in sync if this list changes.
  */
 export const BUSINESS_TYPES = [
   { value: "ecommerce", label: "E-commerce / Online store" },
@@ -82,6 +83,7 @@ export const BUSINESS_TYPES = [
   { value: "finance", label: "Finance / Insurance" },
   { value: "technology", label: "Technology / SaaS" },
   { value: "retail", label: "Retail (physical store)" },
+  { value: "manufacturing", label: "Manufacturing" },
   { value: "other", label: "Other" },
 ] as const;
 
