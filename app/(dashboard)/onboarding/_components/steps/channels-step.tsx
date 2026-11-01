@@ -17,7 +17,7 @@ export function ChannelsStep({
   widgetKeys,
   appOrigin,
   widgetLanguage,
-  publishedAt,
+  isPublished,
   whatsapp,
   instagram,
   whatsappEntitled,
@@ -28,7 +28,7 @@ export function ChannelsStep({
   widgetKeys: WidgetKey[];
   appOrigin: string;
   widgetLanguage: string;
-  publishedAt: string | null;
+  isPublished: boolean;
   whatsapp: WhatsappConnection | null;
   instagram: InstagramConnection | null;
   whatsappEntitled: boolean;
@@ -58,7 +58,7 @@ export function ChannelsStep({
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-semibold text-ds-text-primary">Website widget</h2>
-        <WidgetInstallGuide widgetKeys={widgetKeys} appOrigin={appOrigin} publishedAt={publishedAt} />
+        <WidgetInstallGuide widgetKeys={widgetKeys} appOrigin={appOrigin} isPublished={isPublished} />
         <p className="text-xs text-ds-text-muted">You&rsquo;ll get the widget code after publishing.</p>
         <CreateWidgetKeyForm />
         <WidgetKeyList widgetKeys={widgetKeys} appOrigin={appOrigin} widgetLanguage={widgetLanguage} canEdit />

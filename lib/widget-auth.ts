@@ -2,18 +2,64 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
 import { loadLiveAgentSourceByVersion, type LiveAgentSource } from "@/lib/agent-runtime";
+import { logEvent } from "@/lib/logger";
+import {
+  evaluateWidgetAccess,
+  widgetRejectionStatus,
+  type WidgetRejectionReason,
+} from "@/lib/widget-access";
 
 /**
- * Thrown for any widget-key/origin resolution failure. Deliberately
- * generic -- the caller (app/api/chat/route.ts) must not surface which
- * specific check failed (unknown key vs. origin mismatch vs. unconfigured
- * origin), per docs/security.md §10.
+ * Thrown for any widget-key/origin resolution failure. Carries the real
+ * reason and the ids needed to debug it, but callers must still answer the
+ * browser with the generic "Invalid request." body (docs/security.md §10):
+ * only the status differs (`status`: 401 bad key, 403 valid key but not
+ * allowed, 503 server-side failure -- lib/widget-access.ts). Call
+ * logWidgetRejection() so the reason reaches the logs and Sentry.
  */
 export class WidgetAuthError extends Error {
-  constructor() {
+  readonly reason: WidgetRejectionReason;
+  readonly status: 401 | 403 | 503;
+  readonly businessId: string | null;
+  readonly keyId: string | null;
+  readonly origin: string | null;
+
+  constructor(
+    reason: WidgetRejectionReason,
+    details: { businessId?: string | null; keyId?: string | null; origin?: string | null } = {},
+  ) {
     super("Invalid widget key or origin.");
     this.name = "WidgetAuthError";
+    this.reason = reason;
+    this.status = widgetRejectionStatus(reason);
+    this.businessId = details.businessId ?? null;
+    this.keyId = details.keyId ?? null;
+    this.origin = details.origin ?? null;
   }
+}
+
+/**
+ * Server-side record of why a widget request was refused: the reason code,
+ * business id, widget key row id (never the key itself) and the request's
+ * Origin (an exact-match mismatch such as a trailing slash or `www.` is the
+ * usual cause of `origin_not_allowed`). `alert` routes it to Sentry via
+ * logEvent's error level -- used by /api/chat and /api/chat/warm; the polling
+ * endpoints log without alerting so a paused tenant's open widgets don't
+ * flood Sentry.
+ */
+export function logWidgetRejection(error: WidgetAuthError, route: string, alert = true): void {
+  logEvent(
+    "widget_auth_rejected",
+    error.businessId ?? "unknown",
+    {
+      route,
+      reason: error.reason,
+      status: error.status,
+      keyId: error.keyId,
+      origin: error.origin ? error.origin.slice(0, 200) : null,
+    },
+    alert ? "error" : "info",
+  );
 }
 
 /**
@@ -22,8 +68,9 @@ export class WidgetAuthError extends Error {
  * multiple origins per key) to a validated business_id, server-side only.
  * Never accepts a client-supplied business_id anywhere in this flow.
  * Fails closed: an unknown key, a revoked key, a key with no configured
- * origins yet, a missing origin header, or an origin not in the key's
- * allowed_origins list all throw the same WidgetAuthError.
+ * origins yet, a missing origin header, an origin not in the key's
+ * allowed_origins list, or an agent that isn't published all throw
+ * WidgetAuthError (with the specific reason, for logging only).
  */
 export type WidgetBusinessContext = {
   businessId: string;
@@ -50,7 +97,7 @@ export type WidgetBusinessContext = {
 
 // Identity + lifecycle only. Everything the AI says or shows comes from the
 // live snapshot (live_version_id), not from draft columns.
-const AUTH_COLUMNS = "id, clerk_org_id, published_at, live_version_id, status, deleted_at";
+const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at";
 
 // The branding endpoint additionally keeps the draft widget columns, used only
 // as a cosmetic fallback for an agent that has never been published.
@@ -59,7 +106,7 @@ const BRANDING_COLUMNS = `${AUTH_COLUMNS}, name, widget_language, widget_accent_
 type WidgetAuthRow = {
   id: string;
   clerk_org_id: string;
-  published_at: string | null;
+  /** Non-null == published (lib/agent-published.ts, the one live signal). */
   live_version_id: string | null;
   /** Phase 33 Stop 2 (docs/phases.md): a platform admin's suspend/soft-delete action must actually stop the AI replying, not just mark a column. */
   status: "active" | "suspended";
@@ -80,6 +127,7 @@ type WidgetBrandingRow = WidgetAuthRow & {
 };
 
 type WidgetKeyRow = {
+  id: string;
   business_id: string;
   status: string;
   allowed_origins: string[];
@@ -151,36 +199,37 @@ export async function resolveBusinessFromWidgetKey(
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("widget_keys")
-    .select(`business_id, status, allowed_origins, businesses(${AUTH_COLUMNS})`)
+    .select(`id, business_id, status, allowed_origins, businesses(${AUTH_COLUMNS})`)
     .eq("key", key)
     .maybeSingle<WidgetKeyRow>();
 
-  if (error || !data || !data.businesses) {
-    throw new WidgetAuthError();
+  if (error) {
+    throw new WidgetAuthError("lookup_failed", { origin });
   }
 
-  // Phase 25c: an unpublished business (published_at null -- the new
-  // "test your AI before publishing" gate) fails closed exactly like an
-  // unknown key or a bad origin. Collapsing it into the same generic
-  // WidgetAuthError is deliberate, not an oversight -- docs/security.md
-  // §10 already establishes that this endpoint must never reveal which
-  // specific check failed.
-  if (
-    data.status !== "active" ||
-    !origin ||
-    !data.allowed_origins.includes(origin) ||
-    !data.businesses.published_at ||
-    data.businesses.status === "suspended" ||
-    data.businesses.deleted_at
-  ) {
-    throw new WidgetAuthError();
+  // Phase 25c: an unpublished agent fails closed like an unknown key or a
+  // bad origin. "Published" is isAgentPublished() -- live_version_id -- the
+  // same signal the dashboard and the wizard read (lib/agent-published.ts).
+  // The browser still gets only the generic body (docs/security.md §10).
+  const rejection = evaluateWidgetAccess(data, data?.businesses ?? null, origin);
+  const ids = { businessId: data?.business_id ?? null, keyId: data?.id ?? null, origin };
+  if (rejection || !data?.businesses?.live_version_id) {
+    throw new WidgetAuthError(rejection ?? "agent_not_published", ids);
   }
 
-  // Best-effort "last used" bump for the dashboard's key-rotation UI --
-  // deliberately fire-and-forget with errors swallowed. This write must
-  // never fail closed: a business owner deciding whether an old key is
-  // safe to revoke should see a stale timestamp on rare write failure,
-  // not a broken chat response.
+  // A published business with no readable live version fails closed like any
+  // other failed check: the draft tables are never a fallback for a prospect.
+  const liveSource = await loadLiveAgentSourceByVersion(data.business_id, data.businesses.live_version_id);
+  if (!liveSource) {
+    throw new WidgetAuthError("live_version_unavailable", ids);
+  }
+
+  // Best-effort "last used" bump for the dashboard's key-rotation UI, only
+  // once the request has passed EVERY check (a refused request is in the
+  // logs, not here) -- deliberately fire-and-forget with errors swallowed.
+  // This write must never fail closed: a business owner deciding whether an
+  // old key is safe to revoke should see a stale timestamp on rare write
+  // failure, not a broken chat response.
   if (options.touchLastUsed !== false) {
     void supabase
       .from("widget_keys")
@@ -193,15 +242,6 @@ export async function resolveBusinessFromWidgetKey(
       });
   }
 
-  // A published business with no readable live version fails closed like any
-  // other failed check: the draft tables are never a fallback for a prospect.
-  if (!data.businesses.live_version_id) {
-    throw new WidgetAuthError();
-  }
-  const liveSource = await loadLiveAgentSourceByVersion(data.business_id, data.businesses.live_version_id);
-  if (!liveSource) {
-    throw new WidgetAuthError();
-  }
   const config = liveSource.snapshot.config;
 
   return {

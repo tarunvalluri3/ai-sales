@@ -13,7 +13,7 @@ import { WidgetInstallGuide } from "./widget-install-guide";
 import { PermissionNotice } from "../_components/state-views";
 
 export default async function WidgetSettingsPage() {
-  const { businessId, orgId, orgRole } = await requireBusinessContext();
+  const { businessId, orgId, orgRole, published } = await requireBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:admin");
   const [widgetKeys, business, requestHeaders] = await Promise.all([
     listWidgetKeysForBusiness(businessId),
@@ -45,7 +45,7 @@ export default async function WidgetSettingsPage() {
         <WidgetInstallGuide
           widgetKeys={widgetKeys}
           appOrigin={appOrigin}
-          publishedAt={business?.published_at ?? null}
+          isPublished={published}
         />
         {/* Create + manage are one continuous task (create a key, then see
            it appear below) -- grouped tighter than the gap-6 that separates
@@ -62,7 +62,7 @@ export default async function WidgetSettingsPage() {
         </div>
       </section>
 
-      {business?.published_at == null ? (
+      {!published ? (
         <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
           <p className="text-sm font-medium text-ds-text-primary">Not published yet</p>
           <p className="max-w-xl text-sm text-ds-text-secondary">

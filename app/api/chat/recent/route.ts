@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { logAndGetUserMessage, AppError } from "@/lib/errors";
-import { resolveBusinessFromWidgetKey, WidgetAuthError } from "@/lib/widget-auth";
+import { logWidgetRejection, resolveBusinessFromWidgetKey, WidgetAuthError } from "@/lib/widget-auth";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { listRecentConversationsForVisitor } from "@/lib/conversations";
@@ -72,7 +72,8 @@ export async function POST(request: NextRequest) {
     business = await resolveBusinessFromWidgetKey(widgetKey, origin);
   } catch (error) {
     if (error instanceof WidgetAuthError) {
-      return withCors(jsonError("Invalid request.", 401));
+      logWidgetRejection(error, "chat/recent", false);
+      return withCors(jsonError("Invalid request.", error.status));
     }
     const userMessage = logAndGetUserMessage(error);
     return withCors(jsonError(userMessage, 500));

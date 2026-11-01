@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { WidgetKey } from "@/lib/supabase/types";
 import { buildWidgetSnippet } from "./build-widget-snippet";
 import { CopyKeyButton } from "./copy-key-button";
@@ -59,16 +60,17 @@ function StepDone() {
 export function WidgetInstallGuide({
   widgetKeys,
   appOrigin,
-  publishedAt,
+  isPublished,
 }: {
   widgetKeys: WidgetKey[];
   appOrigin: string;
-  publishedAt: string | null;
+  /** lib/agent-published.ts -- the one live signal. */
+  isPublished: boolean;
 }) {
   // Open by default while still setting up (the guide's entire job); once
   // published, this business has already followed it, so it recedes behind
   // "Show" instead of reopening the same wall of steps on every visit.
-  const [open, setOpen] = useState(publishedAt == null);
+  const [open, setOpen] = useState(!isPublished);
   const [platformId, setPlatformId] = useState(PLATFORMS[0].id);
   const activeKeys = widgetKeys.filter((key) => key.status !== "revoked");
   const activeKey = activeKeys[0];
@@ -79,7 +81,7 @@ export function WidgetInstallGuide({
   // rather than guessing.
   const step1Done = activeKeys.length > 0;
   const step3Done = activeKeys.some((key) => key.allowed_origins.length > 0);
-  const step4Done = publishedAt != null;
+  const step4Done = isPublished;
 
   return (
     <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
@@ -166,8 +168,21 @@ export function WidgetInstallGuide({
               {step4Done ? <StepDone /> : null}
             </h3>
             <p className="text-sm text-ds-text-secondary">
-              Click the &ldquo;Publish&rdquo; button on this page. Until you publish, visitors will see the
-              chat bubble but won&rsquo;t get a response.
+              {isPublished ? (
+                <>Your agent is live. Later edits go live when you use &ldquo;Publish changes&rdquo; in the top bar.</>
+              ) : (
+                <>
+                  Publish your agent from the{" "}
+                  <Link
+                    href="/onboarding?step=review"
+                    className="font-medium text-ds-accent-muted underline hover:text-ds-accent"
+                  >
+                    Test &amp; go live
+                  </Link>{" "}
+                  step of the setup wizard. Until you publish, visitors will see the chat bubble but won&rsquo;t
+                  get a response.
+                </>
+              )}
             </p>
           </div>
 

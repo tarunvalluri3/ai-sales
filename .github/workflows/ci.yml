@@ -97,6 +97,14 @@ jobs:
         # file 052, run against staging below.)
         run: npm run test:onboarding-readiness
 
+      - name: Widget access and publish-status tests
+        # 2026-11-01: publish showed "Live" while /api/chat refused every
+        # visitor (publish_agent passed its backfill flag, so published_at
+        # was never set). Covers the key/origin/published decision and its
+        # 401-vs-403 status, the consent contract, and that publish_agent and
+        # every "is it live?" surface use the one signal. Pure, no database.
+        run: npm run test:widget-access
+
       - name: Platform-admin gate rule tests
         # Phase 33 (docs/phases.md): the pure role-ranking and MFA-freshness
         # rules behind the /apache platform-admin gate (lib/platform-admin-rules.ts).

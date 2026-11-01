@@ -7,6 +7,9 @@ import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: PublishBusinessState = {};
 
+/** How long the "Your agent is live" confirmation stays up before the redirect. */
+export const LIVE_CONFIRMATION_MS = 2500;
+
 export function PublishButton({
   isPublished,
   hasActiveKey,
@@ -30,11 +33,15 @@ export function PublishButton({
   const [state, formAction, isPending] = useActionState(publishBusinessAction, initialState);
   const published = isPublished || state.success === true;
 
+  const confirming = state.success === true && Boolean(redirectOnSuccess);
+
+  // Confirm first, then move on: the owner sees "Your agent is live" before
+  // the redirect, not a page that silently swaps under them.
   useEffect(() => {
-    if (state.success === true && redirectOnSuccess) {
-      router.replace(redirectOnSuccess);
-    }
-  }, [state, redirectOnSuccess, router]);
+    if (!confirming || !redirectOnSuccess) return;
+    const timeoutId = setTimeout(() => router.replace(redirectOnSuccess), LIVE_CONFIRMATION_MS);
+    return () => clearTimeout(timeoutId);
+  }, [confirming, redirectOnSuccess, router]);
   // Draft -> Publish -> Live: this button is the FIRST publish (onboarding's
   // "Publish agent"). Later publishes go through the dashboard header's
   // "Publish changes", which submits the same action. Both are readiness-gated.
@@ -88,6 +95,12 @@ export function PublishButton({
         </p>
       ) : null}
 
+      {confirming ? (
+        <p role="status" className="rounded-ds-sm bg-ds-success-bg px-3 py-2 text-sm font-medium text-ds-success">
+          Your agent is live. Taking you to your dashboard…
+        </p>
+      ) : null}
+
       {state.error ? (
         <div role="alert" className="flex flex-col gap-1 text-sm text-ds-danger">
           <p>{state.error}</p>
@@ -104,11 +117,11 @@ export function PublishButton({
       <form action={formAction}>
         <button
           type="submit"
-          disabled={isPending || !canEdit || blockedNow}
+          disabled={isPending || !canEdit || blockedNow || confirming}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
           className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
-          {isPending ? "Publishing…" : state.success && redirectOnSuccess ? "Taking you to your dashboard…" : "Publish agent"}
+          {isPending ? "Publishing…" : confirming ? "Taking you to your dashboard…" : "Publish agent"}
         </button>
       </form>
     </div>

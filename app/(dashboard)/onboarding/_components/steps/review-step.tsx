@@ -1,11 +1,11 @@
 "use client";
 
-import type { ComponentProps } from "react";
+import { useEffect, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { RecommendedDetails } from "./recommended-details";
 import Link from "next/link";
 import { ReadinessChecklist } from "../../../dashboard/widget-settings/readiness-checklist";
-import { PublishButton } from "../../../dashboard/widget-settings/publish-button";
+import { LIVE_CONFIRMATION_MS, PublishButton } from "../../../dashboard/widget-settings/publish-button";
 import { SandboxChatPanel } from "../../../dashboard/_components/sandbox-chat/sandbox-chat-panel";
 import { CopyKeyButton } from "../../../dashboard/widget-settings/copy-key-button";
 import { buildWidgetSnippet } from "../../../dashboard/widget-settings/build-widget-snippet";
@@ -43,23 +43,31 @@ export function ReviewStep({
   recommendedDetails: ComponentProps<typeof RecommendedDetails>;
 }) {
   const router = useRouter();
-  // `isPublished` comes straight from the server-fetched business row,
-  // not local state: publishing is a Server Action, and Next.js
-  // automatically re-renders this route's Server Components (this page's
-  // `review-step` data included) once it resolves -- so this flips to the
-  // success screen on its own the moment `publishBusinessForOrg` commits,
-  // no extra plumbing required.
+  // `isPublished` comes straight from the server-fetched business row
+  // (lib/agent-published.ts), not local state: publishing is a Server Action
+  // whose revalidatePath("/onboarding") re-renders this page, so this flips
+  // to the "Your agent is live" confirmation the moment `publishBusinessForOrg`
+  // commits, then continues to the dashboard welcome on its own.
   const published = isPublished;
   const snippet = activeWidgetKey ? buildWidgetSnippet(activeWidgetKey, appOrigin) : null;
+
+  useEffect(() => {
+    if (!published) return;
+    const timeoutId = setTimeout(() => router.replace("/dashboard?welcome=1"), LIVE_CONFIRMATION_MS);
+    return () => clearTimeout(timeoutId);
+  }, [published, router]);
 
   if (published) {
     return (
       <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-success/40 bg-ds-success-bg px-5 py-6 text-center">
-          <p className="text-lg font-semibold text-ds-text-primary">
-            {businessName} is live on {channelSummary}
+        <div
+          role="status"
+          className="flex flex-col gap-2 rounded-ds-lg border border-ds-success/40 bg-ds-success-bg px-5 py-6 text-center"
+        >
+          <p className="text-lg font-semibold text-ds-text-primary">Your agent is live</p>
+          <p className="text-sm text-ds-text-secondary">
+            {businessName} is answering prospects on {channelSummary}. Taking you to your dashboard…
           </p>
-          <p className="text-sm text-ds-text-secondary">Prospects can start chatting with it right now.</p>
         </div>
 
         {snippet ? (
@@ -82,7 +90,8 @@ export function ReviewStep({
         </ul>
 
         <Link
-          href="/dashboard"
+          href="/dashboard?welcome=1"
+          replace
           className="self-start rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
           Open dashboard
@@ -94,7 +103,7 @@ export function ReviewStep({
   return (
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Readiness checklist</h2>
+        <h2 className="text-sm font-semibold text-ds-text-primary">Setup summary</h2>
         <ul className="flex flex-col divide-y divide-ds-border">
           {checklistRows.map((row) => (
             <li key={row.label} className="flex items-center justify-between gap-3 py-2.5 text-sm">

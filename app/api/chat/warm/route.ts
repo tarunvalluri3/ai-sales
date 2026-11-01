@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { logAndGetUserMessage } from "@/lib/errors";
-import { warmWidgetBusinessContext, WidgetAuthError } from "@/lib/widget-auth";
+import { logWidgetRejection, warmWidgetBusinessContext, WidgetAuthError } from "@/lib/widget-auth";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 
@@ -17,7 +17,8 @@ import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
  *
  * Same trust model as every public widget endpoint: widget key + the
  * request's Origin must pass resolveBusinessFromWidgetKey()'s full check, and
- * every failure is the same generic 401. Rate-limited per IP on its own
+ * every failure is the same generic "Invalid request." body (401 bad key, 403
+ * valid key but not allowed; reason logged server-side). Rate-limited per IP on its own
  * counter (identifier prefixed `warm:`, in the existing `restore_ip` scope --
  * a new scope would need a constraint migration), so warm-ups never consume
  * the chat budget.
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
     await warmWidgetBusinessContext(parsed.data.widgetKey, extractOrigin(request));
   } catch (error) {
     if (error instanceof WidgetAuthError) {
-      return withCors(jsonError("Invalid request.", 401));
+      logWidgetRejection(error, "chat/warm");
+      return withCors(jsonError("Invalid request.", error.status));
     }
     const userMessage = logAndGetUserMessage(error);
     return withCors(jsonError(userMessage, 500));
