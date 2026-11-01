@@ -7,6 +7,7 @@ import type { OnboardingStep } from "@/lib/supabase/types";
 import { listProductsForBusiness } from "@/lib/products";
 import { listFaqsForBusiness } from "@/lib/faqs";
 import { listKnowledgeDocumentsForBusiness } from "@/lib/knowledge";
+import { listBusinessHours } from "@/lib/business-hours";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
 import { getInstagramConnectionForBusiness } from "@/lib/instagram";
@@ -262,6 +263,14 @@ export default async function OnboardingPage({
               ]}
               activeWidgetKey={activeWidgetKey}
               appOrigin={appOrigin}
+              recommendedDetails={{
+                contactPhone: business.contact_phone,
+                website: business.website,
+                privacyPolicyUrl: business.privacy_policy_url,
+                hours: await listBusinessHours(businessId),
+                slaMinutes: business.sla_minutes ?? null,
+                timezone: business.timezone ?? "UTC",
+              }}
             />
           ),
           footer: null,

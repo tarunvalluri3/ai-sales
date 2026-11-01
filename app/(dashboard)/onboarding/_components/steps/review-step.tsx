@@ -1,6 +1,8 @@
 "use client";
 
+import type { ComponentProps } from "react";
 import { useRouter } from "next/navigation";
+import { RecommendedDetails } from "./recommended-details";
 import Link from "next/link";
 import { ReadinessChecklist } from "../../../dashboard/widget-settings/readiness-checklist";
 import { PublishButton } from "../../../dashboard/widget-settings/publish-button";
@@ -27,6 +29,7 @@ export function ReviewStep({
   checklistRows,
   activeWidgetKey,
   appOrigin,
+  recommendedDetails,
 }: {
   report: ReadinessReport;
   isPublished: boolean;
@@ -37,6 +40,7 @@ export function ReviewStep({
   checklistRows: Channel[];
   activeWidgetKey: string | null;
   appOrigin: string;
+  recommendedDetails: ComponentProps<typeof RecommendedDetails>;
 }) {
   const router = useRouter();
   // `isPublished` comes straight from the server-fetched business row,
@@ -106,7 +110,9 @@ export function ReviewStep({
         </ul>
       </section>
 
-      <ReadinessChecklist report={report} />
+      <ReadinessChecklist report={report} hideActionHints />
+
+      <RecommendedDetails {...recommendedDetails} />
 
       <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-semibold text-ds-text-primary">Test your agent</h2>
@@ -122,6 +128,7 @@ export function ReviewStep({
         hasPrivacyPolicyUrl={hasPrivacyPolicyUrl}
         readinessBlocked={report.gateApplies && !report.canPublish}
         blockingCount={report.blockingItems.length}
+        redirectOnSuccess="/dashboard?welcome=1"
       />
 
       <div className="flex items-center justify-between gap-3">

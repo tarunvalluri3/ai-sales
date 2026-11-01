@@ -50,6 +50,7 @@ export const CATALOG_REQUIRED_BUSINESS_TYPES: ReadonlySet<string> = new Set([
   "hospitality",
   "real_estate",
   "technology",
+  "manufacturing",
 ]);
 
 /**

@@ -71,5 +71,7 @@ export async function updateBusinessHoursAction(
   await recordAuditLogEntry(businessId, userId, "business_hours.updated", "business", businessId);
 
   revalidatePath("/dashboard/business-hours");
+  // The onboarding review step embeds this form and shows the readiness result.
+  revalidatePath("/onboarding");
   return { success: true };
 }
