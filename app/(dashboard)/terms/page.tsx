@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ContactLines } from "../_components/contact-lines";
 
 export const metadata = {
   title: "Terms of Service | Waves AI Pilot",
@@ -24,7 +25,7 @@ export default function TermsOfServicePage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-ds-text-primary">Terms of Service</h1>
-          <p className="text-sm text-ds-text-muted">Last updated: 2026-10-19</p>
+          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-01</p>
         </div>
 
         <Section title="Agreement">
@@ -98,6 +99,40 @@ export default function TermsOfServicePage() {
               human or to an AI.
             </li>
           </ul>
+        </Section>
+
+        <Section title="Instagram, WhatsApp and other Meta channels">
+          <p>
+            If you connect Instagram or WhatsApp, you must comply with Meta&apos;s{" "}
+            <a
+              href="https://developers.facebook.com/terms/"
+              className="font-medium text-ds-accent hover:text-ds-accent-strong"
+            >
+              Platform Terms
+            </a>
+            , the{" "}
+            <a
+              href="https://help.instagram.com/581066165581870"
+              className="font-medium text-ds-accent hover:text-ds-accent-strong"
+            >
+              Instagram Terms of Use
+            </a>
+            , the{" "}
+            <a
+              href="https://help.instagram.com/477434105621119"
+              className="font-medium text-ds-accent hover:text-ds-accent-strong"
+            >
+              Instagram Community Guidelines
+            </a>
+            , and Meta&apos;s messaging policies, including the 24-hour messaging window — you may
+            reply only within the period Meta allows after a person&apos;s last message, and must not
+            use the channel to send promotional or unsolicited messages Meta does not permit.
+          </p>
+          <p>
+            You may connect only an account you own or are authorized to manage, and you confirm you
+            have the right to do so. We may disconnect a channel, or suspend it, if Meta requires it
+            or if its rules are breached.
+          </p>
         </Section>
 
         <Section title="AI output">
@@ -241,21 +276,7 @@ export default function TermsOfServicePage() {
           <div className="flex flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-4">
             <p className="font-medium text-ds-text-primary">Tarun Valluri</p>
             <p>Proprietor and Grievance Officer, Waves Web Studio</p>
-            <p>
-              Email:{" "}
-              <a
-                href="mailto:support@waveswebstudio.in"
-                className="font-medium text-ds-accent hover:text-ds-accent-strong"
-              >
-                support@waveswebstudio.in
-              </a>
-            </p>
-            <p>
-              Phone:{" "}
-              <a href="tel:+917981596249" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-                +91 79815 96249
-              </a>
-            </p>
+            <ContactLines />
           </div>
         </Section>
 

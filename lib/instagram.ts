@@ -160,6 +160,7 @@ export async function completeInstagramOAuthCallback(
   }
 
   let shortLivedToken: string;
+  let appScopedUserId: string;
   try {
     const body = new URLSearchParams({
       client_id: appId,
@@ -183,6 +184,9 @@ export async function completeInstagramOAuthCallback(
       return { success: false, error: "Meta returned an unexpected response. Please try connecting again." };
     }
     shortLivedToken = parsed.access_token;
+    // Kept only so Meta's deauthorize / data-deletion callbacks, which
+    // identify the account by this app-scoped id, can find the connection.
+    appScopedUserId = String(parsed.user_id);
   } catch {
     return { success: false, error: "Couldn't reach Meta's API to complete this connection. Please try again." };
   }
@@ -292,6 +296,7 @@ export async function completeInstagramOAuthCallback(
       {
         business_id: stateRow.business_id,
         instagram_business_account_id: instagramBusinessAccountId,
+        instagram_app_scoped_user_id: appScopedUserId,
         ig_username: igUsername,
         status: "connected",
         token_expires_at: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),

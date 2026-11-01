@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ContactLines } from "../_components/contact-lines";
 
 export const metadata = {
   title: "Privacy Policy | Waves AI Pilot",
@@ -38,7 +39,7 @@ export default function PrivacyPolicyPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-ds-text-primary">Privacy Policy</h1>
-          <p className="text-sm text-ds-text-muted">Last updated: 2026-10-19</p>
+          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-01</p>
         </div>
 
         <Section title="Who this policy covers">
@@ -149,9 +150,16 @@ export default function PrivacyPolicyPage() {
           <p>
             For account data, we process on the basis of performing the contract you entered into when
             you created an account, and to meet our own legal and tax obligations. For visitor contact
-            details, our customer is responsible for obtaining consent; our widget presents a
-            standalone consent notice before contact details are stored, and a visitor who does not
-            consent can still use the chat without their contact details being saved.
+            details, our customer is responsible for obtaining consent. On the{" "}
+            <strong>website chat widget only</strong>, our widget presents a standalone consent notice
+            before contact details are stored, and a visitor who does not consent can still use the
+            chat without their contact details being saved.
+          </p>
+          <p>
+            That notice does not apply to Instagram or WhatsApp. On those channels the person chose to
+            message the business first, and no widget notice is shown. The customer business is the
+            Data Fiduciary for those conversations and is responsible for its own privacy notice to
+            the people who message it.
           </p>
         </Section>
 
@@ -169,8 +177,9 @@ export default function PrivacyPolicyPage() {
               isolated per business at the database level.
             </li>
             <li>
-              <strong>Google (Gemini)</strong> — generates AI responses and embeddings from the
-              conversation and the business&apos;s approved knowledge. Message content is sent to
+              <strong>Google (Gemini)</strong> — the only AI provider we use. It generates AI
+              responses and embeddings from the conversation and the business&apos;s approved
+              knowledge. Message content, including messages received over Instagram, is sent to
               Gemini in order to produce a response.
             </li>
             <li>
@@ -188,6 +197,88 @@ export default function PrivacyPolicyPage() {
               in order to receive and send messages on those channels.
             </li>
           </ul>
+        </Section>
+
+        <Section title="Instagram and other Meta platforms">
+          <p>
+            A customer can connect its Instagram professional account to Waves AI Pilot using
+            &quot;Instagram API with Instagram Login.&quot; This section describes exactly what we
+            receive and do through that connection.
+          </p>
+          <p>
+            <strong>What we access, and which permission gives it.</strong>
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <code>instagram_business_basic</code> — the connected account&apos;s Instagram ID and
+              username, so we can show the customer which account is connected and match incoming
+              messages to the right business.
+            </li>
+            <li>
+              <code>instagram_business_manage_messages</code> — the text of direct messages people
+              send to the connected account, each sender&apos;s Instagram-scoped ID and each
+              message&apos;s ID, and the ability to send replies from that account. We do not receive
+              the sender&apos;s name or profile details. We do not store attachments: for a
+              non-text message we keep only a note that one arrived.
+            </li>
+            <li>
+              <strong>Access token</strong> — the token Instagram issues when the customer connects.
+              It is kept in a restricted database table that no customer or visitor can read, used
+              only to receive and send messages for that account, renewed before it expires, and
+              never written to our logs.
+            </li>
+          </ul>
+          <p>
+            We do not access the account&apos;s posts, media, comments, followers, or insights.
+          </p>
+          <p>
+            <strong>Why.</strong> Only to receive direct messages sent to the connected business
+            account, generate AI replies grounded in that business&apos;s own approved knowledge, and
+            let its staff take over a conversation.
+          </p>
+          <p>
+            <strong>What we never do.</strong> Data we receive from Meta is never sold, never used for
+            advertising or profiling, never used to train or fine-tune any AI model, and never shared
+            with another business. Message text is sent to our AI provider, Google (Gemini), solely to
+            produce the reply, and to no one else except the service providers listed above that host
+            the data.
+          </p>
+          <p>
+            <strong>How long we keep it.</strong> Instagram messages are kept like any other
+            conversation: permanently deleted after 24 months of inactivity, or sooner if the customer
+            deletes them or its account. The access token is kept only while the account is
+            connected, and is deleted when the customer disconnects Instagram, when the account owner
+            removes the app in Instagram, or when the business is deleted. Disconnecting stops all
+            use of the account at once but does not by itself delete earlier conversations. If
+            Instagram sends us a data deletion request, we also delete every conversation received
+            through that account, the connection record, and the account ID and username.
+          </p>
+          <p>
+            <strong>How to revoke access.</strong> In Instagram, go to Settings → Apps and websites
+            and remove Waves AI Pilot, or have the customer disconnect Instagram in its dashboard.
+            Step-by-step instructions, and how to ask for your data to be deleted, are on our{" "}
+            <Link href="/data-deletion" className="font-medium text-ds-accent hover:text-ds-accent-strong">
+              Data Deletion Instructions
+            </Link>{" "}
+            page.
+          </p>
+          <p>
+            We comply with the{" "}
+            <a
+              href="https://developers.facebook.com/terms/"
+              className="font-medium text-ds-accent hover:text-ds-accent-strong"
+            >
+              Meta Platform Terms
+            </a>{" "}
+            and{" "}
+            <a
+              href="https://developers.facebook.com/devpolicy/"
+              className="font-medium text-ds-accent hover:text-ds-accent-strong"
+            >
+              Developer Policies
+            </a>
+            .
+          </p>
         </Section>
 
         <Section title="Transfers outside India">
@@ -270,21 +361,7 @@ export default function PrivacyPolicyPage() {
           <div className="flex flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-4">
             <p className="font-medium text-ds-text-primary">Tarun Valluri</p>
             <p>Proprietor and Grievance Officer, Waves Web Studio</p>
-            <p>
-              Email:{" "}
-              <a
-                href="mailto:support@waveswebstudio.in"
-                className="font-medium text-ds-accent hover:text-ds-accent-strong"
-              >
-                support@waveswebstudio.in
-              </a>
-            </p>
-            <p>
-              Phone:{" "}
-              <a href="tel:+917981596249" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-                +91 79815 96249
-              </a>
-            </p>
+            <ContactLines />
             <p className="pt-1">
               Plot No. 19, Venkatramana Colony, Phase-1, Street-2,
               <br />

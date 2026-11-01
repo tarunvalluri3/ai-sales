@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { GENERAL_EMAIL, PHONE_PRIMARY, PHONE_WHATSAPP, SUPPORT_EMAIL } from "@/lib/site-contact";
+import { ContactLines } from "../_components/contact-lines";
 
 export const metadata = {
   title: "Contact Us | Waves AI Pilot",
@@ -61,17 +63,37 @@ export default function ContactPage() {
 
         <Section title="Customer care">
           <dl className="flex flex-col gap-3">
-            <Row label="Email">
+            <Row label="Email (support, grievances, data requests)">
               <a
-                href="mailto:support@waveswebstudio.in"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className="font-medium text-ds-accent hover:text-ds-accent-strong"
               >
-                support@waveswebstudio.in
+                {SUPPORT_EMAIL}
+              </a>
+            </Row>
+            <Row label="Email (general and business enquiries)">
+              <a
+                href={`mailto:${GENERAL_EMAIL}`}
+                className="font-medium text-ds-accent hover:text-ds-accent-strong"
+              >
+                {GENERAL_EMAIL}
               </a>
             </Row>
             <Row label="Phone">
-              <a href="tel:+917981596249" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-                +91 79815 96249
+              <a href={PHONE_PRIMARY.tel} className="font-medium text-ds-accent hover:text-ds-accent-strong">
+                {PHONE_PRIMARY.display}
+              </a>
+            </Row>
+            <Row label="Phone / WhatsApp">
+              <a href={PHONE_WHATSAPP.tel} className="font-medium text-ds-accent hover:text-ds-accent-strong">
+                {PHONE_WHATSAPP.display}
+              </a>{" "}
+              ·{" "}
+              <a
+                href={PHONE_WHATSAPP.whatsapp}
+                className="font-medium text-ds-accent hover:text-ds-accent-strong"
+              >
+                Message on WhatsApp
               </a>
             </Row>
             <Row label="Hours">Monday to Friday, 10:00 to 18:00 IST (UTC+5:30)</Row>
@@ -93,21 +115,7 @@ export default function ContactPage() {
           <div className="flex flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-4 text-sm">
             <p className="font-medium text-ds-text-primary">Tarun Valluri</p>
             <p>Proprietor and Grievance Officer, Waves Web Studio</p>
-            <p>
-              Email:{" "}
-              <a
-                href="mailto:support@waveswebstudio.in"
-                className="font-medium text-ds-accent hover:text-ds-accent-strong"
-              >
-                support@waveswebstudio.in
-              </a>
-            </p>
-            <p>
-              Phone:{" "}
-              <a href="tel:+917981596249" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-                +91 79815 96249
-              </a>
-            </p>
+            <ContactLines />
             <p className="pt-1">
               Plot No. 19, Venkatramana Colony, Phase-1, Street-2,
               <br />
@@ -139,6 +147,10 @@ export default function ContactPage() {
               <strong>Your personal data — access, correction, export, or deletion</strong> — see{" "}
               <Link href="/privacy" className="font-medium text-ds-accent hover:text-ds-accent-strong">
                 Privacy Policy
+              </Link>{" "}
+              and{" "}
+              <Link href="/data-deletion" className="font-medium text-ds-accent hover:text-ds-accent-strong">
+                Data Deletion Instructions
               </Link>
               . A customer can export and delete everything from the dashboard without asking us.
             </li>

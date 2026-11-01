@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AtSign, Globe, MessageCircle } from "lucide-react";
 import { Reveal } from "./_components/homepage/reveal";
 import { WavesLogo } from "./_components/waves-logo";
+import { GENERAL_EMAIL, PHONE_PRIMARY, PHONE_WHATSAPP, SUPPORT_EMAIL } from "@/lib/site-contact";
 import { HeroConversation } from "@/components/marketing/fragments/hero-conversation";
 import { GroundedAnswer } from "@/components/marketing/fragments/grounded-answer";
 import { BusinessSetup } from "@/components/marketing/fragments/business-setup";
@@ -446,6 +447,9 @@ export default function HomePage() {
             <Link href="/privacy" className="transition-colors hover:text-ds-text-primary">
               Privacy Policy
             </Link>
+            <Link href="/data-deletion" className="transition-colors hover:text-ds-text-primary">
+              Data Deletion
+            </Link>
             <Link href="/terms" className="transition-colors hover:text-ds-text-primary">
               Terms of Service
             </Link>
@@ -458,6 +462,28 @@ export default function HomePage() {
           </div>
           <p className="text-center text-2xs text-ds-text-muted">
             Waves AI Pilot is a product of Waves Web Studio, Hyderabad, India · GSTIN 36BYQPT2686E1ZR
+          </p>
+          <p className="text-center text-2xs text-ds-text-muted">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="transition-colors hover:text-ds-text-primary">
+              {SUPPORT_EMAIL}
+            </a>
+            {" · "}
+            <a href={`mailto:${GENERAL_EMAIL}`} className="transition-colors hover:text-ds-text-primary">
+              {GENERAL_EMAIL}
+            </a>
+            {" · "}
+            <a href={PHONE_PRIMARY.tel} className="transition-colors hover:text-ds-text-primary">
+              {PHONE_PRIMARY.display}
+            </a>
+            {" · "}
+            <a href={PHONE_WHATSAPP.tel} className="transition-colors hover:text-ds-text-primary">
+              {PHONE_WHATSAPP.display}
+            </a>{" "}
+            (
+            <a href={PHONE_WHATSAPP.whatsapp} className="transition-colors hover:text-ds-text-primary">
+              WhatsApp
+            </a>
+            )
           </p>
         </div>
       </footer>
