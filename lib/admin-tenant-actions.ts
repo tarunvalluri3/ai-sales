@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requirePlatformAdmin, requirePlatformAdminStepUp } from "@/lib/platform-admin";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { recordAdminAuditLogEntry } from "@/lib/admin-audit-log";
+import { restampPublishedIfMissing } from "@/lib/agent-published-repair";
 import { checkAdminMutationRateLimit } from "@/lib/admin-rate-limit";
 import { PLAN_KEYS, type PlanKey } from "@/lib/plans";
 
@@ -76,10 +77,15 @@ export async function reactivateTenant(businessId: string, reason: string): Prom
 
   if (error) return { ok: false, error: "Could not reactivate this tenant. Please try again." };
 
+  // A tenant suspended while in the 2026-11-01 publish bug's state (live but
+  // published_at never stamped) was skipped by migration 20261110000000's
+  // repair; repair it now that it may serve again.
+  const restamped = await restampPublishedIfMissing(supabase, businessId);
+
   await recordAdminAuditLogEntry(admin.user_id, "tenant.reactivated", "business", businessId, {
     businessId,
     before: before ?? undefined,
-    after: { status: "active", reason: reasonCheck.data },
+    after: { status: "active", reason: reasonCheck.data, publishedRestamped: restamped },
   });
   return { ok: true };
 }

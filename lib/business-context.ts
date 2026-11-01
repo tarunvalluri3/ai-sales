@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
 import { isAgentPublished } from "@/lib/agent-published";
+import { businessLifecycleBlock } from "@/lib/business-lifecycle";
 
 export type BusinessContext = {
   userId: string;
@@ -40,7 +41,7 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
   // action must actually block dashboard access, not just mark a column.
   // Checked here (the one place every dashboard page/Server Action already
   // resolves businessId through) rather than per-page.
-  if (business.deleted_at || business.status === "suspended") {
+  if (businessLifecycleBlock(business)) {
     redirect("/suspended");
   }
 

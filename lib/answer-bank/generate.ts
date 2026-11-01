@@ -5,6 +5,7 @@ import { generateBankAnswer, type BusinessProfileContext } from "@/lib/rag";
 import { loadOfferings } from "@/lib/tools/list-offerings";
 import { logEvent } from "@/lib/logger";
 import { isAgentPublished } from "@/lib/agent-published";
+import { businessLifecycleBlock } from "@/lib/business-lifecycle";
 import type { WidgetLanguage } from "@/lib/supabase/types";
 import { CATALOG_ENTRY_KEY, CATALOG_ENTRY_TEXT, buildCatalogAnswer } from "@/lib/answer-bank/catalog";
 import { normalizeQuestionKey, tokenize } from "@/lib/answer-bank/normalize";
@@ -35,6 +36,8 @@ type BusinessRow = {
   widget_language: WidgetLanguage;
   widget_suggested_questions: string[] | null;
   live_version_id: string | null;
+  status: "active" | "suspended";
+  deleted_at: string | null;
   answer_bank_version: number | string;
 };
 
@@ -51,7 +54,7 @@ type EntryRow = {
 };
 
 const BUSINESS_COLUMNS =
-  "id, name, description, contact_email, contact_phone, website, widget_language, widget_suggested_questions, live_version_id, answer_bank_version";
+  "id, name, description, contact_email, contact_phone, website, widget_language, widget_suggested_questions, live_version_id, status, deleted_at, answer_bank_version";
 
 async function loadBusiness(supabase: SupabaseClient, businessId: string): Promise<BusinessRow | null> {
   const { data } = await supabase.from("businesses").select(BUSINESS_COLUMNS).eq("id", businessId).maybeSingle();
@@ -195,7 +198,7 @@ async function inBatches<T>(items: T[], size: number, run: (item: T) => Promise<
 }
 
 export type RefreshResult =
-  | { status: "skipped"; reason: "not_found" | "not_published" }
+  | { status: "skipped"; reason: "not_found" | "suspended" | "not_published" }
   | { status: "done"; version: number; ready: number; failed: number; needsReview: number; stable: boolean };
 
 /**
@@ -209,6 +212,8 @@ export type RefreshResult =
 export async function refreshAnswerBank(supabase: SupabaseClient, businessId: string): Promise<RefreshResult> {
   const business = await loadBusiness(supabase, businessId);
   if (!business) return { status: "skipped", reason: "not_found" };
+  // No Gemini spend for a tenant that may not serve (lib/business-lifecycle.ts).
+  if (businessLifecycleBlock(business)) return { status: "skipped", reason: "suspended" };
   if (!isAgentPublished(business)) return { status: "skipped", reason: "not_published" };
   const version = Number(business.answer_bank_version);
   const language = business.widget_language;

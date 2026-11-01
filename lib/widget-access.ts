@@ -1,4 +1,5 @@
 import { isAgentPublished } from "@/lib/agent-published";
+import { businessLifecycleBlock } from "@/lib/business-lifecycle";
 
 /**
  * Why a public widget request was refused. Internal only: logged server-side
@@ -44,8 +45,8 @@ export function evaluateWidgetAccess(
   if (key.status !== "active") return "key_revoked";
   if (!origin) return "origin_missing";
   if (!key.allowed_origins.includes(origin)) return "origin_not_allowed";
-  if (business.deleted_at) return "business_deleted";
-  if (business.status === "suspended") return "business_suspended";
+  const blocked = businessLifecycleBlock(business);
+  if (blocked) return blocked;
   if (!isAgentPublished(business)) return "agent_not_published";
   return null;
 }
