@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { publishBusinessAction, type PublishBusinessState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
@@ -13,6 +14,7 @@ export function PublishButton({
   readinessBlocked = false,
   blockingCount = 0,
   canEdit = true,
+  redirectOnSuccess,
 }: {
   isPublished: boolean;
   hasActiveKey: boolean;
@@ -21,9 +23,18 @@ export function PublishButton({
   readinessBlocked?: boolean;
   blockingCount?: number;
   canEdit?: boolean;
+  /** Where to send the owner once a publish succeeds (onboarding: the dashboard welcome). */
+  redirectOnSuccess?: string;
 }) {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(publishBusinessAction, initialState);
   const published = isPublished || state.success === true;
+
+  useEffect(() => {
+    if (state.success === true && redirectOnSuccess) {
+      router.replace(redirectOnSuccess);
+    }
+  }, [state, redirectOnSuccess, router]);
   // Draft -> Publish -> Live: this button is the FIRST publish (onboarding's
   // "Publish agent"). Later publishes go through the dashboard header's
   // "Publish changes", which submits the same action. Both are readiness-gated.
@@ -97,7 +108,7 @@ export function PublishButton({
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
           className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
         >
-          {isPending ? "Publishing…" : "Publish agent"}
+          {isPending ? "Publishing…" : state.success && redirectOnSuccess ? "Taking you to your dashboard…" : "Publish agent"}
         </button>
       </form>
     </div>

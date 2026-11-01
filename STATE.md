@@ -6,6 +6,26 @@ Last updated: 2026-11-01 (**"Manufacturing" added as a business type/industry op
 
 ---
 
+## Onboarding review step: inline "recommended details" -- 2026-11-01
+
+The readiness checklist's recommended items (hours, phone, website, privacy policy URL) were text-only and pointed at dashboard pages that aren't reachable before publishing (phone and privacy URL were hidden inputs in the wizard). New `RecommendedDetails` section on the review step: phone / website / privacy policy URL form (`saveOptionalDetailsAction` in `onboarding/actions.ts`, validated with the existing `businessContactPhoneSchema`/`businessWebsiteSchema`/`businessPrivacyPolicyUrlSchema`, admin-only, blank clears; new narrow `updateBusinessOptionalDetails` in `lib/business.ts` writes only those three columns) plus the existing `BusinessHoursForm` reused in a collapsible. `ReadinessChecklist` gained `hideActionHints` (used by the wizard only; widget-settings unchanged). `updateBusinessHoursAction` now also revalidates `/onboarding`. All optional; none blocks publish.
+
+**Checks:** `npx tsc --noEmit` clean, `npm run lint` clean. Build/browser NOT run. **Manual test:** on `/onboarding?step=review`, save phone/website/privacy URL and hours; checklist rows flip to Done; an `http://` privacy URL shows an error.
+
+**Files:** new `onboarding/_components/steps/recommended-details.tsx`. Modified `onboarding/actions.ts`, `onboarding/page.tsx`, `steps/review-step.tsx`, `lib/business.ts`, `dashboard/business-hours/actions.ts`, `widget-settings/readiness-checklist.tsx`.
+
+---
+
+## Onboarding: post-publish redirect + dashboard launch card -- 2026-11-01
+
+After "Publish agent" the owner stayed on `/onboarding?step=review` (the server-side `published_at` redirect in `onboarding/page.tsx` was not firing after the Server Action's revalidation). Now: `PublishButton` takes `redirectOnSuccess`; on `state.success` it `router.replace`s to `/dashboard?welcome=1` (button reads "Taking you to your dashboard…" meanwhile; `replace` so Back doesn't return to the wizard). The review step passes it. `/dashboard` renders a new `LaunchCard` (`dashboard/_components/launch-card.tsx`) when `?welcome=1`: "Your AI sales employee is live", three next steps (test on site, add knowledge, watch conversations), the widget embed snippet with copy, and a Dismiss link back to `/dashboard` (no stored state). The dashboard's own "Publish changes" flow is unchanged. The old `published` branch in `review-step.tsx` is still unreachable dead code (left alone, out of scope).
+
+**Checks:** `npx tsc --noEmit` clean, `npm run lint` clean. `npm run build` and browser click-through NOT run. **Manual test:** finish onboarding, click Publish agent, expect redirect to `/dashboard?welcome=1` with the launch card; Dismiss removes it; reload `/dashboard` shows no card.
+
+**Files:** new `dashboard/_components/launch-card.tsx`. Modified `dashboard/widget-settings/publish-button.tsx`, `onboarding/_components/steps/review-step.tsx`, `dashboard/page.tsx`.
+
+---
+
 ## Onboarding: "Manufacturing" added as a business type/industry option -- 2026-11-01
 
 User asked to add Manufacturing to the industry list in onboarding. `business_type` is a closed enum (`lib/schemas/business.ts`'s `BUSINESS_TYPES`, backed by the DB's `businesses_business_type_check`, added 2026-09-11) shared by both `/onboarding` and `/dashboard/profile` -- a one-line addition to that array, plus a new migration widening the check constraint, is the whole change.

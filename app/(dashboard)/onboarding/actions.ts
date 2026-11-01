@@ -1,12 +1,14 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import {
   createBusinessForOrg,
   getBusinessForOrg,
   saveOnboardingStep,
+  updateBusinessOptionalDetails,
   BusinessAlreadyExistsError,
 } from "@/lib/business";
 import { computeOnboardingProgress, ONBOARDING_STEPS } from "@/lib/onboarding-steps";
@@ -18,6 +20,7 @@ import {
   businessContactEmailRequiredSchema,
   businessContactPhoneSchema,
   businessWebsiteSchema,
+  businessPrivacyPolicyUrlSchema,
 } from "@/lib/schemas/business";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -105,6 +108,54 @@ export async function createBusiness(
   await saveOnboardingStep(context.orgId, "knowledge").catch(() => {});
 
   redirect("/onboarding?step=knowledge");
+}
+
+const optionalDetailsSchema = z.object({
+  contactPhone: businessContactPhoneSchema,
+  website: businessWebsiteSchema,
+  privacyPolicyUrl: businessPrivacyPolicyUrlSchema,
+});
+
+export type OptionalDetailsState = {
+  error?: string;
+  fieldErrors?: Partial<Record<"contactPhone" | "website" | "privacyPolicyUrl", string>>;
+  success?: boolean;
+};
+
+/** Review step: saves the recommended phone / website / privacy policy URL. Blank clears a value. */
+export async function saveOptionalDetailsAction(
+  _prevState: OptionalDetailsState,
+  formData: FormData,
+): Promise<OptionalDetailsState> {
+  const context = await requireAuthContext({ role: "org:admin" });
+  if (!context.orgId) {
+    return { error: "Select or create an organization first." };
+  }
+
+  const parsed = optionalDetailsSchema.safeParse({
+    contactPhone: formData.get("contactPhone"),
+    website: formData.get("website"),
+    privacyPolicyUrl: formData.get("privacyPolicyUrl"),
+  });
+  if (!parsed.success) {
+    const fieldErrors: NonNullable<OptionalDetailsState["fieldErrors"]> = {};
+    for (const issue of parsed.error.issues) {
+      const field = issue.path[0];
+      if (typeof field === "string" && !(field in fieldErrors)) {
+        fieldErrors[field as keyof typeof fieldErrors] = issue.message;
+      }
+    }
+    return { error: "Fix the highlighted fields below.", fieldErrors };
+  }
+
+  try {
+    await updateBusinessOptionalDetails(context.orgId, parsed.data);
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  revalidatePath("/onboarding");
+  return { success: true };
 }
 
 export type AdvanceOnboardingResult = { ok: true } | { ok: false; error: string };

@@ -181,6 +181,34 @@ export async function updateWidgetBranding(orgId: string, input: WidgetBrandingI
 }
 
 /**
+ * Saves only the three optional "recommended" details the onboarding review
+ * step collects (phone, website, privacy policy URL) -- a narrow update so it
+ * can never overwrite the other profile or branding columns.
+ */
+export async function updateBusinessOptionalDetails(
+  orgId: string,
+  input: { contactPhone: string | null; website: string | null; privacyPolicyUrl: string | null },
+): Promise<void> {
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("businesses")
+    .update({
+      contact_phone: input.contactPhone,
+      website: input.website,
+      privacy_policy_url: input.privacyPolicyUrl,
+    })
+    .eq("clerk_org_id", orgId);
+
+  if (error) {
+    throw new AppError(
+      "Something went wrong saving your details. Please try again.",
+      "updateBusinessOptionalDetails failed",
+      error,
+    );
+  }
+}
+
+/**
  * Saves the business's reviewed/edited list of AI-suggested prefilled
  * widget questions (Phase 25e). `questions` must already be the final,
  * human-approved list -- validated shape only, no AI call happens here

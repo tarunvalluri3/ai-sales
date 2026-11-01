@@ -59,7 +59,15 @@ function DismissControl({ item, canEdit }: { item: ReadinessItem; canEdit: boole
   );
 }
 
-function ChecklistItem({ item, canEdit }: { item: ReadinessItem; canEdit: boolean }) {
+function ChecklistItem({
+  item,
+  canEdit,
+  hideActionHint,
+}: {
+  item: ReadinessItem;
+  canEdit: boolean;
+  hideActionHint: boolean;
+}) {
   return (
     <li className="flex flex-col gap-1 border-t border-ds-border py-3 first:border-t-0">
       <div className="flex items-start gap-2">
@@ -83,7 +91,7 @@ function ChecklistItem({ item, canEdit }: { item: ReadinessItem; canEdit: boolea
             </Badge>
           </div>
           <p className="text-xs text-ds-text-secondary">{item.why}</p>
-          {item.status === "unmet" && item.action ? (
+          {item.status === "unmet" && item.action && !hideActionHint ? (
             <p className="text-xs text-ds-text-muted">{item.action}</p>
           ) : null}
           {item.dismissible && item.status !== "met" ? (
@@ -106,9 +114,12 @@ function ChecklistItem({ item, canEdit }: { item: ReadinessItem; canEdit: boolea
 export function ReadinessChecklist({
   report,
   canEdit = true,
+  hideActionHints = false,
 }: {
   report: ReadinessReport;
   canEdit?: boolean;
+  /** The onboarding wizard edits these inline, so the "go to page X" hints would mislead. */
+  hideActionHints?: boolean;
 }) {
   const required = report.items.filter((item) => item.tier === "required");
   const recommended = report.items.filter((item) => item.tier === "recommended");
@@ -138,7 +149,7 @@ export function ReadinessChecklist({
         </h3>
         <ul className="flex flex-col">
           {required.map((item) => (
-            <ChecklistItem key={item.key} item={item} canEdit={canEdit} />
+            <ChecklistItem key={item.key} item={item} canEdit={canEdit} hideActionHint={hideActionHints} />
           ))}
         </ul>
       </div>
@@ -149,7 +160,7 @@ export function ReadinessChecklist({
         </h3>
         <ul className="flex flex-col">
           {recommended.map((item) => (
-            <ChecklistItem key={item.key} item={item} canEdit={canEdit} />
+            <ChecklistItem key={item.key} item={item} canEdit={canEdit} hideActionHint={hideActionHints} />
           ))}
         </ul>
       </div>

@@ -1,3 +1,7 @@
+import { headers } from "next/headers";
+import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
+import { buildWidgetSnippet } from "./widget-settings/build-widget-snippet";
+import { LaunchCard } from "./_components/launch-card";
 import { requireLiveBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listProductsForBusiness } from "@/lib/products";
@@ -16,9 +20,22 @@ import { QualificationDonut } from "./_components/charts/qualification-donut";
 
 const RECENT_LIMIT = 5;
 
-export default async function DashboardOverviewPage() {
+export default async function DashboardOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
   const { businessId, businessName } = await requireLiveBusinessContext();
   const supabase = createServerSupabaseClient();
+
+  const { welcome } = await searchParams;
+  let launchSnippet: string | null = null;
+  if (welcome === "1") {
+    const [widgetKeys, requestHeaders] = await Promise.all([listWidgetKeysForBusiness(businessId), headers()]);
+    const activeKey = widgetKeys.find((k) => k.status !== "revoked")?.key ?? null;
+    const origin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
+    launchSnippet = activeKey ? buildWidgetSnippet(activeKey, origin) : null;
+  }
 
   const [
     products,
@@ -47,6 +64,8 @@ export default async function DashboardOverviewPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
+      {welcome === "1" ? <LaunchCard snippet={launchSnippet} /> : null}
+
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold text-ds-text-primary">{businessName}</h1>
         <p className="text-sm text-ds-text-secondary">
