@@ -97,6 +97,11 @@ jobs:
         # file 052, run against staging below.)
         run: npm run test:onboarding-readiness
 
+      - name: Meta signed_request verification tests
+        # 2026-11-01: Meta App Review's deauthorize / data-deletion callbacks.
+        # Valid, tampered, wrong-secret and malformed signed requests; pure.
+        run: npm run test:meta-signed-request
+
       - name: Widget access and publish-status tests
         # 2026-11-01: publish showed "Live" while /api/chat refused every
         # visitor (publish_agent passed its backfill flag, so published_at
