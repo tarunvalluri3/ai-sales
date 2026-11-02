@@ -9,6 +9,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   expired_state: "That connection link expired. Connection links last 10 minutes.",
   config: "Instagram isn't set up on our side yet. Please try again later or contact support.",
   exchange_failed: "Meta didn't complete the login. Please try again.",
+  me_failed: "Meta completed the login but wouldn't tell us which business connected. Please try again.",
+  accounts_failed: "Meta completed the login but wouldn't list the shared Instagram accounts. Please try again.",
+  account_in_use: "That Instagram account is already connected to another business on AI Sales. Disconnect it there first.",
   no_accounts:
     "No Instagram account was shared. When Meta asks, choose your business portfolio and tick an Instagram professional (Business or Creator) account.",
   subscribe_failed: "Meta approved the login but refused to send this account's messages to us. Please try again.",
