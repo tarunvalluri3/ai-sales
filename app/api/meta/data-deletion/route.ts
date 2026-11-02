@@ -7,7 +7,7 @@ import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
  * Meta's "Data Deletion Request Callback URL". Verifies `signed_request`
- * (HMAC-SHA256, INSTAGRAM_APP_SECRET), records a request, answers at once
+ * (HMAC-SHA256, META_APP_SECRET), records a request, answers at once
  * with the `{ url, confirmation_code }` JSON Meta requires, and runs the
  * deletion in after() so Meta is never kept waiting. The person can follow
  * progress at /data-deletion/status?code=<code>. Never logs the body, a
@@ -18,7 +18,7 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const verified = verifyMetaSignedRequest(
     await readSignedRequestField(request),
-    process.env.INSTAGRAM_APP_SECRET,
+    process.env.META_APP_SECRET,
   );
   if (!verified.ok) {
     return new Response(null, { status: 401 });

@@ -104,6 +104,8 @@ export type SendReplyState = {
   error?: string;
   success?: boolean;
   message?: Message;
+  /** Saved, but not delivered on the channel (e.g. Instagram's 24-hour window closed). */
+  notice?: string;
 };
 
 /**
@@ -196,10 +198,13 @@ export async function sendHumanReplyAction(
   // Phase 26 shipped, so a staff reply during human takeover saved to the
   // transcript but never reached the prospect on Instagram (found via the
   // user's own live test, STATE.md Phase 26 follow-up #5).
+  let notice: string | undefined;
   if (conversation.source === INSTAGRAM_CONVERSATION_SOURCE && conversation.visitor_id) {
     try {
       const connection = await getInstagramConnectionForBusiness(businessId);
-      if (connection?.status === "connected") {
+      if (connection?.status !== "connected") {
+        notice = "Saved, but not sent: Instagram is disconnected. Reconnect it on the Instagram page.";
+      } else {
         const serviceSupabase = createServiceSupabaseClient();
         const outbound = await createInstagramOutboundMessage(serviceSupabase, {
           businessId,
@@ -209,14 +214,20 @@ export async function sendHumanReplyAction(
           instagramBusinessAccountId: connection.instagram_business_account_id,
           content: parsed.data.content,
         });
-        await sendInstagramOutboundMessage(outbound.id);
+        const sent = await sendInstagramOutboundMessage(outbound.id);
+        if (sent.reason === "outside_window") {
+          notice =
+            "Saved, but not sent: Instagram only allows replies within 24 hours of the person's last message.";
+        } else if (sent.reason === "token_revoked") {
+          notice = "Saved, but not sent: Meta says our Instagram access was removed. Reconnect Instagram.";
+        }
       }
     } catch (error) {
       logAndGetUserMessage(error);
     }
   }
 
-  return { success: true, message };
+  return { success: true, message, notice };
 }
 
 const dismissAttentionSchema = z.object({

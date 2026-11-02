@@ -1,4 +1,5 @@
 import { Camera, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { INSTAGRAM_CONNECT_PATH } from "./connect-path";
 
 const BENEFITS = [
   {
@@ -19,12 +20,9 @@ const BENEFITS = [
 ];
 
 /**
- * Replaces WhatsApp's manual-paste form entirely -- Instagram business
- * messaging requires going through Meta's own OAuth dialog via this
- * app's Meta App, so there is nothing to type in. A plain `<a>` (not a
- * Server Action) is required: this needs a real top-level browser
- * navigation to /api/oauth/instagram/authorize, which itself redirects
- * to Meta -- a Server Action cannot produce a cross-origin redirect.
+ * Starts Meta's business login (Instagram API with Unified Login). A plain
+ * <a>: it must be a top-level navigation to the connect route, which
+ * redirects to Meta (a Server Action cannot redirect cross-origin).
  */
 export function ConnectInstagramButton() {
   return (
@@ -39,8 +37,8 @@ export function ConnectInstagramButton() {
         <div className="flex flex-col gap-1">
           <h2 className="text-sm font-semibold text-ds-text-primary">Connect your Instagram account</h2>
           <p className="max-w-md text-sm text-ds-text-secondary">
-            Link an Instagram professional account through Meta so prospects can message your AI sales
-            employee on Instagram, just like they can on your website.
+            Sign in with Instagram or Facebook, choose your business portfolio and the Instagram professional
+            account to share. No Facebook Page is needed.
           </p>
         </div>
       </div>
@@ -55,13 +53,18 @@ export function ConnectInstagramButton() {
         ))}
       </ul>
 
-      <a
-        href="/api/oauth/instagram/authorize"
-        className="inline-flex w-fit items-center gap-2 rounded-ds-md bg-ds-accent px-4 py-2.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
-      >
-        <Camera className="size-4" aria-hidden="true" />
-        Connect with Instagram
-      </a>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-ds-text-secondary">
+          We need access to read and reply to Instagram DMs for this business.
+        </p>
+        <a
+          href={INSTAGRAM_CONNECT_PATH}
+          className="inline-flex w-fit items-center gap-2 rounded-ds-md bg-ds-accent px-4 py-2.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        >
+          <Camera className="size-4" aria-hidden="true" />
+          Connect Instagram
+        </a>
+      </div>
     </section>
   );
 }

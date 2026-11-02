@@ -1,51 +1,60 @@
 import "server-only";
 import crypto from "node:crypto";
+import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Conversation, InstagramConnection } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { logEvent } from "@/lib/logger";
 import { createConversation } from "@/lib/conversations";
+import { getMetaConfig, graphRequest, hasTokenEncryptionKey, openToken, sealToken } from "@/lib/meta-graph";
+import {
+  buildUnifiedLoginUrl,
+  checkOAuthState,
+  OAUTH_STATE_TTL_MS,
+  SUBSCRIBED_FIELDS,
+} from "@/lib/meta-instagram-rules";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
 /**
- * Phase 26's Instagram DM integration -- mirrors lib/whatsapp.ts's shape
- * (connection CRUD, business_id resolution, conversation get-or-create)
- * except for the one thing WhatsApp never needed: OAuth. Instagram
- * business messaging requires a business to connect *through this app's
- * own Meta App* via Meta's "Instagram API with Instagram Login" business
- * login flow, rather than pasting a permanent token generated directly in
- * their own Meta Business Manager. Every endpoint below was live-verified
- * against developers.facebook.com during implementation (2026-09-12), not
- * assumed from training data -- see STATE.md for the confirmed values.
+ * Instagram DMs through Meta's "Instagram API with Unified Login"
+ * (Facebook Login for Business with a config_id). The client signs in with
+ * Instagram or Facebook, picks its business portfolio and the Instagram
+ * account(s) to share, and we receive a Business Integration System User
+ * access token: it belongs to the client's business, does not expire, and
+ * can be revoked. Endpoints follow Meta's get-started and webhooks setup
+ * guides (graph.facebook.com, v26.0) -- see STATE.md.
+ *
+ * Trust: the connect route runs inside an authenticated dashboard session
+ * and writes a single-use, short-lived state row tied to that business; the
+ * callback (no Clerk session) trusts only that row. The token is stored
+ * encrypted (lib/token-crypto.ts) in service-role-only tables and never
+ * logged.
  */
 
-const OAUTH_AUTHORIZE_URL = "https://www.instagram.com/oauth/authorize";
-const SHORT_LIVED_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
-const LONG_LIVED_TOKEN_URL = "https://graph.instagram.com/access_token";
-const REFRESH_TOKEN_URL = "https://graph.instagram.com/refresh_access_token";
-const GRAPH_API_VERSION = "v25.0";
-const GRAPH_API_BASE = `https://graph.instagram.com/${GRAPH_API_VERSION}`;
-const OAUTH_SCOPES = "instagram_business_basic,instagram_business_manage_messages";
-const STATE_TTL_MS = 10 * 60 * 1000;
-const REFRESH_WINDOW_DAYS = 5;
-const REQUEST_TIMEOUT_MS = 10_000;
+const SELECTION_TTL_MS = 15 * 60 * 1000;
+const IG_ID_PATTERN = /^\d{1,32}$/;
 
-function errorMessageOnly(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 500);
-}
+export const INSTAGRAM_CONVERSATION_SOURCE = "instagram";
 
-async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
+/** Short codes the dashboard turns into friendly copy (never Meta's raw error text). */
+export type InstagramConnectError =
+  | "denied"
+  | "invalid_state"
+  | "expired_state"
+  | "config"
+  | "exchange_failed"
+  | "no_accounts"
+  | "subscribe_failed"
+  | "selection_expired"
+  | "unexpected";
+
+const assignedAccountsSchema = z.object({
+  data: z.array(z.object({ id: z.string().regex(IG_ID_PATTERN), username: z.string().optional() })),
+});
+
+export type InstagramAccountChoice = { id: string; username: string | null };
 
 /** Reads a business's own Instagram connection (no token). `businessId` must come from `requireBusinessContext()`. */
 export async function getInstagramConnectionForBusiness(businessId: string): Promise<InstagramConnection | null> {
@@ -68,224 +77,279 @@ export async function getInstagramConnectionForBusiness(businessId: string): Pro
 }
 
 /**
- * Starts the OAuth flow: generates a single-use, short-lived CSRF state
- * token, records it (service-role only -- never client-readable) against
- * the already-authenticated caller's businessId/userId, and returns
- * Meta's authorize URL to redirect to. `businessId`/`userId` must come
- * from `requireBusinessContext()` -- this is where authorization is
- * actually enforced (the callback route that consumes this state later
- * has no Clerk session to check against).
+ * Starts the login: records a random, single-use state (10 minutes) for the
+ * already-authenticated caller's business and returns Meta's login dialog
+ * URL. `businessId`/`userId` must come from `requireBusinessContext()`.
  */
-export async function buildInstagramAuthorizeUrl(
-  businessId: string,
-  userId: string,
-): Promise<{ url: string }> {
-  const appId = process.env.INSTAGRAM_APP_ID;
-  const redirectUri = process.env.INSTAGRAM_OAUTH_REDIRECT_URI;
-  if (!appId || !redirectUri) {
+export async function buildInstagramConnectUrl(businessId: string, userId: string): Promise<{ url: string }> {
+  const config = getMetaConfig();
+  if (!config || !hasTokenEncryptionKey()) {
     throw new AppError(
       "Instagram isn't configured yet. Please try again later.",
-      "buildInstagramAuthorizeUrl missing INSTAGRAM_APP_ID or INSTAGRAM_OAUTH_REDIRECT_URI",
+      "buildInstagramConnectUrl missing META_* config or META_TOKEN_ENCRYPTION_KEY",
     );
   }
 
   const state = crypto.randomBytes(32).toString("base64url");
   const supabase = createServiceSupabaseClient();
+
+  // Housekeeping: expired states for this business are useless; drop them.
+  await supabase
+    .from("instagram_oauth_states")
+    .delete()
+    .eq("business_id", businessId)
+    .lt("expires_at", new Date().toISOString());
+
   const { error } = await supabase.from("instagram_oauth_states").insert({
     state,
     business_id: businessId,
     initiated_by_user_id: userId,
-    expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+    expires_at: new Date(Date.now() + OAUTH_STATE_TTL_MS).toISOString(),
   });
 
   if (error) {
     throw new AppError(
       "Something went wrong starting the Instagram connection. Please try again.",
-      "buildInstagramAuthorizeUrl state insert failed",
+      "buildInstagramConnectUrl state insert failed",
       error,
     );
   }
 
-  const url = new URL(OAUTH_AUTHORIZE_URL);
-  url.searchParams.set("client_id", appId);
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", OAUTH_SCOPES);
-  url.searchParams.set("state", state);
-
-  return { url: url.toString() };
+  return {
+    url: buildUnifiedLoginUrl({
+      appId: config.appId,
+      configId: config.loginConfigId,
+      redirectUri: config.redirectUri,
+      state,
+    }),
+  };
 }
 
-export type ConnectInstagramResult =
-  | { success: true; connection: InstagramConnection; initiatedByUserId: string }
-  | { success: false; error: string };
-
-/**
- * Completes the OAuth round-trip: consumes the CSRF state (single-use,
- * fail-closed if missing/expired -- this IS the callback's entire trust
- * mechanism, since Meta's redirect carries no Clerk session), exchanges
- * the authorization code for a short-lived then long-lived token, looks
- * up the connected account's username, and upserts both
- * instagram_credentials and instagram_connections via the service-role
- * client (same "authorization already checked upstream" pattern as
- * connectWhatsappNumber() -- here, checked when the state row was
- * created, not at write time, since there is no session to check now).
- */
-export async function completeInstagramOAuthCallback(
-  code: string,
+/** Consumes (deletes) a state row and checks it. Used for both the success and the cancel/error callback. */
+export async function consumeInstagramOAuthState(
   state: string,
-): Promise<ConnectInstagramResult> {
+): Promise<{ ok: true; businessId: string; userId: string } | { ok: false; error: InstagramConnectError }> {
   const supabase = createServiceSupabaseClient();
-
-  const { data: stateRow, error: stateError } = await supabase
+  const { data, error } = await supabase
     .from("instagram_oauth_states")
     .delete()
     .eq("state", state)
     .select("business_id, initiated_by_user_id, expires_at")
     .maybeSingle();
 
-  if (stateError || !stateRow) {
-    return { success: false, error: "This connection link is invalid or was already used. Please try connecting again." };
+  const checked = checkOAuthState(error ? null : data, new Date());
+  if (!checked.ok) {
+    return { ok: false, error: checked.reason === "expired" ? "expired_state" : "invalid_state" };
   }
+  return checked;
+}
 
-  if (new Date(stateRow.expires_at) < new Date()) {
-    return { success: false, error: "This connection link expired. Please try connecting again." };
-  }
+export type CompleteConnectResult =
+  | { kind: "connected"; connection: InstagramConnection }
+  | { kind: "choose"; selectionId: string }
+  | { kind: "error"; error: InstagramConnectError };
 
-  const appId = process.env.INSTAGRAM_APP_ID;
-  const appSecret = process.env.INSTAGRAM_APP_SECRET;
-  const redirectUri = process.env.INSTAGRAM_OAUTH_REDIRECT_URI;
-  if (!appId || !appSecret || !redirectUri) {
-    return { success: false, error: "Instagram isn't configured yet. Please try again later." };
-  }
+/**
+ * Finishes the login for a business whose state was already verified:
+ * exchanges the code (server-side, app secret), reads the system user id
+ * and client_business_id, lists the shared Instagram accounts, then either
+ * connects the only one or parks the token so the client can choose.
+ */
+export async function completeInstagramConnect(
+  businessId: string,
+  userId: string,
+  code: string,
+): Promise<CompleteConnectResult> {
+  const config = getMetaConfig();
+  if (!config || !hasTokenEncryptionKey()) return { kind: "error", error: "config" };
 
-  let shortLivedToken: string;
-  let appScopedUserId: string;
-  try {
-    const body = new URLSearchParams({
-      client_id: appId,
-      client_secret: appSecret,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri,
+  const exchanged = await graphRequest<{ access_token?: string }>("GET", "/oauth/access_token", {
+    query: {
+      client_id: config.appId,
+      client_secret: config.appSecret,
+      redirect_uri: config.redirectUri,
       code,
-    });
-    const response = await fetchWithTimeout(SHORT_LIVED_TOKEN_URL, { method: "POST", body });
-    if (!response.ok) {
-      return { success: false, error: "Meta rejected this connection attempt. Please try connecting again." };
-    }
-    // This response's own `user_id` is the Instagram *app-scoped* user ID --
-    // NOT the same ID Meta later sends as `entry.id` in messaging webhook
-    // payloads. Deliberately not used below; the real ID is fetched
-    // separately from GET /me's `user_id` field further down. Confirmed
-    // live via developers.facebook.com after a real DM's webhook delivery
-    // showed a different ID than what this endpoint returns (STATE.md).
-    const parsed = (await response.json()) as { access_token?: string; user_id?: number | string };
-    if (!parsed.access_token || parsed.user_id == null) {
-      return { success: false, error: "Meta returned an unexpected response. Please try connecting again." };
-    }
-    shortLivedToken = parsed.access_token;
-    // Kept only so Meta's deauthorize / data-deletion callbacks, which
-    // identify the account by this app-scoped id, can find the connection.
-    appScopedUserId = String(parsed.user_id);
-  } catch {
-    return { success: false, error: "Couldn't reach Meta's API to complete this connection. Please try again." };
+    },
+  });
+  if (!exchanged.ok || !exchanged.data.access_token) {
+    logEvent("instagram_connect_exchange_failed", businessId, { status: exchanged.ok ? 200 : exchanged.status }, "error");
+    return { kind: "error", error: "exchange_failed" };
+  }
+  const token = exchanged.data.access_token;
+
+  const me = await graphRequest<{ id?: string; client_business_id?: string }>("GET", "/me", {
+    token,
+    query: { fields: "id,client_business_id" },
+  });
+  if (!me.ok || !me.data.id) {
+    logEvent("instagram_connect_me_failed", businessId, { status: me.ok ? 200 : me.status }, "error");
+    return { kind: "error", error: "exchange_failed" };
+  }
+  const systemUserId = String(me.data.id);
+  const clientBusinessId = me.data.client_business_id ? String(me.data.client_business_id) : null;
+
+  const assigned = await graphRequest<unknown>("GET", "/me/assigned_instagram_accounts", {
+    token,
+    query: { fields: "id,username" },
+  });
+  const parsedAccounts = assigned.ok ? assignedAccountsSchema.safeParse(assigned.data) : null;
+  if (!parsedAccounts?.success) {
+    logEvent("instagram_connect_accounts_failed", businessId, { status: assigned.ok ? 200 : assigned.status }, "error");
+    return { kind: "error", error: "exchange_failed" };
+  }
+  const accounts: InstagramAccountChoice[] = parsedAccounts.data.data.map((account) => ({
+    id: account.id,
+    username: account.username ?? null,
+  }));
+
+  if (accounts.length === 0) return { kind: "error", error: "no_accounts" };
+
+  if (accounts.length === 1) {
+    return connectInstagramAccount(businessId, userId, token, systemUserId, clientBusinessId, accounts[0]);
   }
 
-  let longLivedToken: string;
-  let expiresInSeconds: number;
-  try {
-    const url = new URL(LONG_LIVED_TOKEN_URL);
-    url.searchParams.set("grant_type", "ig_exchange_token");
-    url.searchParams.set("client_secret", appSecret);
-    url.searchParams.set("access_token", shortLivedToken);
-    const response = await fetchWithTimeout(url.toString());
-    if (!response.ok) {
-      return { success: false, error: "Meta rejected this connection attempt. Please try connecting again." };
-    }
-    const parsed = (await response.json()) as { access_token?: string; expires_in?: number };
-    if (!parsed.access_token) {
-      return { success: false, error: "Meta returned an unexpected response. Please try connecting again." };
-    }
-    longLivedToken = parsed.access_token;
-    expiresInSeconds = parsed.expires_in ?? 60 * 24 * 60 * 60;
-  } catch {
-    return { success: false, error: "Couldn't reach Meta's API to complete this connection. Please try again." };
+  const supabase = createServiceSupabaseClient();
+  await supabase.from("instagram_pending_selections").delete().eq("business_id", businessId);
+  const { data, error } = await supabase
+    .from("instagram_pending_selections")
+    .insert({
+      business_id: businessId,
+      initiated_by_user_id: userId,
+      access_token_encrypted: sealToken(token),
+      meta_system_user_id: systemUserId,
+      client_business_id: clientBusinessId,
+      accounts,
+      expires_at: new Date(Date.now() + SELECTION_TTL_MS).toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new AppError(
+      "Something went wrong saving your Instagram accounts. Please try again.",
+      "completeInstagramConnect pending selection insert failed",
+      error,
+    );
   }
 
-  // Getting a valid token only proves the credentials work -- it does not
-  // tell Meta to actually deliver this account's messages to our webhook.
-  // That requires this separate subscription call, unconditionally on
-  // every connect/reconnect (idempotent at Meta's end). Same "verify
-  // first, subscribe second, write third" invariant as
-  // connectWhatsappNumber()'s WABA subscription call: a subscription
-  // failure must not silently leave `status='connected'` while Meta
-  // never sends us a single message.
-  try {
-    const url = new URL(`${GRAPH_API_BASE}/me/subscribed_apps`);
-    url.searchParams.set("subscribed_fields", "messages");
-    url.searchParams.set("access_token", longLivedToken);
-    const response = await fetchWithTimeout(url.toString(), { method: "POST" });
-    if (!response.ok) {
-      return {
-        success: false,
-        error: "Meta accepted your credentials but refused to enable message delivery for this Instagram account. Please try connecting again.",
-      };
-    }
-  } catch {
-    return {
-      success: false,
-      error: "Couldn't reach Meta's API to enable message delivery for this Instagram account. Please try again.",
-    };
-  }
+  return { kind: "choose", selectionId: data.id };
+}
 
-  // GET /me's own `id` field is the same app-scoped ID the token exchange
-  // above already returned -- still not what webhooks use. Its `user_id`
-  // field is the actual Instagram professional account ID (<IG_ID>) that
-  // matches messaging webhook `entry.id`, per Meta's User Profile API docs.
-  // Fetching this is mandatory, not best-effort: storing the wrong ID here
-  // doesn't fail loudly, it just means resolveBusinessFromInstagramAccountId()
-  // never matches and every inbound DM silently resolves to "unknown
-  // account" -- exactly the bug this fixes (STATE.md follow-up #4).
-  let instagramBusinessAccountId: string;
-  let igUsername: string | null = null;
-  try {
-    const url = new URL(`${GRAPH_API_BASE}/me`);
-    url.searchParams.set("fields", "user_id,username");
-    url.searchParams.set("access_token", longLivedToken);
-    const response = await fetchWithTimeout(url.toString());
-    if (!response.ok) {
-      return {
-        success: false,
-        error: "Meta accepted your credentials but didn't return this account's ID. Please try connecting again.",
-      };
-    }
-    const parsed = (await response.json()) as { user_id?: number | string; username?: string };
-    if (parsed.user_id == null) {
-      return {
-        success: false,
-        error: "Meta accepted your credentials but didn't return this account's ID. Please try connecting again.",
-      };
-    }
-    instagramBusinessAccountId = String(parsed.user_id);
-    igUsername = parsed.username ?? null;
-  } catch {
-    return {
-      success: false,
-      error: "Couldn't reach Meta's API to complete this connection. Please try again.",
-    };
-  }
+/** The accounts a business may choose from (no token). Null when the selection is unknown, expired or someone else's. */
+export async function getInstagramPendingSelection(
+  businessId: string,
+  selectionId: string,
+): Promise<InstagramAccountChoice[] | null> {
+  if (!z.string().uuid().safeParse(selectionId).success) return null;
+  const supabase = createServiceSupabaseClient();
+  const { data } = await supabase
+    .from("instagram_pending_selections")
+    .select("accounts, expires_at")
+    .eq("id", selectionId)
+    .eq("business_id", businessId)
+    .maybeSingle<{ accounts: InstagramAccountChoice[]; expires_at: string }>();
 
+  if (!data || new Date(data.expires_at) <= new Date()) return null;
+  return data.accounts;
+}
+
+/** Connects the account the client picked. `businessId`/`userId` come from the caller's session, never the form. */
+export async function finishInstagramSelection(
+  businessId: string,
+  userId: string,
+  selectionId: string,
+  accountId: string,
+): Promise<CompleteConnectResult> {
+  const supabase = createServiceSupabaseClient();
+  const { data } = await supabase
+    .from("instagram_pending_selections")
+    .delete()
+    .eq("id", selectionId)
+    .eq("business_id", businessId)
+    .select("access_token_encrypted, meta_system_user_id, client_business_id, accounts, expires_at")
+    .maybeSingle<{
+      access_token_encrypted: string;
+      meta_system_user_id: string;
+      client_business_id: string | null;
+      accounts: InstagramAccountChoice[];
+      expires_at: string;
+    }>();
+
+  if (!data || new Date(data.expires_at) <= new Date()) return { kind: "error", error: "selection_expired" };
+
+  const account = data.accounts.find((candidate) => candidate.id === accountId);
+  if (!account) return { kind: "error", error: "selection_expired" };
+
+  return connectInstagramAccount(
+    businessId,
+    userId,
+    openToken(data.access_token_encrypted),
+    data.meta_system_user_id,
+    data.client_business_id,
+    account,
+  );
+}
+
+/**
+ * Subscribes the account to our app's webhooks, then stores the connection.
+ * Subscribe first: a stored "connected" row that Meta never sends messages
+ * for would look healthy and silently drop every DM.
+ */
+async function connectInstagramAccount(
+  businessId: string,
+  userId: string,
+  token: string,
+  systemUserId: string,
+  clientBusinessId: string | null,
+  account: InstagramAccountChoice,
+): Promise<CompleteConnectResult> {
+  if (!IG_ID_PATTERN.test(account.id)) return { kind: "error", error: "exchange_failed" };
+
+  const subscribed = await graphRequest<{ success?: boolean }>("POST", `/${account.id}/subscribed_apps`, {
+    token,
+    form: { subscribed_fields: SUBSCRIBED_FIELDS.join(",") },
+  });
+  if (!subscribed.ok || subscribed.data.success !== true) {
+    logEvent(
+      "instagram_webhook_subscribe_failed",
+      businessId,
+      { status: subscribed.ok ? 200 : subscribed.status, code: subscribed.ok ? null : (subscribed.error?.code ?? null) },
+      "error",
+    );
+    return { kind: "error", error: "subscribe_failed" };
+  }
+  logEvent("instagram_webhook_subscribed", businessId, {});
+
+  const supabase = createServiceSupabaseClient();
   const nowIso = new Date().toISOString();
 
+  // One Instagram account can serve one business. If another business held
+  // this account, its row is replaced only when it is not connected.
+  const { data: existingOwner } = await supabase
+    .from("instagram_connections")
+    .select("business_id, status")
+    .eq("instagram_business_account_id", account.id)
+    .maybeSingle<{ business_id: string; status: string }>();
+  if (existingOwner && existingOwner.business_id !== businessId) {
+    if (existingOwner.status === "connected") {
+      logEvent("instagram_account_owned_by_other_business", businessId, {}, "error");
+      return { kind: "error", error: "unexpected" };
+    }
+    await supabase
+      .from("instagram_connections")
+      .delete()
+      .eq("instagram_business_account_id", account.id)
+      .eq("business_id", existingOwner.business_id);
+  }
+
   const { error: credentialsError } = await supabase.from("instagram_credentials").upsert(
-    { business_id: stateRow.business_id, access_token: longLivedToken, token_updated_at: nowIso },
+    { business_id: businessId, access_token_encrypted: sealToken(token), token_updated_at: nowIso },
     { onConflict: "business_id" },
   );
-
   if (credentialsError) {
     throw new AppError(
       "Something went wrong saving your Instagram credentials. Please try again.",
-      "completeInstagramOAuthCallback credentials upsert failed",
+      "connectInstagramAccount credentials upsert failed",
       credentialsError,
     );
   }
@@ -294,13 +358,13 @@ export async function completeInstagramOAuthCallback(
     .from("instagram_connections")
     .upsert(
       {
-        business_id: stateRow.business_id,
-        instagram_business_account_id: instagramBusinessAccountId,
-        instagram_app_scoped_user_id: appScopedUserId,
-        ig_username: igUsername,
+        business_id: businessId,
+        instagram_business_account_id: account.id,
+        ig_username: account.username,
+        meta_system_user_id: systemUserId,
+        client_business_id: clientBusinessId,
         status: "connected",
-        token_expires_at: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
-        access_token_last4: longLivedToken.slice(-4),
+        access_token_last4: token.slice(-4),
         last_verified_at: nowIso,
         last_error: null,
         connected_at: nowIso,
@@ -314,42 +378,122 @@ export async function completeInstagramOAuthCallback(
   if (connectionError) {
     throw new AppError(
       "Something went wrong saving your Instagram connection. Please try again.",
-      "completeInstagramOAuthCallback connection upsert failed",
+      "connectInstagramAccount connection upsert failed",
       connectionError,
     );
   }
 
-  return { success: true, connection, initiatedByUserId: stateRow.initiated_by_user_id };
+  const { error: auditError } = await supabase.from("audit_log").insert({
+    business_id: businessId,
+    actor_user_id: userId,
+    action: "instagram_connection.created",
+    target_type: "instagram_connection",
+    target_id: connection.id,
+  });
+  if (auditError) {
+    logEvent("instagram_connect_audit_failed", businessId, {}, "error");
+  }
+
+  return { kind: "connected", connection };
 }
 
-/** Removes a business's Instagram connection and credentials. Returns the deleted connection's id, or `null` if none existed. */
-export async function disconnectInstagramNumber(businessId: string): Promise<string | null> {
+/** Decrypts a business's stored token. Null when there is none (or it can't be decrypted). Never logs it. */
+export async function getInstagramAccessToken(
+  supabase: ServiceSupabaseClient,
+  businessId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("instagram_credentials")
+    .select("access_token_encrypted")
+    .eq("business_id", businessId)
+    .maybeSingle<{ access_token_encrypted: string }>();
+  if (!data) return null;
+  try {
+    return openToken(data.access_token_encrypted);
+  } catch {
+    logEvent("instagram_token_decrypt_failed", businessId, {}, "error");
+    return null;
+  }
+}
+
+/**
+ * Meta said the token is invalid or revoked: delete it and mark the
+ * connection disconnected so nothing tries to send again. The dashboard
+ * then shows "Reconnect Instagram".
+ */
+export async function markInstagramConnectionRevoked(
+  supabase: ServiceSupabaseClient,
+  businessId: string,
+): Promise<void> {
+  await supabase.from("instagram_credentials").delete().eq("business_id", businessId);
+  await supabase
+    .from("instagram_connections")
+    .update({
+      status: "disconnected",
+      access_token_last4: null,
+      last_error: "token_revoked",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("business_id", businessId);
+  logEvent("instagram_token_revoked", businessId, {}, "error");
+}
+
+/**
+ * Dashboard "Disconnect": unsubscribes the account from our webhooks when
+ * we still hold a working token (best effort, logged), then deletes the
+ * token and the connection row. Conversations stay. Returns the deleted
+ * connection's id, or null if none existed.
+ */
+export async function disconnectInstagram(businessId: string): Promise<string | null> {
   const supabase = createServiceSupabaseClient();
 
-  const { data: deletedConnections, error: connectionError } = await supabase
+  const { data: connection } = await supabase
+    .from("instagram_connections")
+    .select("instagram_business_account_id")
+    .eq("business_id", businessId)
+    .maybeSingle<{ instagram_business_account_id: string }>();
+
+  const token = await getInstagramAccessToken(supabase, businessId);
+  if (connection && token && IG_ID_PATTERN.test(connection.instagram_business_account_id)) {
+    const result = await graphRequest("DELETE", `/${connection.instagram_business_account_id}/subscribed_apps`, { token });
+    logEvent(
+      result.ok ? "instagram_webhook_unsubscribed" : "instagram_webhook_unsubscribe_failed",
+      businessId,
+      { status: result.ok ? 200 : result.status },
+      result.ok ? "info" : "error",
+    );
+  }
+
+  const { error: credentialsError } = await supabase.from("instagram_credentials").delete().eq("business_id", businessId);
+  if (credentialsError) {
+    throw new AppError(
+      "Something went wrong disconnecting Instagram. Please try again.",
+      "disconnectInstagram credentials delete failed",
+      credentialsError,
+    );
+  }
+  await supabase.from("instagram_pending_selections").delete().eq("business_id", businessId);
+
+  const { data: deleted, error: connectionError } = await supabase
     .from("instagram_connections")
     .delete()
     .eq("business_id", businessId)
     .select("id");
-
   if (connectionError) {
     throw new AppError(
       "Something went wrong disconnecting Instagram. Please try again.",
-      "disconnectInstagramNumber connection delete failed",
+      "disconnectInstagram connection delete failed",
       connectionError,
     );
   }
 
-  await supabase.from("instagram_credentials").delete().eq("business_id", businessId);
-
-  return deletedConnections?.[0]?.id ?? null;
+  return deleted?.[0]?.id ?? null;
 }
 
 /**
- * Resolves an inbound webhook's receiving-account id to a business_id --
- * used only by app/api/webhooks/instagram/route.ts. A connection that
- * isn't `status = 'connected'` resolves to null, same fail-closed shape
- * as resolveBusinessFromWhatsappPhoneNumberId().
+ * Resolves an inbound webhook's `entry.id` (the client's Instagram account
+ * id) to a business. Only a `connected` connection resolves -- unknown or
+ * disconnected accounts are ignored.
  */
 export async function resolveBusinessFromInstagramAccountId(
   supabase: ServiceSupabaseClient,
@@ -369,13 +513,10 @@ export async function resolveBusinessFromInstagramAccountId(
   return { businessId: data.business_id };
 }
 
-export const INSTAGRAM_CONVERSATION_SOURCE = "instagram";
-
 /**
  * Finds this Instagram sender's most recent conversation with the
- * business, or starts a new one. Reuses `visitor_id`, same pattern as
- * getOrCreateWhatsappConversation() -- the id comes from Meta's own
- * HMAC-verified webhook payload, never client input.
+ * business, or starts a new one. The sender id comes from Meta's own
+ * signature-verified webhook payload, never client input.
  */
 export async function getOrCreateInstagramConversation(
   supabase: ServiceSupabaseClient,
@@ -405,104 +546,4 @@ export async function getOrCreateInstagramConversation(
   }
 
   return createConversation(supabase, businessId, INSTAGRAM_CONVERSATION_SOURCE, null, igSenderId);
-}
-
-/**
- * Refreshes one business's long-lived token before it expires. Meta's
- * refresh re-uses the existing long-lived token as input (no separate
- * refresh_token, confirmed live) -- the token must be at least 24h old
- * and not yet expired. On failure, marks the connection `error` with safe
- * copy and leaves the still-technically-valid existing token in place
- * (only ever replaced on a successful refresh) -- recovery is a manual
- * "Reconnect with Instagram" from the dashboard, not an auto-disconnect.
- */
-export async function refreshInstagramToken(businessId: string): Promise<{ success: boolean }> {
-  const supabase = createServiceSupabaseClient();
-
-  const { data: credentials } = await supabase
-    .from("instagram_credentials")
-    .select("access_token")
-    .eq("business_id", businessId)
-    .maybeSingle<{ access_token: string }>();
-
-  if (!credentials) {
-    return { success: false };
-  }
-
-  try {
-    const url = new URL(REFRESH_TOKEN_URL);
-    url.searchParams.set("grant_type", "ig_refresh_token");
-    url.searchParams.set("access_token", credentials.access_token);
-    const response = await fetchWithTimeout(url.toString());
-    if (!response.ok) {
-      throw new Error(`Refresh endpoint responded with status ${response.status}`);
-    }
-    const parsed = (await response.json()) as { access_token?: string; expires_in?: number };
-    if (!parsed.access_token) {
-      throw new Error("Refresh endpoint returned no access_token");
-    }
-
-    const nowIso = new Date().toISOString();
-    await supabase
-      .from("instagram_credentials")
-      .update({ access_token: parsed.access_token, token_updated_at: nowIso })
-      .eq("business_id", businessId);
-    await supabase
-      .from("instagram_connections")
-      .update({
-        status: "connected",
-        last_error: null,
-        token_expires_at: new Date(Date.now() + (parsed.expires_in ?? 60 * 24 * 60 * 60) * 1000).toISOString(),
-        access_token_last4: parsed.access_token.slice(-4),
-        last_verified_at: nowIso,
-        updated_at: nowIso,
-      })
-      .eq("business_id", businessId);
-
-    logEvent("instagram_token_refresh_succeeded", businessId, {});
-    return { success: true };
-  } catch (error) {
-    await supabase
-      .from("instagram_connections")
-      .update({ status: "error", last_error: errorMessageOnly(error), updated_at: new Date().toISOString() })
-      .eq("business_id", businessId);
-
-    logEvent("instagram_token_refresh_failed", businessId, {}, "error");
-    return { success: false };
-  }
-}
-
-export type RefreshDueInstagramTokensResult = {
-  processed: number;
-  succeeded: number;
-  failed: number;
-};
-
-/** Sweeps connections whose token expires within REFRESH_WINDOW_DAYS. Called from the shared daily cron. */
-export async function refreshDueInstagramTokens(): Promise<RefreshDueInstagramTokensResult> {
-  const supabase = createServiceSupabaseClient();
-
-  const { data: due, error } = await supabase
-    .from("instagram_connections")
-    .select("business_id")
-    .eq("status", "connected")
-    .lt("token_expires_at", new Date(Date.now() + REFRESH_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString());
-
-  if (error) {
-    logEvent("instagram_token_refresh_sweep_failed", "unknown", {}, "error");
-    return { processed: 0, succeeded: 0, failed: 0 };
-  }
-
-  let succeeded = 0;
-  let failed = 0;
-  for (const row of due ?? []) {
-    const result = await refreshInstagramToken(row.business_id);
-    if (result.success) {
-      succeeded++;
-    } else {
-      failed++;
-    }
-  }
-
-  return { processed: (due ?? []).length, succeeded, failed };
 }

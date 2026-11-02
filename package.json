@@ -16,6 +16,7 @@
     "test:widget-access": "node --test scripts/run-widget-access-tests.mjs",
     "test:business-lifecycle": "node --test scripts/run-business-lifecycle-tests.mjs",
     "test:meta-signed-request": "node --test scripts/run-meta-signed-request-tests.mjs",
+    "test:meta-instagram": "node --test scripts/run-meta-instagram-tests.mjs",
     "test:razorpay":"node --test scripts/run-razorpay-signature-tests.mjs scripts/run-razorpay-webhook-tests.mjs",
     "test:chat-perf": "node --test scripts/run-chat-perf-tests.mjs",
     "test:chat-streaming": "node --test scripts/run-chat-streaming-tests.mjs",

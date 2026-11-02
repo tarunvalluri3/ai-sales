@@ -32,10 +32,16 @@ const envSchema = z.object({
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
-  INSTAGRAM_APP_ID: z.string().min(1).optional(),
-  INSTAGRAM_APP_SECRET: z.string().min(1).optional(),
-  INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
-  INSTAGRAM_OAUTH_REDIRECT_URI: z.string().min(1).optional(),
+  // Instagram API with Unified Login (lib/meta-graph.ts). Optional like the
+  // WhatsApp pair: the connect route, callback and webhook each fail closed
+  // when the value they need is missing, instead of failing startup.
+  META_APP_ID: z.string().regex(/^\d+$/, "must be the numeric Meta app id").optional(),
+  META_APP_SECRET: z.string().min(1).optional(),
+  META_LOGIN_CONFIG_ID: z.string().regex(/^\d+$/, "must be the numeric Facebook Login for Business config id").optional(),
+  META_REDIRECT_URI: z.url().optional(),
+  META_WEBHOOK_VERIFY_TOKEN: z.string().min(16).optional(),
+  META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/, "must look like v26.0").optional(),
+  META_TOKEN_ENCRYPTION_KEY: z.string().min(32).optional(),
   /**
    * Phase 17b: Razorpay. All six are `.optional()`, the same "degrade,
    * don't fail startup" posture as RESEND_API_KEY and the WhatsApp and
