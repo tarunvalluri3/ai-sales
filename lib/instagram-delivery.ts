@@ -5,6 +5,7 @@ import { AppError } from "@/lib/errors";
 import { graphRequest } from "@/lib/meta-graph";
 import { getInstagramAccessToken, markInstagramConnectionRevoked } from "@/lib/instagram";
 import { flagConversationNeedsAttention } from "@/lib/conversations";
+import { isInstagramAllowed } from "@/lib/subscription";
 import { isOutsideWindowError, isRevokedTokenError, isWithinMessagingWindow } from "@/lib/meta-instagram-rules";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
@@ -18,6 +19,8 @@ type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
  * business's decrypted system user token. Two rules are enforced here, at
  * the one place every Instagram send goes through (AI replies, staff
  * replies, appointment notices, cron retries):
+ *  - Instagram must be allowed for the business (a plan that includes it,
+ *    or the service-role-only `businesses.instagram_enabled` override);
  *  - the 24-hour window: no send unless the person's last message is under
  *    24 hours old; otherwise the row fails as `outside_24h_window` and the
  *    conversation is flagged for the team (no HUMAN_AGENT tag yet);
@@ -85,7 +88,7 @@ type InstagramOutboundRow = {
 
 export type InstagramSendResult = {
   success: boolean;
-  reason?: "outside_window" | "token_revoked" | "no_credentials" | "retry_scheduled" | "failed";
+  reason?: "not_allowed" | "outside_window" | "token_revoked" | "no_credentials" | "retry_scheduled" | "failed";
 };
 
 /**
@@ -158,6 +161,14 @@ async function deliverInstagramOutboundRow(
   supabase: ServiceSupabaseClient,
   outbound: InstagramOutboundRow,
 ): Promise<InstagramSendResult> {
+  // The one place every send passes through (AI, staff, appointment notices,
+  // cron retries): no plan with Instagram and no override means no send.
+  if (!(await isInstagramAllowed(supabase, outbound.business_id))) {
+    await failRow(supabase, outbound.id, "instagram_not_allowed");
+    logEvent("instagram_send_not_allowed", outbound.business_id, { outboundId: outbound.id });
+    return { success: false, reason: "not_allowed" };
+  }
+
   const lastInbound = await lastInboundAt(supabase, outbound.business_id, outbound.conversation_id);
   if (!isWithinMessagingWindow(lastInbound, new Date())) {
     await flagOutsideWindow(supabase, outbound);

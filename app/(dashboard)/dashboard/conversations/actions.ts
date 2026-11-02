@@ -215,7 +215,9 @@ export async function sendHumanReplyAction(
           content: parsed.data.content,
         });
         const sent = await sendInstagramOutboundMessage(outbound.id);
-        if (sent.reason === "outside_window") {
+        if (sent.reason === "not_allowed") {
+          notice = "Saved, but not sent: Instagram messaging is not available for this business yet.";
+        } else if (sent.reason === "outside_window") {
           notice =
             "Saved, but not sent: Instagram only allows replies within 24 hours of the person's last message.";
         } else if (sent.reason === "token_revoked") {

@@ -171,6 +171,19 @@ export function isChannelEnabledForPlan(planKey: PlanKey, channel: ChannelKey): 
   return PLANS[planKey].channels[channel];
 }
 
+/**
+ * A plan's channels plus the per-business override (`businesses.instagram_enabled`,
+ * service-role-only, migration 20261113000000). Instagram is allowed when the
+ * plan includes it OR the override is on; the override can never take a
+ * channel away. Pure, so the rule is unit-tested without a database.
+ */
+export function applyChannelOverrides(
+  planChannels: Readonly<Record<ChannelKey, boolean>>,
+  overrides: { instagramEnabled: boolean },
+): Readonly<Record<ChannelKey, boolean>> {
+  return { ...planChannels, instagram: planChannels.instagram || overrides.instagramEnabled };
+}
+
 /* ------------------------------------------------------------------ *
  * GST derivation from a GST-inclusive gross.
  *

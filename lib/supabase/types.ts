@@ -35,6 +35,8 @@ export type Business = {
   suspended_reason: string | null;
   deleted_at: string | null;
   deletion_reason: string | null;
+  /** Service-role-only Instagram override (migration 20261113000000): Instagram is allowed when the plan includes it OR this is true. */
+  instagram_enabled: boolean;
   created_at: string;
   updated_at: string;
 };
