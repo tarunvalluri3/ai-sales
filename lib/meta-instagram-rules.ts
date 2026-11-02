@@ -18,18 +18,19 @@ export const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 export const SUBSCRIBED_FIELDS = ["messages", "messaging_postbacks", "message_reactions", "messaging_seen"] as const;
 
 /**
- * Facebook Login: the fields sent on POST /<PAGE_ID>/subscribed_apps, which
- * installs our app on the Page so Meta delivers the Instagram messaging
- * webhooks configured in the App Dashboard. Every value is in the Page
- * subscribed_apps `subscribed_fields` enum (Graph API reference, v26.0).
- * `messaging_seen` is NOT in that enum (sending it would fail the whole
- * call), so its Page-level counterpart `message_reads` is sent instead.
- * Meta: "You cannot use the subscribed_fields parameter to configure or
- * subscribe to Webhooks for Instagram" -- the Instagram fields (messages,
- * messaging_postbacks, message_reactions, messaging_seen) are subscribed in
- * the App Dashboard, and only fields subscribed at both levels deliver.
+ * Facebook Login: the field sent on POST /<PAGE_ID>/subscribed_apps. This
+ * call only links the Page to our app; Instagram DMs arrive through the
+ * APP-LEVEL "instagram" webhook object (App Dashboard), not through Page
+ * fields. Meta, "Webhooks for Instagram" (Graph API): "Your app must enable
+ * Page subscriptions on the Page connected to the app user's account by
+ * sending a POST request to the Page Subscribed Apps edge and subscribing to
+ * any Page field" -- the documented example is `subscribed_fields=feed`,
+ * which needs only `pages_manage_metadata` and the Page token.
+ * Messenger fields (messages, messaging_postbacks, ...) must NOT be sent:
+ * they are for Facebook Page DMs and require `pages_messaging`, which we
+ * neither request nor need (Meta 403 / code 200, 2026-11-02).
  */
-export const PAGE_SUBSCRIBED_FIELDS = ["messages", "messaging_postbacks", "message_reactions", "message_reads"] as const;
+export const PAGE_SUBSCRIBED_FIELDS = ["feed"] as const;
 
 // ------------------------------------------------------------ login mode
 

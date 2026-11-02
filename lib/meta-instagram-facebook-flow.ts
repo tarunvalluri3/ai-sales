@@ -207,8 +207,9 @@ export type SubscribePageResult = { ok: true } | { ok: false; error: "subscribe_
  *  1. GET /me/permissions (User token) -- logs granted/declined permission
  *     names so a failed subscribe can be told apart from a missing grant.
  *     Diagnostic only; a failure here does not stop the subscribe.
- *  2. POST /<PAGE_ID>/subscribed_apps with the PAGE token (Messenger
- *     Platform webhooks: "using the Page's access token").
+ *  2. POST /<PAGE_ID>/subscribed_apps with the PAGE token and
+ *     `subscribed_fields=feed`, which only links the Page to the app
+ *     (see PAGE_SUBSCRIBED_FIELDS).
  * On failure the log carries Meta's own message; the reason names a
  * permission only when Meta's text names it.
  */

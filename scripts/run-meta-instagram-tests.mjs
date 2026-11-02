@@ -771,10 +771,11 @@ test("facebook mode: the dashboard has copy for every new error code, incl. a gu
 });
 
 test("facebook mode: the Page is subscribed with its Page token and Page-valid fields before anything is stored", () => {
-  assert.deepEqual([...rules.PAGE_SUBSCRIBED_FIELDS], ["messages", "messaging_postbacks", "message_reactions", "message_reads"]);
-  // Every value must be in the Page subscribed_apps enum (Graph API reference, v26.0); messaging_seen is not.
-  const pageEnum = ["messages", "message_reactions", "message_echoes", "message_reads", "messaging_postbacks", "messaging_referrals", "standby", "messaging_handovers"];
-  for (const field of rules.PAGE_SUBSCRIBED_FIELDS) assert.ok(pageEnum.includes(field), field);
+  // Only links the Page to the app ("subscribing to any Page field", documented example `feed`).
+  assert.deepEqual([...rules.PAGE_SUBSCRIBED_FIELDS], ["feed"]);
+  // Messenger fields need pages_messaging, which we do not request: none may be sent.
+  const messengerFields = ["messages", "message_reactions", "message_echoes", "message_reads", "messaging_postbacks", "messaging_referrals", "standby", "messaging_handovers"];
+  for (const field of rules.PAGE_SUBSCRIBED_FIELDS) assert.ok(!messengerFields.includes(field), field);
 
   const lib = read("lib/instagram.ts");
   const connect = lib.slice(lib.indexOf("async function connectFacebookPage("), lib.indexOf("async function connectUnifiedAccount("));
@@ -920,7 +921,7 @@ test("facebook subscribe: POST /<PAGE_ID>/subscribed_apps uses the PAGE token, n
   assert.equal(subscribe.method, "POST");
   assert.equal(subscribe.options.token, PAGE_TOKEN_1);
   assert.notEqual(subscribe.options.token, LONG_TOKEN);
-  assert.equal(subscribe.options.form.subscribed_fields, "messages,messaging_postbacks,message_reactions,message_reads");
+  assert.equal(subscribe.options.form.subscribed_fields, "feed");
   // /me/permissions is the only call made with the user token.
   assert.deepEqual(calls.filter((call) => call.options.token === LONG_TOKEN).map((call) => call.path), ["/me/permissions"]);
   assert.deepEqual(parsed.map((line) => line.event), ["ig_connect_permissions", "ig_connect_subscribed"]);
