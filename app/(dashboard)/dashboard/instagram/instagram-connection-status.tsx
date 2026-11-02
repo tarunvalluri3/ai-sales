@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Camera } from "lucide-react";
+import { Camera, CheckSquare } from "lucide-react";
 import type { InstagramConnection } from "@/lib/supabase/types";
 import { Badge, type BadgeTone } from "../_components/badge";
 import { disconnectInstagramAction, type InstagramActionState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { INSTAGRAM_CONNECT_PATH } from "./connect-path";
+import { MESSAGE_ACCESS_HINT } from "./message-access-hint";
 
 const initialState: InstagramActionState = {};
 
@@ -126,6 +127,15 @@ export function InstagramConnectionStatus({
           </div>
         )}
       </div>
+      {connection.status === "connected" ? (
+        <div className="flex items-start gap-2 rounded-ds-sm bg-ds-surface-soft px-3 py-2 text-xs text-ds-text-secondary">
+          <CheckSquare aria-hidden="true" className="mt-px size-3.5 shrink-0 text-ds-text-muted" />
+          <p>
+            <span className="font-medium text-ds-text-primary">Not getting DMs? Check message access.</span>{" "}
+            {MESSAGE_ACCESS_HINT}
+          </p>
+        </div>
+      ) : null}
       {broken ? (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           <span>{describeBrokenConnection(connection)}</span>

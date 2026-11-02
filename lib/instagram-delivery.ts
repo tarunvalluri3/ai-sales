@@ -33,6 +33,7 @@ type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
  */
 
 const MAX_DELIVERIES_PER_RUN = 10;
+const OUTBOUND_COLUMNS = "id, business_id, conversation_id, instagram_business_account_id, to_ig_id, content, attempts";
 const MAX_DELIVERY_ATTEMPTS = 5;
 const BACKOFF_BASE_SECONDS = 60;
 const MAX_BACKOFF_SECONDS = 60 * 60;
@@ -46,11 +47,15 @@ export type CreateInstagramOutboundMessageInput = {
   content: string;
 };
 
-/** Enqueues a reply for sending. Returns the created row's id, to pass to sendInstagramOutboundMessage(). */
+/**
+ * Enqueues a reply for sending. Returns the created row: pass its id to
+ * sendInstagramOutboundMessage(), or the row itself to
+ * deliverInstagramOutbound() to skip reading it straight back.
+ */
 export async function createInstagramOutboundMessage(
   supabase: ServiceSupabaseClient,
   input: CreateInstagramOutboundMessageInput,
-): Promise<{ id: string }> {
+): Promise<InstagramOutboundRow> {
   const { data, error } = await supabase
     .from("instagram_outbound_messages")
     .insert({
@@ -61,8 +66,8 @@ export async function createInstagramOutboundMessage(
       instagram_business_account_id: input.instagramBusinessAccountId,
       content: input.content,
     })
-    .select("id")
-    .single();
+    .select(OUTBOUND_COLUMNS)
+    .single<InstagramOutboundRow>();
 
   if (error) {
     throw new AppError(
@@ -79,7 +84,7 @@ function backoffSeconds(attempts: number): number {
   return Math.min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), MAX_BACKOFF_SECONDS);
 }
 
-type InstagramOutboundRow = {
+export type InstagramOutboundRow = {
   id: string;
   business_id: string;
   conversation_id: string;
@@ -103,7 +108,7 @@ export async function sendInstagramOutboundMessage(outboundId: string): Promise<
 
   const { data: outbound } = await supabase
     .from("instagram_outbound_messages")
-    .select("id, business_id, conversation_id, instagram_business_account_id, to_ig_id, content, attempts")
+    .select(OUTBOUND_COLUMNS)
     .eq("id", outboundId)
     .maybeSingle<InstagramOutboundRow>();
 
@@ -111,6 +116,18 @@ export async function sendInstagramOutboundMessage(outboundId: string): Promise<
     return { success: false, reason: "failed" };
   }
 
+  return deliverInstagramOutbound(outbound, supabase);
+}
+
+/**
+ * Sends a row the caller has just created (createInstagramOutboundMessage's
+ * return value) without reading it back first. Same rules and outcomes as
+ * sendInstagramOutboundMessage(). Never throws.
+ */
+export async function deliverInstagramOutbound(
+  outbound: InstagramOutboundRow,
+  supabase: ServiceSupabaseClient = createServiceSupabaseClient(),
+): Promise<InstagramSendResult> {
   try {
     return await deliverInstagramOutboundRow(supabase, outbound);
   } catch {
@@ -164,27 +181,34 @@ async function deliverInstagramOutboundRow(
   supabase: ServiceSupabaseClient,
   outbound: InstagramOutboundRow,
 ): Promise<InstagramSendResult> {
-  // The one place every send passes through (AI, staff, appointment notices,
-  // cron retries): no plan with Instagram and no override means no send.
-  if (!(await isInstagramAllowed(supabase, outbound.business_id))) {
+  // The four reads are independent, so they run as one parallel round trip
+  // (2026-11-02 latency pass) instead of four in a row. The gates below are
+  // still checked in the same order, and Meta is called only if all pass.
+  const [allowed, lastInbound, token, sendNode] = await Promise.all([
+    // The one place every send passes through (AI, staff, appointment notices,
+    // cron retries): no plan with Instagram and no override means no send.
+    isInstagramAllowed(supabase, outbound.business_id),
+    lastInboundAt(supabase, outbound.business_id, outbound.conversation_id),
+    getInstagramAccessToken(supabase, outbound.business_id),
+    getInstagramSendNode(supabase, outbound.business_id),
+  ]);
+
+  if (!allowed) {
     await failRow(supabase, outbound.id, "instagram_not_allowed");
     logEvent("instagram_send_not_allowed", outbound.business_id, { outboundId: outbound.id });
     return { success: false, reason: "not_allowed" };
   }
 
-  const lastInbound = await lastInboundAt(supabase, outbound.business_id, outbound.conversation_id);
   if (!isWithinMessagingWindow(lastInbound, new Date())) {
     await flagOutsideWindow(supabase, outbound);
     return { success: false, reason: "outside_window" };
   }
 
-  const token = await getInstagramAccessToken(supabase, outbound.business_id);
   if (!token) {
     await failRow(supabase, outbound.id, "No Instagram credentials for this business.");
     return { success: false, reason: "no_credentials" };
   }
 
-  const sendNode = await getInstagramSendNode(supabase, outbound.business_id);
   if (!sendNode) {
     await failRow(supabase, outbound.id, "No Instagram connection for this business.");
     return { success: false, reason: "no_credentials" };
@@ -280,4 +304,48 @@ export async function processInstagramOutboundMessages(): Promise<ProcessInstagr
   }
 
   return { processed: rows.length, succeeded, failed };
+}
+export type InstagramSenderAction = "mark_seen" | "typing_on" | "typing_off";
+
+/**
+ * Meta sender actions (Messenger Platform for Instagram, "Sender Actions",
+ * read 2026-11-02): POST /<PAGE_ID>/messages with ONLY `recipient` and
+ * `sender_action` (`mark_seen`, `typing_on`, `typing_off`) and the Page
+ * token. The message itself must be a separate request. Instagram cannot
+ * stream a reply, so "Seen" plus "typing..." is what makes the wait feel
+ * short.
+ *
+ * Perceived speed only: the caller starts this without awaiting it on the
+ * reply path, and only once it knows the agent will reply. Uses the same
+ * Graph node and token as replies. NEVER throws; a failure is logged with
+ * the Graph status only.
+ */
+export async function sendInstagramSenderActions(
+  supabase: ServiceSupabaseClient,
+  businessId: string,
+  toIgId: string,
+  actions: InstagramSenderAction[],
+): Promise<void> {
+  try {
+    const [token, sendNode] = await Promise.all([
+      getInstagramAccessToken(supabase, businessId),
+      getInstagramSendNode(supabase, businessId),
+    ]);
+    if (!token || !sendNode) return;
+    const results = await Promise.all(
+      actions.map((action) =>
+        graphRequest("POST", `/${sendNode}/messages`, {
+          token,
+          json: { recipient: { id: toIgId }, sender_action: action },
+        }),
+      ),
+    );
+    results.forEach((result, index) => {
+      if (!result.ok) {
+        logEvent("instagram_sender_action_failed", businessId, { action: actions[index], status: result.status });
+      }
+    });
+  } catch {
+    logEvent("instagram_sender_action_failed", businessId, { action: actions.join(","), status: 0 });
+  }
 }

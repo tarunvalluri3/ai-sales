@@ -1005,3 +1005,127 @@ test("hygiene: the subscribe step's log calls never pass a token", () => {
   assert.ok(calls.length >= 4, `found ${calls.length}`);
   for (const call of calls) assert.doesNotMatch(call, /userToken|pageToken|access_token\b/, call);
 });
+
+// ------------------------------------------------------- reply latency (2026-11-02)
+
+const replyTiming = await import(new URL("../lib/instagram-reply-timing.ts", import.meta.url).href);
+
+test("timing: ig_reply_timing sums the widget's stage names and keeps the milestones", () => {
+  const line = replyTiming.summarizeInstagramReplyTiming({
+    conversationId: "c1",
+    milestones: { signatureVerifiedAtMs: 2, messageSavedAtMs: 310, backgroundStartedAtMs: 330, contextLoadedAtMs: 400, llmCompleteAtMs: 2100, metaSendReturnedAtMs: 2600 },
+    stages: [
+      { stage: "embedding_prefetch", ms: 380 },
+      { stage: "embedding", ms: 20 },
+      { stage: "vector_search", ms: 70 },
+      { stage: "instant_local", ms: 5 },
+      { stage: "model_call_1", ms: 900 },
+      { stage: "tool_batch_1", ms: 150, tools: ["check_product_details"] },
+      { stage: "model_call_2", ms: 700 },
+      { stage: "meta_send", ms: 450 },
+    ],
+    totalMs: 2650,
+    model: "gemini-x",
+    outcome: "ai",
+    sent: true,
+    metaDeliveryLagMs: 800,
+  });
+  assert.equal(line.llmFirstCallMs, 900);
+  assert.equal(line.llmCalls, 2);
+  assert.equal(line.llmMs, 1600);
+  assert.equal(line.toolMs, 150);
+  assert.equal(line.embeddingPrefetchMs, 380);
+  assert.equal(line.embeddingWaitMs, 20);
+  assert.equal(line.vectorSearchMs, 70);
+  assert.equal(line.sendMs, 450);
+  assert.equal(line.metaSendReturnedAtMs, 2600);
+  assert.equal(line.totalMs, 2650);
+  assert.equal(line.metaDeliveryLagMs, 800);
+  // Flat values only (LogMetadata), and nothing that could be message text.
+  for (const value of Object.values(line)) assert.ok(value === null || ["string", "number", "boolean"].includes(typeof value));
+  assert.deepEqual(Object.keys(line).filter((key) => /token|answer|question|content|messageText|body/i.test(key)), []);
+});
+
+test("timing: an instant answer has no model call and a null first-call time", () => {
+  const line = replyTiming.summarizeInstagramReplyTiming({
+    conversationId: "c1",
+    milestones: { signatureVerifiedAtMs: 1, messageSavedAtMs: 200, backgroundStartedAtMs: 210, contextLoadedAtMs: 260, llmCompleteAtMs: 280, metaSendReturnedAtMs: 700 },
+    stages: [{ stage: "instant_local", ms: 12 }],
+    totalMs: 710,
+    model: null,
+    outcome: "instant",
+    sent: true,
+    metaDeliveryLagMs: 800,
+  });
+  assert.equal(line.llmFirstCallMs, null);
+  assert.equal(line.llmCalls, 0);
+  assert.equal(line.instantCheckMs, 12);
+});
+
+test("latency: the Instagram reply uses the widget's speed-ups (one timer, cached embedding, instant answers, deferred metrics)", () => {
+  const route = read("app/api/meta/instagram/webhook/route.ts");
+  assert.ok(route.indexOf("const receivedAt = Date.now();") < route.indexOf("request.text()"), "the clock starts when the webhook arrives");
+  assert.match(route, /new TurnTimer\(receivedAt\)/);
+  assert.match(route, /embedQueryWithCache\(supabase, businessId, prepared\.text\)/);
+  const ask = route.slice(route.indexOf("await askSalesEmployee("), route.indexOf("milestones.llmCompleteAtMs"));
+  assert.match(ask, /timer,\s*quota,\s*prefetch\.queryEmbedding,\s*instant,\s*\/\/[^\n]*\n\s*true,\s*"webhook_instagram",\s*businessContext\.liveSource/);
+  assert.match(route, /writeDeferredTurnMetrics\(supabase, metricsDraft, timer\)/);
+  assert.match(route, /const HISTORY_LIMIT = 20;/);
+  // The gate reads start during ingest, before the conversation lookup and the message write.
+  const ingest = route.slice(route.indexOf("async function ingestInboundMessage("), route.indexOf("async function replyToInboundMessage("));
+  for (const read of ["loadBusinessAiContext(businessId)", "canAgentServe(businessId)", "checkReplyQuota(supabase, businessId)"]) {
+    assert.ok(ingest.indexOf(read) > ingest.indexOf('.from("instagram_inbound_messages")'), `${read} starts only after dedup`);
+    assert.ok(ingest.indexOf(read) < ingest.indexOf("getOrCreateInstagramConversation("), `${read} overlaps the conversation lookup`);
+  }
+  assert.ok(ingest.indexOf("embedQueryWithCache(") > ingest.indexOf('checkAndIncrementRateLimit("conversation"'), "no embedding before every rate limit passes");
+});
+
+test("latency: follow-up work runs after the Send API call, and one ig_reply_timing line is logged", () => {
+  const route = read("app/api/meta/instagram/webhook/route.ts");
+  const answer = route.slice(route.indexOf("async function answerInboundMessage("), route.indexOf("async function sendCannedReply("));
+  const send = answer.indexOf("const sendResult = await sendReply(");
+  assert.ok(send > answer.indexOf("await askSalesEmployee("));
+  for (const later of ['.from("unanswered_questions")', "flagConversationNeedsAttention(supabase, businessId, conversation.id, businessContext.clerkOrgId);\n    logEvent", "writeDeferredTurnMetrics(", "sendUsageReminderIfDue("]) {
+    assert.ok(answer.indexOf(later) > send, `${later} must run after the reply is sent`);
+  }
+  assert.equal((route.match(/logEvent\(\s*"ig_reply_timing"/g) ?? []).length, 1);
+  assert.match(route, /finally \{\s*logEvent\(\s*"ig_reply_timing"/);
+});
+
+test("perceived speed: mark_seen + typing_on fire once a reply is certain, never awaited on the reply path", () => {
+  const route = read("app/api/meta/instagram/webhook/route.ts");
+  const answer = route.slice(route.indexOf("async function answerInboundMessage("), route.indexOf("async function sendCannedReply("));
+  const typing = answer.indexOf('background.push(sendInstagramSenderActions(supabase, businessId, inbound.senderId, ["mark_seen", "typing_on"]))');
+  assert.ok(typing > 0, "fired into the background list, not awaited");
+  assert.ok(typing > answer.indexOf('conversation.control === "human"'));
+  assert.ok(typing > answer.indexOf("if (!agentServing)"));
+  assert.ok(typing > answer.indexOf("if (!contextResult.ok)"));
+  assert.ok(typing < answer.indexOf("await askSalesEmployee("));
+  assert.doesNotMatch(answer, /await sendInstagramSenderActions\(/);
+
+  const delivery = read("lib/instagram-delivery.ts");
+  const actions = delivery.slice(delivery.indexOf("export async function sendInstagramSenderActions("));
+  // Meta: only `recipient` and `sender_action`, to the same /<node>/messages edge, Page token.
+  assert.match(actions, /json: \{ recipient: \{ id: toIgId \}, sender_action: action \}/);
+  assert.match(actions, /`\/\$\{sendNode\}\/messages`/);
+  assert.match(actions, /\} catch \{/);
+});
+
+test("latency: the send path reads its four gates in one parallel round trip, still in order, and skips the row read-back", () => {
+  const delivery = read("lib/instagram-delivery.ts");
+  const deliver = delivery.slice(delivery.indexOf("async function deliverInstagramOutboundRow("));
+  assert.match(deliver, /const \[allowed, lastInbound, token, sendNode\] = await Promise\.all\(\[/);
+  assert.ok(deliver.indexOf("if (!allowed)") < deliver.indexOf("if (!isWithinMessagingWindow("));
+  assert.ok(deliver.indexOf("if (!isWithinMessagingWindow(") < deliver.indexOf("if (!token)"));
+  assert.ok(deliver.indexOf("if (!sendNode)") < deliver.indexOf("graphRequest<"));
+  const route = read("app/api/meta/instagram/webhook/route.ts");
+  assert.match(route, /deliverInstagramOutbound\(outbound, supabase\)/);
+  assert.doesNotMatch(route, /sendInstagramOutboundMessage\(/);
+});
+
+test("timing: Meta's event timestamp is kept (when present) for the delivery-lag figure", () => {
+  const withTime = rules.extractInboundMessages(entry([{ sender: { id: "S1" }, timestamp: 1730000000000, message: { mid: "m1", text: "hi" } }]));
+  assert.equal(withTime[0].sentAtMs, 1730000000000);
+  const bad = rules.extractInboundMessages(entry([{ sender: { id: "S1" }, timestamp: "soon", message: { mid: "m2", text: "hi" } }]));
+  assert.equal("sentAtMs" in bad[0], false);
+});

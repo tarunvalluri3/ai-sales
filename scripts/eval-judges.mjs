@@ -136,6 +136,44 @@ export function inventedPriceForUnknownProduct(answer, productPattern = /quantum
   return null;
 }
 
+// ------------------------------------------- invented track record (2026-11-02)
+
+/**
+ * A real Instagram reply (2026-11-02) answered "there are no proofs on your
+ * website that you built AI agents before?" by saying case studies are
+ * "shared during consultations to protect our clients' privacy" and offering
+ * to discuss "how we've helped other businesses". None of it was in the
+ * business's knowledge. For a business whose data has no clients, case
+ * studies, results or experience figures (Acme Test Co.), any of these is an
+ * invention. Deliberately NOT negation-aware: "we don't publish case studies,
+ * but we share them in consultations" is still an invented claim.
+ * Returns the offending sentence, or null.
+ */
+const TRACK_RECORD_CLAIMS = [
+  // An invented reason why proof is missing.
+  /\b(privacy|confidential(ity)?|non-disclosure|nda)\b[^.!?]{0,60}\bclients?\b|\bclients?['’]?s?\b[^.!?]{0,40}\b(privacy|confidential(ity)?)\b/i,
+  // Proof that supposedly exists somewhere else.
+  /\b(case stud(y|ies)|portfolio|examples? of (our )?(past |previous )?work|testimonials?|references)\b[^.!?]{0,60}\b(shared|available|provided|discussed|shown)\b[^.!?]{0,40}\b(during|in|on|upon|over)\b/i,
+  /\b(shared|available|provided|discussed|shown)\b[^.!?]{0,30}\b(during|in|on|upon)\b[^.!?]{0,20}\b(consultations?|calls?|meetings?|request)\b/i,
+  // Past work, clients or results asserted as fact.
+  /\bhow we(?:['’]ve| have)? helped\b/i,
+  /\bwe(?:['’]ve| have)\s+(already\s+)?(helped|worked with|built|delivered|served|completed|automated)\b/i,
+  /\b(our|many|several|numerous|past|previous|existing|satisfied|happy)\s+(past\s+|previous\s+|existing\s+|satisfied\s+|happy\s+)?clients\b/i,
+  /\b\d+\s*\+?\s*(years?(\s+of\s+experience)?|clients|projects|businesses|customers|agents)\b(?![^.!?]{0,15}\bago\b)/i,
+];
+
+export function inventedTrackRecord(answer) {
+  for (const sentence of sentences(answer)) {
+    if (TRACK_RECORD_CLAIMS.some((pattern) => pattern.test(sentence))) return sentence.trim();
+  }
+  return null;
+}
+
+/** The honest shape the grounding rule asks for: say the information isn't here. */
+export function admitsMissingInformation(answer) {
+  return /\b(don['’]t|do not|doesn['’]t|does not)\s+have\b|\bno (information|details)\b|\bnot (able|something I can)\b[^.!?]{0,30}\b(share|confirm)\b|\bcan['’]t (share|confirm)\b/i.test(answer);
+}
+
 // ------------------------------------------------------------- the catalog
 
 const zw = "​";
