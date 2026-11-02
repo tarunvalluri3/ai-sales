@@ -201,11 +201,10 @@ export default function PrivacyPolicyPage() {
 
         <Section title="Instagram and other Meta platforms">
           <p>
-            A customer can connect its Instagram professional account to Waves AI Pilot through
-            Meta&apos;s business login (&quot;Instagram API with Unified Login&quot;). The customer
-            signs in with Instagram or Facebook, chooses its business portfolio, and chooses which
-            Instagram account to share with us; no Facebook Page is needed. This section describes
-            exactly what we receive and do through that connection.
+            A customer can connect its Instagram professional account to Waves AI Pilot by logging
+            in with Facebook (&quot;Instagram API with Facebook Login&quot;) and choosing the Facebook
+            Page that is linked to its Instagram account. This section describes exactly what we
+            receive and do through that connection.
           </p>
           <p>
             <strong>What we access, and which permission gives it.</strong>
@@ -224,17 +223,35 @@ export default function PrivacyPolicyPage() {
               non-text message we keep only a note that one arrived.
             </li>
             <li>
-              <strong>Access token</strong> — the business integration token Meta issues to the
-              customer&apos;s business when it connects, plus the IDs that identify it (the
-              business&apos;s Meta business ID and the token&apos;s app-scoped user ID). The token is
-              stored encrypted in a restricted database table that no customer or visitor can read,
-              used only to receive and send messages for that account, and never written to our logs.
+              <code>pages_show_list</code> — the list of Facebook Pages the person manages, so they
+              can choose the Page linked to their Instagram account.
+            </li>
+            <li>
+              <code>pages_manage_metadata</code> — lets us subscribe the chosen Page to our app so
+              Meta delivers that Instagram account&apos;s messages to us, and unsubscribe it when the
+              customer disconnects.
+            </li>
+            <li>
+              <code>pages_read_engagement</code> — the chosen Page&apos;s name and ID and the
+              Instagram account linked to it, which Meta requires to read the Page.
+            </li>
+            <li>
+              <code>business_management</code> — lets the login reach Pages and Instagram accounts
+              that the customer manages through a Meta business portfolio. We use it for nothing else.
+            </li>
+            <li>
+              <strong>Access token</strong> — the Facebook Page access token Meta issues for the
+              chosen Page, plus the IDs that identify the connection (the Facebook Page ID and name and
+              the app-scoped Facebook user ID of the person who connected). The token is stored
+              encrypted in a restricted database table that no customer or visitor can read, used only
+              to receive and send Instagram messages for that account, and never written to our logs.
               It is kept until the customer disconnects Instagram, removes our app, or deletes the
               business.
             </li>
           </ul>
           <p>
-            We do not access the account&apos;s posts, media, comments, followers, or insights.
+            We do not access the account&apos;s or the Page&apos;s posts, media, comments, followers, or
+            insights, and we never post anything.
           </p>
           <p>
             <strong>Why.</strong> Only to receive direct messages sent to the connected business
@@ -253,16 +270,18 @@ export default function PrivacyPolicyPage() {
             conversation: permanently deleted after 24 months of inactivity, or sooner if the customer
             deletes them or its account. The access token is kept only while the account is
             connected, and is deleted when the customer disconnects Instagram, when the customer
-            removes our app in Instagram or Meta Business Suite, or when the business is deleted.
+            removes our app in Facebook, Instagram or Meta Business Suite, or when the business is
+            deleted.
             Disconnecting stops all use of the account at once but does not by itself delete earlier
             conversations. If Meta sends us a data deletion request, we also delete every
             conversation received through that account, the connection record, and the account ID,
-            username and business IDs.
+            username, Page ID and name, and user IDs.
           </p>
           <p>
-            <strong>How to revoke access.</strong> In Instagram, go to Settings → Apps and websites
-            and remove Waves AI Pilot; or in Meta Business Suite, go to Settings → Integrations →
-            Connected apps and remove Waves AI Pilot; or have the customer disconnect Instagram in
+            <strong>How to revoke access.</strong> In Facebook, go to Settings → Business
+            integrations and remove Waves AI Pilot; or in Meta Business Suite, go to Settings →
+            Integrations → Connected apps and remove Waves AI Pilot; or in Instagram, go to Settings →
+            Apps and websites and remove Waves AI Pilot; or have the customer disconnect Instagram in
             its dashboard.
             Step-by-step instructions, and how to ask for your data to be deleted, are on our{" "}
             <Link href="/data-deletion" className="font-medium text-ds-accent hover:text-ds-accent-strong">

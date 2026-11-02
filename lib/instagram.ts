@@ -5,27 +5,48 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Conversation, InstagramConnection } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
-import { logEvent } from "@/lib/logger";
+import { logEvent, type LogMetadata } from "@/lib/logger";
 import { createConversation } from "@/lib/conversations";
 import { discoverInstagramAccounts, graphFailureMetadata } from "@/lib/meta-instagram-connect-flow";
-import { getMetaConfig, graphRequest, hasTokenEncryptionKey, openToken, sealToken } from "@/lib/meta-graph";
+import { discoverFacebookPages, PAGE_FIELDS, toLinkedPage, type LinkedPage } from "@/lib/meta-instagram-facebook-flow";
 import {
+  getMetaConfig,
+  getMetaLoginMode,
+  graphRequest,
+  hasTokenEncryptionKey,
+  openToken,
+  sealToken,
+} from "@/lib/meta-graph";
+import {
+  buildFacebookLoginUrl,
   buildUnifiedLoginUrl,
   checkOAuthState,
+  instagramGraphNode,
   OAUTH_STATE_TTL_MS,
+  PAGE_SUBSCRIBED_FIELDS,
   SUBSCRIBED_FIELDS,
+  type MetaLoginMode,
 } from "@/lib/meta-instagram-rules";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
 /**
- * Instagram DMs through Meta's "Instagram API with Unified Login"
- * (Facebook Login for Business with a config_id). The client signs in with
- * Instagram or Facebook, picks its business portfolio and the Instagram
- * account(s) to share, and we receive a Business Integration System User
- * access token: it belongs to the client's business, does not expire, and
- * can be revoked. Endpoints follow Meta's get-started and webhooks setup
- * guides (graph.facebook.com, v26.0) -- see STATE.md.
+ * Instagram DMs through Meta. Two login flows, picked by META_IG_LOGIN_MODE
+ * for NEW connections (each connection row remembers its own `login_mode`,
+ * and sends/disconnects follow the row):
+ *
+ *  - "facebook" (default): Instagram API with Facebook Login (Messenger API
+ *    support for Instagram). The client logs in with Facebook and picks the
+ *    Facebook Page linked to its Instagram professional account. We exchange
+ *    for a long-lived User token, read the Page access token from
+ *    /me/accounts (no expiry when derived from a long-lived User token),
+ *    install the app on the Page (POST /<PAGE_ID>/subscribed_apps) and send
+ *    with POST /<PAGE_ID>/messages.
+ *  - "unified": Instagram API with Unified Login (Facebook Login for Business,
+ *    Business Integration System User token, POST /<IG_ID>/...). Kept for a
+ *    switch back; see STATE.md.
+ *
+ * Endpoints follow Meta's docs on graph.facebook.com (v26.0) -- see STATE.md.
  *
  * Trust: the connect route runs inside an authenticated dashboard session
  * and writes a single-use, short-lived state row tied to that business; the
@@ -46,15 +67,24 @@ export type InstagramConnectError =
   | "expired_state"
   | "config"
   | "exchange_failed"
+  | "long_lived_failed"
   | "me_failed"
   | "accounts_failed"
+  | "pages_failed"
   | "no_accounts"
+  | "no_linked_pages"
   | "account_in_use"
   | "subscribe_failed"
   | "selection_expired"
   | "unexpected";
 
-export type InstagramAccountChoice = { id: string; username: string | null };
+/** One choosable Instagram account. Facebook mode adds the linked Page (never its token). */
+export type InstagramAccountChoice = {
+  id: string;
+  username: string | null;
+  pageId?: string;
+  pageName?: string | null;
+};
 
 /** Reads a business's own Instagram connection (no token). `businessId` must come from `requireBusinessContext()`. */
 export async function getInstagramConnectionForBusiness(businessId: string): Promise<InstagramConnection | null> {
@@ -115,13 +145,9 @@ export async function buildInstagramConnectUrl(businessId: string, userId: strin
     );
   }
 
+  const loginInput = { appId: config.appId, configId: config.loginConfigId, redirectUri: config.redirectUri, state };
   return {
-    url: buildUnifiedLoginUrl({
-      appId: config.appId,
-      configId: config.loginConfigId,
-      redirectUri: config.redirectUri,
-      state,
-    }),
+    url: getMetaLoginMode() === "unified" ? buildUnifiedLoginUrl(loginInput) : buildFacebookLoginUrl(loginInput),
   };
 }
 
@@ -149,11 +175,20 @@ export type CompleteConnectResult =
   | { kind: "choose"; selectionId: string }
   | { kind: "error"; error: InstagramConnectError };
 
+/** The non-secret ids a connection row records, per login mode. */
+type ConnectionIds = {
+  loginMode: MetaLoginMode;
+  metaSystemUserId: string | null;
+  clientBusinessId: string | null;
+  facebookUserId: string | null;
+  facebookPageId: string | null;
+  facebookPageName: string | null;
+};
+
 /**
- * Finishes the login for a business whose state was already verified:
- * exchanges the code (server-side, app secret), reads the system user id
- * and client_business_id, lists the shared Instagram accounts, then either
- * connects the only one or parks the token so the client can choose.
+ * Finishes the login for a business whose state was already verified,
+ * using the flow META_IG_LOGIN_MODE selects. One account -> connect it;
+ * several -> park the (encrypted) token so the client can choose.
  */
 export async function completeInstagramConnect(
   businessId: string,
@@ -162,22 +197,61 @@ export async function completeInstagramConnect(
 ): Promise<CompleteConnectResult> {
   const config = getMetaConfig();
   if (!config || !hasTokenEncryptionKey()) return { kind: "error", error: "config" };
-
-  const discovered = await discoverInstagramAccounts({
+  const discoverInput = {
     graph: graphRequest,
-    log: (event, metadata, level) => logEvent(event, businessId, metadata, level),
+    log: (event: string, metadata: LogMetadata, level?: "info" | "error") => logEvent(event, businessId, metadata, level),
     appId: config.appId,
     appSecret: config.appSecret,
     redirectUri: config.redirectUri,
     code,
-  });
+  };
+
+  if (getMetaLoginMode() === "facebook") {
+    const discovered = await discoverFacebookPages(discoverInput);
+    if (!discovered.ok) return { kind: "error", error: discovered.error };
+    const { userToken, facebookUserId, pages } = discovered;
+
+    if (pages.length === 1) {
+      return connectFacebookPage(businessId, userId, facebookUserId, pages[0]);
+    }
+    return parkSelection(businessId, userId, userToken, {
+      loginMode: "facebook",
+      metaSystemUserId: null,
+      clientBusinessId: null,
+      facebookUserId,
+      accounts: pages.map((page) => ({ id: page.igId, username: page.username, pageId: page.pageId, pageName: page.pageName })),
+    });
+  }
+
+  const discovered = await discoverInstagramAccounts(discoverInput);
   if (!discovered.ok) return { kind: "error", error: discovered.error };
   const { token, systemUserId, clientBusinessId, accounts } = discovered;
 
   if (accounts.length === 1) {
-    return connectInstagramAccount(businessId, userId, token, systemUserId, clientBusinessId, accounts[0]);
+    return connectUnifiedAccount(businessId, userId, token, systemUserId, clientBusinessId, accounts[0]);
   }
+  return parkSelection(businessId, userId, token, {
+    loginMode: "unified",
+    metaSystemUserId: systemUserId,
+    clientBusinessId,
+    facebookUserId: null,
+    accounts,
+  });
+}
 
+/** Stores the token (encrypted) and the choosable accounts for 15 minutes. */
+async function parkSelection(
+  businessId: string,
+  userId: string,
+  token: string,
+  selection: {
+    loginMode: MetaLoginMode;
+    metaSystemUserId: string | null;
+    clientBusinessId: string | null;
+    facebookUserId: string | null;
+    accounts: InstagramAccountChoice[];
+  },
+): Promise<CompleteConnectResult> {
   const supabase = createServiceSupabaseClient();
   await supabase.from("instagram_pending_selections").delete().eq("business_id", businessId);
   const { data, error } = await supabase
@@ -186,9 +260,11 @@ export async function completeInstagramConnect(
       business_id: businessId,
       initiated_by_user_id: userId,
       access_token_encrypted: sealToken(token),
-      meta_system_user_id: systemUserId,
-      client_business_id: clientBusinessId,
-      accounts,
+      login_mode: selection.loginMode,
+      meta_system_user_id: selection.metaSystemUserId,
+      client_business_id: selection.clientBusinessId,
+      facebook_user_id: selection.facebookUserId,
+      accounts: selection.accounts,
       expires_at: new Date(Date.now() + SELECTION_TTL_MS).toISOString(),
     })
     .select("id")
@@ -197,12 +273,17 @@ export async function completeInstagramConnect(
   if (error || !data) {
     throw new AppError(
       "Something went wrong saving your Instagram accounts. Please try again.",
-      "completeInstagramConnect pending selection insert failed",
+      "parkSelection pending selection insert failed",
       error,
     );
   }
 
-  logEvent("ig_connect_choose", businessId, { step: "choose", count: accounts.length, selectionId: data.id });
+  logEvent("ig_connect_choose", businessId, {
+    step: "choose",
+    loginMode: selection.loginMode,
+    count: selection.accounts.length,
+    selectionId: data.id,
+  });
   return { kind: "choose", selectionId: data.id };
 }
 
@@ -237,11 +318,13 @@ export async function finishInstagramSelection(
     .delete()
     .eq("id", selectionId)
     .eq("business_id", businessId)
-    .select("access_token_encrypted, meta_system_user_id, client_business_id, accounts, expires_at")
+    .select("access_token_encrypted, login_mode, meta_system_user_id, client_business_id, facebook_user_id, accounts, expires_at")
     .maybeSingle<{
       access_token_encrypted: string;
-      meta_system_user_id: string;
+      login_mode: MetaLoginMode;
+      meta_system_user_id: string | null;
       client_business_id: string | null;
+      facebook_user_id: string | null;
       accounts: InstagramAccountChoice[];
       expires_at: string;
     }>();
@@ -250,23 +333,91 @@ export async function finishInstagramSelection(
 
   const account = data.accounts.find((candidate) => candidate.id === accountId);
   if (!account) return { kind: "error", error: "selection_expired" };
+  const token = openToken(data.access_token_encrypted);
 
-  return connectInstagramAccount(
-    businessId,
-    userId,
-    openToken(data.access_token_encrypted),
-    data.meta_system_user_id,
-    data.client_business_id,
-    account,
-  );
+  if (data.login_mode === "facebook") {
+    if (!data.facebook_user_id || !account.pageId || !IG_ID_PATTERN.test(account.pageId)) {
+      return { kind: "error", error: "selection_expired" };
+    }
+    // The pending row holds the long-lived USER token; read the chosen
+    // Page's own token now and re-check that it is still linked.
+    const page = await graphRequest<unknown>("GET", `/${account.pageId}`, { token, query: { fields: PAGE_FIELDS } });
+    const linked = page.ok ? toLinkedPage(page.data) : null;
+    if (!linked || linked.igId !== account.id) {
+      logEvent(
+        "ig_connect_failed",
+        businessId,
+        page.ok
+          ? { step: "choose_page", pageId: account.pageId, status: 200, reason: "page_not_linked" }
+          : { step: "choose_page", pageId: account.pageId, ...graphFailureMetadata(page) },
+        "error",
+      );
+      return { kind: "error", error: "pages_failed" };
+    }
+    return connectFacebookPage(businessId, userId, data.facebook_user_id, linked);
+  }
+
+  if (!data.meta_system_user_id) return { kind: "error", error: "selection_expired" };
+  return connectUnifiedAccount(businessId, userId, token, data.meta_system_user_id, data.client_business_id, {
+    id: account.id,
+    username: account.username,
+  });
 }
 
 /**
- * Subscribes the account to our app's webhooks, then stores the connection.
+ * Facebook Login: installs our app on the Page (POST /<PAGE_ID>/subscribed_apps
+ * with the Page token) so Meta delivers its linked Instagram account's
+ * messaging webhooks, then stores the connection with the Page token.
  * Subscribe first: a stored "connected" row that Meta never sends messages
  * for would look healthy and silently drop every DM.
  */
-async function connectInstagramAccount(
+async function connectFacebookPage(
+  businessId: string,
+  userId: string,
+  facebookUserId: string,
+  page: LinkedPage,
+): Promise<CompleteConnectResult> {
+  if (!IG_ID_PATTERN.test(page.igId) || !IG_ID_PATTERN.test(page.pageId)) {
+    logEvent("ig_connect_failed", businessId, { step: "connect", reason: "invalid_account_id" }, "error");
+    return { kind: "error", error: "unexpected" };
+  }
+
+  const subscribed = await graphRequest<{ success?: boolean }>("POST", `/${page.pageId}/subscribed_apps`, {
+    token: page.pageToken,
+    form: { subscribed_fields: PAGE_SUBSCRIBED_FIELDS.join(",") },
+  });
+  if (!subscribed.ok || subscribed.data.success !== true) {
+    logEvent(
+      "ig_connect_failed",
+      businessId,
+      subscribed.ok
+        ? { step: "subscribe", pageId: page.pageId, accountId: page.igId, status: 200, reason: "success_not_true" }
+        : { step: "subscribe", pageId: page.pageId, accountId: page.igId, ...graphFailureMetadata(subscribed) },
+      "error",
+    );
+    return { kind: "error", error: "subscribe_failed" };
+  }
+  logEvent("ig_connect_subscribed", businessId, {
+    step: "subscribe",
+    loginMode: "facebook",
+    pageId: page.pageId,
+    accountId: page.igId,
+    fields: PAGE_SUBSCRIBED_FIELDS.join(","),
+    status: 200,
+  });
+
+  return saveConnection(businessId, userId, page.pageToken, { id: page.igId, username: page.username }, {
+    loginMode: "facebook",
+    metaSystemUserId: null,
+    clientBusinessId: null,
+    facebookUserId,
+    facebookPageId: page.pageId,
+    facebookPageName: page.pageName,
+  });
+}
+
+/** Unified Login: subscribes the Instagram account to our webhooks, then stores the connection with the system user token. */
+async function connectUnifiedAccount(
   businessId: string,
   userId: string,
   token: string,
@@ -294,8 +445,26 @@ async function connectInstagramAccount(
     );
     return { kind: "error", error: "subscribe_failed" };
   }
-  logEvent("ig_connect_subscribed", businessId, { step: "subscribe", accountId: account.id, status: 200 });
+  logEvent("ig_connect_subscribed", businessId, { step: "subscribe", loginMode: "unified", accountId: account.id, status: 200 });
 
+  return saveConnection(businessId, userId, token, account, {
+    loginMode: "unified",
+    metaSystemUserId: systemUserId,
+    clientBusinessId,
+    facebookUserId: null,
+    facebookPageId: null,
+    facebookPageName: null,
+  });
+}
+
+/** Stores the encrypted token and the connection row (shared by both login modes). */
+async function saveConnection(
+  businessId: string,
+  userId: string,
+  token: string,
+  account: InstagramAccountChoice,
+  ids: ConnectionIds,
+): Promise<CompleteConnectResult> {
   const supabase = createServiceSupabaseClient();
   const nowIso = new Date().toISOString();
 
@@ -325,7 +494,7 @@ async function connectInstagramAccount(
   if (credentialsError) {
     throw new AppError(
       "Something went wrong saving your Instagram credentials. Please try again.",
-      "connectInstagramAccount credentials upsert failed",
+      "saveConnection credentials upsert failed",
       credentialsError,
     );
   }
@@ -337,8 +506,12 @@ async function connectInstagramAccount(
         business_id: businessId,
         instagram_business_account_id: account.id,
         ig_username: account.username,
-        meta_system_user_id: systemUserId,
-        client_business_id: clientBusinessId,
+        login_mode: ids.loginMode,
+        meta_system_user_id: ids.metaSystemUserId,
+        client_business_id: ids.clientBusinessId,
+        facebook_user_id: ids.facebookUserId,
+        facebook_page_id: ids.facebookPageId,
+        facebook_page_name: ids.facebookPageName,
         status: "connected",
         access_token_last4: token.slice(-4),
         last_verified_at: nowIso,
@@ -354,7 +527,7 @@ async function connectInstagramAccount(
   if (connectionError) {
     throw new AppError(
       "Something went wrong saving your Instagram connection. Please try again.",
-      "connectInstagramAccount connection upsert failed",
+      "saveConnection connection upsert failed",
       connectionError,
     );
   }
@@ -372,7 +545,9 @@ async function connectInstagramAccount(
 
   logEvent("ig_connect_saved", businessId, {
     step: "save",
+    loginMode: ids.loginMode,
     accountId: account.id,
+    pageId: ids.facebookPageId,
     username: account.username,
     connectionId: connection.id,
   });
@@ -420,9 +595,21 @@ export async function markInstagramConnectionRevoked(
   logEvent("instagram_token_revoked", businessId, {}, "error");
 }
 
+
+/** The Graph node a business's sends go through (see instagramGraphNode), or null without a usable connection. */
+export async function getInstagramSendNode(supabase: ServiceSupabaseClient, businessId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("instagram_connections")
+    .select("login_mode, instagram_business_account_id, facebook_page_id")
+    .eq("business_id", businessId)
+    .maybeSingle<{ login_mode: MetaLoginMode; instagram_business_account_id: string; facebook_page_id: string | null }>();
+  return data ? instagramGraphNode(data) : null;
+}
+
 /**
- * Dashboard "Disconnect": unsubscribes the account from our webhooks when
- * we still hold a working token (best effort, logged), then deletes the
+ * Dashboard "Disconnect": unsubscribes from our webhooks when we still hold
+ * a working token (best effort, logged) -- the Page for facebook-mode
+ * connections, the Instagram account for unified ones -- then deletes the
  * token and the connection row. Conversations stay. Returns the deleted
  * connection's id, or null if none existed.
  */
@@ -431,17 +618,20 @@ export async function disconnectInstagram(businessId: string): Promise<string | 
 
   const { data: connection } = await supabase
     .from("instagram_connections")
-    .select("instagram_business_account_id")
+    .select("login_mode, instagram_business_account_id, facebook_page_id")
     .eq("business_id", businessId)
-    .maybeSingle<{ instagram_business_account_id: string }>();
+    .maybeSingle<{ login_mode: MetaLoginMode; instagram_business_account_id: string; facebook_page_id: string | null }>();
 
   const token = await getInstagramAccessToken(supabase, businessId);
-  if (connection && token && IG_ID_PATTERN.test(connection.instagram_business_account_id)) {
-    const result = await graphRequest("DELETE", `/${connection.instagram_business_account_id}/subscribed_apps`, { token });
+  const node = connection ? instagramGraphNode(connection) : null;
+  if (connection && token && node) {
+    const result = await graphRequest("DELETE", `/${node}/subscribed_apps`, { token });
     logEvent(
       result.ok ? "instagram_webhook_unsubscribed" : "instagram_webhook_unsubscribe_failed",
       businessId,
-      { status: result.ok ? 200 : result.status },
+      result.ok
+        ? { loginMode: connection.login_mode, node, status: 200 }
+        : { loginMode: connection.login_mode, node, ...graphFailureMetadata(result) },
       result.ok ? "info" : "error",
     );
   }

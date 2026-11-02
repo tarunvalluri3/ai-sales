@@ -33,7 +33,7 @@ function describeBrokenConnection(connection: InstagramConnection): string {
     case "token_revoked":
       return "Meta says our access to this Instagram account was removed or is no longer valid, so we've stopped sending replies.";
     case "reconnect_required":
-      return "We moved to Meta's new business login. Reconnect once to keep answering Instagram DMs.";
+      return "We changed how Instagram connects. Reconnect once to keep answering Instagram DMs.";
     default:
       return "This Instagram connection stopped working, so we've stopped sending replies.";
   }
@@ -69,6 +69,9 @@ export function InstagramConnectionStatus({
                 {STATUS_LABEL[connection.status]}
               </Badge>
             </div>
+            {connection.facebook_page_name ? (
+              <p className="text-xs text-ds-text-muted">Through the Facebook Page {connection.facebook_page_name}</p>
+            ) : null}
             {connection.connected_at ? (
               <p className="text-xs text-ds-text-muted">
                 Connected {new Date(connection.connected_at).toLocaleString()}

@@ -1,11 +1,12 @@
 import "server-only";
 import { decryptToken, encryptToken, parseEncryptionKey } from "@/lib/token-crypto";
-import { readGraphError, type GraphError } from "@/lib/meta-instagram-rules";
+import { parseLoginMode, readGraphError, type GraphError, type MetaLoginMode } from "@/lib/meta-instagram-rules";
 
 /**
- * Server-only access to Meta's Graph API for Instagram API with Unified
- * Login. Host is graph.facebook.com (the Instagram-Login host does not accept
- * Business Integration System User tokens). Every value comes from env;
+ * Server-only access to Meta's Graph API (graph.facebook.com) for the
+ * Instagram integration: Instagram API with Facebook Login (Page tokens, the
+ * default) or Instagram API with Unified Login (system user tokens,
+ * META_IG_LOGIN_MODE=unified). Every value comes from env;
  * nothing here logs a token, the app secret or a response body.
  */
 
@@ -27,6 +28,11 @@ export function getMetaConfig(): MetaConfig | null {
   const redirectUri = process.env.META_REDIRECT_URI;
   if (!appId || !appSecret || !loginConfigId || !redirectUri) return null;
   return { appId, appSecret, loginConfigId, redirectUri };
+}
+
+/** Which login new connections use. Existing connections keep the mode stored on their row. */
+export function getMetaLoginMode(): MetaLoginMode {
+  return parseLoginMode(process.env.META_IG_LOGIN_MODE);
 }
 
 export function graphBase(): string {

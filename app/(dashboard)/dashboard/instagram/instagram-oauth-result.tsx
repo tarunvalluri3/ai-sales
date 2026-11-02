@@ -9,6 +9,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   expired_state: "That connection link expired. Connection links last 10 minutes.",
   config: "Instagram isn't set up on our side yet. Please try again later or contact support.",
   exchange_failed: "Meta didn't complete the login. Please try again.",
+  long_lived_failed: "Facebook completed the login but wouldn't give us lasting access. Please try again.",
+  pages_failed: "Facebook completed the login but wouldn't list your Facebook Pages. Please try again.",
+  no_linked_pages:
+    "Link your Instagram professional account to a Facebook Page, then try again. When Facebook asks, choose that Page.",
   me_failed: "Meta completed the login but wouldn't tell us which business connected. Please try again.",
   accounts_failed: "Meta completed the login but wouldn't list the shared Instagram accounts. Please try again.",
   account_in_use: "That Instagram account is already connected to another business on AI Sales. Disconnect it there first.",
@@ -52,6 +56,14 @@ export function InstagramOAuthResult({ username }: { username: string | null }) 
     <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-ds-md bg-ds-danger-bg px-4 py-3 text-sm text-ds-danger">
       <span>
         <strong className="font-medium">Couldn&rsquo;t connect Instagram.</strong> {message}
+        {error === "no_linked_pages" ? (
+          <>
+            {" "}
+            <a href="#before-you-connect" className="font-medium underline">
+              See how to link them
+            </a>
+          </>
+        ) : null}
       </span>
       <span className="flex items-center gap-2">
         {NO_RETRY.has(error ?? "") ? null : (

@@ -448,6 +448,13 @@ export type InstagramConnection = {
   /** App-scoped id of the client's Business Integration System User (GET /me). */
   meta_system_user_id: string | null;
   client_business_id: string | null;
+  /** Which Meta login made this connection; sends and disconnects follow it. */
+  login_mode: "unified" | "facebook";
+  /** Facebook Login: app-scoped Facebook user id (GET /me), matched by Meta's deauthorize/data-deletion callbacks. */
+  facebook_user_id: string | null;
+  /** Facebook Login: the Page linked to the Instagram account (sends and webhook subscription go through it). */
+  facebook_page_id: string | null;
+  facebook_page_name: string | null;
   status: InstagramConnectionStatus;
   access_token_last4: string | null;
   last_verified_at: string | null;

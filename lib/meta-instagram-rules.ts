@@ -1,10 +1,11 @@
 import crypto from "node:crypto";
 
 /**
- * Pure decision rules for the Instagram API with Unified Login integration:
- * no I/O, no env, no server-only, so scripts/run-meta-instagram-tests.mjs
- * imports them directly. The routes and lib/instagram*.ts call these; the
- * tests pin their behavior.
+ * Pure decision rules for the Instagram integration -- Instagram API with
+ * Facebook Login by default, Instagram API with Unified Login behind
+ * META_IG_LOGIN_MODE=unified. No I/O, no env, no server-only, so
+ * scripts/run-meta-instagram-tests.mjs imports them directly. The routes and
+ * lib/instagram*.ts call these; the tests pin their behavior.
  */
 
 /** Instagram only allows a standard reply within 24 hours of the person's last message. */
@@ -13,8 +14,31 @@ export const MESSAGING_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** How long a connect attempt's CSRF state stays usable. */
 export const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
-/** The webhook fields every connected account is subscribed to. */
+/** Unified Login: the webhook fields every connected account is subscribed to (POST /<IG_ID>/subscribed_apps). */
 export const SUBSCRIBED_FIELDS = ["messages", "messaging_postbacks", "message_reactions", "messaging_seen"] as const;
+
+/**
+ * Facebook Login: the fields sent on POST /<PAGE_ID>/subscribed_apps, which
+ * installs our app on the Page so Meta delivers the Instagram messaging
+ * webhooks configured in the App Dashboard. Every value is in the Page
+ * subscribed_apps `subscribed_fields` enum (Graph API reference, v26.0).
+ * `messaging_seen` is NOT in that enum (sending it would fail the whole
+ * call), so its Page-level counterpart `message_reads` is sent instead.
+ * Meta: "You cannot use the subscribed_fields parameter to configure or
+ * subscribe to Webhooks for Instagram" -- the Instagram fields (messages,
+ * messaging_postbacks, message_reactions, messaging_seen) are subscribed in
+ * the App Dashboard, and only fields subscribed at both levels deliver.
+ */
+export const PAGE_SUBSCRIBED_FIELDS = ["messages", "messaging_postbacks", "message_reactions", "message_reads"] as const;
+
+// ------------------------------------------------------------ login mode
+
+export type MetaLoginMode = "unified" | "facebook";
+
+/** META_IG_LOGIN_MODE: "unified" switches back to Unified Login; anything else (incl. unset) is "facebook". */
+export function parseLoginMode(value: string | undefined): MetaLoginMode {
+  return value?.trim().toLowerCase() === "unified" ? "unified" : "facebook";
+}
 
 // ------------------------------------------------------------ webhook auth
 
@@ -72,6 +96,62 @@ export function buildUnifiedLoginUrl(input: {
   url.searchParams.set("prompt", "login");
   url.searchParams.set("state", input.state);
   return url.toString();
+}
+
+/**
+ * Builds the Facebook Login dialog URL (Instagram API with Facebook Login).
+ * Permissions come from the login configuration (config_id), not a scope
+ * parameter.
+ */
+export function buildFacebookLoginUrl(input: {
+  appId: string;
+  configId: string;
+  redirectUri: string;
+  state: string;
+}): string {
+  const url = new URL("https://www.facebook.com/dialog/oauth");
+  url.searchParams.set("client_id", input.appId);
+  url.searchParams.set("config_id", input.configId);
+  url.searchParams.set("redirect_uri", input.redirectUri);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("state", input.state);
+  return url.toString();
+}
+
+/**
+ * Where a connection's Graph calls go: facebook-mode connections act on
+ * their Facebook Page (send: POST /<PAGE_ID>/messages with the Page token,
+ * unsubscribe: DELETE /<PAGE_ID>/subscribed_apps); unified-mode ones on the
+ * Instagram account id. Null when the stored id is not a plain numeric id.
+ */
+export function instagramGraphNode(connection: {
+  login_mode: MetaLoginMode;
+  instagram_business_account_id: string;
+  facebook_page_id: string | null;
+}): string | null {
+  const node = connection.login_mode === "facebook" ? connection.facebook_page_id : connection.instagram_business_account_id;
+  return node && /^\d{1,32}$/.test(node) ? node : null;
+}
+
+// ------------------------------------------------------------ Meta callbacks
+
+/** Connection columns a deauthorize / data-deletion signed_request user_id is matched against. */
+export const META_CALLBACK_MATCH_COLUMNS = [
+  "facebook_user_id",
+  "meta_system_user_id",
+  "client_business_id",
+  "instagram_business_account_id",
+  "facebook_page_id",
+] as const;
+
+/**
+ * PostgREST `or` filter matching a verified Meta id against every id a
+ * connection stores. Refuses anything but digits, so nothing a caller sends
+ * can widen the filter.
+ */
+export function metaCallbackMatchFilter(metaUserId: string): string {
+  if (!/^\d{1,32}$/.test(metaUserId)) throw new Error("meta user id must be digits");
+  return META_CALLBACK_MATCH_COLUMNS.map((column) => `${column}.eq.${metaUserId}`).join(",");
 }
 
 // ------------------------------------------------------------ inbound events

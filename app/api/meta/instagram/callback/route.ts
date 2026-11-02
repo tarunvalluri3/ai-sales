@@ -7,7 +7,8 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { isInstagramAllowed } from "@/lib/subscription";
 
 /**
- * Meta redirects here after Facebook Login for Business. No Clerk session is
+ * Meta redirects here after the login dialog (Facebook Login by default,
+ * Unified Login with META_IG_LOGIN_MODE=unified). No Clerk session is
  * assumed (cross-site navigation): the single-use, 10-minute state row is
  * the whole trust mechanism, and the business comes from that row, never
  * from this request. The state is consumed on every path, including a
@@ -15,8 +16,9 @@ import { isInstagramAllowed } from "@/lib/subscription";
  * never Meta's raw error text.
  *
  * Every step logs one `ig_connect_*` JSON line (lib/logger.ts, the same
- * logger the webhook uses); lib/meta-instagram-connect-flow.ts logs the
- * Graph steps. No line carries the code, a token or the app secret.
+ * logger the webhook uses); lib/meta-instagram-facebook-flow.ts (facebook
+ * mode) or lib/meta-instagram-connect-flow.ts (unified mode) logs the Graph
+ * steps. No line carries the code, a token or the app secret.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;

@@ -9,8 +9,8 @@ import { logAndGetUserMessage } from "@/lib/errors";
  * "Connect Instagram": a real top-level navigation (a Server Action cannot
  * redirect cross-origin to Meta's login dialog). Needs a signed-in org:admin
  * of an entitled business; writes the single-use state for that business
- * and redirects to Facebook Login for Business (Instagram API with Unified
- * Login).
+ * and redirects to Meta's login dialog: Facebook Login (Instagram API with
+ * Facebook Login) by default, Unified Login when META_IG_LOGIN_MODE=unified.
  */
 export async function GET(request: NextRequest) {
   const { businessId, userId, orgRole } = await requireBusinessContext();

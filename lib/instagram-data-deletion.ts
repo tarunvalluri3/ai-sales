@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
 import { INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
+import { metaCallbackMatchFilter } from "@/lib/meta-instagram-rules";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
@@ -19,11 +20,11 @@ type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
  *    cascade from `conversations`) for that business.
  *
  * `metaUserId` has already been proven genuine by verifyMetaSignedRequest().
- * With Unified Login, Meta's docs don't say which id these callbacks carry,
- * so it is matched against every id we hold for a connection: the system
- * user's app-scoped id (GET /me), the client business id and the Instagram
- * account id. All are digits-only (enforced by the verifier), so they are
- * safe inside the PostgREST filter below. Every write below is scoped to the
+ * For Facebook Login it is the app-scoped Facebook user id we stored from
+ * GET /me (`facebook_user_id`). Unified Login's docs don't say which id the
+ * callbacks carry, so the id is matched against every id we hold for a
+ * connection (metaCallbackMatchFilter). All are digits-only (enforced by the
+ * verifier), so they are safe inside the PostgREST filter. Every write below is scoped to the
  * `business_id` read off the matched connection -- never to anything in the
  * request. Never logs tokens or message content: only ids and counts.
  */
@@ -40,13 +41,7 @@ async function findConnections(
   const { data, error } = await supabase
     .from("instagram_connections")
     .select("id, business_id")
-    .or(
-      [
-        `meta_system_user_id.eq.${metaUserId}`,
-        `client_business_id.eq.${metaUserId}`,
-        `instagram_business_account_id.eq.${metaUserId}`,
-      ].join(","),
-    )
+    .or(metaCallbackMatchFilter(metaUserId))
     .returns<{ id: string; business_id: string }[]>();
   if (error) throw new Error("instagram connection lookup failed");
   return data ?? [];

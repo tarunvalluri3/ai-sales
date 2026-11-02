@@ -58,15 +58,26 @@ export default function DataDeletionPage() {
 
         <Section title="If you are an Instagram user">
           <p>
-            <strong>Remove the app from your Instagram account.</strong> In Instagram go to{" "}
-            <strong>Settings → Apps and websites</strong> (shown as{" "}
-            <strong>Business integrations</strong> on some versions), find{" "}
-            <strong>Waves AI Pilot</strong> and choose <strong>Remove</strong>. If you connected
-            through Meta Business Suite, you can also go to{" "}
-            <strong>Meta Business Suite → Settings → Integrations → Connected apps</strong>, find{" "}
-            <strong>Waves AI Pilot</strong> and remove it. Meta then tells us, we delete the stored
-            access token and mark the connection disconnected, and Meta can ask us to delete the data
-            we hold for your account.
+            <strong>Remove the app.</strong> Instagram is connected through Facebook login, so you can
+            remove Waves AI Pilot in any of these places:
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong>Facebook → Settings → Business integrations</strong>, find{" "}
+              <strong>Waves AI Pilot</strong> and choose <strong>Remove</strong>.
+            </li>
+            <li>
+              <strong>Meta Business Suite → Settings → Integrations → Connected apps</strong>, find{" "}
+              <strong>Waves AI Pilot</strong> and remove it.
+            </li>
+            <li>
+              <strong>Instagram → Settings → Apps and websites</strong>, find{" "}
+              <strong>Waves AI Pilot</strong> and choose <strong>Remove</strong>.
+            </li>
+          </ul>
+          <p>
+            Meta then tells us, we delete the stored access token and mark the connection
+            disconnected, and Meta can ask us to delete the data we hold for your account.
           </p>
           <p>
             <strong>Ask us to delete your data.</strong> Email{" "}
@@ -89,8 +100,9 @@ export default function DataDeletionPage() {
           <ul className="list-disc space-y-2 pl-5">
             <li>The Instagram access token and its connection record.</li>
             <li>
-              The Instagram account ID and username, and the Meta business and app-scoped user IDs, we
-              stored when the account was connected.
+              The Instagram account ID and username, the Facebook Page ID and name, and the app-scoped
+              Facebook user ID (and, for older connections, Meta business IDs) we stored when the
+              account was connected.
             </li>
             <li>
               Every conversation received through that Instagram account — the messages, the
