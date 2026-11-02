@@ -3,7 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
 import { AppError } from "@/lib/errors";
 import { graphRequest } from "@/lib/meta-graph";
-import { getInstagramAccessToken, markInstagramConnectionRevoked } from "@/lib/instagram";
+import { getInstagramAccessToken, getInstagramSendNode, markInstagramConnectionRevoked } from "@/lib/instagram";
 import { flagConversationNeedsAttention } from "@/lib/conversations";
 import { isInstagramAllowed } from "@/lib/subscription";
 import { isOutsideWindowError, isRevokedTokenError, isWithinMessagingWindow } from "@/lib/meta-instagram-rules";
@@ -15,8 +15,11 @@ type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
  * lib/whatsapp-delivery.ts). A row is written and an immediate send is
  * attempted inline; the shared daily cron retries failures.
  *
- * Unified Login: POST graph.facebook.com/<IG account id>/messages with the
- * business's decrypted system user token. Two rules are enforced here, at
+ * Facebook Login connections (default): POST graph.facebook.com/<PAGE_ID>/messages
+ * with the stored Page access token (Meta: Instagram Messaging "Send a
+ * message"). Unified Login connections: POST /<IG account id>/messages with
+ * the system user token. The node comes from the connection row
+ * (getInstagramSendNode). These rules are enforced here, at
  * the one place every Instagram send goes through (AI replies, staff
  * replies, appointment notices, cron retries):
  *  - Instagram must be allowed for the business (a plan that includes it,
@@ -181,9 +184,15 @@ async function deliverInstagramOutboundRow(
     return { success: false, reason: "no_credentials" };
   }
 
+  const sendNode = await getInstagramSendNode(supabase, outbound.business_id);
+  if (!sendNode) {
+    await failRow(supabase, outbound.id, "No Instagram connection for this business.");
+    return { success: false, reason: "no_credentials" };
+  }
+
   const result = await graphRequest<{ message_id?: string }>(
     "POST",
-    `/${encodeURIComponent(outbound.instagram_business_account_id)}/messages`,
+    `/${sendNode}/messages`,
     {
       token,
       json: { recipient: { id: outbound.to_ig_id }, message: { text: outbound.content } },

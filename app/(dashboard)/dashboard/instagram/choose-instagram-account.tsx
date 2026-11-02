@@ -12,7 +12,7 @@ export function ChooseInstagramAccount({
   accounts,
 }: {
   selectionId: string;
-  accounts: { id: string; username: string | null }[];
+  accounts: { id: string; username: string | null; pageName?: string | null }[];
 }) {
   const [state, formAction, isPending] = useActionState(chooseInstagramAccountAction, initialState);
 
@@ -37,7 +37,12 @@ export function ChooseInstagramAccount({
             >
               <input type="radio" name="accountId" value={account.id} defaultChecked={index === 0} required />
               <Camera className="size-4 text-ds-text-muted" aria-hidden="true" />
-              {account.username ? `@${account.username}` : `Instagram account ${account.id}`}
+              <span className="flex flex-col">
+                <span>{account.username ? `@${account.username}` : `Instagram account ${account.id}`}</span>
+                {account.pageName ? (
+                  <span className="text-xs text-ds-text-muted">Facebook Page: {account.pageName}</span>
+                ) : null}
+              </span>
             </label>
           ))}
         </fieldset>

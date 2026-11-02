@@ -32,12 +32,14 @@ const envSchema = z.object({
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
-  // Instagram API with Unified Login (lib/meta-graph.ts). Optional like the
+  // Instagram via Meta (lib/meta-graph.ts): Facebook Login by default,
+  // Unified Login with META_IG_LOGIN_MODE=unified. Optional like the
   // WhatsApp pair: the connect route, callback and webhook each fail closed
   // when the value they need is missing, instead of failing startup.
   META_APP_ID: z.string().regex(/^\d+$/, "must be the numeric Meta app id").optional(),
   META_APP_SECRET: z.string().min(1).optional(),
-  META_LOGIN_CONFIG_ID: z.string().regex(/^\d+$/, "must be the numeric Facebook Login for Business config id").optional(),
+  META_LOGIN_CONFIG_ID: z.string().regex(/^\d+$/, "must be the numeric Facebook Login configuration id").optional(),
+  META_IG_LOGIN_MODE: z.enum(["facebook", "unified"]).optional(),
   META_REDIRECT_URI: z.url().optional(),
   META_WEBHOOK_VERIFY_TOKEN: z.string().min(16).optional(),
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/, "must look like v26.0").optional(),

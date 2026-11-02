@@ -34,7 +34,10 @@ import {
 } from "@/lib/meta-instagram-rules";
 
 /**
- * Inbound Instagram DMs (Instagram API with Unified Login). Meta signs every
+ * Inbound Instagram DMs (Instagram API with Facebook Login -- Messenger API
+ * support for Instagram -- or Unified Login; the payload is the same:
+ * object "instagram", entry.id = the Instagram professional account id,
+ * sender.id = the customer's Instagram-scoped id). Meta signs every
  * POST with X-Hub-Signature-256 using META_APP_SECRET. The business is
  * resolved from `entry.id` (the client's Instagram account id) server-side,
  * never from anything a client controls. Reuses the same conversation,

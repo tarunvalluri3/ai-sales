@@ -20,7 +20,7 @@ const BENEFITS = [
 ];
 
 /**
- * Starts Meta's business login (Instagram API with Unified Login). A plain
+ * Starts Meta's login (Instagram API with Facebook Login by default). A plain
  * <a>: it must be a top-level navigation to the connect route, which
  * redirects to Meta (a Server Action cannot redirect cross-origin).
  */
@@ -37,8 +37,7 @@ export function ConnectInstagramButton() {
         <div className="flex flex-col gap-1">
           <h2 className="text-sm font-semibold text-ds-text-primary">Connect your Instagram account</h2>
           <p className="max-w-md text-sm text-ds-text-secondary">
-            Sign in with Instagram or Facebook, choose your business portfolio and the Instagram professional
-            account to share. No Facebook Page is needed.
+            Log in with Facebook and choose the Facebook Page linked to your Instagram professional account.
           </p>
         </div>
       </div>

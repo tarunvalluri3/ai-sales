@@ -1,4 +1,4 @@
-// Tests for the Instagram API with Unified Login integration:
+// Tests for the Instagram integration (Facebook Login mode + Unified Login mode):
 // lib/meta-instagram-rules.ts (pure rules) and lib/token-crypto.ts, plus
 // structural checks on the routes and send path that need Next/Supabase to
 // run for real. Node's built-in runner, same approach as
@@ -575,4 +575,315 @@ test("hygiene: the connect flow's log calls never pass the token, code or secret
   for (const call of calls) {
     assert.doesNotMatch(call, /\btoken\b|access_token\b|appSecret|input\.code/, call);
   }
+});
+
+// ------------------------------------------------------- facebook login mode (Instagram API with Facebook Login)
+
+const fbFlow = await import(new URL("../lib/meta-instagram-facebook-flow.ts", import.meta.url).href);
+
+const SHORT_TOKEN = "EAAshort_user_token_SHOULD_NEVER_BE_LOGGED_aa11";
+const LONG_TOKEN = "EAAlong_user_token_SHOULD_NEVER_BE_LOGGED_bb22";
+const PAGE_TOKEN_1 = "EAApage_token_one_SHOULD_NEVER_BE_LOGGED_cc33";
+const PAGE_TOKEN_2 = "EAApage_token_two_SHOULD_NEVER_BE_LOGGED_dd44";
+const FB_USER_ID = "10223344556677889";
+const PAGE_1 = "105000000000001";
+const PAGE_2 = "105000000000002";
+const PAGE_3 = "105000000000003";
+const IG_2 = "17841400000000002";
+
+const fbRoutes = (accounts) => ({
+  "GET /oauth/access_token": (options) =>
+    options.query.grant_type === "fb_exchange_token"
+      ? ok({ access_token: LONG_TOKEN, token_type: "bearer", expires_in: 5183944 })
+      : ok({ access_token: SHORT_TOKEN, token_type: "bearer" }),
+  "GET /me": ok({ id: FB_USER_ID }),
+  "GET /me/accounts": accounts,
+});
+
+async function runFbFlow(routes) {
+  const calls = [];
+  const lines = [];
+  const graph = async (method, path, options = {}) => {
+    calls.push({ method, path, options });
+    const handler = routes[`${method} ${path}`];
+    if (!handler) return graphFail(404, 803);
+    return typeof handler === "function" ? handler(options) : handler;
+  };
+  const log = (event, metadata, level = "info") => lines.push(JSON.stringify({ event, businessId: "biz-1", level, ...metadata }));
+  const result = await fbFlow.discoverFacebookPages({
+    graph,
+    log,
+    appId: "1876820120425285",
+    appSecret: APP_SECRET,
+    redirectUri: "https://aipilot.waveswebstudio.in/api/meta/instagram/callback",
+    code: AUTH_CODE,
+  });
+  return { result, calls, lines, events: lines.map((line) => JSON.parse(line).event) };
+}
+
+const assertNoFbSecrets = (lines) => {
+  for (const line of lines) {
+    for (const secret of [SHORT_TOKEN, LONG_TOKEN, PAGE_TOKEN_1, PAGE_TOKEN_2, AUTH_CODE, APP_SECRET, "SHOULD_NEVER_BE_LOGGED"]) {
+      assert.ok(!line.includes(secret), `log line leaked a secret: ${line}`);
+    }
+  }
+};
+
+const linkedPage = (id, token, igId, username, name = `Page ${id.slice(-1)}`) => ({
+  id,
+  name,
+  access_token: token,
+  instagram_business_account: { id: igId, username },
+});
+
+test("facebook mode: login mode defaults to facebook; only 'unified' switches back", () => {
+  assert.equal(rules.parseLoginMode(undefined), "facebook");
+  assert.equal(rules.parseLoginMode(""), "facebook");
+  assert.equal(rules.parseLoginMode("facebook"), "facebook");
+  assert.equal(rules.parseLoginMode("unified"), "unified");
+  assert.equal(rules.parseLoginMode(" Unified "), "unified");
+  assert.equal(rules.parseLoginMode("something-else"), "facebook");
+  assert.match(read("lib/meta-graph.ts"), /parseLoginMode\(process\.env\.META_IG_LOGIN_MODE\)/);
+});
+
+test("facebook mode: the login URL is www.facebook.com/dialog/oauth with client_id, config_id, redirect_uri, code and state", () => {
+  const url = new URL(
+    rules.buildFacebookLoginUrl({ appId: "1876820120425285", configId: "999000111", redirectUri: "https://x.test/cb", state: "s1" }),
+  );
+  assert.equal(url.origin + url.pathname, "https://www.facebook.com/dialog/oauth");
+  assert.equal(url.searchParams.get("client_id"), "1876820120425285");
+  assert.equal(url.searchParams.get("config_id"), "999000111");
+  assert.equal(url.searchParams.get("redirect_uri"), "https://x.test/cb");
+  assert.equal(url.searchParams.get("response_type"), "code");
+  assert.equal(url.searchParams.get("state"), "s1");
+  assert.equal(url.searchParams.get("prompt"), null);
+  assert.equal(url.searchParams.get("scope"), null, "permissions come from the login configuration");
+  const lib = read("lib/instagram.ts");
+  assert.match(lib, /getMetaLoginMode\(\) === "unified" \? buildUnifiedLoginUrl\(loginInput\) : buildFacebookLoginUrl\(loginInput\)/);
+});
+
+test("facebook mode: one Page with Instagram -> code, long-lived exchange, /me, /me/accounts; Page token returned", async () => {
+  const { result, calls, events, lines } = await runFbFlow(
+    fbRoutes(ok({ data: [linkedPage(PAGE_1, PAGE_TOKEN_1, IG_ID, "waveswebstudio", "Waves Web Studio")] })),
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.userToken, LONG_TOKEN);
+  assert.equal(result.facebookUserId, FB_USER_ID);
+  assert.deepEqual(result.pages, [
+    { pageId: PAGE_1, pageName: "Waves Web Studio", pageToken: PAGE_TOKEN_1, igId: IG_ID, username: "waveswebstudio" },
+  ]);
+  assert.deepEqual(events, ["ig_connect_code_exchanged", "ig_connect_long_lived", "ig_connect_me", "ig_connect_pages"]);
+
+  // Step 1: the code exchange uses redirect_uri; step 2 exchanges the short token for a long-lived one.
+  assert.equal(calls[0].options.query.code, AUTH_CODE);
+  assert.equal(calls[0].options.query.redirect_uri, "https://aipilot.waveswebstudio.in/api/meta/instagram/callback");
+  assert.equal(calls[1].options.query.grant_type, "fb_exchange_token");
+  assert.equal(calls[1].options.query.fb_exchange_token, SHORT_TOKEN);
+  // /me and /me/accounts use the LONG-lived token (Page tokens from it do not expire).
+  assert.equal(calls[2].options.token, LONG_TOKEN);
+  const accountsCall = calls.find((call) => call.path === "/me/accounts");
+  assert.equal(accountsCall.options.token, LONG_TOKEN);
+  assert.equal(accountsCall.options.query.fields, "id,name,access_token,instagram_business_account{id,username}");
+  assertNoFbSecrets(lines);
+});
+
+test("facebook mode: several Pages with Instagram -> all returned (chooser); Pages without Instagram are dropped", async () => {
+  const { result, lines } = await runFbFlow(
+    fbRoutes(
+      ok({
+        data: [
+          linkedPage(PAGE_1, PAGE_TOKEN_1, IG_ID, "waveswebstudio"),
+          { id: PAGE_3, name: "No IG Page", access_token: "EAAx_SHOULD_NEVER_BE_LOGGED" },
+          linkedPage(PAGE_2, PAGE_TOKEN_2, IG_2, "wavesdemo"),
+        ],
+      }),
+    ),
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.pages.map((page) => [page.pageId, page.igId]), [[PAGE_1, IG_ID], [PAGE_2, IG_2]]);
+  const pagesLine = JSON.parse(lines.find((line) => line.includes('"ig_connect_pages"')));
+  assert.equal(pagesLine.pageCount, 3);
+  assert.equal(pagesLine.linkedCount, 2);
+  assertNoFbSecrets(lines);
+});
+
+test("facebook mode: /me/accounts paging is followed via the after cursor", async () => {
+  let call = 0;
+  const { result, calls } = await runFbFlow(
+    fbRoutes((options) => {
+      call += 1;
+      if (call === 1) {
+        assert.equal(options.query.after, undefined);
+        return ok({
+          data: [{ id: PAGE_3, name: "No IG", access_token: "t" }],
+          paging: { cursors: { after: "CURSOR1" }, next: "https://graph.facebook.com/next" },
+        });
+      }
+      assert.equal(options.query.after, "CURSOR1");
+      return ok({ data: [linkedPage(PAGE_2, PAGE_TOKEN_2, IG_2, "wavesdemo")], paging: { cursors: { after: "CURSOR2" } } });
+    }),
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.pages.map((page) => page.igId), [IG_2]);
+  assert.equal(calls.filter((c) => c.path === "/me/accounts").length, 2);
+});
+
+test("facebook mode: zero Pages with Instagram -> no_linked_pages", async () => {
+  const empty = await runFbFlow(fbRoutes(ok({ data: [] })));
+  assert.deepEqual(empty.result, { ok: false, error: "no_linked_pages" });
+  const unlinked = await runFbFlow(fbRoutes(ok({ data: [{ id: PAGE_3, name: "Plain Page", access_token: "EAAz_SHOULD_NEVER_BE_LOGGED" }] })));
+  assert.deepEqual(unlinked.result, { ok: false, error: "no_linked_pages" });
+  assert.equal(unlinked.events.at(-1), "ig_connect_failed");
+  assertNoFbSecrets(unlinked.lines);
+});
+
+test("facebook mode: each failing step has its own code (exchange, long-lived, me, pages)", async () => {
+  const exchange = await runFbFlow({ "GET /oauth/access_token": graphFail(400, 100, "TraceFb") });
+  assert.deepEqual(exchange.result, { ok: false, error: "exchange_failed" });
+  assert.equal(exchange.calls.length, 1);
+  const line = JSON.parse(exchange.lines[0]);
+  assert.equal(line.step, "code_exchange");
+  assert.equal(line.metaCode, 100);
+  assert.equal(line.fbtraceId, "TraceFb");
+
+  const longLived = await runFbFlow({
+    "GET /oauth/access_token": (options) =>
+      options.query.grant_type === "fb_exchange_token" ? graphFail(400, 190) : ok({ access_token: SHORT_TOKEN }),
+  });
+  assert.deepEqual(longLived.result, { ok: false, error: "long_lived_failed" });
+
+  const me = await runFbFlow({ ...fbRoutes(ok({ data: [] })), "GET /me": graphFail(400, 190) });
+  assert.deepEqual(me.result, { ok: false, error: "me_failed" });
+
+  const pages = await runFbFlow(fbRoutes(graphFail(403, 200)));
+  assert.deepEqual(pages.result, { ok: false, error: "pages_failed" });
+
+  for (const run of [exchange, longLived, me, pages]) assertNoFbSecrets(run.lines);
+});
+
+test("facebook mode: the dashboard has copy for every new error code, incl. a guide link for no_linked_pages", () => {
+  const copy = read("app/(dashboard)/dashboard/instagram/instagram-oauth-result.tsx");
+  for (const code of ["long_lived_failed", "pages_failed", "no_linked_pages"]) assert.match(copy, new RegExp(`\\b${code}:`), code);
+  assert.match(copy, /Link your Instagram professional account to a Facebook Page, then try again/);
+  assert.match(copy, /href="#before-you-connect"/);
+  assert.match(read("app/(dashboard)/dashboard/instagram/instagram-setup-guide.tsx"), /id="before-you-connect"/);
+});
+
+test("facebook mode: the Page is subscribed with its Page token and Page-valid fields before anything is stored", () => {
+  assert.deepEqual([...rules.PAGE_SUBSCRIBED_FIELDS], ["messages", "messaging_postbacks", "message_reactions", "message_reads"]);
+  // Every value must be in the Page subscribed_apps enum (Graph API reference, v26.0); messaging_seen is not.
+  const pageEnum = ["messages", "message_reactions", "message_echoes", "message_reads", "messaging_postbacks", "messaging_referrals", "standby", "messaging_handovers"];
+  for (const field of rules.PAGE_SUBSCRIBED_FIELDS) assert.ok(pageEnum.includes(field), field);
+
+  const lib = read("lib/instagram.ts");
+  const connect = lib.slice(lib.indexOf("async function connectFacebookPage("), lib.indexOf("async function connectUnifiedAccount("));
+  assert.match(
+    connect,
+    /graphRequest<\{ success\?: boolean \}>\("POST", `\/\$\{page\.pageId\}\/subscribed_apps`, \{\s*token: page\.pageToken,\s*form: \{ subscribed_fields: PAGE_SUBSCRIBED_FIELDS\.join\(","\) \}/,
+  );
+  assert.match(connect, /error: missingPermission \? "subscribe_permission" : "subscribe_failed"/);
+  assert.ok(connect.indexOf("subscribed_apps") < connect.indexOf("saveConnection("));
+  assert.match(connect, /saveConnection\(businessId, userId, page\.pageToken,/);
+  assert.match(connect, /facebookUserId,\s*facebookPageId: page\.pageId,/);
+});
+
+test("facebook mode: one Page connects directly, several park the encrypted USER token for the chooser", () => {
+  const lib = read("lib/instagram.ts");
+  const complete = lib.slice(lib.indexOf("export async function completeInstagramConnect("), lib.indexOf("async function parkSelection("));
+  assert.match(complete, /if \(getMetaLoginMode\(\) === "facebook"\)/);
+  assert.match(complete, /pages\.length === 1[\s\S]*?connectFacebookPage\(businessId, userId, facebookUserId, pages\[0\]\)/);
+  assert.match(complete, /parkSelection\(businessId, userId, userToken, \{\s*loginMode: "facebook"/);
+  // The chooser stores Page name + username, never a Page token.
+  assert.match(complete, /\{ id: page\.igId, username: page\.username, pageId: page\.pageId, pageName: page\.pageName \}/);
+  const finish = lib.slice(lib.indexOf("export async function finishInstagramSelection("), lib.indexOf("async function connectFacebookPage("));
+  assert.match(finish, /graphRequest<unknown>\("GET", `\/\$\{account\.pageId\}`, \{ token, query: \{ fields: PAGE_FIELDS \} \}\)/);
+  assert.match(finish, /linked\.igId !== account\.id/);
+  const chooser = read("app/(dashboard)/dashboard/instagram/choose-instagram-account.tsx");
+  assert.match(chooser, /Facebook Page: \{account\.pageName\}/);
+});
+
+test("facebook mode: replies go to POST /<PAGE_ID>/messages with the stored Page token; unified rows keep /<IG_ID>", () => {
+  assert.equal(rules.instagramGraphNode({ login_mode: "facebook", instagram_business_account_id: IG_ID, facebook_page_id: PAGE_1 }), PAGE_1);
+  assert.equal(rules.instagramGraphNode({ login_mode: "unified", instagram_business_account_id: IG_ID, facebook_page_id: null }), IG_ID);
+  assert.equal(rules.instagramGraphNode({ login_mode: "facebook", instagram_business_account_id: IG_ID, facebook_page_id: null }), null);
+  assert.equal(rules.instagramGraphNode({ login_mode: "facebook", instagram_business_account_id: IG_ID, facebook_page_id: "1/../x" }), null);
+
+  const delivery = read("lib/instagram-delivery.ts");
+  const deliver = delivery.slice(delivery.indexOf("async function deliverInstagramOutboundRow("));
+  assert.ok(deliver.indexOf("getInstagramAccessToken(") < deliver.indexOf("graphRequest<"));
+  assert.ok(deliver.indexOf("getInstagramSendNode(") < deliver.indexOf("graphRequest<"));
+  assert.match(
+    deliver,
+    /`\/\$\{sendNode\}\/messages`,\s*\{\s*token,\s*json: \{ recipient: \{ id: outbound\.to_ig_id \}, message: \{ text: outbound\.content \} \}/,
+  );
+  // 24h window and code-190 handling still sit on the same path.
+  assert.ok(deliver.indexOf("isWithinMessagingWindow(") < deliver.indexOf("graphRequest<"));
+  assert.match(deliver, /if \(isRevokedTokenError\(result\.status, result\.error\)\)/);
+});
+
+test("facebook mode: disconnect unsubscribes the Page, deletes token + connection, keeps conversations", () => {
+  const lib = read("lib/instagram.ts");
+  const disconnect = lib.slice(
+    lib.indexOf("export async function disconnectInstagram("),
+    lib.indexOf("export async function resolveBusinessFromInstagramAccountId("),
+  );
+  assert.match(disconnect, /instagramGraphNode\(connection\)/);
+  assert.match(disconnect, /graphRequest\("DELETE", `\/\$\{node\}\/subscribed_apps`, \{ token \}\)/);
+  assert.match(disconnect, /from\("instagram_credentials"\)\.delete\(\)/);
+  assert.match(disconnect, /from\("instagram_connections"\)\s*\.delete\(\)/);
+  assert.doesNotMatch(disconnect, /from\("conversations"\)/);
+});
+
+test("facebook mode: deauthorize / data deletion match the signed_request user_id against the stored Facebook user id (plus existing ids)", () => {
+  assert.equal(
+    rules.metaCallbackMatchFilter(FB_USER_ID),
+    [
+      `facebook_user_id.eq.${FB_USER_ID}`,
+      `meta_system_user_id.eq.${FB_USER_ID}`,
+      `client_business_id.eq.${FB_USER_ID}`,
+      `instagram_business_account_id.eq.${FB_USER_ID}`,
+      `facebook_page_id.eq.${FB_USER_ID}`,
+    ].join(","),
+  );
+  for (const bad of ["1,id.neq.0", "abc", "", "1)"]) assert.throws(() => rules.metaCallbackMatchFilter(bad), bad);
+  const deletion = read("lib/instagram-data-deletion.ts");
+  assert.match(deletion, /\.or\(metaCallbackMatchFilter\(metaUserId\)\)/);
+  assert.match(read("app/api/meta/deauthorize/route.ts"), /deauthorizeInstagramUser\(createServiceSupabaseClient\(\), verified\.userId\)/);
+  // The Facebook user id is stored at connect time.
+  assert.match(read("lib/instagram.ts"), /facebook_user_id: ids\.facebookUserId,/);
+});
+
+test("facebook mode: migration adds login_mode + Facebook ids and grants nothing new", () => {
+  const migration = read("supabase/migrations/20261114000000_instagram_facebook_login.sql");
+  assert.match(migration, /add column login_mode text not null default 'unified'\s*check \(login_mode in \('unified', 'facebook'\)\)/);
+  for (const column of ["facebook_user_id", "facebook_page_id", "facebook_page_name"]) assert.match(migration, new RegExp(`add column ${column} text`));
+  assert.match(migration, /alter column meta_system_user_id drop not null/);
+  assert.doesNotMatch(migration.replace(/--.*$/gm, ""), /\bgrant\b/i);
+});
+
+test("hygiene: the Facebook flow's log calls never pass a token, the code or the secret", () => {
+  const source = read("lib/meta-instagram-facebook-flow.ts");
+  const calls = source.match(/\blog\(\s*"ig_connect_[a-z_]+"[\s\S]*?\);/g) ?? [];
+  assert.ok(calls.length >= 8, `found ${calls.length}`);
+  for (const call of calls) {
+    assert.doesNotMatch(call, /userToken|pageToken|access_token\b|appSecret|input\.code|exchanged\.data|longLived\.data\.access_token/, call);
+  }
+  assert.doesNotMatch(source, /graph\.instagram\.com/);
+});
+
+test("facebook mode: a subscribe refused for a missing permission (pages_manage_metadata) logs a clear reason and returns subscribe_permission", () => {
+  assert.equal(rules.isPermissionError({ code: 200 }), true);
+  assert.equal(rules.isPermissionError({ code: 210 }), true);
+  assert.equal(rules.isPermissionError({ code: 10 }), true);
+  assert.equal(rules.isPermissionError({ code: 10, error_subcode: 2534022 }), false, "outside-window is not a permission error");
+  assert.equal(rules.isPermissionError({ code: 190 }), false);
+  assert.equal(rules.isPermissionError(null), false);
+  const lib = read("lib/instagram.ts");
+  const connect = lib.slice(lib.indexOf("async function connectFacebookPage("), lib.indexOf("async function connectUnifiedAccount("));
+  assert.match(connect, /isPermissionError\(subscribed\.error\)/);
+  assert.match(connect, /"missing_permission_pages_manage_metadata"/);
+  assert.match(connect, /missingPermission \? "subscribe_permission" : "subscribe_failed"/);
+  assert.match(read("app/(dashboard)/dashboard/instagram/instagram-oauth-result.tsx"), /\bsubscribe_permission:/);
+  // pages_manage_metadata missing must not throw: the branch returns an error result.
+  assert.doesNotMatch(connect.slice(connect.indexOf("missingPermission"), connect.indexOf("ig_connect_subscribed")), /throw /);
 });
