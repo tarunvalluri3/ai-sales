@@ -22,6 +22,7 @@ import {
   buildUnifiedLoginUrl,
   checkOAuthState,
   instagramGraphNode,
+  isPermissionError,
   OAUTH_STATE_TTL_MS,
   PAGE_SUBSCRIBED_FIELDS,
   SUBSCRIBED_FIELDS,
@@ -75,6 +76,7 @@ export type InstagramConnectError =
   | "no_linked_pages"
   | "account_in_use"
   | "subscribe_failed"
+  | "subscribe_permission"
   | "selection_expired"
   | "unexpected";
 
@@ -387,15 +389,24 @@ async function connectFacebookPage(
     form: { subscribed_fields: PAGE_SUBSCRIBED_FIELDS.join(",") },
   });
   if (!subscribed.ok || subscribed.data.success !== true) {
+    // Meta requires pages_manage_metadata for this call; a missing grant
+    // comes back as a permission error and gets its own code + log reason.
+    const missingPermission = !subscribed.ok && isPermissionError(subscribed.error);
     logEvent(
       "ig_connect_failed",
       businessId,
       subscribed.ok
         ? { step: "subscribe", pageId: page.pageId, accountId: page.igId, status: 200, reason: "success_not_true" }
-        : { step: "subscribe", pageId: page.pageId, accountId: page.igId, ...graphFailureMetadata(subscribed) },
+        : {
+            step: "subscribe",
+            pageId: page.pageId,
+            accountId: page.igId,
+            reason: missingPermission ? "missing_permission_pages_manage_metadata" : "graph_error",
+            ...graphFailureMetadata(subscribed),
+          },
       "error",
     );
-    return { kind: "error", error: "subscribe_failed" };
+    return { kind: "error", error: missingPermission ? "subscribe_permission" : "subscribe_failed" };
   }
   logEvent("ig_connect_subscribed", businessId, {
     step: "subscribe",

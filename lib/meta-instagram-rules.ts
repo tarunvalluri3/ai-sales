@@ -242,6 +242,18 @@ export function isRevokedTokenError(httpStatus: number, error: GraphError | null
   return error.code === 190 || error.code === 102;
 }
 
+/**
+ * Graph "permission not granted" errors: code 200 (and the 200-299
+ * permission range) or code 10 without the outside-window subcode. Used
+ * to spot a login configuration missing pages_manage_metadata, which
+ * POST /<PAGE_ID>/subscribed_apps requires.
+ */
+export function isPermissionError(error: GraphError | null | undefined): boolean {
+  if (!error || typeof error.code !== "number") return false;
+  if (error.code >= 200 && error.code <= 299) return true;
+  return error.code === 10 && error.error_subcode !== 2534022;
+}
+
 /** Meta refused a send because the 24-hour window has closed (code 10, subcode 2534022). */
 export function isOutsideWindowError(error: GraphError | null | undefined): boolean {
   return error?.code === 10 && error.error_subcode === 2534022;

@@ -60,6 +60,7 @@ insert into _tap_results select throws_ok(
   'org_a session cannot read pending selections (they hold a user token)'
 );
 
+reset role;
 insert into _tap_results select * from finish();
 select line from _tap_results;
 rollback;

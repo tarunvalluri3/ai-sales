@@ -19,13 +19,15 @@ const ERROR_MESSAGES: Record<string, string> = {
   no_accounts:
     "No Instagram account was shared. When Meta asks, choose your business portfolio and tick an Instagram professional (Business or Creator) account.",
   subscribe_failed: "Meta approved the login but refused to send this account's messages to us. Please try again.",
+  subscribe_permission:
+    "Facebook didn't give us permission to receive this Page's messages. This is a setup issue on our side; please contact support.",
   selection_expired: "That account choice expired. Please connect again.",
   forbidden: "Only an admin of this business can connect Instagram.",
   not_entitled: "Instagram messaging isn't available on your plan.",
   unexpected: "Something went wrong connecting Instagram. Please try again.",
 };
 
-const NO_RETRY = new Set(["forbidden", "not_entitled", "config"]);
+const NO_RETRY = new Set(["forbidden", "not_entitled", "config", "subscribe_permission"]);
 
 /**
  * Result of the Meta login round trip, from the ?connected=1 / ?error=<code>

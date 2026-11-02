@@ -781,7 +781,7 @@ test("facebook mode: the Page is subscribed with its Page token and Page-valid f
     connect,
     /graphRequest<\{ success\?: boolean \}>\("POST", `\/\$\{page\.pageId\}\/subscribed_apps`, \{\s*token: page\.pageToken,\s*form: \{ subscribed_fields: PAGE_SUBSCRIBED_FIELDS\.join\(","\) \}/,
   );
-  assert.match(connect, /return \{ kind: "error", error: "subscribe_failed" \}/);
+  assert.match(connect, /error: missingPermission \? "subscribe_permission" : "subscribe_failed"/);
   assert.ok(connect.indexOf("subscribed_apps") < connect.indexOf("saveConnection("));
   assert.match(connect, /saveConnection\(businessId, userId, page\.pageToken,/);
   assert.match(connect, /facebookUserId,\s*facebookPageId: page\.pageId,/);
@@ -869,4 +869,21 @@ test("hygiene: the Facebook flow's log calls never pass a token, the code or the
     assert.doesNotMatch(call, /userToken|pageToken|access_token\b|appSecret|input\.code|exchanged\.data|longLived\.data\.access_token/, call);
   }
   assert.doesNotMatch(source, /graph\.instagram\.com/);
+});
+
+test("facebook mode: a subscribe refused for a missing permission (pages_manage_metadata) logs a clear reason and returns subscribe_permission", () => {
+  assert.equal(rules.isPermissionError({ code: 200 }), true);
+  assert.equal(rules.isPermissionError({ code: 210 }), true);
+  assert.equal(rules.isPermissionError({ code: 10 }), true);
+  assert.equal(rules.isPermissionError({ code: 10, error_subcode: 2534022 }), false, "outside-window is not a permission error");
+  assert.equal(rules.isPermissionError({ code: 190 }), false);
+  assert.equal(rules.isPermissionError(null), false);
+  const lib = read("lib/instagram.ts");
+  const connect = lib.slice(lib.indexOf("async function connectFacebookPage("), lib.indexOf("async function connectUnifiedAccount("));
+  assert.match(connect, /isPermissionError\(subscribed\.error\)/);
+  assert.match(connect, /"missing_permission_pages_manage_metadata"/);
+  assert.match(connect, /missingPermission \? "subscribe_permission" : "subscribe_failed"/);
+  assert.match(read("app/(dashboard)/dashboard/instagram/instagram-oauth-result.tsx"), /\bsubscribe_permission:/);
+  // pages_manage_metadata missing must not throw: the branch returns an error result.
+  assert.doesNotMatch(connect.slice(connect.indexOf("missingPermission"), connect.indexOf("ig_connect_subscribed")), /throw /);
 });
