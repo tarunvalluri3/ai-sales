@@ -304,3 +304,70 @@ test("hygiene: the account subscription uses the documented fields on graph.face
   assert.match(lib, /graphRequest<\{ success\?: boolean \}>\("POST", `\/\$\{account\.id\}\/subscribed_apps`/);
   assert.match(lib, /subscribed_fields: SUBSCRIBED_FIELDS\.join\(","\)/);
 });
+
+// ------------------------------------------------------- per-business access override
+
+const plans = await import(new URL("../lib/plans.ts", import.meta.url).href);
+
+test("access: Instagram is allowed when the plan includes it OR the business override is on", () => {
+  const off = { website: true, whatsapp: true, instagram: false };
+  const on = { website: true, whatsapp: true, instagram: true };
+  assert.equal(plans.applyChannelOverrides(off, { instagramEnabled: false }).instagram, false);
+  assert.equal(plans.applyChannelOverrides(off, { instagramEnabled: true }).instagram, true);
+  assert.equal(plans.applyChannelOverrides(on, { instagramEnabled: false }).instagram, true);
+  assert.equal(plans.applyChannelOverrides(on, { instagramEnabled: true }).instagram, true);
+});
+
+test("access: the override changes only Instagram, and no plan includes Instagram today", () => {
+  const starter = { website: true, whatsapp: false, instagram: false };
+  assert.deepEqual(plans.applyChannelOverrides(starter, { instagramEnabled: true }), { website: true, whatsapp: false, instagram: true });
+  for (const key of plans.PLAN_KEYS) assert.equal(plans.PLANS[key].channels.instagram, false, key);
+});
+
+test("access: getEntitlement merges the override and reads it fail-closed", () => {
+  const subscription = read("lib/subscription.ts");
+  assert.match(subscription, /applyChannelOverrides\(planEntitlement\.channels, \{ instagramEnabled \}\)/);
+  assert.match(subscription, /\.select\("instagram_enabled"\)[\s\S]*?if \(error\) \{[\s\S]*?return false;/);
+  assert.match(subscription, /return data\?\.instagram_enabled === true;/);
+});
+
+test("access: every server path checks Instagram access before acting", () => {
+  const connect = read("app/api/meta/instagram/connect/route.ts");
+  assert.ok(connect.indexOf("entitlement.channels.instagram") < connect.indexOf("buildInstagramConnectUrl(businessId"));
+
+  const callback = read("app/api/meta/instagram/callback/route.ts");
+  assert.ok(callback.indexOf("isInstagramAllowed(") > callback.indexOf("consumeInstagramOAuthState(state)"));
+  assert.ok(callback.indexOf("isInstagramAllowed(") < callback.indexOf("completeInstagramConnect("));
+
+  const chooser = read("app/(dashboard)/dashboard/instagram/actions.ts");
+  assert.ok(chooser.indexOf('isChannelEntitled(businessId, "instagram")') < chooser.indexOf("await finishInstagramSelection("));
+
+  const webhook = read("app/api/meta/instagram/webhook/route.ts");
+  const ingest = webhook.slice(webhook.indexOf("async function ingestInboundMessage("));
+  assert.ok(ingest.indexOf("isInstagramAllowed(supabase, businessId)") < ingest.indexOf('.from("instagram_inbound_messages")'));
+  assert.ok(ingest.indexOf("isInstagramAllowed(supabase, businessId)") < ingest.indexOf("createMessage("));
+
+  const delivery = read("lib/instagram-delivery.ts");
+  const deliver = delivery.slice(delivery.indexOf("async function deliverInstagramOutboundRow("));
+  assert.ok(deliver.indexOf("isInstagramAllowed(supabase, outbound.business_id)") < deliver.indexOf("getInstagramAccessToken("));
+  assert.ok(deliver.indexOf("isInstagramAllowed(supabase, outbound.business_id)") < deliver.indexOf("graphRequest<"));
+});
+
+test("access: the override migration leaves the column out of customer grants and blocks it on insert", () => {
+  const migration = read("supabase/migrations/20261113000000_business_instagram_override.sql");
+  assert.match(migration, /add column instagram_enabled boolean not null default false/);
+  assert.match(migration, /as restrictive\s+for insert\s+to authenticated\s+with check \(instagram_enabled = false\)/);
+  assert.doesNotMatch(migration, /grant update[^;]*instagram_enabled/i);
+});
+
+test("access: the admin and seed scripts carry no credentials and act on one resolved business", () => {
+  for (const file of ["scripts/instagram-access.mjs", "scripts/seed-review-demo.mjs", "scripts/lib/owner-business.mjs"]) {
+    const source = read(file);
+    assert.doesNotMatch(source, /password\s*[:=]|sk_live_|sk_test_|eyJhbGci/i, file);
+    assert.doesNotMatch(source, /console\.log\([^)]*process\.env/, file);
+  }
+  const seed = read("scripts/seed-review-demo.mjs");
+  for (const call of seed.match(/\.(update|delete)\([^)]*\)[\s\S]*?;/g) ?? []) {
+    assert.match(call, /\.eq\("(business_)?id", businessId\)/, call);
+  }
+});

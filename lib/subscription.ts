@@ -7,6 +7,7 @@ import {
   PLAN_KEYS,
   PLANS,
   TRIAL_REPLY_QUOTA,
+  applyChannelOverrides,
   type ChannelKey,
   type PlanKey,
 } from "@/lib/plans";
@@ -310,6 +311,40 @@ export async function getEntitlement(
   businessId: string,
   now: Date = new Date(),
 ): Promise<Entitlement> {
+  const [planEntitlement, instagramEnabled] = await Promise.all([
+    getPlanEntitlement(supabase, businessId, now),
+    readInstagramOverride(supabase, businessId),
+  ]);
+  return {
+    ...planEntitlement,
+    channels: applyChannelOverrides(planEntitlement.channels, { instagramEnabled }),
+  };
+}
+
+/**
+ * `businesses.instagram_enabled` (service-role-only, migration
+ * 20261113000000). FAILS CLOSED, unlike the plan read: a read error means
+ * "no override", so a database blip can only ever withhold Instagram from a
+ * business that isn't on a plan with it -- never grant it.
+ */
+async function readInstagramOverride(supabase: SupabaseClient, businessId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("businesses")
+    .select("instagram_enabled")
+    .eq("id", businessId)
+    .maybeSingle<{ instagram_enabled: boolean | null }>();
+  if (error) {
+    logEvent("instagram_override_read_failed", businessId, {}, "error");
+    return false;
+  }
+  return data?.instagram_enabled === true;
+}
+
+async function getPlanEntitlement(
+  supabase: SupabaseClient,
+  businessId: string,
+  now: Date,
+): Promise<Entitlement> {
   const { data, error } = await supabase
     .from("subscriptions")
     .select(ENTITLEMENT_COLUMNS)
@@ -384,6 +419,16 @@ export async function getBillingIdentityForBusiness(
 export async function isChannelEntitled(businessId: string, channel: ChannelKey): Promise<boolean> {
   const entitlement = await getEntitlementForBusiness(businessId);
   return entitlement.channels[channel];
+}
+
+/**
+ * The server-side Instagram gate for paths with no Clerk session (the OAuth
+ * callback, the webhook, the send queue): plan includes Instagram OR the
+ * business's service-role-only override is on. Pass the service-role client.
+ */
+export async function isInstagramAllowed(supabase: SupabaseClient, businessId: string): Promise<boolean> {
+  const entitlement = await getEntitlement(supabase, businessId);
+  return entitlement.channels.instagram;
 }
 
 /** The user-facing refusal when a channel is not on the business's plan. */

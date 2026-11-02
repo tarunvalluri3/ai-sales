@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { completeInstagramConnect, consumeInstagramOAuthState } from "@/lib/instagram";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { createServiceSupabaseClient } from "@/lib/supabase/service";
+import { isInstagramAllowed } from "@/lib/subscription";
 
 /**
  * Meta redirects here after Facebook Login for Business. No Clerk session is
@@ -30,6 +32,11 @@ export async function GET(request: NextRequest) {
 
     if (cancelled) {
       return back("error=denied");
+    }
+    // Re-checked here, not only at /connect: access may have been switched
+    // off in the 10 minutes the state was alive.
+    if (!(await isInstagramAllowed(createServiceSupabaseClient(), checked.businessId))) {
+      return back("error=not_entitled");
     }
     if (!code) {
       return back("error=invalid_state");

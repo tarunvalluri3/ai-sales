@@ -44,6 +44,26 @@ values ('user_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'owner');
 
 No new environment variables -- `/apache` reuses `SUPABASE_SECRET_KEY` (already required) through its own dedicated service-role client, `lib/supabase/admin.ts`.
 
+## Instagram access per business (until Meta approves the app)
+
+Instagram is on no plan yet (`lib/plans.ts`). A business may still use it when its **`businesses.instagram_enabled`** flag is on (migration `20261113000000`). Customers cannot change this flag -- it has no customer UPDATE grant and a restrictive INSERT policy forces it to `false` (pgTAP `065`) -- so it is set only with the service-role key, by these scripts. The connect route, OAuth callback, account chooser, webhook and every send check it on the server.
+
+The scripts read `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SECRET_KEY` and `CLERK_SECRET_KEY` from `.env.local`, print the Supabase project they act on (and `(PRODUCTION)` when it is production), and never print a secret. "The business owned by an email" = the business of the Clerk organization that email's user is an `org:admin` of. If the email owns several, the script lists them and asks for `--org <clerk org id>`.
+
+```bash
+npm run instagram:enable  -- --email owner@example.com            # prints the business name and the new value
+npm run instagram:disable -- --email owner@example.com
+npm run instagram:enable  -- --email owner@example.com --org org_xxx   # when the email owns several businesses
+```
+
+**Meta App Review demo business.** Create the reviewer login by hand through the normal sign-up page (no account or password is ever stored in this repo), finish onboarding up to having a business, then:
+
+```bash
+npm run seed:review-demo -- --email reviewer@example.com
+```
+
+It turns `instagram_enabled` on and fills "Waves Demo Store": description, Asia/Kolkata timezone, Mon-Sat 10:00-19:00 hours, 3 products and 2 services priced in ₹, and 6 FAQs (pricing, delivery, timings, booking, refunds, contact). It only touches that one business and is safe to run again (rows are matched by name/question and updated, never duplicated). The knowledge documents are queued for ingestion (no Gemini call from the script); they are embedded on the daily cron, or straight away when any product/service/FAQ is saved in the dashboard (each save processes up to 5 queued documents). Then sign in as the reviewer and click **Publish** so the agent serves the new content.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

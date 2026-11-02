@@ -56,11 +56,12 @@ export default async function InstagramPage({
 
       {canEdit && entitled && !choices ? <InstagramSetupGuide hasConnection={connection?.status === "connected"} /> : null}
 
-      {/* An existing connection keeps working and stays visible even when
-          the plan no longer includes Instagram. */}
+      {/* An existing connection stays visible, but without access (a plan
+          with Instagram, or the per-business override) no message is
+          received or sent -- the webhook and send queue refuse. */}
       {connection && !entitled ? (
         <ChannelUpgradeNotice
-          message={`${channelNotEntitledMessage("instagram", entitlement)} This account is still connected and still receiving messages.`}
+          message={`${channelNotEntitledMessage("instagram", entitlement)} This account is still connected, but its messages are not being received or answered.`}
           showPlansLink={false}
         />
       ) : null}

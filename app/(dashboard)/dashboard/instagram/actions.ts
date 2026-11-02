@@ -8,6 +8,7 @@ import { requireMinRole } from "@/lib/auth";
 import { disconnectInstagram, finishInstagramSelection } from "@/lib/instagram";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { isChannelEntitled } from "@/lib/subscription";
 
 export type InstagramActionState = {
   error?: string;
@@ -75,6 +76,10 @@ export async function chooseInstagramAccountAction(
   });
   if (!parsed.success) {
     return { error: "Please choose an Instagram account." };
+  }
+
+  if (!(await isChannelEntitled(businessId, "instagram"))) {
+    redirect("/dashboard/instagram?error=not_entitled");
   }
 
   let target: string;

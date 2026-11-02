@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { selectBurstLimit } from "@/lib/abuse-limits";
 import { checkReplyQuota } from "@/lib/usage-limit";
+import { isInstagramAllowed } from "@/lib/subscription";
 import { isExpectedRefusal, loadBusinessAiContext } from "@/lib/business-ai-context";
 import {
   getOrCreateInstagramConversation,
@@ -126,6 +127,14 @@ async function ingestInboundMessage(
     return null;
   }
   const { businessId } = resolved;
+
+  // Instagram is allowed only on a plan that includes it or with the
+  // business's service-role-only override. Otherwise the message is not
+  // stored or answered (still a 200, so Meta does not retry it).
+  if (!(await isInstagramAllowed(supabase, businessId))) {
+    logEvent("instagram_not_allowed", businessId, {}, "info");
+    return null;
+  }
 
   const senderAllowed = await checkAndIncrementRateLimit(
     "instagram_webhook",

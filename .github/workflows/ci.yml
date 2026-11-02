@@ -106,7 +106,9 @@ jobs:
         # 2026-11-02: Instagram API with Unified Login. Webhook signature
         # (valid / tampered / wrong secret), GET verification, OAuth state,
         # echo + duplicate handling, the 24-hour window, revoked-token
-        # handling and token encryption. Pure, no database or secrets.
+        # handling and token encryption, plus the per-business access gate
+        # (plan OR businesses.instagram_enabled) on every server path.
+        # Pure, no database or secrets.
         run: npm run test:meta-instagram
 
       - name: Widget access and publish-status tests
