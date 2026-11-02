@@ -229,7 +229,56 @@ export function isWithinMessagingWindow(lastInboundAt: string | Date | null, now
   return age >= 0 ? age <= MESSAGING_WINDOW_MS : true;
 }
 
-export type GraphError = { code?: number; error_subcode?: number; type?: string; fbtrace_id?: string };
+export type GraphError = {
+  code?: number;
+  error_subcode?: number;
+  type?: string;
+  fbtrace_id?: string;
+  /** Meta's developer message, sanitized (see sanitizeMetaText). Safe to log. */
+  message?: string;
+  /** Meta's user-facing message, sanitized. Safe to log; never shown to the client. */
+  error_user_msg?: string;
+};
+
+const META_TEXT_MAX = 300;
+
+/**
+ * Meta's error.message / error.error_user_msg are plain text, not secrets,
+ * but they come from outside: collapse whitespace, mask anything shaped
+ * like an access token (EAA..., IGQ..., or any 40+ char token-ish run) and
+ * cap the length before it reaches a log line.
+ */
+export function sanitizeMetaText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value
+    .replace(/\s+/g, " ")
+    .replace(/\b(?:EAA|IGQ|IGA)[A-Za-z0-9_-]{8,}/g, "[redacted]")
+    .replace(/[A-Za-z0-9_\-.]{40,}/g, "[redacted]")
+    .trim();
+  if (cleaned.length === 0) return undefined;
+  return cleaned.length > META_TEXT_MAX ? `${cleaned.slice(0, META_TEXT_MAX)}…` : cleaned;
+}
+
+/** Permission names we look for in Meta's error text (the first one named wins). */
+const KNOWN_PERMISSIONS = [
+  "pages_manage_metadata",
+  "pages_messaging",
+  "pages_show_list",
+  "pages_read_engagement",
+  "instagram_manage_messages",
+  "instagram_basic",
+  "business_management",
+] as const;
+
+/**
+ * The permission Meta's error text actually names, or null. Lets a log
+ * reason say "missing_permission_<name>" only when Meta said so, instead of
+ * guessing from the error code.
+ */
+export function permissionNamedInError(error: GraphError | null | undefined): string | null {
+  const text = `${error?.message ?? ""} ${error?.error_user_msg ?? ""}`;
+  return KNOWN_PERMISSIONS.find((name) => new RegExp(`\\b${name}\\b`).test(text)) ?? null;
+}
 
 /**
  * Meta's "this token no longer works" errors: code 190 (invalid, expired or
@@ -244,9 +293,9 @@ export function isRevokedTokenError(httpStatus: number, error: GraphError | null
 
 /**
  * Graph "permission not granted" errors: code 200 (and the 200-299
- * permission range) or code 10 without the outside-window subcode. Used
- * to spot a login configuration missing pages_manage_metadata, which
- * POST /<PAGE_ID>/subscribed_apps requires.
+ * permission range) or code 10 without the outside-window subcode. Which
+ * permission is missing comes from Meta's text (permissionNamedInError),
+ * not from the code.
  */
 export function isPermissionError(error: GraphError | null | undefined): boolean {
   if (!error || typeof error.code !== "number") return false;
@@ -264,11 +313,15 @@ export function readGraphError(body: unknown): GraphError | null {
   if (!body || typeof body !== "object") return null;
   const error = (body as { error?: unknown }).error;
   if (!error || typeof error !== "object") return null;
-  const { code, error_subcode, type, fbtrace_id } = error as Record<string, unknown>;
+  const { code, error_subcode, type, fbtrace_id, message, error_user_msg } = error as Record<string, unknown>;
+  const safeMessage = sanitizeMetaText(message);
+  const safeUserMessage = sanitizeMetaText(error_user_msg);
   return {
     code: typeof code === "number" ? code : undefined,
     error_subcode: typeof error_subcode === "number" ? error_subcode : undefined,
     type: typeof type === "string" ? type : undefined,
     ...(typeof fbtrace_id === "string" && /^[\w-]{1,64}$/.test(fbtrace_id) ? { fbtrace_id } : {}),
+    ...(safeMessage ? { message: safeMessage } : {}),
+    ...(safeUserMessage ? { error_user_msg: safeUserMessage } : {}),
   };
 }

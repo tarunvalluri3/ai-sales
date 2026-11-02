@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { graphFailureMetadata, type ConnectLog, type GraphCall } from "@/lib/meta-instagram-connect-flow";
+import { isPermissionError, PAGE_SUBSCRIBED_FIELDS, permissionNamedInError } from "@/lib/meta-instagram-rules";
 
 /**
  * Account discovery for "Instagram API with Facebook Login" (Messenger API
@@ -178,4 +179,104 @@ export async function discoverFacebookPages(input: FacebookDiscoverInput): Promi
     return { ok: false, error: "no_linked_pages" };
   }
   return { ok: true, userToken, facebookUserId, pages };
+}
+
+const permissionsSchema = z.object({
+  data: z.array(z.object({ permission: z.string(), status: z.string() })),
+});
+
+/** Permission names only, never anything else. */
+function safePermissionName(name: string): string {
+  return /^[a-z_]{1,64}$/.test(name) ? name : "other";
+}
+
+export type SubscribePageInput = {
+  graph: GraphCall;
+  log: ConnectLog;
+  /** Long-lived User token: used ONLY for GET /me/permissions. */
+  userToken: string;
+  /** The Page from /me/accounts (or GET /<PAGE_ID>); its pageToken is what subscribes. */
+  page: LinkedPage;
+};
+
+export type SubscribePageResult = { ok: true } | { ok: false; error: "subscribe_failed" | "subscribe_permission" };
+
+/**
+ * Installs our app on the Page so Meta delivers its linked Instagram
+ * account's messaging webhooks:
+ *  1. GET /me/permissions (User token) -- logs granted/declined permission
+ *     names so a failed subscribe can be told apart from a missing grant.
+ *     Diagnostic only; a failure here does not stop the subscribe.
+ *  2. POST /<PAGE_ID>/subscribed_apps with the PAGE token (Messenger
+ *     Platform webhooks: "using the Page's access token").
+ * On failure the log carries Meta's own message; the reason names a
+ * permission only when Meta's text names it.
+ */
+export async function subscribeFacebookPage(input: SubscribePageInput): Promise<SubscribePageResult> {
+  const { graph, log, userToken, page } = input;
+
+  const permissions = await graph<unknown>("GET", "/me/permissions", { token: userToken });
+  const parsedPermissions = permissions.ok ? permissionsSchema.safeParse(permissions.data) : null;
+  if (parsedPermissions?.success) {
+    const names = (status: string) =>
+      parsedPermissions.data.data
+        .filter((row) => row.status === status)
+        .map((row) => safePermissionName(row.permission))
+        .join(",");
+    log("ig_connect_permissions", {
+      step: "permissions",
+      status: 200,
+      pageId: page.pageId,
+      granted: names("granted"),
+      declined: names("declined"),
+      expired: names("expired"),
+    });
+  } else {
+    log(
+      "ig_connect_permissions_failed",
+      permissions.ok
+        ? { step: "permissions", pageId: page.pageId, status: 200, reason: "unexpected_shape" }
+        : { step: "permissions", pageId: page.pageId, ...graphFailureMetadata(permissions) },
+      "error",
+    );
+  }
+
+  const subscribed = await graph<{ success?: boolean }>("POST", `/${page.pageId}/subscribed_apps`, {
+    token: page.pageToken,
+    form: { subscribed_fields: PAGE_SUBSCRIBED_FIELDS.join(",") },
+  });
+  if (!subscribed.ok || subscribed.data?.success !== true) {
+    if (subscribed.ok) {
+      log(
+        "ig_connect_failed",
+        { step: "subscribe", pageId: page.pageId, accountId: page.igId, status: 200, reason: "success_not_true" },
+        "error",
+      );
+      return { ok: false, error: "subscribe_failed" };
+    }
+    const namedPermission = permissionNamedInError(subscribed.error);
+    log(
+      "ig_connect_failed",
+      {
+        step: "subscribe",
+        pageId: page.pageId,
+        accountId: page.igId,
+        fields: PAGE_SUBSCRIBED_FIELDS.join(","),
+        reason: namedPermission ? `missing_permission_${namedPermission}` : "subscribe_failed",
+        ...graphFailureMetadata(subscribed),
+      },
+      "error",
+    );
+    return { ok: false, error: isPermissionError(subscribed.error) ? "subscribe_permission" : "subscribe_failed" };
+  }
+
+  log("ig_connect_subscribed", {
+    step: "subscribe",
+    loginMode: "facebook",
+    pageId: page.pageId,
+    accountId: page.igId,
+    fields: PAGE_SUBSCRIBED_FIELDS.join(","),
+    status: 200,
+  });
+  return { ok: true };
 }
