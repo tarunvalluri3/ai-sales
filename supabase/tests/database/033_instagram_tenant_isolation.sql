@@ -32,7 +32,7 @@ values
   ('90000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000a', 'ig_account_a', 'connected'),
   ('90000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000000b', 'ig_account_b', 'connected');
 
-insert into public.instagram_credentials (business_id, access_token)
+insert into public.instagram_credentials (business_id, access_token_encrypted)
 values
   ('00000000-0000-0000-0000-00000000000a', 'token_a'),
   ('00000000-0000-0000-0000-00000000000b', 'token_b');

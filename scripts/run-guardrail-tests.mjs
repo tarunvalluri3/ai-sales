@@ -279,9 +279,10 @@ test("wiring: WhatsApp and Instagram read the raw text exactly once, into prepar
   const whatsapp = read("app/api/webhooks/whatsapp/route.ts");
   assert.equal(occurrences(whatsapp, "message.text!.body!"), 1);
   assert.match(whatsapp, /prepareProspectMessage\(message\.text!\.body!\)/);
-  const instagram = read("app/api/webhooks/instagram/route.ts");
-  assert.equal(occurrences(instagram, "event.message.text!"), 1);
-  assert.match(instagram, /prepareProspectMessage\(event\.message\.text!\)/);
+  const instagram = read("app/api/meta/instagram/webhook/route.ts");
+  // One null check, one read into prepareProspectMessage -- nowhere else.
+  assert.equal(occurrences(instagram, "inbound.text"), 2);
+  assert.match(instagram, /prepareProspectMessage\(inbound\.text\)/);
 });
 
 test("wiring: the dashboard sandbox runs the same pipeline", () => {

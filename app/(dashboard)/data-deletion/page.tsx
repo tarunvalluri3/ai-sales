@@ -11,7 +11,7 @@ const LINK = "font-medium text-ds-accent hover:text-ds-accent-strong";
 /**
  * Meta App Review's "Data Deletion Instructions URL". Every statement here
  * describes implemented behavior: the dashboard's Instagram disconnect
- * (lib/instagram.ts disconnectInstagramNumber), the Profile page's
+ * (lib/instagram.ts disconnectInstagram), the Profile page's
  * "Delete this business" (cascading hard delete), and the Meta callbacks in
  * app/api/meta/. Disconnecting deletes the token at once but does NOT delete
  * message history -- the page says so rather than implying otherwise.
@@ -22,7 +22,7 @@ export default function DataDeletionPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-ds-text-primary">Data Deletion Instructions</h1>
-          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-01</p>
+          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-02</p>
         </div>
 
         <Section title="Who this page is from">
@@ -61,9 +61,12 @@ export default function DataDeletionPage() {
             <strong>Remove the app from your Instagram account.</strong> In Instagram go to{" "}
             <strong>Settings → Apps and websites</strong> (shown as{" "}
             <strong>Business integrations</strong> on some versions), find{" "}
-            <strong>Waves AI Pilot</strong> and choose <strong>Remove</strong>. Instagram then tells
-            us, we delete the stored access token and mark the connection disconnected, and Instagram
-            can ask us to delete the data we hold for your account.
+            <strong>Waves AI Pilot</strong> and choose <strong>Remove</strong>. If you connected
+            through Meta Business Suite, you can also go to{" "}
+            <strong>Meta Business Suite → Settings → Integrations → Connected apps</strong>, find{" "}
+            <strong>Waves AI Pilot</strong> and remove it. Meta then tells us, we delete the stored
+            access token and mark the connection disconnected, and Meta can ask us to delete the data
+            we hold for your account.
           </p>
           <p>
             <strong>Ask us to delete your data.</strong> Email{" "}
@@ -85,7 +88,10 @@ export default function DataDeletionPage() {
         <Section title="What gets deleted">
           <ul className="list-disc space-y-2 pl-5">
             <li>The Instagram access token and its connection record.</li>
-            <li>The Instagram account ID and username we stored when the account was connected.</li>
+            <li>
+              The Instagram account ID and username, and the Meta business and app-scoped user IDs, we
+              stored when the account was connected.
+            </li>
             <li>
               Every conversation received through that Instagram account — the messages, the
               sender&apos;s Instagram-scoped ID, replies sent, and any lead captured in them.

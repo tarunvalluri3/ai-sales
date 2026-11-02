@@ -2,26 +2,34 @@ import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
 import { AppError } from "@/lib/errors";
+import { graphRequest } from "@/lib/meta-graph";
+import { getInstagramAccessToken, markInstagramConnectionRevoked } from "@/lib/instagram";
+import { flagConversationNeedsAttention } from "@/lib/conversations";
+import { isOutsideWindowError, isRevokedTokenError, isWithinMessagingWindow } from "@/lib/meta-instagram-rules";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
 /**
- * Phase 26's Instagram reply-send queue -- near-verbatim port of
- * lib/whatsapp-delivery.ts's claim/backoff/dead-letter shape. A row is
- * written and an immediate send is attempted inline in the same request
- * that produced the reply (the webhook handler's AI-reply path); this
- * queue exists as the retry backstop for when that immediate attempt
- * fails, not as the primary delivery path. Swept by the same shared
- * daily cron as every other background queue this app has.
+ * Instagram reply-send queue (claim/backoff/dead-letter, same shape as
+ * lib/whatsapp-delivery.ts). A row is written and an immediate send is
+ * attempted inline; the shared daily cron retries failures.
+ *
+ * Unified Login: POST graph.facebook.com/<IG account id>/messages with the
+ * business's decrypted system user token. Two rules are enforced here, at
+ * the one place every Instagram send goes through (AI replies, staff
+ * replies, appointment notices, cron retries):
+ *  - the 24-hour window: no send unless the person's last message is under
+ *    24 hours old; otherwise the row fails as `outside_24h_window` and the
+ *    conversation is flagged for the team (no HUMAN_AGENT tag yet);
+ *  - a revoked or invalid token (Graph code 190): the token is deleted, the
+ *    connection marked disconnected (the dashboard shows "Reconnect"), and
+ *    the row fails without retries.
  */
 
 const MAX_DELIVERIES_PER_RUN = 10;
 const MAX_DELIVERY_ATTEMPTS = 5;
 const BACKOFF_BASE_SECONDS = 60;
 const MAX_BACKOFF_SECONDS = 60 * 60;
-const DELIVERY_TIMEOUT_MS = 10_000;
-const GRAPH_API_VERSION = "v25.0";
-const GRAPH_API_BASE = `https://graph.instagram.com/${GRAPH_API_VERSION}`;
 
 export type CreateInstagramOutboundMessageInput = {
   businessId: string;
@@ -65,123 +73,153 @@ function backoffSeconds(attempts: number): number {
   return Math.min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), MAX_BACKOFF_SECONDS);
 }
 
-function errorMessageOnly(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 500);
-}
-
 type InstagramOutboundRow = {
   id: string;
   business_id: string;
+  conversation_id: string;
   instagram_business_account_id: string;
   to_ig_id: string;
   content: string;
   attempts: number;
 };
 
+export type InstagramSendResult = {
+  success: boolean;
+  reason?: "outside_window" | "token_revoked" | "no_credentials" | "retry_scheduled" | "failed";
+};
+
 /**
- * Sends one queued reply via Meta's Graph API. Never throws -- every
- * outcome (including a missing/errored connection or credential) is
- * recorded on the row itself and reflected in the return value, matching
- * lib/whatsapp-delivery.ts's contract.
+ * Sends one queued reply. Never throws -- every outcome is recorded on the
+ * row itself and reflected in the return value.
  */
-export async function sendInstagramOutboundMessage(outboundId: string): Promise<{ success: boolean }> {
+export async function sendInstagramOutboundMessage(outboundId: string): Promise<InstagramSendResult> {
   const supabase = createServiceSupabaseClient();
 
   const { data: outbound } = await supabase
     .from("instagram_outbound_messages")
-    .select("id, business_id, instagram_business_account_id, to_ig_id, content, attempts")
+    .select("id, business_id, conversation_id, instagram_business_account_id, to_ig_id, content, attempts")
     .eq("id", outboundId)
     .maybeSingle<InstagramOutboundRow>();
 
   if (!outbound) {
-    return { success: false };
+    return { success: false, reason: "failed" };
   }
 
-  return deliverInstagramOutboundRow(supabase, outbound);
+  try {
+    return await deliverInstagramOutboundRow(supabase, outbound);
+  } catch {
+    logEvent("instagram_delivery_unexpected_error", outbound.business_id, { outboundId: outbound.id }, "error");
+    return { success: false, reason: "failed" };
+  }
+}
+
+async function failRow(supabase: ServiceSupabaseClient, outboundId: string, lastError: string): Promise<void> {
+  await supabase
+    .from("instagram_outbound_messages")
+    .update({ status: "failed", last_error: lastError, updated_at: new Date().toISOString() })
+    .eq("id", outboundId);
+}
+
+/** When the person last wrote to the business in this conversation (inbound rows are role `user`). */
+async function lastInboundAt(
+  supabase: ServiceSupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("messages")
+    .select("created_at")
+    .eq("business_id", businessId)
+    .eq("conversation_id", conversationId)
+    .eq("role", "user")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ created_at: string }>();
+  return data?.created_at ?? null;
+}
+
+async function flagOutsideWindow(supabase: ServiceSupabaseClient, outbound: InstagramOutboundRow): Promise<void> {
+  await failRow(supabase, outbound.id, "outside_24h_window");
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("clerk_org_id")
+    .eq("id", outbound.business_id)
+    .maybeSingle<{ clerk_org_id: string }>();
+  if (business) {
+    await flagConversationNeedsAttention(supabase, outbound.business_id, outbound.conversation_id, business.clerk_org_id);
+  }
+  logEvent("instagram_send_outside_window", outbound.business_id, {
+    outboundId: outbound.id,
+    conversationId: outbound.conversation_id,
+  });
 }
 
 async function deliverInstagramOutboundRow(
   supabase: ServiceSupabaseClient,
   outbound: InstagramOutboundRow,
-): Promise<{ success: boolean }> {
-  const { data: credentials } = await supabase
-    .from("instagram_credentials")
-    .select("access_token")
-    .eq("business_id", outbound.business_id)
-    .maybeSingle<{ access_token: string }>();
-
-  if (!credentials) {
-    await supabase
-      .from("instagram_outbound_messages")
-      .update({ status: "failed", last_error: "No Instagram credentials for this business.", updated_at: new Date().toISOString() })
-      .eq("id", outbound.id);
-    return { success: false };
+): Promise<InstagramSendResult> {
+  const lastInbound = await lastInboundAt(supabase, outbound.business_id, outbound.conversation_id);
+  if (!isWithinMessagingWindow(lastInbound, new Date())) {
+    await flagOutsideWindow(supabase, outbound);
+    return { success: false, reason: "outside_window" };
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await fetch(`${GRAPH_API_BASE}/${encodeURIComponent(outbound.instagram_business_account_id)}/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${credentials.access_token}`,
-        },
-        body: JSON.stringify({
-          recipient: { id: outbound.to_ig_id },
-          message: { text: outbound.content },
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
-    }
+  const token = await getInstagramAccessToken(supabase, outbound.business_id);
+  if (!token) {
+    await failRow(supabase, outbound.id, "No Instagram credentials for this business.");
+    return { success: false, reason: "no_credentials" };
+  }
 
-    if (!response.ok) {
-      throw new Error(`Graph API responded with status ${response.status}`);
-    }
+  const result = await graphRequest<{ message_id?: string }>(
+    "POST",
+    `/${encodeURIComponent(outbound.instagram_business_account_id)}/messages`,
+    {
+      token,
+      json: { recipient: { id: outbound.to_ig_id }, message: { text: outbound.content } },
+    },
+  );
 
-    const body = (await response.json()) as { message_id?: string };
-    const igMessageId = body.message_id ?? null;
-
+  if (result.ok) {
+    const nowIso = new Date().toISOString();
     await supabase
       .from("instagram_outbound_messages")
-      .update({
-        status: "sent",
-        ig_message_id: igMessageId,
-        sent_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: "sent", ig_message_id: result.data.message_id ?? null, sent_at: nowIso, updated_at: nowIso })
       .eq("id", outbound.id);
-
     logEvent("instagram_delivery_succeeded", outbound.business_id, { outboundId: outbound.id });
     return { success: true };
-  } catch (error) {
-    const attempts = outbound.attempts + 1;
-    const isDeadLetter = attempts >= MAX_DELIVERY_ATTEMPTS;
-
-    await supabase
-      .from("instagram_outbound_messages")
-      .update({
-        status: isDeadLetter ? "failed" : "pending",
-        attempts,
-        last_error: errorMessageOnly(error),
-        next_attempt_at: new Date(Date.now() + backoffSeconds(attempts) * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", outbound.id);
-
-    logEvent(
-      isDeadLetter ? "instagram_delivery_dead_lettered" : "instagram_delivery_retry_scheduled",
-      outbound.business_id,
-      { outboundId: outbound.id, attempts },
-      isDeadLetter ? "error" : undefined,
-    );
-    return { success: false };
   }
+
+  if (isRevokedTokenError(result.status, result.error)) {
+    await failRow(supabase, outbound.id, "token_revoked");
+    await markInstagramConnectionRevoked(supabase, outbound.business_id);
+    return { success: false, reason: "token_revoked" };
+  }
+
+  if (isOutsideWindowError(result.error)) {
+    await flagOutsideWindow(supabase, outbound);
+    return { success: false, reason: "outside_window" };
+  }
+
+  const attempts = outbound.attempts + 1;
+  const isDeadLetter = attempts >= MAX_DELIVERY_ATTEMPTS;
+  await supabase
+    .from("instagram_outbound_messages")
+    .update({
+      status: isDeadLetter ? "failed" : "pending",
+      attempts,
+      last_error: `Graph API responded with status ${result.status}${result.error?.code ? ` (code ${result.error.code})` : ""}`,
+      next_attempt_at: new Date(Date.now() + backoffSeconds(attempts) * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", outbound.id);
+
+  logEvent(
+    isDeadLetter ? "instagram_delivery_dead_lettered" : "instagram_delivery_retry_scheduled",
+    outbound.business_id,
+    { outboundId: outbound.id, attempts },
+    isDeadLetter ? "error" : undefined,
+  );
+  return { success: false, reason: isDeadLetter ? "failed" : "retry_scheduled" };
 }
 
 export type ProcessInstagramOutboundResult = {
@@ -208,7 +246,12 @@ export async function processInstagramOutboundMessages(): Promise<ProcessInstagr
   let failed = 0;
 
   for (const row of rows) {
-    const result = await deliverInstagramOutboundRow(supabase, row);
+    let result: InstagramSendResult;
+    try {
+      result = await deliverInstagramOutboundRow(supabase, row);
+    } catch {
+      result = { success: false, reason: "failed" };
+    }
     if (result.success) {
       succeeded++;
     } else {

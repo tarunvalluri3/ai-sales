@@ -39,7 +39,7 @@ export default function PrivacyPolicyPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-ds-text-primary">Privacy Policy</h1>
-          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-01</p>
+          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-02</p>
         </div>
 
         <Section title="Who this policy covers">
@@ -201,31 +201,36 @@ export default function PrivacyPolicyPage() {
 
         <Section title="Instagram and other Meta platforms">
           <p>
-            A customer can connect its Instagram professional account to Waves AI Pilot using
-            &quot;Instagram API with Instagram Login.&quot; This section describes exactly what we
-            receive and do through that connection.
+            A customer can connect its Instagram professional account to Waves AI Pilot through
+            Meta&apos;s business login (&quot;Instagram API with Unified Login&quot;). The customer
+            signs in with Instagram or Facebook, chooses its business portfolio, and chooses which
+            Instagram account to share with us; no Facebook Page is needed. This section describes
+            exactly what we receive and do through that connection.
           </p>
           <p>
             <strong>What we access, and which permission gives it.</strong>
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              <code>instagram_business_basic</code> — the connected account&apos;s Instagram ID and
+              <code>instagram_basic</code> — the connected account&apos;s Instagram ID and
               username, so we can show the customer which account is connected and match incoming
               messages to the right business.
             </li>
             <li>
-              <code>instagram_business_manage_messages</code> — the text of direct messages people
+              <code>instagram_manage_messages</code> — the text of direct messages people
               send to the connected account, each sender&apos;s Instagram-scoped ID and each
               message&apos;s ID, and the ability to send replies from that account. We do not receive
               the sender&apos;s name or profile details. We do not store attachments: for a
               non-text message we keep only a note that one arrived.
             </li>
             <li>
-              <strong>Access token</strong> — the token Instagram issues when the customer connects.
-              It is kept in a restricted database table that no customer or visitor can read, used
-              only to receive and send messages for that account, renewed before it expires, and
-              never written to our logs.
+              <strong>Access token</strong> — the business integration token Meta issues to the
+              customer&apos;s business when it connects, plus the IDs that identify it (the
+              business&apos;s Meta business ID and the token&apos;s app-scoped user ID). The token is
+              stored encrypted in a restricted database table that no customer or visitor can read,
+              used only to receive and send messages for that account, and never written to our logs.
+              It is kept until the customer disconnects Instagram, removes our app, or deletes the
+              business.
             </li>
           </ul>
           <p>
@@ -247,15 +252,18 @@ export default function PrivacyPolicyPage() {
             <strong>How long we keep it.</strong> Instagram messages are kept like any other
             conversation: permanently deleted after 24 months of inactivity, or sooner if the customer
             deletes them or its account. The access token is kept only while the account is
-            connected, and is deleted when the customer disconnects Instagram, when the account owner
-            removes the app in Instagram, or when the business is deleted. Disconnecting stops all
-            use of the account at once but does not by itself delete earlier conversations. If
-            Instagram sends us a data deletion request, we also delete every conversation received
-            through that account, the connection record, and the account ID and username.
+            connected, and is deleted when the customer disconnects Instagram, when the customer
+            removes our app in Instagram or Meta Business Suite, or when the business is deleted.
+            Disconnecting stops all use of the account at once but does not by itself delete earlier
+            conversations. If Meta sends us a data deletion request, we also delete every
+            conversation received through that account, the connection record, and the account ID,
+            username and business IDs.
           </p>
           <p>
             <strong>How to revoke access.</strong> In Instagram, go to Settings → Apps and websites
-            and remove Waves AI Pilot, or have the customer disconnect Instagram in its dashboard.
+            and remove Waves AI Pilot; or in Meta Business Suite, go to Settings → Integrations →
+            Connected apps and remove Waves AI Pilot; or have the customer disconnect Instagram in
+            its dashboard.
             Step-by-step instructions, and how to ask for your data to be deleted, are on our{" "}
             <Link href="/data-deletion" className="font-medium text-ds-accent hover:text-ds-accent-strong">
               Data Deletion Instructions

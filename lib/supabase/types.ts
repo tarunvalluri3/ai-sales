@@ -443,8 +443,10 @@ export type InstagramConnection = {
   business_id: string;
   instagram_business_account_id: string;
   ig_username: string | null;
+  /** App-scoped id of the client's Business Integration System User (GET /me). */
+  meta_system_user_id: string | null;
+  client_business_id: string | null;
   status: InstagramConnectionStatus;
-  token_expires_at: string | null;
   access_token_last4: string | null;
   last_verified_at: string | null;
   last_error: string | null;

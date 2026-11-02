@@ -4,7 +4,6 @@ import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { processWebhookDeliveries } from "@/lib/webhook-delivery";
 import { processWhatsappOutboundMessages } from "@/lib/whatsapp-delivery";
 import { processInstagramOutboundMessages } from "@/lib/instagram-delivery";
-import { refreshDueInstagramTokens } from "@/lib/instagram";
 import { refreshDueUrlKnowledgeSources } from "@/lib/url-ingestion";
 import { runSlaEscalationSweep } from "@/lib/sla-routing";
 import { sendDailyDigestEmails } from "@/lib/notifications";
@@ -63,7 +62,6 @@ export async function GET(request: NextRequest) {
       webhooks,
       whatsappOutbound,
       instagramOutbound,
-      instagramTokenRefresh,
       urlRefresh,
       slaRouting,
       notificationDigest,
@@ -78,7 +76,6 @@ export async function GET(request: NextRequest) {
       processWebhookDeliveries(),
       processWhatsappOutboundMessages(),
       processInstagramOutboundMessages(),
-      refreshDueInstagramTokens(),
       refreshDueUrlKnowledgeSources(),
       runSlaEscalationSweep(),
       sendDailyDigestEmails(),
@@ -108,7 +105,6 @@ export async function GET(request: NextRequest) {
       webhooks,
       whatsappOutbound,
       instagramOutbound,
-      instagramTokenRefresh,
       urlRefresh,
       slaRouting,
       notificationDigest,

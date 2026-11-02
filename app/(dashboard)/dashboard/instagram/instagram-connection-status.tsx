@@ -6,6 +6,7 @@ import type { InstagramConnection } from "@/lib/supabase/types";
 import { Badge, type BadgeTone } from "../_components/badge";
 import { disconnectInstagramAction, type InstagramActionState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { INSTAGRAM_CONNECT_PATH } from "./connect-path";
 
 const initialState: InstagramActionState = {};
 
@@ -23,23 +24,19 @@ const STATUS_TONE: Record<InstagramConnection["status"], BadgeTone> = {
   disconnected: "muted",
 };
 
-const TOKEN_WARNING_WINDOW_DAYS = 7;
-
 /**
- * `last_error` is a raw string this app itself wrote (refreshInstagramToken()'s
- * caught-error branch, or a future producer) -- never render it verbatim,
- * same convention as WhatsApp's describeConnectionError().
+ * Why a connection stopped, from the short code this app writes to
+ * `last_error` (never Meta's raw text).
  */
-function describeConnectionError(lastError: string): string {
-  const normalized = lastError.toLowerCase();
-  if (normalized.includes("token") || normalized.includes("oauth")) {
-    return "Your Instagram connection stopped working and needs to be reconnected.";
+function describeBrokenConnection(connection: InstagramConnection): string {
+  switch (connection.last_error) {
+    case "token_revoked":
+      return "Meta says our access to this Instagram account was removed or is no longer valid, so we've stopped sending replies.";
+    case "reconnect_required":
+      return "We moved to Meta's new business login. Reconnect once to keep answering Instagram DMs.";
+    default:
+      return "This Instagram connection stopped working, so we've stopped sending replies.";
   }
-  return "This connection stopped working and needs to be reconnected.";
-}
-
-function formatDaysUntil(dateIso: string): number {
-  return Math.ceil((new Date(dateIso).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
 }
 
 export function InstagramConnectionStatus({
@@ -51,10 +48,7 @@ export function InstagramConnectionStatus({
 }) {
   const [state, formAction, isPending] = useActionState(disconnectInstagramAction, initialState);
   const [confirming, setConfirming] = useState(false);
-
-  const daysUntilExpiry = connection.token_expires_at ? formatDaysUntil(connection.token_expires_at) : null;
-  const showExpiryWarning =
-    connection.status === "connected" && daysUntilExpiry !== null && daysUntilExpiry <= TOKEN_WARNING_WINDOW_DAYS;
+  const broken = connection.status === "disconnected" || connection.status === "error";
 
   return (
     <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
@@ -85,8 +79,8 @@ export function InstagramConnectionStatus({
         {confirming ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <span className="text-xs text-ds-text-secondary">
-              This disconnects Instagram — prospects won&rsquo;t reach your AI sales employee there until you
-              reconnect.
+              This removes our access to the account and stops replies there. Past conversations stay in your
+              dashboard.
             </span>
             <form action={formAction}>
               <button
@@ -110,7 +104,7 @@ export function InstagramConnectionStatus({
         ) : (
           <div className="flex items-center gap-2">
             <a
-              href="/api/oauth/instagram/authorize"
+              href={INSTAGRAM_CONNECT_PATH}
               aria-disabled={!canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
               className={`rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${!canEdit ? "pointer-events-none opacity-60" : ""}`}
@@ -129,17 +123,18 @@ export function InstagramConnectionStatus({
           </div>
         )}
       </div>
-      {connection.status === "error" && connection.last_error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
-          {describeConnectionError(connection.last_error)} Click &ldquo;Reconnect&rdquo; above to fix it.
-        </p>
-      ) : null}
-      {showExpiryWarning ? (
-        <p className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
-          {daysUntilExpiry !== null && daysUntilExpiry > 0
-            ? `Your connection needs to be refreshed within ${daysUntilExpiry} day${daysUntilExpiry === 1 ? "" : "s"}. This normally happens automatically — if you see this message linger, click "Reconnect."`
-            : "Your connection needs to be refreshed. Click “Reconnect” above."}
-        </p>
+      {broken ? (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+          <span>{describeBrokenConnection(connection)}</span>
+          {canEdit ? (
+            <a
+              href={INSTAGRAM_CONNECT_PATH}
+              className="rounded-ds-sm bg-ds-accent px-3 py-1.5 font-medium text-ds-accent-on hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            >
+              Reconnect Instagram
+            </a>
+          ) : null}
+        </div>
       ) : null}
       {state.error ? (
         <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">

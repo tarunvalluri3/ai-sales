@@ -79,6 +79,11 @@ export function ReplyComposer({
           {state.error}
         </span>
       ) : null}
+      {state.success && state.notice ? (
+        <span role="status" className="text-xs text-ds-warning">
+          {state.notice}
+        </span>
+      ) : null}
     </form>
   );
 }

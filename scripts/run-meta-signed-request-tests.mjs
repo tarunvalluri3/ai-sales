@@ -99,7 +99,7 @@ test("callback routes verify before acting and never log request content", async
   for (const route of ["app/api/meta/deauthorize/route.ts", "app/api/meta/data-deletion/route.ts"]) {
     const source = read(route);
     assert.match(source, /verifyMetaSignedRequest/);
-    assert.match(source, /INSTAGRAM_APP_SECRET/);
+    assert.match(source, /META_APP_SECRET/);
     assert.match(source, /status: 401/);
     assert.ok(source.indexOf("verifyMetaSignedRequest(") < source.indexOf("createServiceSupabaseClient()"));
     assert.doesNotMatch(source, /console\.|logEvent\(/);

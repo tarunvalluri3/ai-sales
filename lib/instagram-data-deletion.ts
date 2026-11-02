@@ -9,16 +9,21 @@ type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 /**
  * Meta's two account-removal callbacks (app review requirement):
  *
- *  - deauthorize: the account owner removed the app in Instagram. We stop
- *    using the account at once: delete the access token and mark the
+ *  - deauthorize: the client removed the app (Instagram > Apps and
+ *    websites, or Meta Business Suite > Integrations > Connected apps). We
+ *    stop using the account at once: delete the access token and mark the
  *    connection `disconnected`. Message history is left to the business.
  *  - data deletion: the owner asked Meta to delete the data we hold. We
  *    also delete the connection row and every Instagram-sourced
  *    conversation (messages, captured leads and queued outbound replies
  *    cascade from `conversations`) for that business.
  *
- * `instagramUserId` has already been proven genuine by
- * verifyMetaSignedRequest(). Every write below is scoped to the
+ * `metaUserId` has already been proven genuine by verifyMetaSignedRequest().
+ * With Unified Login, Meta's docs don't say which id these callbacks carry,
+ * so it is matched against every id we hold for a connection: the system
+ * user's app-scoped id (GET /me), the client business id and the Instagram
+ * account id. All are digits-only (enforced by the verifier), so they are
+ * safe inside the PostgREST filter below. Every write below is scoped to the
  * `business_id` read off the matched connection -- never to anything in the
  * request. Never logs tokens or message content: only ids and counts.
  */
@@ -27,30 +32,42 @@ const CONFIRMATION_CODE_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
 export type DeletionStatus = "pending" | "completed" | "failed";
 
-async function findConnection(
+/** Every connection the id belongs to (one client business can connect accounts to several of our businesses). */
+async function findConnections(
   supabase: ServiceSupabaseClient,
-  instagramUserId: string,
-): Promise<{ id: string; business_id: string } | null> {
+  metaUserId: string,
+): Promise<{ id: string; business_id: string }[]> {
   const { data, error } = await supabase
     .from("instagram_connections")
     .select("id, business_id")
     .or(
-      `instagram_business_account_id.eq.${instagramUserId},instagram_app_scoped_user_id.eq.${instagramUserId}`,
+      [
+        `meta_system_user_id.eq.${metaUserId}`,
+        `client_business_id.eq.${metaUserId}`,
+        `instagram_business_account_id.eq.${metaUserId}`,
+      ].join(","),
     )
-    .limit(1)
-    .maybeSingle<{ id: string; business_id: string }>();
+    .returns<{ id: string; business_id: string }[]>();
   if (error) throw new Error("instagram connection lookup failed");
-  return data;
+  return data ?? [];
 }
 
-/** Deletes the token and marks the connection disconnected. Returns whether a connection matched. */
+/** Deletes the token and marks each matching connection disconnected. Returns whether any connection matched. */
 export async function deauthorizeInstagramUser(
   supabase: ServiceSupabaseClient,
-  instagramUserId: string,
+  metaUserId: string,
 ): Promise<boolean> {
-  const connection = await findConnection(supabase, instagramUserId);
-  if (!connection) return false;
+  const connections = await findConnections(supabase, metaUserId);
+  for (const connection of connections) {
+    await deauthorizeConnection(supabase, connection);
+  }
+  return connections.length > 0;
+}
 
+async function deauthorizeConnection(
+  supabase: ServiceSupabaseClient,
+  connection: { id: string; business_id: string },
+): Promise<void> {
   const { error: tokenError } = await supabase
     .from("instagram_credentials")
     .delete()
@@ -62,8 +79,7 @@ export async function deauthorizeInstagramUser(
     .update({
       status: "disconnected",
       access_token_last4: null,
-      token_expires_at: null,
-      last_error: null,
+      last_error: "token_revoked",
       updated_at: new Date().toISOString(),
     })
     .eq("id", connection.id)
@@ -71,18 +87,17 @@ export async function deauthorizeInstagramUser(
   if (updateError) throw new Error("instagram connection update failed");
 
   logEvent("instagram_deauthorized", connection.business_id, {});
-  return true;
 }
 
 /** Records a request, returning the confirmation code Meta shows the person. */
 export async function createDeletionRequest(
   supabase: ServiceSupabaseClient,
-  instagramUserId: string,
+  metaUserId: string,
 ): Promise<string> {
   const confirmationCode = crypto.randomBytes(18).toString("base64url");
   const { error } = await supabase
     .from("instagram_data_deletion_requests")
-    .insert({ confirmation_code: confirmationCode, instagram_user_id: instagramUserId });
+    .insert({ confirmation_code: confirmationCode, instagram_user_id: metaUserId });
   if (error) throw new Error("instagram deletion request insert failed");
   return confirmationCode;
 }
@@ -91,20 +106,21 @@ export async function createDeletionRequest(
 export async function runInstagramDataDeletion(
   supabase: ServiceSupabaseClient,
   confirmationCode: string,
-  instagramUserId: string,
+  metaUserId: string,
 ): Promise<void> {
   let businessId: string | null = null;
   try {
-    const connection = await findConnection(supabase, instagramUserId);
+    const connections = await findConnections(supabase, metaUserId);
 
-    if (connection) {
-      businessId = connection.business_id;
+    for (const connection of connections) {
+      businessId = businessId ?? connection.business_id;
       const scoped = connection.business_id;
 
       // Token first, so nothing can send or refresh once we begin.
       const steps = [
         supabase.from("instagram_credentials").delete().eq("business_id", scoped),
         supabase.from("instagram_oauth_states").delete().eq("business_id", scoped),
+        supabase.from("instagram_pending_selections").delete().eq("business_id", scoped),
         supabase
           .from("conversations")
           .delete()

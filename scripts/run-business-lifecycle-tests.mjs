@@ -83,7 +83,7 @@ test("reinstate repair applies only to an active, live row with no published_at"
 
 for (const channel of ["whatsapp", "instagram"]) {
   test(`${channel}: the channel gate runs before ANY reply and returns when it refuses`, () => {
-    const source = read(`app/api/webhooks/${channel}/route.ts`);
+    const source = read(channel === "instagram" ? "app/api/meta/instagram/webhook/route.ts" : `app/api/webhooks/${channel}/route.ts`);
     const gate = source.indexOf("await loadBusinessAiContext(businessId)");
     assert.ok(gate > 0, "webhook loads its context through loadBusinessAiContext");
     const firstReply = source.indexOf("await sendCannedReply(");

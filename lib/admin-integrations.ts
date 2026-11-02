@@ -11,7 +11,6 @@ export type IntegrationRow = {
   status: string;
   lastVerifiedAt: string | null;
   lastError: string | null;
-  tokenExpiresAt: string | null;
 };
 
 export async function listIntegrations(): Promise<IntegrationRow[]> {
@@ -21,7 +20,7 @@ export async function listIntegrations(): Promise<IntegrationRow[]> {
 
   const [whatsapp, instagram] = await Promise.all([
     supabase.from("whatsapp_connections").select("business_id, status, last_verified_at, last_error"),
-    supabase.from("instagram_connections").select("business_id, status, last_verified_at, last_error, token_expires_at"),
+    supabase.from("instagram_connections").select("business_id, status, last_verified_at, last_error"),
   ]);
 
   const rows: IntegrationRow[] = [];
@@ -35,7 +34,6 @@ export async function listIntegrations(): Promise<IntegrationRow[]> {
       status: row.status,
       lastVerifiedAt: row.last_verified_at,
       lastError: row.last_error,
-      tokenExpiresAt: null,
     });
   }
   for (const row of instagram.data ?? []) {
@@ -48,7 +46,6 @@ export async function listIntegrations(): Promise<IntegrationRow[]> {
       status: row.status,
       lastVerifiedAt: row.last_verified_at,
       lastError: row.last_error,
-      tokenExpiresAt: row.token_expires_at,
     });
   }
 

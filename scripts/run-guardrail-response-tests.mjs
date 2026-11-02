@@ -155,7 +155,7 @@ test("wiring: guardrail-flagged messages stay out of the owner's unanswered ques
 test("wiring: WhatsApp and Instagram flag the conversation, send the fixed reply and stop before the model", () => {
   for (const [file, send] of [
     ["app/api/webhooks/whatsapp/route.ts", "sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, inputAction.reply)"],
-    ["app/api/webhooks/instagram/route.ts", "sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, event.sender.id, inputAction.reply)"],
+    ["app/api/meta/instagram/webhook/route.ts", "sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, inbound.senderId, inputAction.reply)"],
   ]) {
     const source = read(file);
     const policyAt = source.indexOf("resolveInputGuardrailAction(");
