@@ -149,7 +149,7 @@ export function isWithinMessagingWindow(lastInboundAt: string | Date | null, now
   return age >= 0 ? age <= MESSAGING_WINDOW_MS : true;
 }
 
-export type GraphError = { code?: number; error_subcode?: number; type?: string };
+export type GraphError = { code?: number; error_subcode?: number; type?: string; fbtrace_id?: string };
 
 /**
  * Meta's "this token no longer works" errors: code 190 (invalid, expired or
@@ -172,10 +172,11 @@ export function readGraphError(body: unknown): GraphError | null {
   if (!body || typeof body !== "object") return null;
   const error = (body as { error?: unknown }).error;
   if (!error || typeof error !== "object") return null;
-  const { code, error_subcode, type } = error as Record<string, unknown>;
+  const { code, error_subcode, type, fbtrace_id } = error as Record<string, unknown>;
   return {
     code: typeof code === "number" ? code : undefined,
     error_subcode: typeof error_subcode === "number" ? error_subcode : undefined,
     type: typeof type === "string" ? type : undefined,
+    ...(typeof fbtrace_id === "string" && /^[\w-]{1,64}$/.test(fbtrace_id) ? { fbtrace_id } : {}),
   };
 }

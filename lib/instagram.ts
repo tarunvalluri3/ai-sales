@@ -7,6 +7,7 @@ import type { Conversation, InstagramConnection } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { logEvent } from "@/lib/logger";
 import { createConversation } from "@/lib/conversations";
+import { discoverInstagramAccounts, graphFailureMetadata } from "@/lib/meta-instagram-connect-flow";
 import { getMetaConfig, graphRequest, hasTokenEncryptionKey, openToken, sealToken } from "@/lib/meta-graph";
 import {
   buildUnifiedLoginUrl,
@@ -45,14 +46,13 @@ export type InstagramConnectError =
   | "expired_state"
   | "config"
   | "exchange_failed"
+  | "me_failed"
+  | "accounts_failed"
   | "no_accounts"
+  | "account_in_use"
   | "subscribe_failed"
   | "selection_expired"
   | "unexpected";
-
-const assignedAccountsSchema = z.object({
-  data: z.array(z.object({ id: z.string().regex(IG_ID_PATTERN), username: z.string().optional() })),
-});
 
 export type InstagramAccountChoice = { id: string; username: string | null };
 
@@ -163,46 +163,16 @@ export async function completeInstagramConnect(
   const config = getMetaConfig();
   if (!config || !hasTokenEncryptionKey()) return { kind: "error", error: "config" };
 
-  const exchanged = await graphRequest<{ access_token?: string }>("GET", "/oauth/access_token", {
-    query: {
-      client_id: config.appId,
-      client_secret: config.appSecret,
-      redirect_uri: config.redirectUri,
-      code,
-    },
+  const discovered = await discoverInstagramAccounts({
+    graph: graphRequest,
+    log: (event, metadata, level) => logEvent(event, businessId, metadata, level),
+    appId: config.appId,
+    appSecret: config.appSecret,
+    redirectUri: config.redirectUri,
+    code,
   });
-  if (!exchanged.ok || !exchanged.data.access_token) {
-    logEvent("instagram_connect_exchange_failed", businessId, { status: exchanged.ok ? 200 : exchanged.status }, "error");
-    return { kind: "error", error: "exchange_failed" };
-  }
-  const token = exchanged.data.access_token;
-
-  const me = await graphRequest<{ id?: string; client_business_id?: string }>("GET", "/me", {
-    token,
-    query: { fields: "id,client_business_id" },
-  });
-  if (!me.ok || !me.data.id) {
-    logEvent("instagram_connect_me_failed", businessId, { status: me.ok ? 200 : me.status }, "error");
-    return { kind: "error", error: "exchange_failed" };
-  }
-  const systemUserId = String(me.data.id);
-  const clientBusinessId = me.data.client_business_id ? String(me.data.client_business_id) : null;
-
-  const assigned = await graphRequest<unknown>("GET", "/me/assigned_instagram_accounts", {
-    token,
-    query: { fields: "id,username" },
-  });
-  const parsedAccounts = assigned.ok ? assignedAccountsSchema.safeParse(assigned.data) : null;
-  if (!parsedAccounts?.success) {
-    logEvent("instagram_connect_accounts_failed", businessId, { status: assigned.ok ? 200 : assigned.status }, "error");
-    return { kind: "error", error: "exchange_failed" };
-  }
-  const accounts: InstagramAccountChoice[] = parsedAccounts.data.data.map((account) => ({
-    id: account.id,
-    username: account.username ?? null,
-  }));
-
-  if (accounts.length === 0) return { kind: "error", error: "no_accounts" };
+  if (!discovered.ok) return { kind: "error", error: discovered.error };
+  const { token, systemUserId, clientBusinessId, accounts } = discovered;
 
   if (accounts.length === 1) {
     return connectInstagramAccount(businessId, userId, token, systemUserId, clientBusinessId, accounts[0]);
@@ -232,6 +202,7 @@ export async function completeInstagramConnect(
     );
   }
 
+  logEvent("ig_connect_choose", businessId, { step: "choose", count: accounts.length, selectionId: data.id });
   return { kind: "choose", selectionId: data.id };
 }
 
@@ -303,7 +274,10 @@ async function connectInstagramAccount(
   clientBusinessId: string | null,
   account: InstagramAccountChoice,
 ): Promise<CompleteConnectResult> {
-  if (!IG_ID_PATTERN.test(account.id)) return { kind: "error", error: "exchange_failed" };
+  if (!IG_ID_PATTERN.test(account.id)) {
+    logEvent("ig_connect_failed", businessId, { step: "connect", reason: "invalid_account_id" }, "error");
+    return { kind: "error", error: "unexpected" };
+  }
 
   const subscribed = await graphRequest<{ success?: boolean }>("POST", `/${account.id}/subscribed_apps`, {
     token,
@@ -311,14 +285,16 @@ async function connectInstagramAccount(
   });
   if (!subscribed.ok || subscribed.data.success !== true) {
     logEvent(
-      "instagram_webhook_subscribe_failed",
+      "ig_connect_failed",
       businessId,
-      { status: subscribed.ok ? 200 : subscribed.status, code: subscribed.ok ? null : (subscribed.error?.code ?? null) },
+      subscribed.ok
+        ? { step: "subscribe", accountId: account.id, status: 200, reason: "success_not_true" }
+        : { step: "subscribe", accountId: account.id, ...graphFailureMetadata(subscribed) },
       "error",
     );
     return { kind: "error", error: "subscribe_failed" };
   }
-  logEvent("instagram_webhook_subscribed", businessId, {});
+  logEvent("ig_connect_subscribed", businessId, { step: "subscribe", accountId: account.id, status: 200 });
 
   const supabase = createServiceSupabaseClient();
   const nowIso = new Date().toISOString();
@@ -332,8 +308,8 @@ async function connectInstagramAccount(
     .maybeSingle<{ business_id: string; status: string }>();
   if (existingOwner && existingOwner.business_id !== businessId) {
     if (existingOwner.status === "connected") {
-      logEvent("instagram_account_owned_by_other_business", businessId, {}, "error");
-      return { kind: "error", error: "unexpected" };
+      logEvent("ig_connect_failed", businessId, { step: "save", accountId: account.id, reason: "account_in_use" }, "error");
+      return { kind: "error", error: "account_in_use" };
     }
     await supabase
       .from("instagram_connections")
@@ -394,6 +370,12 @@ async function connectInstagramAccount(
     logEvent("instagram_connect_audit_failed", businessId, {}, "error");
   }
 
+  logEvent("ig_connect_saved", businessId, {
+    step: "save",
+    accountId: account.id,
+    username: account.username,
+    connectionId: connection.id,
+  });
   return { kind: "connected", connection };
 }
 
