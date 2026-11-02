@@ -84,13 +84,16 @@ test("reinstate repair applies only to an active, live row with no published_at"
 for (const channel of ["whatsapp", "instagram"]) {
   test(`${channel}: the channel gate runs before ANY reply and returns when it refuses`, () => {
     const source = read(channel === "instagram" ? "app/api/meta/instagram/webhook/route.ts" : `app/api/webhooks/${channel}/route.ts`);
-    const gate = source.indexOf("await loadBusinessAiContext(businessId)");
-    assert.ok(gate > 0, "webhook loads its context through loadBusinessAiContext");
+    // Instagram starts the read early (2026-11-02 latency pass) and gates on its result later,
+    // so the gate is the `if (!contextResult.ok)` check, not the call site.
+    assert.ok(source.includes("loadBusinessAiContext(businessId)"), "webhook loads its context through loadBusinessAiContext");
+    const gate = channel === "instagram" ? source.indexOf("if (!contextResult.ok)") : source.indexOf("await loadBusinessAiContext(businessId)");
+    assert.ok(gate > 0, "the webhook gates on the context result");
     const firstReply = source.indexOf("await sendCannedReply(");
     const aiCall = source.indexOf("await askSalesEmployee(");
     assert.ok(firstReply > gate, "no canned reply is sent before the gate");
     assert.ok(aiCall > gate, "no AI call happens before the gate");
-    assert.match(source.slice(gate, firstReply), /if \(!contextResult\.ok\) \{[\s\S]*?return;\s*\}/);
+    assert.match(source.slice(gate, firstReply), /if \(!contextResult\.ok\) \{[\s\S]*?return(?: \{[^}]*\})?;\s*\}/);
   });
 }
 

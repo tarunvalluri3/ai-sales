@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MESSAGE_ACCESS_HINT } from "./message-access-hint";
 
 function StepDone() {
   return <span className="text-xs font-medium text-ds-success">✓ Done</span>;
@@ -16,7 +17,11 @@ const STEPS = [
     body: "On Facebook, open your Page → Settings → Linked accounts → Instagram → Connect, and log in to Instagram. No Page yet? Create one first — it only takes a minute.",
   },
   {
-    title: "Step 3 — Connect",
+    title: "Step 3 — Allow message access",
+    body: MESSAGE_ACCESS_HINT,
+  },
+  {
+    title: "Step 4 — Connect",
     body: "Click “Connect Instagram”, log in with Facebook, choose the Page and its Instagram account, and approve. Your password is entered only on Facebook’s site.",
   },
 ];
@@ -41,7 +46,7 @@ export function InstagramSetupGuide({ hasConnection }: { hasConnection: boolean 
           <h2 className="text-lg font-semibold text-ds-text-primary">Before you connect</h2>
           <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
         </button>
-        <p className="text-sm text-ds-text-secondary">Three quick checks and you&rsquo;re ready.</p>
+        <p className="text-sm text-ds-text-secondary">Four quick checks and you&rsquo;re ready.</p>
       </div>
 
       <ol className={open ? "flex flex-col gap-6" : "hidden"}>

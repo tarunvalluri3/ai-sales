@@ -183,6 +183,8 @@ export type InboundMessage = {
   mid: string;
   /** Text as Meta sent it, or null for a non-text message (attachment, sticker, story reply without text...). */
   text: string | null;
+  /** Meta's event `timestamp` (epoch ms, when the person sent it), when present. Timing logs only. */
+  sentAtMs?: number;
 };
 
 /**
@@ -212,7 +214,8 @@ export function extractInboundMessages(body: InstagramWebhookBody): InboundMessa
       seen.add(message.mid);
 
       const text = typeof message.text === "string" && message.text.length > 0 ? message.text : null;
-      result.push({ accountId, senderId, mid: message.mid, text });
+      const sentAt = typeof event.timestamp === "number" && Number.isFinite(event.timestamp) ? { sentAtMs: event.timestamp } : {};
+      result.push({ accountId, senderId, mid: message.mid, text, ...sentAt });
     }
   }
 

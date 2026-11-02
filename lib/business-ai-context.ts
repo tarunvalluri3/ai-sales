@@ -26,6 +26,8 @@ export type BusinessAiContext = {
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
   appointmentsEnabled: boolean;
+  /** The live persona's suggested questions -- the instant-answer (answer bank) input the widget also uses. */
+  suggestedQuestions: string[];
   /** The published version every field above was read from, and the source lib/rag.ts must read knowledge/catalog/FAQs from (Draft -> Publish -> Live, 2026-10-29). */
   liveSource: LiveAgentSource;
 };
@@ -102,6 +104,7 @@ export async function loadBusinessAiContext(businessId: string): Promise<Busines
     language: config.language,
     recommendProductsEnabled: config.capabilities.recommendProducts,
     appointmentsEnabled: config.capabilities.appointments,
+    suggestedQuestions: config.persona.suggestedQuestions,
     liveSource,
   } };
 }
