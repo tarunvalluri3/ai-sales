@@ -215,6 +215,7 @@ test("revoked: readGraphError pulls code/subcode out of Meta's error body and ig
     code: 190,
     error_subcode: 463,
     type: "OAuthException",
+    message: "x",
   });
   assert.equal(rules.readGraphError(null), null);
   assert.equal(rules.readGraphError({ nope: 1 }), null);
@@ -777,12 +778,9 @@ test("facebook mode: the Page is subscribed with its Page token and Page-valid f
 
   const lib = read("lib/instagram.ts");
   const connect = lib.slice(lib.indexOf("async function connectFacebookPage("), lib.indexOf("async function connectUnifiedAccount("));
-  assert.match(
-    connect,
-    /graphRequest<\{ success\?: boolean \}>\("POST", `\/\$\{page\.pageId\}\/subscribed_apps`, \{\s*token: page\.pageToken,\s*form: \{ subscribed_fields: PAGE_SUBSCRIBED_FIELDS\.join\(","\) \}/,
-  );
-  assert.match(connect, /error: missingPermission \? "subscribe_permission" : "subscribe_failed"/);
-  assert.ok(connect.indexOf("subscribed_apps") < connect.indexOf("saveConnection("));
+  assert.match(connect, /subscribeFacebookPage\(\{[\s\S]*?userToken,\s*page,\s*\}\)/);
+  assert.match(connect, /if \(!subscribed\.ok\) return \{ kind: "error", error: subscribed\.error \}/);
+  assert.ok(connect.indexOf("subscribeFacebookPage(") < connect.indexOf("saveConnection("));
   assert.match(connect, /saveConnection\(businessId, userId, page\.pageToken,/);
   assert.match(connect, /facebookUserId,\s*facebookPageId: page\.pageId,/);
 });
@@ -791,7 +789,7 @@ test("facebook mode: one Page connects directly, several park the encrypted USER
   const lib = read("lib/instagram.ts");
   const complete = lib.slice(lib.indexOf("export async function completeInstagramConnect("), lib.indexOf("async function parkSelection("));
   assert.match(complete, /if \(getMetaLoginMode\(\) === "facebook"\)/);
-  assert.match(complete, /pages\.length === 1[\s\S]*?connectFacebookPage\(businessId, userId, facebookUserId, pages\[0\]\)/);
+  assert.match(complete, /pages\.length === 1[\s\S]*?connectFacebookPage\(businessId, userId, facebookUserId, userToken, pages\[0\]\)/);
   assert.match(complete, /parkSelection\(businessId, userId, userToken, \{\s*loginMode: "facebook"/);
   // The chooser stores Page name + username, never a Page token.
   assert.match(complete, /\{ id: page\.igId, username: page\.username, pageId: page\.pageId, pageName: page\.pageName \}/);
@@ -878,12 +876,131 @@ test("facebook mode: a subscribe refused for a missing permission (pages_manage_
   assert.equal(rules.isPermissionError({ code: 10, error_subcode: 2534022 }), false, "outside-window is not a permission error");
   assert.equal(rules.isPermissionError({ code: 190 }), false);
   assert.equal(rules.isPermissionError(null), false);
-  const lib = read("lib/instagram.ts");
-  const connect = lib.slice(lib.indexOf("async function connectFacebookPage("), lib.indexOf("async function connectUnifiedAccount("));
-  assert.match(connect, /isPermissionError\(subscribed\.error\)/);
-  assert.match(connect, /"missing_permission_pages_manage_metadata"/);
-  assert.match(connect, /missingPermission \? "subscribe_permission" : "subscribe_failed"/);
   assert.match(read("app/(dashboard)/dashboard/instagram/instagram-oauth-result.tsx"), /\bsubscribe_permission:/);
-  // pages_manage_metadata missing must not throw: the branch returns an error result.
-  assert.doesNotMatch(connect.slice(connect.indexOf("missingPermission"), connect.indexOf("ig_connect_subscribed")), /throw /);
+});
+
+// ------------------------------------------------------- facebook mode: Page subscribe step
+
+const fbPage = { pageId: PAGE_1, pageName: "Waves", pageToken: PAGE_TOKEN_1, igId: IG_ID, username: "waveswebstudio" };
+const permissionsOk = ok({
+  data: [
+    { permission: "pages_show_list", status: "granted" },
+    { permission: "pages_manage_metadata", status: "granted" },
+    { permission: "instagram_manage_messages", status: "granted" },
+    { permission: "pages_messaging", status: "declined" },
+  ],
+});
+const metaFail = (status, code, message, error_user_msg) => ({
+  ok: false,
+  status,
+  error: rules.readGraphError({ error: { code, type: "OAuthException", message, error_user_msg, fbtrace_id: "AH31enm" } }),
+});
+
+async function runSubscribe(routes) {
+  const calls = [];
+  const lines = [];
+  const graph = async (method, path, options = {}) => {
+    calls.push({ method, path, options });
+    const handler = routes[`${method} ${path}`];
+    if (!handler) return graphFail(404, 803);
+    return typeof handler === "function" ? handler(options) : handler;
+  };
+  const log = (event, metadata, level = "info") => lines.push(JSON.stringify({ event, level, ...metadata }));
+  const result = await fbFlow.subscribeFacebookPage({ graph, log, userToken: LONG_TOKEN, page: fbPage });
+  return { result, calls, lines, parsed: lines.map((line) => JSON.parse(line)) };
+}
+
+test("facebook subscribe: POST /<PAGE_ID>/subscribed_apps uses the PAGE token, never the user token", async () => {
+  const { result, calls, parsed, lines } = await runSubscribe({
+    "GET /me/permissions": permissionsOk,
+    [`POST /${PAGE_1}/subscribed_apps`]: ok({ success: true }),
+  });
+  assert.deepEqual(result, { ok: true });
+  const subscribe = calls.find((call) => call.path === `/${PAGE_1}/subscribed_apps`);
+  assert.equal(subscribe.method, "POST");
+  assert.equal(subscribe.options.token, PAGE_TOKEN_1);
+  assert.notEqual(subscribe.options.token, LONG_TOKEN);
+  assert.equal(subscribe.options.form.subscribed_fields, "messages,messaging_postbacks,message_reactions,message_reads");
+  // /me/permissions is the only call made with the user token.
+  assert.deepEqual(calls.filter((call) => call.options.token === LONG_TOKEN).map((call) => call.path), ["/me/permissions"]);
+  assert.deepEqual(parsed.map((line) => line.event), ["ig_connect_permissions", "ig_connect_subscribed"]);
+  assertNoFbSecrets(lines);
+});
+
+test("facebook subscribe: granted/declined permission names are logged before subscribing", async () => {
+  const { calls, parsed, lines } = await runSubscribe({
+    "GET /me/permissions": permissionsOk,
+    [`POST /${PAGE_1}/subscribed_apps`]: ok({ success: true }),
+  });
+  assert.equal(calls[0].path, "/me/permissions");
+  const perms = parsed.find((line) => line.event === "ig_connect_permissions");
+  assert.equal(perms.granted, "pages_show_list,pages_manage_metadata,instagram_manage_messages");
+  assert.equal(perms.declined, "pages_messaging");
+  assertNoFbSecrets(lines);
+});
+
+test("facebook subscribe: a /me/permissions failure is logged but does not block the subscribe", async () => {
+  const { result, parsed } = await runSubscribe({
+    "GET /me/permissions": graphFail(400, 190),
+    [`POST /${PAGE_1}/subscribed_apps`]: ok({ success: true }),
+  });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(parsed[0].event, "ig_connect_permissions_failed");
+});
+
+test("facebook subscribe: failure logs Meta's message + user message; reason names a permission only if Meta does", async () => {
+  const generic = await runSubscribe({
+    "GET /me/permissions": permissionsOk,
+    [`POST /${PAGE_1}/subscribed_apps`]: metaFail(403, 200, "(#200) Permissions error", "You need a role on this Page."),
+  });
+  assert.deepEqual(generic.result, { ok: false, error: "subscribe_permission" });
+  const failed = generic.parsed.find((line) => line.event === "ig_connect_failed");
+  assert.equal(failed.reason, "subscribe_failed");
+  assert.equal(failed.metaMessage, "(#200) Permissions error");
+  assert.equal(failed.metaUserMessage, "You need a role on this Page.");
+  assert.equal(failed.metaCode, 200);
+  assert.equal(failed.status, 403);
+
+  const named = await runSubscribe({
+    "GET /me/permissions": permissionsOk,
+    [`POST /${PAGE_1}/subscribed_apps`]: metaFail(
+      403,
+      200,
+      "(#200) To subscribe to the messages field, one of these permissions is needed: pages_messaging",
+    ),
+  });
+  assert.equal(named.parsed.find((line) => line.event === "ig_connect_failed").reason, "missing_permission_pages_messaging");
+
+  const metadata = await runSubscribe({
+    "GET /me/permissions": permissionsOk,
+    [`POST /${PAGE_1}/subscribed_apps`]: metaFail(403, 200, "Requires pages_manage_metadata permission"),
+  });
+  assert.equal(metadata.parsed.find((line) => line.event === "ig_connect_failed").reason, "missing_permission_pages_manage_metadata");
+
+  const nonPermission = await runSubscribe({
+    "GET /me/permissions": permissionsOk,
+    [`POST /${PAGE_1}/subscribed_apps`]: metaFail(400, 100, "Invalid parameter"),
+  });
+  assert.deepEqual(nonPermission.result, { ok: false, error: "subscribe_failed" });
+  for (const run of [generic, named, metadata, nonPermission]) assertNoFbSecrets(run.lines);
+});
+
+test("facebook subscribe: a token echoed inside Meta's message is redacted before it is logged", async () => {
+  const { lines } = await runSubscribe({
+    "GET /me/permissions": permissionsOk,
+    [`POST /${PAGE_1}/subscribed_apps`]: metaFail(400, 190, `Bad token ${PAGE_TOKEN_1} and ${LONG_TOKEN}`, `x ${"A".repeat(60)}`),
+  });
+  assertNoFbSecrets(lines);
+  assert.ok(!lines.join("").includes("A".repeat(60)));
+  assert.match(lines.join(""), /\[redacted\]/);
+  assert.equal(rules.sanitizeMetaText("a".repeat(400)).length <= 301, true);
+  assert.equal(rules.sanitizeMetaText(42), undefined);
+});
+
+test("hygiene: the subscribe step's log calls never pass a token", () => {
+  const source = read("lib/meta-instagram-facebook-flow.ts");
+  const body = source.slice(source.indexOf("export async function subscribeFacebookPage("));
+  const calls = body.match(/\blog\(\s*"ig_connect_[a-z_]+"[\s\S]*?\);/g) ?? [];
+  assert.ok(calls.length >= 4, `found ${calls.length}`);
+  for (const call of calls) assert.doesNotMatch(call, /userToken|pageToken|access_token\b/, call);
 });

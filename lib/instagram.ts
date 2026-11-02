@@ -8,7 +8,13 @@ import { AppError } from "@/lib/errors";
 import { logEvent, type LogMetadata } from "@/lib/logger";
 import { createConversation } from "@/lib/conversations";
 import { discoverInstagramAccounts, graphFailureMetadata } from "@/lib/meta-instagram-connect-flow";
-import { discoverFacebookPages, PAGE_FIELDS, toLinkedPage, type LinkedPage } from "@/lib/meta-instagram-facebook-flow";
+import {
+  discoverFacebookPages,
+  PAGE_FIELDS,
+  subscribeFacebookPage,
+  toLinkedPage,
+  type LinkedPage,
+} from "@/lib/meta-instagram-facebook-flow";
 import {
   getMetaConfig,
   getMetaLoginMode,
@@ -22,9 +28,7 @@ import {
   buildUnifiedLoginUrl,
   checkOAuthState,
   instagramGraphNode,
-  isPermissionError,
   OAUTH_STATE_TTL_MS,
-  PAGE_SUBSCRIBED_FIELDS,
   SUBSCRIBED_FIELDS,
   type MetaLoginMode,
 } from "@/lib/meta-instagram-rules";
@@ -214,7 +218,7 @@ export async function completeInstagramConnect(
     const { userToken, facebookUserId, pages } = discovered;
 
     if (pages.length === 1) {
-      return connectFacebookPage(businessId, userId, facebookUserId, pages[0]);
+      return connectFacebookPage(businessId, userId, facebookUserId, userToken, pages[0]);
     }
     return parkSelection(businessId, userId, userToken, {
       loginMode: "facebook",
@@ -345,7 +349,7 @@ export async function finishInstagramSelection(
     // Page's own token now and re-check that it is still linked.
     const page = await graphRequest<unknown>("GET", `/${account.pageId}`, { token, query: { fields: PAGE_FIELDS } });
     const linked = page.ok ? toLinkedPage(page.data) : null;
-    if (!linked || linked.igId !== account.id) {
+    if (!linked || linked.pageId !== account.pageId || linked.igId !== account.id) {
       logEvent(
         "ig_connect_failed",
         businessId,
@@ -356,7 +360,7 @@ export async function finishInstagramSelection(
       );
       return { kind: "error", error: "pages_failed" };
     }
-    return connectFacebookPage(businessId, userId, data.facebook_user_id, linked);
+    return connectFacebookPage(businessId, userId, data.facebook_user_id, token, linked);
   }
 
   if (!data.meta_system_user_id) return { kind: "error", error: "selection_expired" };
@@ -377,6 +381,7 @@ async function connectFacebookPage(
   businessId: string,
   userId: string,
   facebookUserId: string,
+  userToken: string,
   page: LinkedPage,
 ): Promise<CompleteConnectResult> {
   if (!IG_ID_PATTERN.test(page.igId) || !IG_ID_PATTERN.test(page.pageId)) {
@@ -384,38 +389,14 @@ async function connectFacebookPage(
     return { kind: "error", error: "unexpected" };
   }
 
-  const subscribed = await graphRequest<{ success?: boolean }>("POST", `/${page.pageId}/subscribed_apps`, {
-    token: page.pageToken,
-    form: { subscribed_fields: PAGE_SUBSCRIBED_FIELDS.join(",") },
+  // Subscribes with the PAGE token; the User token only reads /me/permissions.
+  const subscribed = await subscribeFacebookPage({
+    graph: graphRequest,
+    log: (event: string, metadata: LogMetadata, level?: "info" | "error") => logEvent(event, businessId, metadata, level),
+    userToken,
+    page,
   });
-  if (!subscribed.ok || subscribed.data.success !== true) {
-    // Meta requires pages_manage_metadata for this call; a missing grant
-    // comes back as a permission error and gets its own code + log reason.
-    const missingPermission = !subscribed.ok && isPermissionError(subscribed.error);
-    logEvent(
-      "ig_connect_failed",
-      businessId,
-      subscribed.ok
-        ? { step: "subscribe", pageId: page.pageId, accountId: page.igId, status: 200, reason: "success_not_true" }
-        : {
-            step: "subscribe",
-            pageId: page.pageId,
-            accountId: page.igId,
-            reason: missingPermission ? "missing_permission_pages_manage_metadata" : "graph_error",
-            ...graphFailureMetadata(subscribed),
-          },
-      "error",
-    );
-    return { kind: "error", error: missingPermission ? "subscribe_permission" : "subscribe_failed" };
-  }
-  logEvent("ig_connect_subscribed", businessId, {
-    step: "subscribe",
-    loginMode: "facebook",
-    pageId: page.pageId,
-    accountId: page.igId,
-    fields: PAGE_SUBSCRIBED_FIELDS.join(","),
-    status: 200,
-  });
+  if (!subscribed.ok) return { kind: "error", error: subscribed.error };
 
   return saveConnection(businessId, userId, page.pageToken, { id: page.igId, username: page.username }, {
     loginMode: "facebook",

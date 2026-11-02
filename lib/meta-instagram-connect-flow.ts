@@ -35,7 +35,7 @@ export type DiscoverResult =
 export type GraphCall = <T>(
   method: "GET" | "POST" | "DELETE",
   path: string,
-  options?: { token?: string; query?: Record<string, string> },
+  options?: { token?: string; query?: Record<string, string>; form?: Record<string, string> },
 ) => Promise<GraphResult<T>>;
 
 export type ConnectLog = (event: string, metadata: LogMetadata, level?: "info" | "error") => void;
@@ -80,6 +80,9 @@ export function graphFailureMetadata(result: { status: number; error: GraphError
     metaSubcode: result.error?.error_subcode ?? null,
     metaType: result.error?.type ?? null,
     fbtraceId: result.error?.fbtrace_id ?? null,
+    // Meta's own words (sanitized in readGraphError; never a token).
+    metaMessage: result.error?.message ?? null,
+    metaUserMessage: result.error?.error_user_msg ?? null,
   };
 }
 
