@@ -466,7 +466,7 @@
     }
   }
 
-  async function handleSend(requestId, text, consentGiven, suggested) {
+  async function handleSend(requestId, text, consentGiven, suggested, turnstileToken) {
     // The synchronous chat response is more current than any poll could
     // be, and this avoids two competing requests updating state at once.
     isSendInFlight = true;
@@ -495,6 +495,9 @@
           stream: true,
           // Set only for a suggested-question chip click (analytics).
           suggested: suggested === true ? true : undefined,
+          // Cloudflare Turnstile token from the iframe (production readiness
+          // item 3); the server verifies it when a new conversation starts.
+          turnstileToken: typeof turnstileToken === "string" && turnstileToken.length <= 2048 ? turnstileToken : undefined,
         }),
         signal: controller.signal,
       });
@@ -610,7 +613,7 @@
     if (data.type === "widget:resize" && typeof data.width === "number" && typeof data.height === "number") {
       applyResize(data.width, data.height);
     } else if (data.type === "widget:send" && typeof data.requestId === "string" && typeof data.text === "string") {
-      handleSend(data.requestId, data.text, data.consentGiven, data.suggested);
+      handleSend(data.requestId, data.text, data.consentGiven, data.suggested, data.turnstileToken);
     } else if (data.type === "widget:abort" && typeof data.requestId === "string") {
       // The visitor pressed stop: cancel that request's fetch. handleSend's
       // catch then relays a widget:stream_aborted so the panel keeps the

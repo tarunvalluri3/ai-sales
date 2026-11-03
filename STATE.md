@@ -18,7 +18,23 @@ Last updated: 2026-11-03 (**Production readiness work from LAUNCH_AUDIT.md -- br
 
 **Item 2 DONE (/apache deletes cancel Razorpay).** `softDeleteTenant` and `hardDeleteTenant` now call `recordCancellationForAdminDeletion` (same record → immediate cancel → retry/backoff → alert path as the owner's delete) BEFORE deleting, and refuse if the durable record can't be written. Previously a soft-deleted tenant kept its subscription row, so later charges were applied silently. The Razorpay webhook now checks `billing_cancellations` BEFORE the normal path, so a charge after a soft-delete is alerted, not applied. The "charged after deletion" email now has payment id, amount, customer id, who deleted, when, and refund steps; it never refunds. Migration `20261122000000` (NOT applied) adds reasons `admin_soft_deleted`/`admin_hard_deleted`; pgTAP `074` written, not run. A soft-deleted tenant's mandate is cancelled, so if one is ever un-deleted by hand it must check out again. Checks: lint, typecheck, all 30 suites pass (`test:billing-cancellation` 20/20).
 
-**NOT done yet (next session, in this order):** item 3 (Turnstile + per-IP/per-business limits + daily Gemini cap), 4 (configurable protected prod ref), 5 (migration timestamps: analysis so far says new migrations must be dated after `20261120000000` or `db push` rejects them as out of order; use `20261121…`+ and add an order check, never rename applied ones), 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: blocking local `next dev` against prod (with an override flag); recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
+**Item 3 DONE (public chat abuse protection; no Vercel BotID, the app is moving to a VPS).** `lib/chat-protection.ts` (pure, `test:chat-protection` 14/14), docs/abuse-protection.md.
+- Limits are configurable, defaults unchanged: `CHAT_IP_LIMIT` 30, `CHAT_KEY_LIMIT` 120, `CHAT_CONVERSATION_LIMIT` 20 per 5 min.
+- New ENFORCING per-business limit `CHAT_BUSINESS_LIMIT` (300 per 5 min, fails open).
+- Daily Gemini turn caps on the widget: `GEMINI_DAILY_TURN_CAP_PER_BUSINESS` (1000) and `GEMINI_DAILY_TURN_CAP_GLOBAL` (20000), counted per UTC day; 0 turns a cap off.
+  - Over a cap there is no model call: the visitor gets the fixed "a person will follow up" reply, the conversation is flagged, and `gemini_daily_cap_reached` is alerted.
+  - The caps fail open.
+- Cloudflare Turnstile is `TURNSTILE_MODE=off|log|enforce` (default off) with `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`.
+  - It renders inside OUR widget iframe, so only the app domain is a Turnstile hostname (free plan: 10 hostnames per widget, "any hostname" is Enterprise-only).
+  - The token travels iframe → loader → `/api/chat` and is verified only for a new conversation.
+  - Enforce mode refuses a missing, invalid or wrong-hostname token with a 403. A Cloudflare outage is allowed through.
+  - Cloudflare's docs don't state which hostname is checked inside a cross-origin iframe, so run `log` on a real customer page before enforcing.
+- `sendOpsAlert` is now throttled: one error and one email per window, info after that.
+- Phase 32 abuse scopes and guardrails are still LOG-ONLY (owner decision); how to switch each one to enforcing is in docs/abuse-protection.md.
+- Migration `20261123000000` (NOT applied) adds 3 rate-limit scopes.
+- Checks: lint, typecheck, all 31 suites pass.
+
+**NOT done yet (next session, in this order):** item 4 (configurable protected prod ref), 5 (migration timestamps: analysis so far says new migrations must be dated after `20261120000000` or `db push` rejects them as out of order; use `20261121…`+ and add an order check, never rename applied ones), 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: blocking local `next dev` against prod (with an override flag); recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
 
 ## Production readiness (LAUNCH_AUDIT.md items 1-9) -- 2026-11-03 -- branch `production-readiness`, NOT merged, NOT pushed, migrations NOT applied
 

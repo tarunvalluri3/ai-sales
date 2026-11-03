@@ -22,7 +22,13 @@ export type RateLimitScope =
   // enforcing (not log-only/fail-open -- see lib/abuse-limits.ts), keyed on
   // the acting admin's Clerk user_id, not an IP or tenant.
   | "admin_mutation"
-  | "admin_pii_reveal";
+  | "admin_pii_reveal"
+  // Production readiness item 3 (lib/chat-protection.ts): an ENFORCING
+  // per-business limit on the public chat, and the daily Gemini turn caps
+  // (per business, and "global" across all). All three fail OPEN.
+  | "business"
+  | "gemini_daily_business"
+  | "gemini_daily_global";
 
 /**
  * Raw fixed-window increment: bumps the (scope, identifier) counter via

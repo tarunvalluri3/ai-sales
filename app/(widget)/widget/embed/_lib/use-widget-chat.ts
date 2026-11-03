@@ -43,7 +43,18 @@ function newId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export function useWidgetChat(strings: WidgetStrings) {
+export function useWidgetChat(
+  strings: WidgetStrings,
+  options: {
+    /** Production readiness item 3: the latest Turnstile token, if Turnstile is on (use-turnstile.ts). */
+    takeTurnstileToken?: () => string | null;
+  } = {},
+) {
+  const { takeTurnstileToken } = options;
+  const takeTurnstileTokenRef = useRef(takeTurnstileToken);
+  useEffect(() => {
+    takeTurnstileTokenRef.current = takeTurnstileToken;
+  }, [takeTurnstileToken]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAwaitingResponse, setIsAwaitingResponse] = useState(false);
   // feat/chat-streaming: true from send until the stream's terminal event.
@@ -236,12 +247,17 @@ export function useWidgetChat(strings: WidgetStrings) {
     setMessages((prev) => [...prev, { id: assistantPlaceholderId, role: "assistant", content: "" }]);
     setIsAwaitingResponse(true);
     setIsStreaming(true);
+    // Attached to every send while Turnstile is on; the server verifies it
+    // only when this send starts a new conversation (the loader, not this
+    // iframe, knows for certain whether one exists).
+    const turnstileToken = takeTurnstileTokenRef.current?.() ?? null;
     postToParent({
       type: "widget:send",
       requestId,
       text,
       consentGiven: consentGivenRef.current,
       ...(suggested ? { suggested: true } : {}),
+      ...(turnstileToken ? { turnstileToken } : {}),
     });
   }, []);
 

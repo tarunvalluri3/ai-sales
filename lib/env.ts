@@ -114,6 +114,18 @@ const envSchema = z.object({
   // subscription read fails (0 disables the fallback).
   TRIAL_REPLY_QUOTA: z.string().regex(/^\d+$/, "must be a whole number 1-100000").optional(),
   SUBSCRIPTION_LAST_KNOWN_MAX_HOURS: z.string().regex(/^\d+(\.\d+)?$/, "must be a number of hours 0-168").optional(),
+  // Public-chat protection (2026-11-03, lib/chat-protection.ts, docs/abuse-protection.md).
+  // All optional with the previous limits as defaults; Turnstile is off unless
+  // TURNSTILE_MODE is log|enforce AND both keys are set.
+  CHAT_IP_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  CHAT_KEY_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  CHAT_CONVERSATION_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  CHAT_BUSINESS_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  GEMINI_DAILY_TURN_CAP_PER_BUSINESS: z.string().regex(/^\d+$/, "must be a whole number (0 = no cap)").optional(),
+  GEMINI_DAILY_TURN_CAP_GLOBAL: z.string().regex(/^\d+$/, "must be a whole number (0 = no cap)").optional(),
+  TURNSTILE_MODE: z.enum(["off", "log", "enforce"]).optional(),
+  TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -171,6 +183,20 @@ process.env.GEMINI_API_KEY = resolvedGeminiApiKey;
 // Normalised so modules that can't import this server-only file (the usage
 // ledger, the /apache header) see the same answer.
 process.env.APP_ENV = appEnvironment;
+
+// Turnstile asked for but not fully configured: it stays off (never blocks).
+if (
+  (parsed.data.TURNSTILE_MODE === "log" || parsed.data.TURNSTILE_MODE === "enforce") &&
+  (!parsed.data.TURNSTILE_SITE_KEY || !parsed.data.TURNSTILE_SECRET_KEY)
+) {
+  console.warn(
+    JSON.stringify({
+      event: "env_target_warning",
+      level: "warn",
+      message: "TURNSTILE_MODE is set but TURNSTILE_SITE_KEY or TURNSTILE_SECRET_KEY is missing, so Turnstile is OFF.",
+    }),
+  );
+}
 
 // Names only, never values: e.g. local dev pointed at the production database.
 for (const warning of environmentWarnings(appEnvironment, process.env)) {

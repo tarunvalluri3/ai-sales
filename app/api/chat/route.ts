@@ -37,6 +37,15 @@ import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 import { CORS_HEADERS } from "@/lib/http/widget-cors";
 import { clientWantsStream, encodeStreamEvent, CHAT_STREAM_CONTENT_TYPE, type ChatStreamEvent } from "@/lib/chat-stream";
 import { logEvent } from "@/lib/logger";
+import { sendOpsAlert } from "@/lib/ops-alert";
+import {
+  CHAT_RATE_LIMIT_WINDOW_SECONDS,
+  DAY_SECONDS,
+  chatProtectionConfigFromEnv,
+  dailyCapVerdict,
+  turnstileDecision,
+  verifyTurnstileToken,
+} from "@/lib/chat-protection";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 import { dispatchNotification } from "@/lib/notification-dispatch";
 import { getAppUrl } from "@/lib/app-url";
@@ -85,10 +94,11 @@ const _maxDurationMatchesSharedContract: typeof maxDuration extends typeof CHAT_
   : "app/api/chat/route.ts maxDuration must equal CHAT_SERVER_MAX_DURATION_SECONDS in lib/chat-timeouts.ts" = true;
 void _maxDurationMatchesSharedContract;
 
-const RATE_LIMIT_WINDOW_SECONDS = 300;
-const IP_LIMIT = 30;
-const KEY_LIMIT = 120;
-const CONVERSATION_LIMIT = 20;
+// Production readiness item 3: the limits are configurable (CHAT_IP_LIMIT,
+// CHAT_KEY_LIMIT, CHAT_CONVERSATION_LIMIT, CHAT_BUSINESS_LIMIT, the daily
+// Gemini turn caps and TURNSTILE_*), with the previous values as defaults.
+// See lib/chat-protection.ts and docs/abuse-protection.md.
+const RATE_LIMIT_WINDOW_SECONDS = CHAT_RATE_LIMIT_WINDOW_SECONDS;
 const HISTORY_LIMIT = 20;
 
 /**
@@ -132,6 +142,10 @@ export async function POST(request: NextRequest) {
   // `latency_ms`, whose clock started after the quota check, the cache
   // read, the embedding call and the vector search had already run.
   const timer = new TurnTimer();
+  const protection = chatProtectionConfigFromEnv();
+  const IP_LIMIT = protection.ipLimit;
+  const KEY_LIMIT = protection.keyLimit;
+  const CONVERSATION_LIMIT = protection.conversationLimit;
   let body: unknown;
   try {
     body = await request.json();
@@ -275,12 +289,45 @@ export async function POST(request: NextRequest) {
     : null;
   earlyHistory?.catch(() => undefined);
 
-  const keyAllowed = await timer.time("rate_limit_key", () =>
-    checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+  // Per widget key (fail-closed, unchanged) and per business across all its
+  // keys (item 3: enforcing, fail-open), in one round trip.
+  const [keyAllowed, businessAllowed] = await timer.time("rate_limit_key", () =>
+    Promise.all([
+      checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+      checkAndIncrementRateLimit("business", business.businessId, protection.businessLimit, RATE_LIMIT_WINDOW_SECONDS),
+    ]),
   );
-  if (!keyAllowed) {
-    logEvent("rate_limit_exceeded", business.businessId, { scope: "key" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
+  if (!keyAllowed || !businessAllowed) {
+    logEvent("rate_limit_exceeded", business.businessId, { scope: keyAllowed ? "business" : "key" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
+  }
+
+  // Cloudflare Turnstile (item 3), only when a NEW conversation starts: the
+  // token is single-use and valid for 5 minutes, and an existing conversation
+  // is already held by the per-conversation limit. TURNSTILE_MODE=log records
+  // the result without blocking; enforce refuses a missing/invalid token
+  // (Cloudflare itself being unavailable is allowed and logged).
+  if (!conversationId && protection.turnstile.mode !== "off" && protection.turnstile.secretKey) {
+    const turnstile = await timer.time("turnstile_verify", () =>
+      verifyTurnstileToken({
+        token: parsed.data.turnstileToken,
+        secretKey: protection.turnstile.secretKey!,
+        remoteIp: ip,
+        expectedHostname: protection.turnstile.expectedHostname,
+      }),
+    );
+    const decision = turnstileDecision(protection.turnstile.mode, turnstile);
+    logEvent("turnstile_verified", business.businessId, {
+      mode: protection.turnstile.mode,
+      ok: turnstile.ok,
+      reason: turnstile.ok ? null : turnstile.reason,
+      errorCodes: turnstile.ok ? null : turnstile.errorCodes.join(","),
+      hostname: turnstile.hostname,
+      decision,
+    });
+    if (decision === "reject") {
+      return withCors(jsonError("Please refresh the page and try again.", 403));
+    }
   }
 
   // Start the question's embedding NOW -- widget auth and the per-key rate
@@ -367,7 +414,7 @@ export async function POST(request: NextRequest) {
     // duplicate-submit guard, toLangchainHistory) relies on the current
     // question being the last element, and still gets exactly that. A
     // human-control turn wastes this one read; that branch is rare.
-    const [, userMessageRow, quota, burstCount, priorHistory, abuseStrikes, agentServing] = await Promise.all([
+    const [, userMessageRow, quota, burstCount, priorHistory, abuseStrikes, agentServing, dailyCounts] = await Promise.all([
       consentGiven
         ? timer.time("consent_write", () => recordConversationConsent(supabase, business.businessId, conversationRowId))
         : Promise.resolve(null),
@@ -392,6 +439,14 @@ export async function POST(request: NextRequest) {
       // Returns 0 without a query unless the abuse check is enforcing.
       countAbuseStrikes(supabase, business.businessId, conversationRowId),
       servingCheck,
+      // Item 3: the daily Gemini turn caps (per business, and global), one
+      // UTC-day counter each, incremented concurrently with the reads above.
+      timer.time("rate_limit_gemini_daily", () =>
+        Promise.all([
+          incrementRateLimitCounter("gemini_daily_business", business.businessId, DAY_SECONDS),
+          incrementRateLimitCounter("gemini_daily_global", "all", DAY_SECONDS),
+        ]).then(([businessCount, globalCount]) => ({ business: businessCount, global: globalCount })),
+      ),
     ]);
 
     // The subscription no longer lets this agent serve (lapsed past grace,
@@ -408,6 +463,44 @@ export async function POST(request: NextRequest) {
           answer: AGENT_UNAVAILABLE_MESSAGE,
           escalate: false,
           control: conversation.control,
+          asOf: userMessageRow.created_at,
+        }),
+      );
+    }
+
+    // Item 3: the daily Gemini cap. Over it, no model call is made: the
+    // visitor gets the fixed "a person will follow up" reply, the conversation
+    // is flagged for the team, and the owner is alerted (throttled to one
+    // email per hour per cap). Fail-open on a counter error.
+    const dailyCap = dailyCapVerdict(dailyCounts, protection);
+    if (!dailyCap.allowed) {
+      void sendOpsAlert({
+        event: "gemini_daily_cap_reached",
+        businessId: business.businessId,
+        subject:
+          dailyCap.which === "global"
+            ? "Daily Gemini cap reached for ALL businesses"
+            : "Daily Gemini cap reached for one business",
+        paragraphs: [
+          "The public chat stopped making AI calls for the rest of the UTC day. Visitors are told a person will follow up and the conversations are flagged.",
+          "Raise GEMINI_DAILY_TURN_CAP_PER_BUSINESS / GEMINI_DAILY_TURN_CAP_GLOBAL if this is real traffic.",
+        ],
+        facts: [
+          { label: "Cap", value: dailyCap.which },
+          { label: "Business", value: business.businessId },
+          { label: "Business turns today", value: String(dailyCounts.business ?? "unknown") },
+          { label: "All turns today", value: String(dailyCounts.global ?? "unknown") },
+        ],
+        throttleKey: dailyCap.which === "global" ? "gemini_daily_cap:global" : `gemini_daily_cap:${business.businessId}`,
+      });
+      await timer.time("escalation_flag", () =>
+        flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
+      );
+      return withCors(
+        jsonSuccess({
+          conversationId: conversation.id,
+          answer: SOFT_LIMIT_MESSAGE,
+          escalate: true,
           asOf: userMessageRow.created_at,
         }),
       );

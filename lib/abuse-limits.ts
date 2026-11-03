@@ -61,6 +61,11 @@ export const FAIL_OPEN_SCOPES: ReadonlySet<RateLimitScope> = new Set([
   "business_burst",
   "new_conversation_ip",
   "ip_subnet",
+  // Production readiness item 3: enforcing, but a counter outage must not
+  // silence every widget (the fail-closed ip/key limits still apply).
+  "business",
+  "gemini_daily_business",
+  "gemini_daily_global",
 ]);
 
 /**
