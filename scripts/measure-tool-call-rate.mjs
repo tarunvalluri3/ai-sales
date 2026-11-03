@@ -21,6 +21,11 @@
  * itself and also tolerates the local idle-connection hiccup documented in
  * STATE.md.
  */
+import { guardAgainstProduction } from "./lib/production-guard.mjs";
+
+// Production readiness: refuses to touch the production Supabase project unless explicitly confirmed (scripts/lib/production-guard.mjs).
+guardAgainstProduction({ scriptName: "measure-tool-call-rate", allowOverride: true });
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { requireProdConfirmation } from "./lib/usage-guard.mjs";
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
+import { resolveAppEnvironment } from "@/lib/deployment-env";
 
 /**
  * Per-raw-API-call Gemini usage log (token-burn audit, 2026-10-28). This is
@@ -53,14 +54,15 @@ export type GeminiUsageEntry = {
 };
 
 function resolveEnvironment(): GeminiUsageEnvironment {
-  // Vercel sets VERCEL_ENV to exactly one of these on every deploy
-  // (https://vercel.com/docs/environment-variables/system-environment-variables).
-  // Falls back to "development" for local runs and scripts, where it is unset.
-  const vercelEnv = process.env.VERCEL_ENV;
-  if (vercelEnv === "production" || vercelEnv === "preview" || vercelEnv === "development") {
-    return vercelEnv;
+  // APP_ENV first, then VERCEL_ENV (lib/deployment-env.ts), so a VPS
+  // production server is tagged "production" too. The stored value keeps the
+  // table's existing check constraint: staging is recorded as "preview".
+  try {
+    const { environment } = resolveAppEnvironment(process.env);
+    return environment === "staging" ? "preview" : environment;
+  } catch {
+    return "development";
   }
-  return "development";
 }
 
 /**

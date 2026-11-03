@@ -1,5 +1,11 @@
 import "server-only";
 import { z } from "zod";
+import {
+  environmentWarnings,
+  geminiKeyVariableFor,
+  isAmbiguousProductionServer,
+  resolveAppEnvironment,
+} from "@/lib/deployment-env";
 
 /**
  * Validates every environment variable currently required by an
@@ -11,6 +17,14 @@ import { z } from "zod";
  * value -- only the name of a missing/invalid variable.
  */
 const envSchema = z.object({
+  // Production readiness (LAUNCH_AUDIT.md §3/§15): the explicit deployment
+  // environment. Optional so existing Vercel deploys keep working through
+  // VERCEL_ENV, but REQUIRED on a non-Vercel production server -- see
+  // isAmbiguousProductionServer() below. lib/deployment-env.ts resolves it.
+  APP_ENV: z.enum(["development", "staging", "production"]).optional(),
+  // Extra production Supabase refs (comma-separated) for the script/test
+  // guard and the startup warnings. The current production ref is built in.
+  PRODUCTION_SUPABASE_PROJECT_REFS: z.string().optional(),
   CLERK_SECRET_KEY: z.string().min(1),
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
@@ -67,6 +81,14 @@ const envSchema = z.object({
   RAZORPAY_PLAN_STARTER_MONTHLY: z.string().min(1).optional(),
   RAZORPAY_PLAN_GROWTH_MONTHLY: z.string().min(1).optional(),
   RAZORPAY_PLAN_SCALE_MONTHLY: z.string().min(1).optional(),
+  // Operational tuning read elsewhere with their own safe defaults
+  // (lib/chat-timeouts.ts, lib/catalog-prefetch.ts, lib/rag.ts); listed here so
+  // a malformed value is caught at startup and all of them are documented.
+  CHAT_AI_DEADLINE_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
+  CHAT_MODEL_CALL_TIMEOUT_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
+  CHAT_TOOL_TIMEOUT_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
+  CATALOG_PREFETCH: z.string().optional(),
+  PIPELINE_PART_B: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -81,9 +103,9 @@ if (!parsed.success) {
 }
 
 /**
- * Which Gemini key this process actually uses -- production (Vercel's own
- * VERCEL_ENV, set on every deploy) uses GEMINI_API_KEY; every other
- * environment (local dev, Vercel preview) uses GEMINI_API_KEY_DEV. Missing
+ * Which Gemini key this process actually uses -- production uses
+ * GEMINI_API_KEY; every other environment (local dev, staging, Vercel
+ * preview) uses GEMINI_API_KEY_DEV. Missing
  * the one this environment needs fails loudly here, at startup, rather
  * than silently falling back to the production key (the exact accidental
  * spend the token-burn audit, STATE.md, found no safeguard against).
@@ -96,16 +118,38 @@ if (!parsed.success) {
  * this module (Next.js's documented startup order), so the reassignment
  * below always happens first.
  */
-const isProductionEnvironment = process.env.VERCEL_ENV === "production";
-const resolvedGeminiApiKey = isProductionEnvironment ? parsed.data.GEMINI_API_KEY : parsed.data.GEMINI_API_KEY_DEV;
+//
+// Production readiness (LAUNCH_AUDIT.md §15): the environment now comes from
+// APP_ENV first, then VERCEL_ENV (lib/deployment-env.ts). A production server
+// with NEITHER -- a VPS running `next start` without APP_ENV -- refuses to
+// start: before this it silently used the dev key and mis-tagged usage rows.
+if (isAmbiguousProductionServer(process.env)) {
+  throw new Error(
+    "APP_ENV is not set on a production server (NODE_ENV=production, no VERCEL_ENV). " +
+      "Set APP_ENV=production (or staging) explicitly. See .env.example.",
+  );
+}
+
+const appEnvironment = resolveAppEnvironment(process.env).environment;
+const geminiKeyVariable = geminiKeyVariableFor(appEnvironment);
+const resolvedGeminiApiKey =
+  geminiKeyVariable === "GEMINI_API_KEY" ? parsed.data.GEMINI_API_KEY : parsed.data.GEMINI_API_KEY_DEV;
 
 if (!resolvedGeminiApiKey) {
   throw new Error(
-    isProductionEnvironment
+    geminiKeyVariable === "GEMINI_API_KEY"
       ? "Missing required environment variable: GEMINI_API_KEY (production). See .env.example and docs/security.md §5."
-      : "Missing required environment variable: GEMINI_API_KEY_DEV. Every non-production environment (local dev, Vercel preview) uses this, never GEMINI_API_KEY -- see .env.example and docs/security.md §5.",
+      : `Missing required environment variable: GEMINI_API_KEY_DEV. Every non-production environment (here: ${appEnvironment}) uses this, never GEMINI_API_KEY -- see .env.example and docs/security.md §5.`,
   );
 }
 process.env.GEMINI_API_KEY = resolvedGeminiApiKey;
+// Normalised so modules that can't import this server-only file (the usage
+// ledger, the /apache header) see the same answer.
+process.env.APP_ENV = appEnvironment;
 
-export const env = { ...parsed.data, GEMINI_API_KEY: resolvedGeminiApiKey };
+// Names only, never values: e.g. local dev pointed at the production database.
+for (const warning of environmentWarnings(appEnvironment, process.env)) {
+  console.warn(JSON.stringify({ event: "env_target_warning", level: "warn", message: warning }));
+}
+
+export const env = { ...parsed.data, APP_ENV: appEnvironment, GEMINI_API_KEY: resolvedGeminiApiKey };

@@ -10,13 +10,27 @@ Three fully separate environments, three separate credential sets. None share a 
 
 | Environment | Supabase project | Purpose | Who touches it |
 |---|---|---|---|
-| **Local dev** | `ai-sales` (production) or a developer's own, per `.env.local` | Day-to-day development | Whoever's coding |
+| **Local dev** | **Must be** `ai-sales-staging` or a developer's own project, per `.env.local` — never production (see §1b) | Day-to-day development | Whoever's coding |
 | **Staging** | `ai-sales-staging` (ref `otmeqswvlmorxvjocaru`, separate Supabase account/org from production) | CI runs every PR's migrations and the pgTAP suite here; a real, always-current pre-production copy | GitHub Actions, plus manual smoke-testing before a promotion |
 | **Production** | `ai-sales` (ref `bykeztxvejpwfcxgsubm`) | Real tenants, real data | Only via the promotion procedure in §3 |
 
 ### 1a. Deliberate simplification, recorded not silently assumed
 
 Staging and production currently point at the **same Clerk application** and the **same `GEMINI_API_KEY`** — only the Supabase project is isolated. This was a scope decision for Phase 20, not an oversight: a second Clerk application and a second billed Gemini key are real setup cost with no immediate safety payoff, since Clerk/Gemini hold no tenant-owned rows the way Supabase does. Revisit if staging ever needs to safely simulate a real signup flow without touching production Clerk users, or if Gemini usage/cost tracking needs to distinguish staging traffic from real traffic (Phase 21/22's cost metrics currently cannot tell the two apart).
+
+**Update (production readiness, 2026-11-03):** the code is now ready for fully separate setups; the remaining work is account/dashboard setup (LAUNCH_AUDIT.md handoff list):
+- `APP_ENV` (`development` | `staging` | `production`) names the environment explicitly (`lib/deployment-env.ts`). Vercel's `VERCEL_ENV` is the fallback; a `next start` server with neither refuses to boot, so a VPS can't silently use the dev Gemini key.
+- Only `APP_ENV=production` uses `GEMINI_API_KEY`; everything else uses `GEMINI_API_KEY_DEV`. CI no longer receives the production key.
+- Give production its own **Clerk production instance** (`pk_live_…`) and keep the development instance for local + staging. The server logs an `env_target_warning` if production runs on a `pk_test_` key or a non-production environment points at the production database.
+
+### 1b. The production guard (scripts and tests)
+
+`.env.local` and the CLI link on the developer machine pointed at **production** (LAUNCH_AUDIT.md §3). Every script and test that can touch Supabase now goes through `scripts/lib/production-guard.mjs`, which uses the same production-ref list as the app (`lib/deployment-env.ts`: `bykeztxvejpwfcxgsubm` built in, plus `PRODUCTION_SUPABASE_PROJECT_REFS`):
+- every `npm run test:*` suite preloads it (`--import ./scripts/lib/test-env-guard.mjs`) — no override;
+- `npm test` (pgTAP) checks both `NEXT_PUBLIC_SUPABASE_URL` and `supabase/.temp/project-ref` — no override;
+- `credit-note`, `instagram:enable|disable`, `seed:review-demo`, `eval` and the `measure-*` scripts refuse production unless run with **both** `--allow-production` and `--confirm-production-ref=<ref>`.
+
+To make local dev safe: put the staging values in `.env.local` and run `npx supabase link --project-ref otmeqswvlmorxvjocaru`.
 
 ---
 
@@ -38,7 +52,7 @@ Staging and production currently point at the **same Clerk application** and the
 Phase 19's audit flagged that `npm test` required a human's locally-linked `supabase` CLI session and always targeted whatever project that session happened to be linked to — meaning it could silently run against production. Phase 20 closes this two ways:
 
 - **In CI**, the workflow links to staging explicitly via `STAGING_SUPABASE_ACCESS_TOKEN`/`STAGING_SUPABASE_PROJECT_REF`/`STAGING_SUPABASE_DB_PASSWORD` before running tests — no ambiguity about which project it targets.
-- **Locally**, the implementing environment's own CLI session was relinked to `ai-sales-staging` as part of setting it up, so `npm test` run by hand now defaults to staging too. Run `npx supabase projects list` and check the `linked` field if you ever need to confirm which project a given machine's CLI session currently targets before running anything destructive.
+- **Locally**, ~~the implementing environment's own CLI session was relinked to `ai-sales-staging`~~ — **this was wrong as of 2026-11-02**: `supabase/.temp/project-ref` on the developer machine is the production ref `bykeztxvejpwfcxgsubm` (LAUNCH_AUDIT.md §3). `npm test` now refuses to run while linked to production (§1b). Relink with `npx supabase link --project-ref otmeqswvlmorxvjocaru`, and check with `npx supabase projects list` (the `linked` field) before running anything destructive.
 
 ### 2b. Known limitation
 

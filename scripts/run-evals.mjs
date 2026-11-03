@@ -19,6 +19,11 @@
  * (dotenv) needed for that.
  */
 
+import { guardAgainstProduction } from "./lib/production-guard.mjs";
+
+// Production readiness: refuses to touch the production Supabase project unless explicitly confirmed (scripts/lib/production-guard.mjs).
+guardAgainstProduction({ scriptName: "npm run eval", allowOverride: true });
+
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
 import { admitsMissingInformation, inventedPriceForUnknownProduct, inventedTrackRecord } from "./eval-judges.mjs";

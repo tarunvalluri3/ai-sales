@@ -29,6 +29,7 @@ import { execSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { guardAgainstProduction } from "./lib/production-guard.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const testDir = path.join(__dirname, "..", "supabase", "tests", "database");
@@ -87,6 +88,10 @@ function runFile(filePath) {
 }
 
 function main() {
+  // Production readiness: never against the production project -- checks both
+  // NEXT_PUBLIC_SUPABASE_URL and the CLI link this runner uses (--linked).
+  guardAgainstProduction({ scriptName: "the pgTAP suite (npm test)", checkLinkedProject: true });
+
   const files = listTestFiles();
   if (files.length === 0) {
     console.log("No pgTAP test files found under supabase/tests/database/.");

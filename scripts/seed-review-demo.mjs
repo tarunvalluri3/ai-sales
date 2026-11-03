@@ -15,6 +15,11 @@
 // document is queued for ingestion (the same queue the dashboard uses), and
 // the queue embeds it -- on the daily cron, or straight away whenever any
 // catalog item is saved in the dashboard.
+import { guardAgainstProduction } from "./lib/production-guard.mjs";
+
+// Production readiness: refuses to touch the production Supabase project unless explicitly confirmed (scripts/lib/production-guard.mjs).
+guardAgainstProduction({ scriptName: "seed:review-demo", allowOverride: true });
+
 import {
   createServiceClient,
   describeSupabaseTarget,

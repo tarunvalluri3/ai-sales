@@ -42,3 +42,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Production readiness: the documented env template is tracked (see .env.example).
+!.env.example
