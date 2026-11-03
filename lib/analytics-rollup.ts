@@ -24,6 +24,12 @@ import { logEvent } from "@/lib/logger";
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const EXCLUDE_SANDBOX_FILTER = `source.is.null,source.neq.${SANDBOX_CONVERSATION_SOURCE}`;
 
+/** True when an embedded `conversations(source)` (object, array or null) is a sandbox test chat. */
+export function isSandboxEmbed(embed: unknown): boolean {
+  const first = Array.isArray(embed) ? embed[0] : embed;
+  return Boolean(first && typeof first === "object" && (first as { source?: unknown }).source === SANDBOX_CONVERSATION_SOURCE);
+}
+
 /** [startUtc, endUtc) for the IST calendar day `daysAgo` days before today. */
 function istDayRangeUtc(daysAgo: number): { startIso: string; endIso: string; dateStr: string } {
   const nowIst = new Date(Date.now() + IST_OFFSET_MS);
@@ -55,8 +61,17 @@ export async function computeDailyRollup(): Promise<RollupResult> {
 
     const [conversationsResult, leadsResult, appointmentsResult] = await Promise.all([
       supabase.from("conversations").select("business_id, source").gte("created_at", startIso).lt("created_at", endIso).or(EXCLUDE_SANDBOX_FILTER),
-      supabase.from("leads").select("business_id").gte("created_at", startIso).lt("created_at", endIso),
-      supabase.from("appointments").select("business_id").gte("created_at", startIso).lt("created_at", endIso),
+      // Production readiness (item 9, LAUNCH_AUDIT.md §5): leads and bookings
+      // made in the dashboard's sandbox test chat were counted as real.
+      // leads.conversation_id is NOT NULL, so an inner join is exact.
+      supabase
+        .from("leads")
+        .select("business_id, conversations!inner(source)")
+        .gte("created_at", startIso)
+        .lt("created_at", endIso)
+        .or(EXCLUDE_SANDBOX_FILTER, { referencedTable: "conversations" }),
+      // appointments.conversation_id is nullable: left join, filtered below.
+      supabase.from("appointments").select("business_id, conversations(source)").gte("created_at", startIso).lt("created_at", endIso),
     ]);
 
     type Tally = { conversations: number; leads: number; appointments: number; website: number; whatsapp: number; instagram: number };
@@ -79,6 +94,7 @@ export async function computeDailyRollup(): Promise<RollupResult> {
       getTally(row.business_id).leads += 1;
     }
     for (const row of appointmentsResult.data ?? []) {
+      if (isSandboxEmbed(row.conversations)) continue;
       getTally(row.business_id).appointments += 1;
     }
 

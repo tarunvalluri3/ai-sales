@@ -113,3 +113,30 @@ test("rate-limit rejections are logged, but never sent to Sentry (quota burn und
     for (const call of calls) assert.doesNotMatch(call, /"error"\)/, `${file}: ${call}`);
   }
 });
+
+// --------------------------------------------------------- /apache notes
+
+const pricing = await import(new URL("../lib/gemini-pricing.ts", import.meta.url).href);
+
+test("USD->INR rate: default 89, overridable by env, never zero/negative", () => {
+  assert.equal(pricing.parseUsdToInrRate(undefined), 89);
+  assert.equal(pricing.parseUsdToInrRate("84.5"), 84.5);
+  assert.equal(pricing.parseUsdToInrRate("0"), 89);
+  assert.equal(pricing.parseUsdToInrRate("-3"), 89);
+  assert.equal(pricing.parseUsdToInrRate("abc"), 89);
+  assert.match(read("lib/gemini-pricing.ts"), /export const USD_TO_INR_RATE = parseUsdToInrRate\(process\.env\.USD_TO_INR_RATE\);/);
+});
+
+test("the client cost table gets the rate from the server page (env is unreadable client-side)", () => {
+  const table = read("app/(dashboard)/apache/ai-usage/tenant-cost-table.tsx");
+  assert.doesNotMatch(table, /from "@\/lib\/gemini-pricing"/);
+  assert.match(table, /usdToInrRate: number/);
+  assert.match(read("app/(dashboard)/apache/ai-usage/page.tsx"), /<TenantCostTable tenants=\{tenantCosts\} usdToInrRate=\{USD_TO_INR_RATE\} \/>/);
+});
+
+test("the admin analytics rollup excludes sandbox test leads and bookings, not only conversations", () => {
+  const rollup = read("lib/analytics-rollup.ts");
+  assert.match(rollup, /\.from\("leads"\)\s*\.select\("business_id, conversations!inner\(source\)"\)[\s\S]*?\.or\(EXCLUDE_SANDBOX_FILTER, \{ referencedTable: "conversations" \}\)/);
+  assert.match(rollup, /\.from\("appointments"\)\.select\("business_id, conversations\(source\)"\)/);
+  assert.match(rollup, /if \(isSandboxEmbed\(row\.conversations\)\) continue;/);
+});
