@@ -321,3 +321,31 @@ test("the env var still adds refs on top of the file", () => {
   assert.ok(env.isProductionSupabaseRef(STAGING_REF, merged));
   assert.ok(env.isProductionSupabaseRef(PROD_REF, merged));
 });
+
+// ------------------------------------- local next dev against production is blocked (2026-11-03)
+
+test("next dev: production refused, exact-ref override allowed loudly, staging allowed", () => {
+  const prod = { NEXT_PUBLIC_SUPABASE_URL: PROD_URL };
+  const refused = env.checkDevServerTarget(prod);
+  assert.equal(refused.action, "refuse");
+  assert.match(refused.message, /Refusing to start next dev/);
+  assert.match(refused.message, new RegExp(`ALLOW_DEV_AGAINST_PRODUCTION=${PROD_REF}`));
+  assert.equal(env.checkDevServerTarget({ ...prod, ALLOW_DEV_AGAINST_PRODUCTION: "true" }).action, "refuse", "a bare flag is not enough");
+  assert.equal(env.checkDevServerTarget({ ...prod, ALLOW_DEV_AGAINST_PRODUCTION: STAGING_REF }).action, "refuse", "another ref is not enough");
+  assert.equal(env.checkDevServerTarget({ ...prod, ALLOW_DEV_AGAINST_PRODUCTION: ` ${PROD_REF.toUpperCase()} ` }).action, "allow_overridden");
+  assert.equal(env.checkDevServerTarget({ NEXT_PUBLIC_SUPABASE_URL: STAGING_URL }).action, "allow");
+  assert.equal(env.checkDevServerTarget({}).action, "allow");
+  // A new production ref from the committed file is refused too.
+  const root = fakeLinkedRoot(null);
+  mkdirSync(path.join(root, "supabase"), { recursive: true });
+  writeFileSync(path.join(root, "supabase", "production-project-refs.txt"), `${NEW_REGION_REF}\n`);
+  const merged = refsFile.withCommittedProductionRefs({ NEXT_PUBLIC_SUPABASE_URL: `https://${NEW_REGION_REF}.supabase.co` }, root);
+  assert.equal(env.checkDevServerTarget(merged).action, "refuse");
+});
+
+test("next.config.ts runs the check only in the development-server phase, with the committed refs, and throws on refuse", () => {
+  const config = read("next.config.ts");
+  assert.match(config, /if \(phase === PHASE_DEVELOPMENT_SERVER\) \{\s*const check = checkDevServerTarget\(withCommittedProductionRefs\(process\.env, process\.cwd\(\)\)\);\s*if \(check\.action === "refuse"\) throw new Error\(check\.message\);/);
+  assert.match(config, /export default function config\(phase: string\) \{/);
+  assert.match(config, /return sentryWrappedConfig;/);
+});

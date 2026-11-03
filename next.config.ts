@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
+import { checkDevServerTarget } from "./lib/deployment-env";
+import { withCommittedProductionRefs } from "./lib/production-refs-file";
 
 /**
  * Framing-sensitive: /widget/embed is deliberately loaded cross-origin
@@ -73,10 +76,27 @@ const nextConfig: NextConfig = {
  * logging in CI for visibility. Absent locally/without the token, the
  * plugin no-ops the upload rather than failing the build.
  */
-export default withSentryConfig(nextConfig, {
+const sentryWrappedConfig = withSentryConfig(nextConfig, {
   org: "waves-web-studio",
   project: "ai-sales",
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,
   widenClientFileUpload: true,
 });
+
+/**
+ * Owner decision 2026-11-03: `next dev` against a PRODUCTION Supabase project
+ * is refused outright (lib/deployment-env.ts checkDevServerTarget). Next loads
+ * .env* before importing this file, so .env.local is already in process.env.
+ * The committed refs (supabase/production-project-refs.txt) are included.
+ * Emergency override: ALLOW_DEV_AGAINST_PRODUCTION=<exact ref>. Builds and
+ * production servers are not affected (development-server phase only).
+ */
+export default function config(phase: string) {
+  if (phase === PHASE_DEVELOPMENT_SERVER) {
+    const check = checkDevServerTarget(withCommittedProductionRefs(process.env, process.cwd()));
+    if (check.action === "refuse") throw new Error(check.message);
+    if (check.action === "allow_overridden") console.warn(check.message);
+  }
+  return sentryWrappedConfig;
+}

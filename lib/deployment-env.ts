@@ -100,6 +100,40 @@ export function isProductionSupabaseRef(ref: string | null | undefined, env: Env
   return productionSupabaseRefs(env).includes(ref.trim().toLowerCase());
 }
 
+export type DevServerTargetCheck =
+  | { action: "allow" }
+  | { action: "allow_overridden"; ref: string; message: string }
+  | { action: "refuse"; ref: string; message: string };
+
+/**
+ * Owner decision 2026-11-03: local `next dev` against a PRODUCTION Supabase
+ * project is refused outright (next.config.ts, development-server phase only).
+ * The emergency override is `ALLOW_DEV_AGAINST_PRODUCTION=<the exact ref>`:
+ * naming the ref means it can't be left on by habit for a different project.
+ * Pass an env that already includes the committed refs
+ * (lib/production-refs-file.ts withCommittedProductionRefs).
+ */
+export function checkDevServerTarget(env: Env): DevServerTargetCheck {
+  const ref = supabaseProjectRefFromUrl(env.NEXT_PUBLIC_SUPABASE_URL);
+  if (!ref || !isProductionSupabaseRef(ref, env)) return { action: "allow" };
+  const override = env.ALLOW_DEV_AGAINST_PRODUCTION?.trim().toLowerCase();
+  if (override === ref) {
+    return {
+      action: "allow_overridden",
+      ref,
+      message: `!!! next dev is running against the PRODUCTION Supabase project ${ref} (ALLOW_DEV_AGAINST_PRODUCTION). Every action touches real customer data. !!!`,
+    };
+  }
+  return {
+    action: "refuse",
+    ref,
+    message:
+      `Refusing to start next dev: NEXT_PUBLIC_SUPABASE_URL points at the PRODUCTION Supabase project ${ref}. ` +
+      "Point .env.local at the staging project instead (see .env.example). " +
+      `Emergency only: ALLOW_DEV_AGAINST_PRODUCTION=${ref} npm run dev`,
+  };
+}
+
 /** Which Gemini key variable this environment must use. Only production uses the production key. */
 export function geminiKeyVariableFor(environment: AppEnvironment): "GEMINI_API_KEY" | "GEMINI_API_KEY_DEV" {
   return environment === "production" ? "GEMINI_API_KEY" : "GEMINI_API_KEY_DEV";

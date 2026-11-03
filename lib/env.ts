@@ -25,6 +25,8 @@ const envSchema = z.object({
   // Extra production Supabase refs (comma-separated) for the script/test
   // guard and the startup warnings. The current production ref is built in.
   PRODUCTION_SUPABASE_PROJECT_REFS: z.string().optional(),
+  // Emergency-only override for the local next dev block (next.config.ts): the exact production ref.
+  ALLOW_DEV_AGAINST_PRODUCTION: z.string().optional(),
   CLERK_SECRET_KEY: z.string().min(1),
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
