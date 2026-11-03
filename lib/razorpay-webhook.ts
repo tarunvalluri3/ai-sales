@@ -229,6 +229,17 @@ export type RazorpayWebhookDeps = {
   releaseEvent(eventId: string): Promise<void>;
   findSubscriptionByRazorpayId(razorpaySubscriptionId: string): Promise<BillingSubscriptionRow | null>;
   findSubscriptionByBusinessId(businessId: string): Promise<BillingSubscriptionRow | null>;
+  /**
+   * Production readiness (item 6): called for a subscription event that
+   * matches no live business. Returns true when the subscription belonged to
+   * a business that was deleted (and handles it: alert on a charge, confirm
+   * a cancellation). Optional so existing callers/tests are unaffected.
+   */
+  handleDeletedBusinessEvent?(
+    razorpaySubscriptionId: string,
+    event: string,
+    payment: { id: string | null; amountPaise: number | null },
+  ): Promise<boolean>;
   updateSubscription(businessId: string, patch: BillingSubscriptionPatch): Promise<void>;
   sendNotice(
     kind: BillingNoticeKind,
@@ -278,7 +289,9 @@ export type WebhookOutcome =
    */
   | "stale"
   /** Verified, but we could not tell which business it belongs to. */
-  | "unresolved";
+  | "unresolved"
+  /** For a subscription whose business was deleted (billing_cancellations knows it). */
+  | "deleted_business";
 
 /* ------------------------------------------------------------------ *
  * Helpers
@@ -461,6 +474,17 @@ async function dispatch(
   }
 
   if (!resolved) {
+    // Production readiness (item 6): the business may have been DELETED
+    // (its subscriptions row cascaded away). public.billing_cancellations
+    // remembers its subscription id; a charge after deletion is alerted on
+    // and the cancellation retried at once (lib/billing-cancellation.ts).
+    if (deps.handleDeletedBusinessEvent) {
+      const handled = await deps.handleDeletedBusinessEvent(subscriptionEntity.id, event, {
+        id: body.payload.payment?.entity.id ?? null,
+        amountPaise: body.payload.payment?.entity.amount ?? null,
+      });
+      if (handled) return "deleted_business";
+    }
     // Verified as Razorpay's, but belongs to no row here. The most likely
     // cause is a subscription created against these keys by something
     // other than this app (a dashboard experiment, another environment

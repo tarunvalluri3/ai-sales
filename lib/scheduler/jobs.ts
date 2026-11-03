@@ -14,6 +14,7 @@ import { processAnswerBankJobs } from "@/lib/answer-bank/generate";
 import { computeDailyRollup } from "@/lib/analytics-rollup";
 import { recoverStuckInboundReplies } from "@/lib/inbound-reply-recovery";
 import { runAppointmentLifecycleSweep } from "@/lib/appointment-lifecycle";
+import { processPendingBillingCancellations } from "@/lib/billing-cancellation";
 import type { ScheduledJob } from "@/lib/scheduler/runner";
 
 /**
@@ -67,6 +68,9 @@ export const SCHEDULED_JOBS: ScheduledJob[] = [
   { name: "url_refresh", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 55_000, retries: 0, run: refreshDueUrlKnowledgeSources },
   { name: "no_activity_workflows", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 40_000, run: runNoActivityWorkflowSweep },
   { name: "billing_lifecycle", schedule: { kind: "every", seconds: 60 * MINUTE }, timeoutMs: 50_000, run: () => runBillingLifecycleSweep() },
+  // Deleted businesses whose Razorpay subscription is not confirmed cancelled
+  // yet (each row has its own backoff; alerts on first failure and give-up).
+  { name: "billing_cancellations", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 50_000, run: processPendingBillingCancellations },
   // Once a day, same slot as the old daily Vercel cron. The digest has no
   // per-business "already sent today" record, so it is at most once a day
   // and never retried (a timeout means some businesses miss one digest,

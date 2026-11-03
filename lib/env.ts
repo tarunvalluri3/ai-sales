@@ -42,6 +42,10 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().min(1).optional(),
   NOTIFICATION_EMAIL_FROM: z.string().min(1).optional(),
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // Production readiness (item 6): where operational alerts are emailed
+  // (a deleted customer's subscription not cancelled, a charge after
+  // deletion). Optional: Sentry gets every one of them regardless.
+  OPS_ALERT_EMAIL: z.email().optional(),
   NEXT_PUBLIC_APP_URL: z.url().optional(),
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),

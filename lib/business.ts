@@ -9,6 +9,7 @@ import { describeBlockingItems, type ReadinessItem } from "@/lib/onboarding-read
 import { track } from "@/lib/analytics-events";
 import { getEntitlementForBusiness } from "@/lib/subscription";
 import { isAgentPublished } from "@/lib/agent-published";
+import { recordCancellationForDeletion } from "@/lib/billing-cancellation";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -444,6 +445,12 @@ export async function saveOnboardingStep(orgId: string, step: Exclude<Onboarding
  * delete, not an error).
  */
 export async function deleteBusinessForOrg(orgId: string): Promise<boolean> {
+  // Production readiness (item 6): record and attempt the Razorpay
+  // cancellation FIRST, in a table that survives the cascade below. A failed
+  // cancel is retried by the scheduler and alerted on; only a failure to
+  // write that record refuses the deletion (it throws an AppError).
+  await recordCancellationForDeletion(orgId);
+
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
