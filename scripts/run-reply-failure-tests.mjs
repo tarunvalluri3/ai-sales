@@ -271,7 +271,7 @@ for (const [channel, file, column] of [
     const end = source.indexOf("\nasync function ", start + 10);
     const body = source.slice(start, end);
     const sends = [...body.matchAll(/await send(?:Canned)?Reply\([\s\S]*?\);/g)];
-    assert.equal(sends.length, 3, `${channel}: the AI, non-text and guardrail sends`);
+    assert.equal(sends.length, 4, `${channel}: the AI, non-text, guardrail and daily-limit notice sends`);
     for (const match of sends) {
       const next = body.slice(match.index + match[0].length, match.index + match[0].length + 80);
       assert.match(next, /^\s*state\.replyQueued = true;/, `${channel}: every send must be followed by replyQueued`);

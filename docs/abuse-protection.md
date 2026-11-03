@@ -10,19 +10,23 @@ Production readiness item 3 (2026-11-03). The code is in `lib/chat-protection.ts
 | Per widget key | `CHAT_KEY_LIMIT` | 120 per 5 min | enforce (429) | fail closed |
 | Per conversation | `CHAT_CONVERSATION_LIMIT` | 20 per 5 min | enforce (429) | fail closed |
 | Per business (all its keys) | `CHAT_BUSINESS_LIMIT` | 300 per 5 min | enforce (429) | fail open |
-| AI turns per business per UTC day | `GEMINI_DAILY_TURN_CAP_PER_BUSINESS` | 1,000 (0 = off) | enforce: fixed "a person will follow up" reply, conversation flagged, no Gemini call | fail open |
-| AI turns per UTC day, all businesses | `GEMINI_DAILY_TURN_CAP_GLOBAL` | 20,000 (0 = off) | same | fail open |
+| AI replies per business per UTC day, website + WhatsApp + Instagram | `GEMINI_DAILY_TURN_CAP_PER_BUSINESS` | 1,000 (0 = off) | enforce: no Gemini call, conversation flagged, "a person will follow up" notice (see below) | fail **closed** (treated as over the limit, logged, alerted) |
+| AI replies per UTC day, all businesses, all channels | `GEMINI_DAILY_TURN_CAP_GLOBAL` | 5,000 (0 = off) | same | fail **closed** |
 | Cloudflare Turnstile (new conversations) | `TURNSTILE_MODE`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | `off` | `log` or `enforce` (403 on a missing/invalid token) | Cloudflare unavailable: allowed and logged |
 
 Why these defaults:
 - The per-business limit (300 per 5 min) is twice the log-only `business_burst` ceiling (150). It is a backstop that only a script hitting one tenant will reach.
-- The daily caps count AI *turns* on the public widget.
+- The daily caps (round 3, `lib/daily-reply-limit.ts`) count AI *replies* on every channel against ONE pair of counters (`gemini_daily_business` per business, `gemini_daily_global` overall).
+  - A reply is counted once, right before the model would be called, after human control, the serving check and guardrail/non-text canned replies. On WhatsApp and Instagram this is after the inbound de-duplication insert, so a webhook Meta redelivers is never counted twice.
   - 1,000 per business per day is about 3x Scale's monthly quota spread evenly (10,000 / 30 ≈ 333). A real busy day fits; a runaway script stops within a day.
-  - 20,000 a day across all businesses is roughly ₹2,000-3,000 of Gemini spend at the current ~4,000 tokens per reply. Raise it as you add customers.
-- WhatsApp and Instagram are not covered by the daily caps. They have their own per-sender and per-conversation limits, plus the plan's reply quota.
+  - 5,000 a day across all businesses (owner decision 2026-11-03) bounds the worst day's Gemini spend. Raise it as you add customers.
+- The notice ("We're receiving a lot of messages right now ... will follow up"):
+  - Website: returned as the reply to each blocked message (the visitor is waiting on that request).
+  - WhatsApp / Instagram: at most once per conversation per UTC day (`gemini_cap_notice` counter, migration `20261124000100`), and only inside the 24-hour window measured from the prospect's message. If that counter can't be read, no notice is sent (never a duplicate); the conversation is still flagged.
 
 Alerts:
-- `gemini_daily_cap_reached` is an error once per cap per hour, then info, and emails `OPS_ALERT_EMAIL` once per hour.
+- `gemini_daily_cap_reached` (error + email to `OPS_ALERT_EMAIL`) once per cap per UTC day: only the request whose atomic increment returned exactly cap + 1 sends it, so it is not repeated per message or per server.
+- `gemini_daily_counter_unavailable` (error + email, throttled to once an hour per process) when the counter can't be read. Each blocked message is also logged as `gemini_daily_cap_blocked` (info).
 - `turnstile_verified` is an info line on every new conversation while Turnstile is on.
 - `rate_limit_exceeded` is info.
 

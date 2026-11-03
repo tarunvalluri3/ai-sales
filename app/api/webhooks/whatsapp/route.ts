@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import { after, NextRequest } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
-import { selectBurstLimit } from "@/lib/abuse-limits";
+import { selectBurstLimit, SOFT_LIMIT_MESSAGE } from "@/lib/abuse-limits";
+import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
+import { whatsappTimestampToMs } from "@/lib/daily-reply-limit-rules";
 import { checkReplyQuota } from "@/lib/usage-limit";
 import { isExpectedRefusal, loadBusinessAiContext } from "@/lib/business-ai-context";
 import {
@@ -74,7 +76,7 @@ const NON_TEXT_REPLY =
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
-type WhatsappInboundMessage = { id?: string; from?: string; type?: string; text?: { body?: string } };
+type WhatsappInboundMessage = { id?: string; from?: string; type?: string; timestamp?: string; text?: { body?: string } };
 
 type WhatsappWebhookValue = {
   metadata?: { phone_number_id?: string };
@@ -370,6 +372,27 @@ async function answerInboundMessage(
   if (inputAction.kind !== "none") {
     await flagConversationNeedsAttention(supabase, businessId, conversation.id, businessContext.clerkOrgId);
     await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, inputAction.reply);
+    state.replyQueued = true;
+    return "replied";
+  }
+
+  // Round 3, item 1: the daily AI reply caps shared with the website and
+  // Instagram. Reached once per inbound message: the dedup insert in
+  // ingestInboundMessage() stops a Meta redelivery before this point. Over a
+  // cap (or the counter can't be read): no Gemini call, the conversation is
+  // flagged, and the prospect gets the notice at most once per conversation
+  // per day, only inside the 24-hour window.
+  const dailyLimit = await checkDailyReplyLimit({
+    supabase,
+    channel: "whatsapp",
+    businessId,
+    conversationId: conversation.id,
+    clerkOrgId: businessContext.clerkOrgId,
+    inboundAtMs: whatsappTimestampToMs(message.timestamp),
+  });
+  if (!dailyLimit.allowed) {
+    if (dailyLimit.notice !== "send") return "skipped";
+    await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, SOFT_LIMIT_MESSAGE);
     state.replyQueued = true;
     return "replied";
   }

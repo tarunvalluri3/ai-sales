@@ -1,7 +1,8 @@
 import { after, NextRequest } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
-import { selectBurstLimit } from "@/lib/abuse-limits";
+import { selectBurstLimit, SOFT_LIMIT_MESSAGE } from "@/lib/abuse-limits";
+import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import { checkReplyQuota, type ReplyQuotaStatus } from "@/lib/usage-limit";
 import { isInstagramAllowed } from "@/lib/subscription";
 import {
@@ -345,7 +346,8 @@ async function replyToInboundMessage(
         outcome = result.outcome;
         model = result.model;
         sent = result.sent;
-        return outcome === "human_control" || outcome === "not_serving" ? "skipped" : "replied";
+        const noReplySent = outcome === "daily_limit" && sent === null;
+        return outcome === "human_control" || outcome === "not_serving" || noReplySent ? "skipped" : "replied";
       },
       reportFailure: async (error, state) => {
         outcome = "error";
@@ -481,6 +483,29 @@ async function answerInboundMessage(
     suggestedQuestions: businessContext.suggestedQuestions,
     suggestedClick: false,
   };
+
+  // Round 3, item 1: the daily AI reply caps shared with the website and
+  // WhatsApp. Reached once per inbound message (the dedup insert stops a Meta
+  // redelivery first). Over a cap (or the counter can't be read): no Gemini
+  // call, the conversation is flagged, and the notice goes out at most once
+  // per conversation per day, only inside the 24-hour window.
+  const dailyLimit = await timer.time("rate_limit_gemini_daily", () =>
+    checkDailyReplyLimit({
+      supabase,
+      channel: "instagram",
+      businessId,
+      conversationId: conversation.id,
+      clerkOrgId: businessContext.clerkOrgId,
+      inboundAtMs: inbound.sentAtMs ?? null,
+    }),
+  );
+  if (!dailyLimit.allowed) {
+    if (dailyLimit.notice !== "send") return { outcome: "daily_limit", model: null, sent: null };
+    const result = await sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, inbound.senderId, SOFT_LIMIT_MESSAGE, timer);
+    state.replyQueued = true;
+    milestones.metaSendReturnedAtMs = timer.elapsedMs();
+    return { outcome: "daily_limit", model: null, sent: result.success };
+  }
 
   // The same function, system prompt, grounding rules, model and history cap
   // as the widget's JSON path (app/api/chat/route.ts).

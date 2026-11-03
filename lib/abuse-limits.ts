@@ -64,8 +64,9 @@ export const FAIL_OPEN_SCOPES: ReadonlySet<RateLimitScope> = new Set([
   // Production readiness item 3: enforcing, but a counter outage must not
   // silence every widget (the fail-closed ip/key limits still apply).
   "business",
-  "gemini_daily_business",
-  "gemini_daily_global",
+  // gemini_daily_business / gemini_daily_global are deliberately NOT here
+  // (round 3, item 1): a daily-cap counter that can't be read is treated as
+  // over the limit (lib/daily-reply-limit-rules.ts).
 ]);
 
 /**

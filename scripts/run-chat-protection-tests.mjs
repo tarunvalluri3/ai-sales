@@ -36,7 +36,7 @@ test("defaults are the previous hard-coded limits; Turnstile is off", () => {
   assert.equal(config.conversationLimit, 20);
   assert.equal(config.businessLimit, 300);
   assert.equal(config.geminiDailyTurnsPerBusiness, 1000);
-  assert.equal(config.geminiDailyTurnsGlobal, 20000);
+  assert.equal(config.geminiDailyTurnsGlobal, 5000, "round 3: overall default lowered to 5,000");
   assert.equal(config.turnstile.mode, "off");
 });
 
@@ -54,7 +54,7 @@ test("configured values are used; malformed or out-of-range values fall back", (
   assert.equal(config.conversationLimit, 20, "below the minimum of 1");
   assert.equal(config.businessLimit, 500);
   assert.equal(config.geminiDailyTurnsPerBusiness, 0, "0 = no cap is allowed");
-  assert.equal(config.geminiDailyTurnsGlobal, 20000);
+  assert.equal(config.geminiDailyTurnsGlobal, 5000);
 });
 
 test("Turnstile is on only with a valid mode AND both keys", () => {
@@ -71,17 +71,8 @@ test("Turnstile is on only with a valid mode AND both keys", () => {
   assert.equal(cp.chatProtectionConfigFromEnv({ NEXT_PUBLIC_APP_URL: "not a url" }).turnstile.expectedHostname, null);
 });
 
-// ------------------------------------------------------------ daily cap
-
-test("daily cap: per business and global, 0 = off, null counts fail open", () => {
-  const config = { geminiDailyTurnsPerBusiness: 3, geminiDailyTurnsGlobal: 10 };
-  assert.deepEqual(cp.dailyCapVerdict({ business: 3, global: 10 }, config), { allowed: true }, "at the cap is allowed");
-  assert.deepEqual(cp.dailyCapVerdict({ business: 4, global: 5 }, config), { allowed: false, which: "business" });
-  assert.deepEqual(cp.dailyCapVerdict({ business: 1, global: 11 }, config), { allowed: false, which: "global" });
-  assert.deepEqual(cp.dailyCapVerdict({ business: 99, global: 99 }, config), { allowed: false, which: "global" }, "global reported first");
-  assert.deepEqual(cp.dailyCapVerdict({ business: null, global: null }, config), { allowed: true }, "counter outage fails open");
-  assert.deepEqual(cp.dailyCapVerdict({ business: 99, global: 99 }, { geminiDailyTurnsPerBusiness: 0, geminiDailyTurnsGlobal: 0 }), { allowed: true });
-});
+// The daily cap rules moved to lib/daily-reply-limit-rules.ts in round 3
+// (every channel, fail-closed): scripts/run-daily-reply-limit-tests.mjs.
 
 // ------------------------------------------------------------ Turnstile
 
@@ -175,10 +166,12 @@ test("Turnstile decision: off/log never block; enforce blocks bad tokens but not
 
 // ------------------------------------------------------------ verdicts
 
-test("new scopes are enforcing but fail open; Phase 32 abuse scopes stay log-only", () => {
-  for (const scope of ["business", "gemini_daily_business", "gemini_daily_global"]) {
+test("business scope enforces and fails open; daily caps fail closed; Phase 32 abuse scopes stay log-only", () => {
+  assert.deepEqual(abuse.resolveAbuseLimitVerdict("business", 11, 10), { allowed: false, wouldExceed: false });
+  assert.deepEqual(abuse.resolveAbuseLimitVerdict("business", null, 10), { allowed: true, wouldExceed: false });
+  for (const scope of ["gemini_daily_business", "gemini_daily_global"]) {
     assert.deepEqual(abuse.resolveAbuseLimitVerdict(scope, 11, 10), { allowed: false, wouldExceed: false }, `${scope} enforces`);
-    assert.deepEqual(abuse.resolveAbuseLimitVerdict(scope, null, 10), { allowed: true, wouldExceed: false }, `${scope} fails open`);
+    assert.deepEqual(abuse.resolveAbuseLimitVerdict(scope, null, 10), { allowed: false, wouldExceed: false }, `${scope} fails closed (round 3)`);
   }
   assert.deepEqual(abuse.resolveAbuseLimitVerdict("ip", null, 10), { allowed: false, wouldExceed: false }, "ip still fails closed");
   for (const scope of ["business_burst", "new_conversation_ip", "ip_subnet"]) {
@@ -202,18 +195,6 @@ test("chat route: limits come from config; per-business limit with the key limit
   assert.ok(turnstile < route.indexOf("embedQueryWithCache(supabase"), "before any Gemini call");
   assert.match(route, /if \(!conversationId && protection\.turnstile\.mode !== "off" && protection\.turnstile\.secretKey\)/);
   assert.match(route, /if \(decision === "reject"\) \{\s*return withCors\(jsonError\("Please refresh the page and try again\.", 403\)\);/);
-});
-
-test("chat route: the daily cap is checked before any model call and flags the conversation", () => {
-  const route = read("app/api/chat/route.ts");
-  assert.match(route, /incrementRateLimitCounter\("gemini_daily_business", business\.businessId, DAY_SECONDS\)/);
-  assert.match(route, /incrementRateLimitCounter\("gemini_daily_global", "all", DAY_SECONDS\)/);
-  const cap = route.indexOf("const dailyCap = dailyCapVerdict(dailyCounts, protection);");
-  assert.ok(cap > 0 && cap < route.indexOf("await askSalesEmployee(") && cap < route.indexOf("of streamSalesEmployee("));
-  const branch = route.slice(cap, route.indexOf("// Evaluate the burst counter", cap));
-  assert.match(branch, /flagConversationNeedsAttention\(/);
-  assert.match(branch, /answer: SOFT_LIMIT_MESSAGE/);
-  assert.match(branch, /event: "gemini_daily_cap_reached"/);
 });
 
 test("ops alerts are throttled: error + email once per window, info after", () => {

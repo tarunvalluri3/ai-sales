@@ -37,12 +37,10 @@ import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 import { CORS_HEADERS } from "@/lib/http/widget-cors";
 import { clientWantsStream, encodeStreamEvent, CHAT_STREAM_CONTENT_TYPE, type ChatStreamEvent } from "@/lib/chat-stream";
 import { logEvent } from "@/lib/logger";
-import { sendOpsAlert } from "@/lib/ops-alert";
+import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import {
   CHAT_RATE_LIMIT_WINDOW_SECONDS,
-  DAY_SECONDS,
   chatProtectionConfigFromEnv,
-  dailyCapVerdict,
   turnstileDecision,
   verifyTurnstileToken,
 } from "@/lib/chat-protection";
@@ -414,7 +412,7 @@ export async function POST(request: NextRequest) {
     // duplicate-submit guard, toLangchainHistory) relies on the current
     // question being the last element, and still gets exactly that. A
     // human-control turn wastes this one read; that branch is rare.
-    const [, userMessageRow, quota, burstCount, priorHistory, abuseStrikes, agentServing, dailyCounts] = await Promise.all([
+    const [, userMessageRow, quota, burstCount, priorHistory, abuseStrikes, agentServing] = await Promise.all([
       consentGiven
         ? timer.time("consent_write", () => recordConversationConsent(supabase, business.businessId, conversationRowId))
         : Promise.resolve(null),
@@ -439,14 +437,6 @@ export async function POST(request: NextRequest) {
       // Returns 0 without a query unless the abuse check is enforcing.
       countAbuseStrikes(supabase, business.businessId, conversationRowId),
       servingCheck,
-      // Item 3: the daily Gemini turn caps (per business, and global), one
-      // UTC-day counter each, incremented concurrently with the reads above.
-      timer.time("rate_limit_gemini_daily", () =>
-        Promise.all([
-          incrementRateLimitCounter("gemini_daily_business", business.businessId, DAY_SECONDS),
-          incrementRateLimitCounter("gemini_daily_global", "all", DAY_SECONDS),
-        ]).then(([businessCount, globalCount]) => ({ business: businessCount, global: globalCount })),
-      ),
     ]);
 
     // The subscription no longer lets this agent serve (lapsed past grace,
@@ -463,44 +453,6 @@ export async function POST(request: NextRequest) {
           answer: AGENT_UNAVAILABLE_MESSAGE,
           escalate: false,
           control: conversation.control,
-          asOf: userMessageRow.created_at,
-        }),
-      );
-    }
-
-    // Item 3: the daily Gemini cap. Over it, no model call is made: the
-    // visitor gets the fixed "a person will follow up" reply, the conversation
-    // is flagged for the team, and the owner is alerted (throttled to one
-    // email per hour per cap). Fail-open on a counter error.
-    const dailyCap = dailyCapVerdict(dailyCounts, protection);
-    if (!dailyCap.allowed) {
-      void sendOpsAlert({
-        event: "gemini_daily_cap_reached",
-        businessId: business.businessId,
-        subject:
-          dailyCap.which === "global"
-            ? "Daily Gemini cap reached for ALL businesses"
-            : "Daily Gemini cap reached for one business",
-        paragraphs: [
-          "The public chat stopped making AI calls for the rest of the UTC day. Visitors are told a person will follow up and the conversations are flagged.",
-          "Raise GEMINI_DAILY_TURN_CAP_PER_BUSINESS / GEMINI_DAILY_TURN_CAP_GLOBAL if this is real traffic.",
-        ],
-        facts: [
-          { label: "Cap", value: dailyCap.which },
-          { label: "Business", value: business.businessId },
-          { label: "Business turns today", value: String(dailyCounts.business ?? "unknown") },
-          { label: "All turns today", value: String(dailyCounts.global ?? "unknown") },
-        ],
-        throttleKey: dailyCap.which === "global" ? "gemini_daily_cap:global" : `gemini_daily_cap:${business.businessId}`,
-      });
-      await timer.time("escalation_flag", () =>
-        flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
-      );
-      return withCors(
-        jsonSuccess({
-          conversationId: conversation.id,
-          answer: SOFT_LIMIT_MESSAGE,
-          escalate: true,
           asOf: userMessageRow.created_at,
         }),
       );
@@ -736,6 +688,34 @@ export async function POST(request: NextRequest) {
           escalate: true,
           control: conversation.control,
           asOf: guardrailMessageRow.created_at,
+        }),
+      );
+    }
+
+    // Round 3, item 1: the daily AI reply caps, shared with WhatsApp and
+    // Instagram (lib/daily-reply-limit.ts). Counted here -- after human
+    // control, serving and the guardrail canned reply -- so only a turn that
+    // would really produce an AI reply is counted. Over a cap, or if the
+    // counter can't be read, no model call is made: the visitor gets the fixed
+    // "a person will follow up" reply (the response to their own request), the
+    // conversation is flagged and the owner is alerted once per cap per day.
+    const dailyLimit = await timer.time("rate_limit_gemini_daily", () =>
+      checkDailyReplyLimit({
+        supabase,
+        channel: "website",
+        businessId: business.businessId,
+        conversationId: conversationRowId,
+        clerkOrgId: business.clerkOrgId,
+        inboundAtMs: null,
+      }),
+    );
+    if (!dailyLimit.allowed) {
+      return withCors(
+        jsonSuccess({
+          conversationId: conversation.id,
+          answer: SOFT_LIMIT_MESSAGE,
+          escalate: true,
+          asOf: userMessageRow.created_at,
         }),
       );
     }

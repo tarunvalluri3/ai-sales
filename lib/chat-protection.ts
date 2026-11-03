@@ -1,7 +1,8 @@
 /**
  * Public-chat protection (production readiness item 3, 2026-11-03): the
  * configurable per-IP / per-key / per-conversation / per-business rate limits,
- * the daily Gemini turn caps, and Cloudflare Turnstile. Pure (no server-only,
+ * the daily Gemini reply caps' configuration (the caps themselves:
+ * lib/daily-reply-limit-rules.ts), and Cloudflare Turnstile. Pure (no server-only,
  * no I/O except the injected `fetch` in verifyTurnstileToken) so every branch
  * is unit-tested without a network or database (scripts/run-chat-protection-tests.mjs).
  *
@@ -32,9 +33,9 @@ export type ChatProtectionConfig = {
   conversationLimit: number;
   /** Per business across all its widget keys, per 5-minute window. Enforcing, fail-open. */
   businessLimit: number;
-  /** AI turns per business per UTC day on the public chat. 0 = no cap. Enforcing, fail-open. */
+  /** AI replies per business per UTC day, website + WhatsApp + Instagram. 0 = no cap. Enforcing, fail-CLOSED (lib/daily-reply-limit.ts). */
   geminiDailyTurnsPerBusiness: number;
-  /** AI turns per UTC day on the public chat across ALL businesses. 0 = no cap. Enforcing, fail-open. */
+  /** AI replies per UTC day across ALL businesses and channels. 0 = no cap. Enforcing, fail-CLOSED. */
   geminiDailyTurnsGlobal: number;
   turnstile: {
     mode: TurnstileMode;
@@ -52,7 +53,8 @@ export const DEFAULT_CHAT_PROTECTION = {
   conversationLimit: 20,
   businessLimit: 300,
   geminiDailyTurnsPerBusiness: 1_000,
-  geminiDailyTurnsGlobal: 20_000,
+  // Round 3 (owner decision 2026-11-03): 5,000 overall, was 20,000.
+  geminiDailyTurnsGlobal: 5_000,
 } as const;
 
 function intFromEnv(raw: string | undefined, fallback: number, min: number, max: number): number {
@@ -105,34 +107,6 @@ export function chatProtectionConfigFromEnv(env: Record<string, string | undefin
       expectedHostname: hostnameOf(env.NEXT_PUBLIC_APP_URL),
     },
   };
-}
-
-/* ------------------------------------------------------------------ *
- * Daily Gemini turn cap
- * ------------------------------------------------------------------ */
-
-export type DailyCapVerdict = { allowed: true } | { allowed: false; which: "business" | "global" };
-
-/**
- * `null` count = the counter read failed: the cap FAILS OPEN (a counter outage
- * must not silence every widget; the per-IP/key limits still apply and the
- * failure is logged by lib/rate-limit.ts). A cap of 0 means "no cap".
- */
-export function dailyCapVerdict(
-  counts: { business: number | null; global: number | null },
-  config: Pick<ChatProtectionConfig, "geminiDailyTurnsPerBusiness" | "geminiDailyTurnsGlobal">,
-): DailyCapVerdict {
-  if (config.geminiDailyTurnsGlobal > 0 && counts.global !== null && counts.global > config.geminiDailyTurnsGlobal) {
-    return { allowed: false, which: "global" };
-  }
-  if (
-    config.geminiDailyTurnsPerBusiness > 0 &&
-    counts.business !== null &&
-    counts.business > config.geminiDailyTurnsPerBusiness
-  ) {
-    return { allowed: false, which: "business" };
-  }
-  return { allowed: true };
 }
 
 /* ------------------------------------------------------------------ *

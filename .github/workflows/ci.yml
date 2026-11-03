@@ -76,6 +76,11 @@ jobs:
         # Turnstile verification (fetch mocked). Pure.
         run: npm run test:chat-protection
 
+      - name: Daily AI reply limit tests
+        # Round 3: shared per-business/overall daily caps on website, WhatsApp
+        # and Instagram; fail closed; one alert/notice. Side effects mocked. Pure.
+        run: npm run test:daily-reply-limit
+
       - name: WhatsApp Embedded Signup tests
         # Signup postMessage parsing, the onboarding steps and every failure
         # path, template submission/status parsing. Graph calls are mocked.
