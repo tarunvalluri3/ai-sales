@@ -214,9 +214,9 @@ test("migration: no FK to businesses (survives the cascade), RLS forced + deny p
   assert.match(sql, /create policy billing_cancellations_no_client_access[\s\S]*?as restrictive[\s\S]*?using \(false\)/);
 });
 
-test("free-trial and card requirements were not changed (a product decision for the owner)", () => {
-  // The onboarding billing step still keys on entitlement.serving and the
-  // trial trigger is untouched (LAUNCH_AUDIT.md §4).
+test("billing cancellation stays separate from the trial/card rules", () => {
+  // The onboarding billing step keys on entitlement.serving (no-card trial,
+  // 2026-11-03); the cancellation code never reads trial or card state.
   assert.match(read("lib/onboarding-steps.ts"), /serving/);
   for (const file of ["lib/billing-cancellation.ts", "lib/billing-cancellation-rules.ts"]) {
     assert.doesNotMatch(read(file), /trial_ends_at|hasPaymentMethod|payment_method/);
@@ -241,4 +241,65 @@ test("unsent invoice/credit-note emails are re-sent through the once-only ledger
   const emailInvoice = store.slice(store.indexOf("async function emailInvoice("), store.indexOf("async function emailCreditNote("));
   assert.ok(emailInvoice.indexOf("claimDocumentNotice(") < emailInvoice.indexOf("sendEmail("));
   assert.match(read("lib/scheduler/jobs.ts"), /name: "document_email_resend", schedule: \{ kind: "every", seconds: 60 \* MINUTE \}, timeoutMs: [\d_]+, retries: 0, run: resendUnsentDocumentEmails/);
+});
+
+// ------------------------------------- platform-admin deletes (item 2, 2026-11-03)
+
+function softDeletedBusinessDeps() {
+  // A SOFT-deleted business still has its subscriptions row.
+  const { deps, state } = deletedBusinessDeps();
+  const row = {
+    business_id: "00000000-0000-0000-0000-0000000000dd",
+    plan_key: "growth",
+    status: "active",
+    razorpay_subscription_id: DELETED_SUB,
+    current_period_start: "2026-11-01T00:00:00.000Z",
+    current_period_end: "2026-12-01T00:00:00.000Z",
+  };
+  deps.findSubscriptionByRazorpayId = async (id) => (id === DELETED_SUB ? row : null);
+  deps.findSubscriptionByBusinessId = async () => row;
+  return { deps, state };
+}
+
+test("a charge after an ADMIN SOFT-delete (row still present) takes the alert path, not the normal one", async () => {
+  const { deps, state } = softDeletedBusinessDeps();
+  const outcome = await processRazorpayEvent(deps, subscriptionEvent("subscription.charged"), "evt_soft_charge");
+  assert.equal(outcome, "deleted_business");
+  assert.equal(state.handled.length, 1);
+  assert.equal(state.updates.length, 0, "the dead tenant's subscription is not advanced");
+  assert.equal(state.invoices.length, 0, "no invoice for a deleted tenant");
+});
+
+test("a live business whose subscription has no cancellation record is processed normally", async () => {
+  const { deps, state } = softDeletedBusinessDeps();
+  const outcome = await processRazorpayEvent(deps, subscriptionEvent("subscription.cancelled", "sub_live"), "evt_live");
+  assert.notEqual(outcome, "deleted_business");
+  assert.equal(state.handled.length, 0);
+});
+
+test("/apache soft-delete and hard-delete record + attempt the cancellation BEFORE deleting, and refuse on failure", () => {
+  const source = read("lib/admin-tenant-actions.ts");
+  const soft = source.slice(source.indexOf("export async function softDeleteTenant("), source.indexOf("const hardDeleteSchema"));
+  assert.ok(soft.indexOf('cancelBillingBeforeAdminDelete(businessId, "admin_soft_deleted")') > 0);
+  assert.ok(soft.indexOf("cancelBillingBeforeAdminDelete(") < soft.indexOf(".update({ deleted_at"), "cancel first");
+  assert.match(soft, /if \(!billing\.ok\) return billing;/);
+  const hard = source.slice(source.indexOf("export async function hardDeleteTenant("));
+  assert.ok(hard.indexOf('cancelBillingBeforeAdminDelete(businessId, "admin_hard_deleted")') > 0);
+  assert.ok(hard.indexOf("cancelBillingBeforeAdminDelete(") < hard.indexOf('.from("businesses").delete()'), "cancel first");
+  const helper = source.slice(source.indexOf("async function cancelBillingBeforeAdminDelete("));
+  assert.match(helper, /recordCancellationForAdminDeletion\(businessId, reason\)/);
+});
+
+test("admin and owner deletes share one cancellation path; the charge alert has refund details and never refunds", () => {
+  const source = read("lib/billing-cancellation.ts");
+  assert.match(source, /return recordCancellation\(supabase, business, "business_deleted"\);/);
+  assert.match(source, /return recordCancellation\(supabase, business, reason\);/);
+  for (const label of ["Payment id", "Amount (INR)", "Razorpay customer", "Deleted by", "Deleted at (UTC)"]) {
+    assert.ok(source.includes(`label: "${label}"`), label);
+  }
+  assert.doesNotMatch(source, /createRefund|refunds\.create|\/refund/, "no automatic refund");
+  const webhook = read("lib/razorpay-webhook.ts");
+  assert.ok(webhook.indexOf("deps.handleDeletedBusinessEvent(") < webhook.indexOf("if (!resolved) {"), "cancellation record checked before the normal path");
+  const sql = read("supabase/migrations/20261122000000_billing_cancellation_admin_reasons.sql");
+  assert.match(sql, /'business_deleted', 'admin_soft_deleted', 'admin_hard_deleted'/);
 });

@@ -473,18 +473,22 @@ async function dispatch(
     return "unresolved";
   }
 
+  // Production readiness (item 6, extended 2026-11-03 to /apache deletes):
+  // a subscription whose business was deleted -- by the owner (row cascaded
+  // away) OR soft-deleted by a platform admin (row still present) -- is
+  // remembered in public.billing_cancellations. Checked BEFORE the normal
+  // path, so a charge after an admin soft-delete is alerted on instead of
+  // being applied to a dead tenant's subscription. A charge after deletion
+  // is never refunded automatically (lib/billing-cancellation.ts).
+  if (deps.handleDeletedBusinessEvent) {
+    const handled = await deps.handleDeletedBusinessEvent(subscriptionEntity.id, event, {
+      id: body.payload.payment?.entity.id ?? null,
+      amountPaise: body.payload.payment?.entity.amount ?? null,
+    });
+    if (handled) return "deleted_business";
+  }
+
   if (!resolved) {
-    // Production readiness (item 6): the business may have been DELETED
-    // (its subscriptions row cascaded away). public.billing_cancellations
-    // remembers its subscription id; a charge after deletion is alerted on
-    // and the cancellation retried at once (lib/billing-cancellation.ts).
-    if (deps.handleDeletedBusinessEvent) {
-      const handled = await deps.handleDeletedBusinessEvent(subscriptionEntity.id, event, {
-        id: body.payload.payment?.entity.id ?? null,
-        amountPaise: body.payload.payment?.entity.amount ?? null,
-      });
-      if (handled) return "deleted_business";
-    }
     // Verified as Razorpay's, but belongs to no row here. The most likely
     // cause is a subscription created against these keys by something
     // other than this app (a dashboard experiment, another environment

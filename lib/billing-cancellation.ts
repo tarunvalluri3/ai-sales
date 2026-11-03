@@ -46,27 +46,66 @@ type CancellationRow = {
   clerk_org_id: string;
   business_name: string | null;
   razorpay_subscription_id: string;
+  razorpay_customer_id: string | null;
+  reason: CancellationReason;
   status: "pending" | "cancelled" | "failed";
   attempts: number;
   charges_after_deletion: number;
+  created_at: string;
 };
 
-const ROW_COLUMNS = "id, business_id, clerk_org_id, business_name, razorpay_subscription_id, status, attempts, charges_after_deletion";
+const ROW_COLUMNS =
+  "id, business_id, clerk_org_id, business_name, razorpay_subscription_id, razorpay_customer_id, reason, status, attempts, charges_after_deletion, created_at";
 
 export type DeletionBillingOutcome = "nothing_to_cancel" | "cancelled" | "pending_retry";
 
 /**
- * Call immediately BEFORE deleting the business. Throws (refusing the
- * deletion) only if the durable record can't be written.
+ * Why the business stopped being a customer. The owner's own delete and both
+ * platform-admin deletes (/apache soft-delete and hard-delete) share this one
+ * path: record, cancel immediately, retry with backoff, alert.
+ */
+export type CancellationReason = "business_deleted" | "admin_soft_deleted" | "admin_hard_deleted";
+
+/**
+ * The owner's delete. Call immediately BEFORE deleting the business. Throws
+ * (refusing the deletion) only if the durable record can't be written.
  */
 export async function recordCancellationForDeletion(orgId: string): Promise<DeletionBillingOutcome> {
   const supabase = createServiceSupabaseClient();
   const { data: business } = await supabase
     .from("businesses")
-    .select("id, name")
+    .select("id, name, clerk_org_id")
     .eq("clerk_org_id", orgId)
-    .maybeSingle<{ id: string; name: string }>();
+    .maybeSingle<{ id: string; name: string; clerk_org_id: string }>();
   if (!business) return "nothing_to_cancel";
+  return recordCancellation(supabase, business, "business_deleted");
+}
+
+/**
+ * A platform-admin delete (/apache). Same path as the owner's: call BEFORE
+ * soft- or hard-deleting; throws (refusing the delete) only if the durable
+ * record can't be written.
+ */
+export async function recordCancellationForAdminDeletion(
+  businessId: string,
+  reason: Extract<CancellationReason, "admin_soft_deleted" | "admin_hard_deleted">,
+): Promise<DeletionBillingOutcome> {
+  const supabase = createServiceSupabaseClient();
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("id, name, clerk_org_id")
+    .eq("id", businessId)
+    .maybeSingle<{ id: string; name: string; clerk_org_id: string }>();
+  if (!business) return "nothing_to_cancel";
+  return recordCancellation(supabase, business, reason);
+}
+
+async function recordCancellation(
+  supabase: ServiceSupabaseClient,
+  business: { id: string; name: string; clerk_org_id: string },
+  reason: CancellationReason,
+): Promise<DeletionBillingOutcome> {
+  const orgId = business.clerk_org_id;
 
   const { data: subscription, error: readError } = await supabase
     .from("subscriptions")
@@ -91,6 +130,7 @@ export async function recordCancellationForDeletion(orgId: string): Promise<Dele
         business_name: business.name,
         razorpay_subscription_id: subscription!.razorpay_subscription_id!,
         razorpay_customer_id: subscription!.razorpay_customer_id,
+        reason,
         status: "pending",
         next_attempt_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -236,6 +276,7 @@ export async function handleDeletedBusinessEvent(
   }
 
   if (action === "charge_after_deletion") {
+    const amountInr = payment.amountPaise !== null ? (payment.amountPaise / 100).toFixed(2) : null;
     await supabase
       .from("billing_cancellations")
       .update({
@@ -250,17 +291,24 @@ export async function handleDeletedBusinessEvent(
     logEvent(
       "billing_charge_after_deletion",
       row.business_id,
-      { cancellationId: row.id, paymentId: payment.id, amountPaise: payment.amountPaise },
+      { cancellationId: row.id, paymentId: payment.id, amountPaise: payment.amountPaise, reason: row.reason },
       "error",
     );
+    // Never refunded automatically (owner decision 2026-11-03): the email
+    // carries everything needed to review and refund by hand.
     await alertOps(
       "ACTION NEEDED: a deleted customer was charged",
       [
-        "Razorpay charged a subscription that belongs to a business that has been deleted.",
-        "The cancellation is being retried now. Decide whether to refund this payment in the Razorpay dashboard.",
+        "Razorpay charged a subscription that belongs to a business that has been deleted. Nothing has been refunded automatically.",
+        "The cancellation is being retried now. To refund: Razorpay Dashboard > Transactions > Payments > search the payment id below > Issue Refund. The refund.processed webhook then issues the GST credit note.",
       ],
       row,
-      payment.id ? `payment ${payment.id}${payment.amountPaise ? `, ${payment.amountPaise / 100} INR` : ""}` : null,
+      null,
+      [
+        { label: "Payment id", value: payment.id ?? "unknown (see Razorpay)" },
+        { label: "Amount (INR)", value: amountInr ?? "unknown" },
+        { label: "Charges since deletion", value: String(row.charges_after_deletion + 1) },
+      ],
     );
     return true;
   }
@@ -270,7 +318,13 @@ export async function handleDeletedBusinessEvent(
 }
 
 /** Error-level event always (Sentry); email too when OPS_ALERT_EMAIL is set. Never throws. */
-async function alertOps(subject: string, paragraphs: string[], row: CancellationRow, detail: string | null): Promise<void> {
+async function alertOps(
+  subject: string,
+  paragraphs: string[],
+  row: CancellationRow,
+  detail: string | null,
+  extraFacts: { label: string; value: string }[] = [],
+): Promise<void> {
   const to = process.env.OPS_ALERT_EMAIL?.trim();
   if (!to) return;
   try {
@@ -284,11 +338,26 @@ async function alertOps(subject: string, paragraphs: string[], row: Cancellation
           { label: "Business (deleted)", value: row.business_name ?? row.business_id },
           { label: "Clerk org", value: row.clerk_org_id },
           { label: "Razorpay subscription", value: row.razorpay_subscription_id },
+          { label: "Razorpay customer", value: row.razorpay_customer_id ?? "unknown" },
+          { label: "Deleted by", value: describeReason(row.reason) },
+          { label: "Deleted at (UTC)", value: row.created_at },
+          ...extraFacts,
           ...(detail ? [{ label: "Detail", value: detail }] : []),
         ],
       }),
     });
   } catch {
     logEvent("ops_alert_email_failed", row.business_id, { cancellationId: row.id }, "error");
+  }
+}
+
+function describeReason(reason: CancellationReason): string {
+  switch (reason) {
+    case "admin_soft_deleted":
+      return "platform admin (soft-delete in /apache)";
+    case "admin_hard_deleted":
+      return "platform admin (permanent delete in /apache)";
+    default:
+      return "the business owner";
   }
 }
