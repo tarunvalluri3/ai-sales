@@ -15,7 +15,7 @@ import { getEntitlementForBusiness, getBillingIdentityForBusiness, channelNotEnt
 import { checkReplyQuota } from "@/lib/usage-limit";
 import { isRazorpayConfigured } from "@/lib/razorpay";
 import { ORDERED_PLANS, GST_RATE_PERCENT, TRIAL_DAYS } from "@/lib/plans";
-import { entitlementConfigFromEnv } from "@/lib/entitlement-rules";
+import { channelLaunchSwitchesFromEnv, describeLaunchedTrialChannels, entitlementConfigFromEnv } from "@/lib/entitlement-rules";
 import { SUPPLIER } from "@/lib/invoice-config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { loadReadinessReport, getFaqGeneratedDocStatuses } from "@/lib/onboarding-readiness-data";
@@ -386,6 +386,7 @@ async function buildPlanStep(
       supplierStateName={SUPPLIER.stateName}
       trialReplyQuota={entitlementConfigFromEnv().trialReplyQuota}
       trialDays={TRIAL_DAYS}
+      trialChannels={describeLaunchedTrialChannels(channelLaunchSwitchesFromEnv())}
     />
   );
 }

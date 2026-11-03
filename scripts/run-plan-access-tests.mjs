@@ -252,3 +252,33 @@ test("UI: onboarding Continue needs the server's serving verdict; pricing shows 
   assert.match(pricing, /const \{ trialReplyQuota \} = entitlementConfigFromEnv\(\);/);
   assert.doesNotMatch(pricing, /not included in any plan above/);
 });
+
+// ------------------------------------- launch switches (item 7)
+
+test("launch switches: WhatsApp and Instagram switch off independently; default on; never add a channel", () => {
+  assert.deepEqual(rules.channelLaunchSwitchesFromEnv({}), { whatsapp: true, instagram: true });
+  assert.deepEqual(rules.channelLaunchSwitchesFromEnv({ CHANNEL_INSTAGRAM_ENABLED: "false" }), { whatsapp: true, instagram: false });
+  assert.deepEqual(rules.channelLaunchSwitchesFromEnv({ CHANNEL_WHATSAPP_ENABLED: "OFF" }), { whatsapp: false, instagram: true });
+  for (const off of ["0", "no", " off "]) assert.equal(rules.channelLaunchSwitchesFromEnv({ CHANNEL_WHATSAPP_ENABLED: off }).whatsapp, false, off);
+  const trial = rules.entitlementFromRow(row(), NOW, CONFIG);
+  const igOff = rules.applyLaunchSwitches(trial.channels, { whatsapp: true, instagram: false });
+  assert.deepEqual(igOff, { website: true, whatsapp: true, instagram: false }, "WhatsApp can launch before Instagram");
+  const waOff = rules.applyLaunchSwitches(trial.channels, { whatsapp: false, instagram: true });
+  assert.deepEqual(waOff, { website: true, whatsapp: false, instagram: true }, "Instagram can launch before WhatsApp");
+  const starter = rules.entitlementFromRow(paidRow("starter"), NOW, CONFIG);
+  assert.deepEqual(rules.applyLaunchSwitches(starter.channels, { whatsapp: true, instagram: true }), starter.channels, "never adds");
+  // The App Review override still reopens Instagram while it's off for everyone.
+  assert.equal(plans.applyChannelOverrides(igOff, { instagramEnabled: true }).instagram, true);
+});
+
+test("launch copy lists only launched channels; server gates and pricing read the same switch", () => {
+  assert.equal(rules.describeLaunchedTrialChannels({ whatsapp: true, instagram: true }), "your website widget, WhatsApp and Instagram");
+  assert.equal(rules.describeLaunchedTrialChannels({ whatsapp: true, instagram: false }), "your website widget and WhatsApp");
+  assert.equal(rules.describeLaunchedTrialChannels({ whatsapp: false, instagram: false }), "your website widget");
+  const subscription = read("lib/subscription.ts");
+  assert.match(subscription, /applyChannelOverrides\(applyLaunchSwitches\(planEntitlement\.channels, channelLaunchSwitchesFromEnv\(\)\)/);
+  assert.match(subscription, /isn't available yet -- we're waiting for Meta's approval/);
+  const pricing = read("app/(dashboard)/pricing/page.tsx");
+  assert.match(pricing, /const launch = channelLaunchSwitchesFromEnv\(\);/);
+  assert.match(pricing, /\(coming soon\)/);
+});

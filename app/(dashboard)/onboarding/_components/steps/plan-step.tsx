@@ -79,6 +79,7 @@ export function PlanStep({
   supplierStateName,
   trialReplyQuota,
   trialDays,
+  trialChannels,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -89,6 +90,8 @@ export function PlanStep({
   supplierStateName: string;
   trialReplyQuota: number;
   trialDays: number;
+  /** e.g. "your website widget, WhatsApp and Instagram" -- only the launched channels. */
+  trialChannels: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -146,7 +149,7 @@ export function PlanStep({
               {trialDays} days or {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first
               {entitlement.trialEndsAt ? ` (ends ${formatDate(entitlement.trialEndsAt)})` : ""}.
             </li>
-            <li>Includes your website widget, WhatsApp and Instagram.</li>
+            <li>Includes {trialChannels}.</li>
             <li>
               {usage.degraded
                 ? "Replies used: unavailable right now."

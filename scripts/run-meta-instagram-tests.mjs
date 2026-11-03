@@ -328,7 +328,8 @@ test("access: the override changes only Instagram; Instagram has the same plan a
 
 test("access: getEntitlement merges the override and reads it fail-closed", () => {
   const subscription = read("lib/subscription.ts");
-  assert.match(subscription, /applyChannelOverrides\(planEntitlement\.channels, \{ instagramEnabled \}\)/);
+  // Item 7 (2026-11-03): launch switches apply first, then the override.
+  assert.match(subscription, /applyChannelOverrides\(applyLaunchSwitches\(planEntitlement\.channels, channelLaunchSwitchesFromEnv\(\)\), \{\s*instagramEnabled,\s*\}\)/);
   assert.match(subscription, /\.select\("instagram_enabled"\)[\s\S]*?if \(error\) \{[\s\S]*?return false;/);
   assert.match(subscription, /return data\?\.instagram_enabled === true;/);
 });

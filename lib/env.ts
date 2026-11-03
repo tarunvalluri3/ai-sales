@@ -130,6 +130,10 @@ const envSchema = z.object({
   GEMINI_DAILY_TURN_CAP_PER_BUSINESS: z.string().regex(/^\d+$/, "must be a whole number (0 = no cap)").optional(),
   GEMINI_DAILY_TURN_CAP_GLOBAL: z.string().regex(/^\d+$/, "must be a whole number (0 = no cap)").optional(),
   TURNSTILE_MODE: z.enum(["off", "log", "enforce"]).optional(),
+  // Launch switches (item 7): turn WhatsApp or Instagram off for the whole
+  // deployment while its Meta approval is pending. Default on.
+  CHANNEL_WHATSAPP_ENABLED: z.enum(["true", "false", "on", "off", "1", "0", "yes", "no"]).optional(),
+  CHANNEL_INSTAGRAM_ENABLED: z.enum(["true", "false", "on", "off", "1", "0", "yes", "no"]).optional(),
   TURNSTILE_SITE_KEY: z.string().min(1).optional(),
   TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
 });

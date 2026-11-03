@@ -61,7 +61,15 @@ Last updated: 2026-11-03 (**Production readiness work from LAUNCH_AUDIT.md -- br
 - `test:whatsapp-embedded-signup` 16/16, all Graph calls mocked.
 - Sending still uses the `WHATSAPP_TEMPLATE_*` names, so set them to the suggested names.
 
-**NOT done yet (next session, in this order):** 7 (separate config switches for Instagram and WhatsApp). Also: recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
+**Item 7 DONE (independent launch switches).**
+- `CHANNEL_WHATSAPP_ENABLED` and `CHANNEL_INSTAGRAM_ENABLED`: false/off/0/no turns the channel off for the whole deployment; the default is on.
+- Applied inside `getEntitlement` (`applyLaunchSwitches`), so every server gate follows them: connect, webhooks, send queues, onboarding, Embedded Signup. The owner sees "isn't available yet -- waiting for Meta's approval".
+- The per-business Instagram override still works while Instagram is off, which is what the App Review test account needs.
+- Pricing and the trial copy list only the launched channels and mark the others "(coming soon)".
+- Launch scope unchanged: website + WhatsApp + Instagram.
+- `test:plan-access` now 18/18.
+
+**NOT done yet (next session, in this order):** recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
 
 ## Production readiness (LAUNCH_AUDIT.md items 1-9) -- 2026-11-03 -- branch `production-readiness`, NOT merged, NOT pushed, migrations NOT applied
 

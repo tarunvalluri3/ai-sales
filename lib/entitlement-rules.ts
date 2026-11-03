@@ -269,6 +269,47 @@ export function channelAllowed(entitlement: Pick<Entitlement, "serving" | "chann
 }
 
 /* ------------------------------------------------------------------ *
+ * Launch switches (production readiness item 7, 2026-11-03)
+ *
+ * WhatsApp and Instagram depend on separate Meta approvals that may land on
+ * different days. Each can be switched off for the whole deployment without
+ * touching plans: CHANNEL_WHATSAPP_ENABLED / CHANNEL_INSTAGRAM_ENABLED
+ * ("false", "off", "0" or "no" = off; anything else or unset = on). Applied in
+ * getEntitlement before the per-business Instagram override, so the Meta App
+ * Review test account (businesses.instagram_enabled) still works while
+ * Instagram is off for everyone else. The website widget has no switch.
+ * ------------------------------------------------------------------ */
+
+export type ChannelLaunchSwitches = { whatsapp: boolean; instagram: boolean };
+
+function switchOn(raw: string | undefined): boolean {
+  if (raw === undefined) return true;
+  return !["false", "off", "0", "no"].includes(raw.trim().toLowerCase());
+}
+
+export function channelLaunchSwitchesFromEnv(env: Record<string, string | undefined> = process.env): ChannelLaunchSwitches {
+  return { whatsapp: switchOn(env.CHANNEL_WHATSAPP_ENABLED), instagram: switchOn(env.CHANNEL_INSTAGRAM_ENABLED) };
+}
+
+/** A plan's (or trial's) channels with switched-off channels removed. Never adds a channel. */
+export function applyLaunchSwitches(
+  channels: Readonly<Record<ChannelKey, boolean>>,
+  switches: ChannelLaunchSwitches,
+): Readonly<Record<ChannelKey, boolean>> {
+  return {
+    website: channels.website,
+    whatsapp: channels.whatsapp && switches.whatsapp,
+    instagram: channels.instagram && switches.instagram,
+  };
+}
+
+/** "website, WhatsApp and Instagram" -- the trial's channels as launched, for copy. */
+export function describeLaunchedTrialChannels(switches: ChannelLaunchSwitches): string {
+  const names = ["your website widget", ...(switches.whatsapp ? ["WhatsApp"] : []), ...(switches.instagram ? ["Instagram"] : [])];
+  return names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+/* ------------------------------------------------------------------ *
  * Last-known entitlement, for read failures.
  *
  * Kept in process memory: when the subscriptions read fails the database is

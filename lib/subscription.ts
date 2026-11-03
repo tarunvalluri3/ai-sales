@@ -7,7 +7,9 @@ import { PLAN_KEYS, applyChannelOverrides, type ChannelKey } from "@/lib/plans";
 import {
   LastKnownEntitlementStore,
   SUBSCRIPTION_STATUSES,
+  applyLaunchSwitches,
   channelAllowed,
+  channelLaunchSwitchesFromEnv,
   entitlementConfigFromEnv,
   entitlementFromRow,
   entitlementOnReadFailure,
@@ -78,9 +80,13 @@ export async function getEntitlement(
     getPlanEntitlement(supabase, businessId, now),
     readInstagramOverride(supabase, businessId),
   ]);
+  // Item 7: deployment-wide launch switches first (a Meta approval not in
+  // yet), then the per-business Instagram override (the App Review account).
   return {
     ...planEntitlement,
-    channels: applyChannelOverrides(planEntitlement.channels, { instagramEnabled }),
+    channels: applyChannelOverrides(applyLaunchSwitches(planEntitlement.channels, channelLaunchSwitchesFromEnv()), {
+      instagramEnabled,
+    }),
   };
 }
 
@@ -237,6 +243,10 @@ export async function isWhatsappAllowed(supabase: SupabaseClient, businessId: st
 export function channelNotEntitledMessage(channel: ChannelKey, entitlement: Entitlement): string {
   const channelName =
     channel === "whatsapp" ? "WhatsApp messaging" : channel === "instagram" ? "Instagram messaging" : "This channel";
+  const switches = channelLaunchSwitchesFromEnv();
+  if ((channel === "whatsapp" && !switches.whatsapp) || (channel === "instagram" && !switches.instagram)) {
+    return `${channelName} isn't available yet -- we're waiting for Meta's approval. Your website widget works in the meantime.`;
+  }
   if (!entitlement.serving) {
     return entitlement.notServingReason === "trial_already_used"
       ? `${channelName} needs a Growth or Scale plan. This organisation has already used its free trial.`

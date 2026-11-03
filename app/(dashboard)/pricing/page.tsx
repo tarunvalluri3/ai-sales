@@ -6,7 +6,7 @@ import {
   formatPaiseAsInr,
   formatReplyQuota,
 } from "@/lib/plans";
-import { entitlementConfigFromEnv } from "@/lib/entitlement-rules";
+import { channelLaunchSwitchesFromEnv, describeLaunchedTrialChannels, entitlementConfigFromEnv } from "@/lib/entitlement-rules";
 import { MicroChip } from "@/components/marketing/fragments/_shared";
 
 export const metadata = {
@@ -58,6 +58,15 @@ export const dynamic = "force-dynamic";
 
 export default function PricingPage() {
   const { trialReplyQuota } = entitlementConfigFromEnv();
+  // Item 7: a channel switched off for launch is shown as "coming soon", never
+  // sold as available -- the same switch the server enforces.
+  const launch = channelLaunchSwitchesFromEnv();
+  const trialChannels = describeLaunchedTrialChannels(launch);
+  const featureLabel = (feature: string): string => {
+    if (feature.startsWith("WhatsApp") && !launch.whatsapp) return `${feature.replace(" *", "")} (coming soon)`;
+    if (feature.startsWith("Instagram") && !launch.instagram) return `${feature.replace(" *", "")} (coming soon)`;
+    return feature;
+  };
   return (
     <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
@@ -69,8 +78,8 @@ export default function PricingPage() {
           <h1 className="text-3xl font-semibold text-ds-text-primary">Pricing</h1>
           <p className="text-sm leading-relaxed text-ds-text-secondary">
             One AI sales employee, grounded in your own business. Start with a {TRIAL_DAYS}-day free
-            trial — no card required, up to {trialReplyQuota.toLocaleString("en-IN")} AI replies, on your
-            website, WhatsApp and Instagram. Cancel any time.
+            trial — no card required, up to {trialReplyQuota.toLocaleString("en-IN")} AI replies, on{" "}
+            {trialChannels}. Cancel any time.
           </p>
           <p className="text-2xs text-ds-text-muted">
             All prices are in Indian Rupees and inclusive of {GST_RATE_PERCENT}% GST — the price you
@@ -122,7 +131,7 @@ export default function PricingPage() {
                     <span aria-hidden="true" className="text-ds-accent">
                       ✓
                     </span>
-                    <span>{feature}</span>
+                    <span>{featureLabel(feature)}</span>
                   </li>
                 ))}
               </ul>
@@ -145,8 +154,8 @@ export default function PricingPage() {
           <Section title="Free trial">
             <p>
               Every new business starts with a free trial. No card is needed. It lasts {TRIAL_DAYS} days
-              or {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first, and includes
-              your website widget, WhatsApp and Instagram.
+              or {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first, and includes{" "}
+              {trialChannels}.
             </p>
             <p>
               When the trial ends, your AI stops replying to prospects until you choose a plan — nothing
@@ -168,6 +177,17 @@ export default function PricingPage() {
               <em>your own</em> Instagram professional account, linked to a Facebook Page. Starter
               includes neither WhatsApp nor Instagram.
             </p>
+            {!launch.whatsapp || !launch.instagram ? (
+              <p>
+                {!launch.whatsapp && !launch.instagram
+                  ? "WhatsApp and Instagram are"
+                  : !launch.whatsapp
+                    ? "WhatsApp is"
+                    : "Instagram is"}{" "}
+                <strong>coming soon</strong>: we&apos;re waiting for Meta&apos;s approval. They switch on for
+                Growth, Scale and trial accounts as soon as it arrives.
+              </p>
+            ) : null}
           </Section>
 
           <Section title="What counts as an AI reply">
