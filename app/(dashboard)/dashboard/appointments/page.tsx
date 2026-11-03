@@ -17,6 +17,7 @@ const STATUS_FILTERS: { value: "all" | AppointmentStatus; label: string }[] = [
   { value: "no_show", label: "No-show" },
   { value: "declined", label: "Declined" },
   { value: "cancelled", label: "Cancelled" },
+  { value: "expired", label: "Expired" },
 ];
 
 export default async function AppointmentsPage({

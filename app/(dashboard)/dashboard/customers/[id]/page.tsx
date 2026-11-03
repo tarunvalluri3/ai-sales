@@ -27,6 +27,7 @@ const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
   cancelled: "Cancelled",
   completed: "Completed",
   no_show: "No-show",
+  expired: "Expired",
 };
 
 function formatDate(iso: string): string {
@@ -144,7 +145,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
                 {appointments.map((appointment) => (
                   <li key={appointment.id} className="flex items-center justify-between gap-2 rounded-ds-sm px-2 py-1.5 text-sm">
                     <span className="text-ds-text-primary">{formatDate(appointment.starts_at)}</span>
-                    <Badge tone={appointment.status === "confirmed" || appointment.status === "completed" ? "success" : appointment.status === "declined" || appointment.status === "cancelled" || appointment.status === "no_show" ? "danger" : "warning"} size="sm">
+                    <Badge tone={appointment.status === "confirmed" || appointment.status === "completed" ? "success" : appointment.status === "declined" || appointment.status === "cancelled" || appointment.status === "no_show" || appointment.status === "expired" ? "danger" : "warning"} size="sm">
                       {APPOINTMENT_STATUS_LABEL[appointment.status]}
                     </Badge>
                   </li>

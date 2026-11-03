@@ -349,6 +349,77 @@ export async function sendAppointmentStatusEmail(
   return outcome;
 }
 
+export type AppointmentLifecycleEmailKind = "reminder" | "expired";
+
+const LIFECYCLE_EMAIL: Record<
+  AppointmentLifecycleEmailKind,
+  { subject: (businessName: string) => string; heading: string; canReply: string; cannotReply: string }
+> = {
+  reminder: {
+    subject: (businessName) => `Reminder: your appointment with ${businessName}`,
+    heading: "Your appointment is coming up",
+    canReply: "We look forward to speaking with you. If anything changes, just reply to this email.",
+    cannotReply: "We look forward to speaking with you. Please get in touch if anything changes.",
+  },
+  expired: {
+    subject: (businessName) => `Your appointment request with ${businessName} couldn't be confirmed in time`,
+    heading: "We couldn't confirm that time",
+    canReply: "Your requested time wasn't confirmed in time, so the slot has been released. Reply to this email to book another time.",
+    cannotReply: "Your requested time wasn't confirmed in time, so the slot has been released. Please get back in touch to book another time.",
+  },
+};
+
+/**
+ * Production readiness (item 5): the prospect's reminder before a confirmed
+ * appointment, and the notice that an unconfirmed booking expired. Same
+ * sender, reply-to and never-throws contract as sendAppointmentStatusEmail().
+ * Sent only from lib/appointment-lifecycle.ts, after the dedup ledger row
+ * (appointment_notifications) was claimed, so each goes out at most once.
+ */
+export async function sendAppointmentLifecycleEmail(
+  businessId: string,
+  to: string,
+  kind: AppointmentLifecycleEmailKind,
+  label: string,
+): Promise<SendEmailOutcome> {
+  if (!process.env.RESEND_API_KEY) {
+    logEvent("appointment_lifecycle_email_skipped_no_api_key", businessId, { kind });
+    return "skipped_no_api_key";
+  }
+
+  const supabase = createServiceSupabaseClient();
+  const { data: business } = await supabase.from("businesses").select("name, contact_email").eq("id", businessId).maybeSingle();
+  const businessName = business?.name ?? "the business";
+  const replyTo = business?.contact_email ?? null;
+  const copy = LIFECYCLE_EMAIL[kind];
+
+  const outcome = await sendEmail({
+    to,
+    subject: copy.subject(businessName),
+    onBehalfOf: businessName,
+    replyTo,
+    email: renderBrandedEmail({
+      senderName: businessName,
+      heading: copy.heading,
+      paragraphs: [replyTo ? copy.canReply : copy.cannotReply],
+      facts: [
+        { label: "With", value: businessName },
+        { label: "When", value: label },
+      ],
+      footnote: replyTo
+        ? `Sent on behalf of ${businessName} by Waves AI Pilot. Replies go straight to ${businessName}.`
+        : `Sent on behalf of ${businessName} by Waves AI Pilot.`,
+    }),
+  });
+
+  if (outcome === "failed") {
+    logEvent("appointment_lifecycle_email_send_failed", businessId, { kind }, "error");
+  } else {
+    logEvent(`appointment_lifecycle_email_${outcome}`, businessId, { kind });
+  }
+  return outcome;
+}
+
 /**
  * Immediate acknowledgement to the PROSPECT at booking time (2026-10-21).
  *

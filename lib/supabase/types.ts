@@ -313,7 +313,7 @@ export type LeadTag = {
  * its time) or, once its time has passed, marked 'completed'/'no_show'
  * (2026-09-10 follow-up -- whether the meeting actually happened).
  */
-export type AppointmentStatus = "pending" | "confirmed" | "declined" | "cancelled" | "completed" | "no_show";
+export type AppointmentStatus = "pending" | "confirmed" | "declined" | "cancelled" | "completed" | "no_show" | "expired";
 
 export type Appointment = {
   id: string;

@@ -13,6 +13,7 @@ import { runBillingLifecycleSweep } from "@/lib/billing-lifecycle";
 import { processAnswerBankJobs } from "@/lib/answer-bank/generate";
 import { computeDailyRollup } from "@/lib/analytics-rollup";
 import { recoverStuckInboundReplies } from "@/lib/inbound-reply-recovery";
+import { runAppointmentLifecycleSweep } from "@/lib/appointment-lifecycle";
 import type { ScheduledJob } from "@/lib/scheduler/runner";
 
 /**
@@ -60,6 +61,9 @@ export const SCHEDULED_JOBS: ScheduledJob[] = [
   { name: "answer_bank", schedule: { kind: "every", seconds: 5 * MINUTE }, timeoutMs: 50_000, run: processAnswerBankJobs },
   // Time-based sweeps, deduped by their own state.
   { name: "sla_escalation", schedule: { kind: "every", seconds: 5 * MINUTE }, timeoutMs: 40_000, run: runSlaEscalationSweep },
+  // Reminders (24 h / 1 h) and expiry of unconfirmed bookings; each notice is
+  // deduped by appointment_notifications, so a retry never sends it twice.
+  { name: "appointment_lifecycle", schedule: { kind: "every", seconds: 5 * MINUTE }, timeoutMs: 50_000, run: () => runAppointmentLifecycleSweep() },
   { name: "url_refresh", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 55_000, retries: 0, run: refreshDueUrlKnowledgeSources },
   { name: "no_activity_workflows", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 40_000, run: runNoActivityWorkflowSweep },
   { name: "billing_lifecycle", schedule: { kind: "every", seconds: 60 * MINUTE }, timeoutMs: 50_000, run: () => runBillingLifecycleSweep() },

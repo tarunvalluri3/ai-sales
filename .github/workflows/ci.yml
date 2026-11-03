@@ -85,6 +85,12 @@ jobs:
         # policy, template config, status callbacks. Pure.
         run: npm run test:whatsapp-window
 
+      - name: Appointment reminder and expiry tests
+        # Production readiness item 5: 24 h / 1 h reminder windows, pending
+        # expiry (48 h / 2 h before start), dedup-ledger claim before every
+        # send, business time zone in labels. Pure.
+        run: npm run test:appointment-lifecycle
+
       - name: Plan pricing / GST arithmetic tests
         # Phase 17a: prices are GST-inclusive and the taxable/CGST/SGST/IGST
         # split is derived from them (lib/plans.ts). Money-and-tax arithmetic

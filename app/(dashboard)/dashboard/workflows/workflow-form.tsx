@@ -67,7 +67,7 @@ function TriggerConfigFields({
   if (triggerType === "appointment_status_changed") {
     return (
       <select value={config.status ?? "pending"} onChange={(event) => onChange({ ...config, status: event.target.value })} className={SELECT_CLASS}>
-        {(["pending", "confirmed", "declined", "cancelled", "completed", "no_show"] as const).map((status) => (
+        {(["pending", "confirmed", "declined", "cancelled", "completed", "no_show", "expired"] as const).map((status) => (
           <option key={status} value={status}>
             {status.replace("_", "-")}
           </option>
