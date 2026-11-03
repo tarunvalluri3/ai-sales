@@ -6,6 +6,7 @@ import { BillingPanel } from "../../../dashboard/billing/billing-panel";
 import type { BillingIdentityValues } from "../../../dashboard/billing/billing-details";
 import { advanceOnboarding } from "../../actions";
 import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
+import { trialVsStarterNote, type ConnectedMetaChannels } from "@/lib/plan-channel-copy";
 
 type PlanSummary = {
   key: "starter" | "growth" | "scale";
@@ -81,6 +82,8 @@ export function PlanStep({
   trialReplyQuota,
   trialDays,
   trialChannels,
+  metaChannelNames,
+  connectedChannels,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -93,7 +96,11 @@ export function PlanStep({
   trialDays: number;
   /** e.g. "your website widget, WhatsApp and Instagram" -- only the launched channels. */
   trialChannels: string;
+  /** Launched Meta channels ("WhatsApp and Instagram"), or null when none is launched. */
+  metaChannelNames: string | null;
+  connectedChannels: ConnectedMetaChannels;
 }) {
+  const starterNote = trialVsStarterNote(metaChannelNames);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +139,8 @@ export function PlanStep({
       gstRatePercent={gstRatePercent}
       supplierStateName={supplierStateName}
       onConfirmingChange={setConfirming}
+      metaChannelNames={metaChannelNames}
+      connectedChannels={connectedChannels}
     />
   );
 
@@ -151,6 +160,7 @@ export function PlanStep({
               {entitlement.trialEndsAt ? ` (ends ${formatDate(entitlement.trialEndsAt)})` : ""}.
             </li>
             <li>Includes {trialChannels}.</li>
+            {starterNote ? <li className="font-medium text-ds-text-primary">{starterNote}</li> : null}
             <li>
               {usage.degraded
                 ? "Replies used: unavailable right now."

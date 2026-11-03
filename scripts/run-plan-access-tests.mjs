@@ -356,3 +356,80 @@ test("trial per user: clear message with the paid plans next to it, on onboardin
   assert.match(read("app/(dashboard)/pricing/page.tsx"), /one free trial per person and one per organisation/);
   assert.doesNotMatch(read("lib/trial-messages.ts"), /import "server-only"/, "client components import it");
 });
+
+// ------------------------------------- trial vs Starter messaging (round 3, item 3)
+
+const copy = await import(new URL("../lib/plan-channel-copy.ts", import.meta.url).href);
+
+test("copy: launched Meta channel names follow the launch switches", () => {
+  assert.equal(copy.launchedMetaChannelNames({ whatsapp: true, instagram: true }), "WhatsApp and Instagram");
+  assert.equal(copy.launchedMetaChannelNames({ whatsapp: true, instagram: false }), "WhatsApp");
+  assert.equal(copy.launchedMetaChannelNames({ whatsapp: false, instagram: true }), "Instagram");
+  assert.equal(copy.launchedMetaChannelNames({ whatsapp: false, instagram: false }), null);
+});
+
+test("copy: plan card channel line matches lib/plans.ts channels (no access change)", () => {
+  for (const key of ["starter", "growth", "scale"]) {
+    const label = copy.planChannelsLabel(key, "WhatsApp and Instagram");
+    const hasMeta = plans.PLANS[key].channels.whatsapp && plans.PLANS[key].channels.instagram;
+    assert.equal(label.includes("WhatsApp and Instagram"), hasMeta, `${key}: label agrees with PLANS`);
+  }
+  assert.equal(copy.planChannelsLabel("starter", "WhatsApp and Instagram"), "Website chat only");
+  assert.equal(copy.planChannelsLabel("growth", null), "Website chat only", "nothing launched: never sold");
+});
+
+test("copy: trial vs Starter note names the launched channels; none when nothing is launched", () => {
+  const note = copy.trialVsStarterNote("WhatsApp and Instagram");
+  assert.match(note, /The free trial includes WhatsApp and Instagram\. Starter does not/);
+  assert.match(note, /choose Growth or Scale/);
+  assert.equal(copy.trialVsStarterNote(null), null);
+});
+
+test("warning: only when Starter is picked AND a Meta channel is connected; generic when unknown", () => {
+  const none = { whatsapp: false, instagram: false };
+  const wa = { whatsapp: true, instagram: false };
+  const both = { whatsapp: true, instagram: true };
+  assert.equal(copy.starterChannelLossWarning("growth", both), null, "not Starter");
+  assert.equal(copy.starterChannelLossWarning("scale", null), null);
+  assert.equal(copy.starterChannelLossWarning("starter", none), null, "nothing to lose");
+  assert.match(copy.starterChannelLossWarning("starter", wa), /Starter does not include WhatsApp\. Your connected WhatsApp is not part/);
+  assert.doesNotMatch(copy.starterChannelLossWarning("starter", wa), /Instagram/);
+  assert.match(copy.starterChannelLossWarning("starter", both), /WhatsApp and Instagram are not part[\s\S]*keep them/);
+  assert.match(copy.starterChannelLossWarning("starter", { whatsapp: false, instagram: true }), /connected Instagram is not part[\s\S]*keep it/);
+  assert.match(copy.starterChannelLossWarning("starter", null), /If you have connected either/, "read failure still warns");
+});
+
+test("plan picker: Starter + connected channel needs an explicit acknowledgement before Continue", () => {
+  const panel = read("app/(dashboard)/dashboard/billing/billing-panel.tsx");
+  assert.match(panel, /const starterWarning = starterChannelLossWarning\(selectedPlan, connectedChannels\);/);
+  assert.match(panel, /\(starterWarning !== null && !starterLossAcknowledged\) \|\|/, "submit disabled until ticked");
+  assert.match(panel, /setSelectedPlan\(plan\.key\);\s*setStarterLossAcknowledged\(false\);/, "re-asked after changing the selection");
+  assert.match(panel, /role="alert"/);
+  assert.match(panel, /I understand and still want Starter\./);
+  assert.match(panel, /\{planChannelsLabel\(plan\.key, metaChannelNames\)\}/);
+  assert.match(panel, /const trialNote = entitlement\.isTrial \? trialVsStarterNote\(metaChannelNames\) : null;/);
+});
+
+test("pricing, trial and upgrade screens all use the shared copy; connections read safely", () => {
+  const pricing = read("app/(dashboard)/pricing/page.tsx");
+  assert.match(pricing, /const starterNote = trialVsStarterNote\(metaNames\);/);
+  assert.match(pricing, /\{planChannelsLabel\(plan\.key, metaNames\)\}/);
+  const step = read("app/(dashboard)/onboarding/_components/steps/plan-step.tsx");
+  assert.match(step, /const starterNote = trialVsStarterNote\(metaChannelNames\);/);
+  assert.match(step, /connectedChannels=\{connectedChannels\}/);
+  assert.match(read("app/(dashboard)/onboarding/page.tsx"), /connectedMetaChannelsFrom\(whatsapp, instagram\)/);
+  const billing = read("app/(dashboard)/dashboard/billing/page.tsx");
+  assert.match(billing, /loadConnectedMetaChannels\(businessId\)/);
+  const loader = read("lib/connected-meta-channels.ts");
+  assert.match(loader, /\} catch \{\s*logEvent\("connected_meta_channels_read_failed", businessId, \{\}, "error"\);\s*return null;/);
+  assert.match(loader, /status === "connected"/);
+});
+
+test("prices and plan access are unchanged by the messaging work", () => {
+  assert.equal(plans.PLANS.starter.monthlyPricePaise, 149_900);
+  assert.equal(plans.PLANS.growth.monthlyPricePaise, 399_900);
+  assert.equal(plans.PLANS.scale.monthlyPricePaise, 999_900);
+  assert.deepEqual({ ...plans.PLANS.starter.channels }, { website: true, whatsapp: false, instagram: false });
+  assert.deepEqual({ ...plans.PLANS.growth.channels }, { website: true, whatsapp: true, instagram: true });
+  assert.deepEqual({ ...plans.TRIAL_CHANNELS }, { website: true, whatsapp: true, instagram: true });
+});

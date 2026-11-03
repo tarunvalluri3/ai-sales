@@ -8,6 +8,7 @@ import {
 } from "@/lib/plans";
 import { channelLaunchSwitchesFromEnv, describeLaunchedTrialChannels, entitlementConfigFromEnv } from "@/lib/entitlement-rules";
 import { MicroChip } from "@/components/marketing/fragments/_shared";
+import { launchedMetaChannelNames, planChannelsLabel, trialVsStarterNote } from "@/lib/plan-channel-copy";
 
 export const metadata = {
   title: "Pricing | Waves AI Pilot",
@@ -62,6 +63,9 @@ export default function PricingPage() {
   // sold as available -- the same switch the server enforces.
   const launch = channelLaunchSwitchesFromEnv();
   const trialChannels = describeLaunchedTrialChannels(launch);
+  // Round 3, item 3: the trial has WhatsApp/Instagram, Starter does not.
+  const metaNames = launchedMetaChannelNames(launch);
+  const starterNote = trialVsStarterNote(metaNames);
   const featureLabel = (feature: string): string => {
     if (feature.startsWith("WhatsApp") && !launch.whatsapp) return `${feature.replace(" *", "")} (coming soon)`;
     if (feature.startsWith("Instagram") && !launch.instagram) return `${feature.replace(" *", "")} (coming soon)`;
@@ -123,6 +127,7 @@ export default function PricingPage() {
                   {formatReplyQuota(plan.monthlyReplyQuota)}
                 </p>
                 <p className="text-ds-text-secondary">{plan.seatsLabel}</p>
+                <p className="text-ds-text-secondary">{planChannelsLabel(plan.key, metaNames)}</p>
               </div>
 
               <ul className="flex flex-1 flex-col gap-2 text-sm text-ds-text-secondary">
@@ -157,6 +162,7 @@ export default function PricingPage() {
               or {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first, and includes{" "}
               {trialChannels}.
             </p>
+            {starterNote ? <p className="font-medium text-ds-text-primary">{starterNote}</p> : null}
             <p>
               When the trial ends, your AI stops replying to prospects until you choose a plan — nothing
               is charged automatically. There is one free trial per person and one per organisation,

@@ -10,6 +10,9 @@ import { listBillingDocuments } from "@/lib/invoice-queries";
 import { SUPPLIER } from "@/lib/invoice-config";
 import { GST_RATE_PERCENT, ORDERED_PLANS, PLANS, formatPaiseAsInr } from "@/lib/plans";
 import { PermissionNotice } from "../_components/state-views";
+import { loadConnectedMetaChannels } from "@/lib/connected-meta-channels";
+import { launchedMetaChannelNames } from "@/lib/plan-channel-copy";
+import { channelLaunchSwitchesFromEnv } from "@/lib/entitlement-rules";
 import { BillingPanel } from "./billing-panel";
 import { BillingDetailsCard } from "./billing-details";
 import { PaymentHistory } from "./payment-history";
@@ -55,13 +58,15 @@ export default async function BillingPage() {
   }
 
   const supabase = createServerSupabaseClient();
-  const [entitlement, quota, identity, documents] = await Promise.all([
+  const [entitlement, quota, identity, documents, connectedChannels] = await Promise.all([
     getEntitlementForBusiness(businessId),
     // The same count the chat path enforces on, so the number shown here
     // and the number that stops the AI are the same number.
     checkReplyQuota(supabase, businessId),
     getBillingIdentityForBusiness(businessId),
     listBillingDocuments(businessId),
+    // Round 3, item 3: warn before Starter would cut off a connected channel.
+    loadConnectedMetaChannels(businessId),
   ]);
 
   const configured = isRazorpayConfigured();
@@ -139,6 +144,8 @@ export default async function BillingPage() {
 
       <BillingPanel
         configured={configured}
+        metaChannelNames={launchedMetaChannelNames(channelLaunchSwitchesFromEnv())}
+        connectedChannels={connectedChannels}
         entitlement={{
           planKey: entitlement.planKey,
           planName: entitlement.planName,

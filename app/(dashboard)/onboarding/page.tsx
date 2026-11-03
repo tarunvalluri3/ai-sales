@@ -16,6 +16,8 @@ import { checkReplyQuota } from "@/lib/usage-limit";
 import { isRazorpayConfigured } from "@/lib/razorpay";
 import { ORDERED_PLANS, GST_RATE_PERCENT, TRIAL_DAYS } from "@/lib/plans";
 import { channelLaunchSwitchesFromEnv, describeLaunchedTrialChannels, entitlementConfigFromEnv } from "@/lib/entitlement-rules";
+import { connectedMetaChannelsFrom } from "@/lib/connected-meta-channels";
+import { launchedMetaChannelNames, type ConnectedMetaChannels } from "@/lib/plan-channel-copy";
 import { SUPPLIER } from "@/lib/invoice-config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { loadReadinessReport, getFaqGeneratedDocStatuses } from "@/lib/onboarding-readiness-data";
@@ -238,7 +240,7 @@ export default async function OnboardingPage({
             entitlement.isTrial && entitlement.serving
               ? "Your free trial is already active. Choose a paid plan now or any time before it ends."
               : "Upgrades take effect straight away; downgrades at your next renewal.",
-          content: await buildPlanStep(businessId, business.name, entitlement),
+          content: await buildPlanStep(businessId, business.name, entitlement, connectedMetaChannelsFrom(whatsapp, instagram)),
           footer: null,
         };
       case "review":
@@ -337,6 +339,7 @@ async function buildPlanStep(
   businessId: string,
   businessName: string,
   entitlement: Awaited<ReturnType<typeof getEntitlementForBusiness>>,
+  connectedChannels: ConnectedMetaChannels,
 ) {
   const supabase = createServerSupabaseClient();
   const [quota, identity] = await Promise.all([
@@ -387,6 +390,8 @@ async function buildPlanStep(
       trialReplyQuota={entitlementConfigFromEnv().trialReplyQuota}
       trialDays={TRIAL_DAYS}
       trialChannels={describeLaunchedTrialChannels(channelLaunchSwitchesFromEnv())}
+      metaChannelNames={launchedMetaChannelNames(channelLaunchSwitchesFromEnv())}
+      connectedChannels={connectedChannels}
     />
   );
 }

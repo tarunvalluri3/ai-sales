@@ -3,10 +3,17 @@
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
+import { AlertTriangle } from "lucide-react";
 import { useToast } from "../_components/toast";
 import { BillingDetailsFields, type BillingIdentityValues } from "./billing-details";
 import { GstBreakdown } from "./gst-breakdown";
 import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
+import {
+  planChannelsLabel,
+  starterChannelLossWarning,
+  trialVsStarterNote,
+  type ConnectedMetaChannels,
+} from "@/lib/plan-channel-copy";
 import {
   cancelSubscriptionAction,
   changePlanAction,
@@ -114,6 +121,8 @@ export function BillingPanel({
   gstRatePercent,
   supplierStateName,
   onConfirmingChange,
+  metaChannelNames,
+  connectedChannels,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -124,12 +133,21 @@ export function BillingPanel({
   supplierStateName: string;
   /** Lets a host (the onboarding plan step) hold its Continue button while the server verifies a payment. */
   onConfirmingChange?: (confirming: boolean) => void;
+  /** Launched Meta channels, e.g. "WhatsApp and Instagram" (lib/plan-channel-copy.ts); null = none launched. */
+  metaChannelNames: string | null;
+  /** WhatsApp / Instagram connected right now, for the "you'd lose it on Starter" warning. */
+  connectedChannels: ConnectedMetaChannels;
 }) {
   const router = useRouter();
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [interval, setInterval] = useState<"monthly" | "annual">(entitlement.billingInterval ?? "monthly");
   const [selectedPlan, setSelectedPlan] = useState(entitlement.planKey);
+  // Round 3, item 3: picking Starter with WhatsApp/Instagram connected needs
+  // an explicit "I understand" first. Reset whenever the selection changes.
+  const [starterLossAcknowledged, setStarterLossAcknowledged] = useState(false);
+  const starterWarning = starterChannelLossWarning(selectedPlan, connectedChannels);
+  const trialNote = entitlement.isTrial ? trialVsStarterNote(metaChannelNames) : null;
   const [scriptReady, setScriptReady] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
@@ -340,6 +358,7 @@ export function BillingPanel({
             Upgrades take effect straight away and you pay only the difference for the rest of your
             period. Downgrades take effect at your next renewal, so you keep what you have paid for.
           </p>
+          {trialNote ? <p className="text-sm font-medium text-ds-text-primary">{trialNote}</p> : null}
         </div>
 
         <fieldset className="flex flex-col gap-2">
@@ -372,7 +391,10 @@ export function BillingPanel({
               <li key={plan.key}>
                 <button
                   type="button"
-                  onClick={() => setSelectedPlan(plan.key)}
+                  onClick={() => {
+                    setSelectedPlan(plan.key);
+                    setStarterLossAcknowledged(false);
+                  }}
                   aria-pressed={selected}
                   className={`flex w-full flex-col gap-1 rounded-ds-md border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
                     selected
@@ -400,6 +422,9 @@ export function BillingPanel({
                     {plan.monthlyReplyQuota.toLocaleString("en-IN")} AI replies / month ·{" "}
                     {plan.seatsLabel}
                   </span>
+                  <span className="text-2xs font-medium text-ds-text-secondary">
+                    {planChannelsLabel(plan.key, metaChannelNames)}
+                  </span>
                 </button>
               </li>
             );
@@ -417,6 +442,27 @@ export function BillingPanel({
             idPrefix="checkout"
           />
 
+          {starterWarning ? (
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+            >
+              <p className="flex items-start gap-2 text-sm text-ds-text-primary">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+                <span>{starterWarning}</span>
+              </p>
+              <label className="flex items-start gap-2 text-sm text-ds-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={starterLossAcknowledged}
+                  onChange={(event) => setStarterLossAcknowledged(event.target.checked)}
+                  className="mt-0.5 size-4 accent-ds-accent"
+                />
+                <span>I understand and still want Starter.</span>
+              </label>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="submit"
@@ -426,6 +472,7 @@ export function BillingPanel({
                 startPending ||
                 changePending ||
                 checkoutOpen ||
+                (starterWarning !== null && !starterLossAcknowledged) ||
                 (selectedPlan === entitlement.planKey && isSubscribed && interval === entitlement.billingInterval)
               }
               className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
