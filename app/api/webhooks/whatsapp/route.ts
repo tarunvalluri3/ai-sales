@@ -17,6 +17,7 @@ import {
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { canAgentServe } from "@/lib/agent-serving";
+import { isWhatsappAllowed } from "@/lib/subscription";
 import { prepareProspectMessage, type PreparedProspectMessage } from "@/lib/guardrails/prepare-message";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
 import { resolveInputGuardrailAction } from "@/lib/guardrails/response-policy";
@@ -190,7 +191,19 @@ async function ingestInboundMessage(
   }
   const { businessId } = resolved;
 
-  const waIdAllowed = await checkAndIncrementRateLimit("whatsapp_webhook", message.from, WA_ID_LIMIT, RATE_LIMIT_WINDOW_SECONDS);
+  // WhatsApp only on a plan that includes it (Growth/Scale) or an active free
+  // trial (owner decision 2026-11-03). Otherwise the message is neither stored
+  // nor answered (still a 200, so Meta does not retry). Checked with the
+  // sender rate limit in one round trip, before any write -- same shape as the
+  // Instagram webhook.
+  const [whatsappAllowed, waIdAllowed] = await Promise.all([
+    isWhatsappAllowed(supabase, businessId),
+    checkAndIncrementRateLimit("whatsapp_webhook", message.from, WA_ID_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+  ]);
+  if (!whatsappAllowed) {
+    logEvent("whatsapp_not_allowed", businessId, {}, "info");
+    return null;
+  }
   if (!waIdAllowed) {
     logEvent("rate_limit_exceeded", businessId, { scope: "whatsapp_webhook" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return null;

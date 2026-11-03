@@ -114,12 +114,15 @@ export async function checkReplyQuota(
     .gte("created_at", entitlement.periodStart);
 
   if (error || count === null) {
-    logEvent("usage_quota_check_failed", businessId, { planKey: entitlement.planKey }, "error");
+    logEvent("usage_quota_check_failed", businessId, { planKey: entitlement.planKey, isTrial: entitlement.isTrial }, "error");
     return {
       // Still honours a hard stop (an expired trial or a lapsed grace
       // period), because that verdict came from the subscription row and
-      // not from the count that just failed.
-      allowed: entitlement.serving,
+      // not from the count that just failed. A FREE TRIAL fails closed here
+      // (owner decision 2026-11-03: the trial's usage limit is hard, so an
+      // uncountable trial turn is refused); a paid plan stays fail-open so a
+      // metrics blip never silences a paying customer.
+      allowed: entitlement.serving && !entitlement.isTrial,
       repliesUsed: 0,
       replyQuota: entitlement.replyQuota,
       entitlement,

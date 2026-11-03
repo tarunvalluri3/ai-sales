@@ -20,7 +20,7 @@ export const WIZARD_STAGES: ReadonlyArray<{
   { key: "train", label: "Train your agent", subtitle: "Knowledge, products & FAQs" },
   { key: "persona", label: "Personality", subtitle: "How your agent sounds" },
   { key: "channels", label: "Channels", subtitle: "Where prospects can chat" },
-  { key: "plan", label: "Plan & billing", subtitle: "Choose how you pay" },
+  { key: "plan", label: "Plan & billing", subtitle: "Free trial, no card" },
   { key: "review", label: "Test & go live", subtitle: "Publish your agent" },
 ];
 

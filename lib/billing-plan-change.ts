@@ -121,7 +121,7 @@ export async function changePlan(params: {
   const row = await readBillingSubscription(supabase, params.businessId);
 
   if (!row) {
-    // No row and no grandfathered materialisation yet: this is a first
+    // No row yet: this is a first
     // subscription, not a change.
     return {
       outcome: "checkout_required",

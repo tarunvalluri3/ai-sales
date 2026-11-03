@@ -4,6 +4,7 @@ import { logEvent } from "@/lib/logger";
 import { AppError } from "@/lib/errors";
 import { flagConversationNeedsAttention } from "@/lib/conversations";
 import { getWhatsappAccessToken } from "@/lib/whatsapp-token";
+import { isWhatsappAllowed } from "@/lib/subscription";
 import {
   buildWhatsappPayload,
   classifyWhatsappSendError,
@@ -125,6 +126,7 @@ export type WhatsappSendResult = {
   success: boolean;
   sentAs?: "text" | "template";
   reason?:
+    | "whatsapp_not_allowed"
     | "no_credentials"
     | "outside_24h_window"
     | "template_not_configured"
@@ -252,11 +254,20 @@ async function deliverWhatsappOutboundRow(
   supabase: ServiceSupabaseClient,
   outbound: WhatsappOutboundRow,
 ): Promise<WhatsappSendResult> {
-  const [accessToken, lastInbound] = await Promise.all([
+  const [allowed, accessToken, lastInbound] = await Promise.all([
+    // The one place every send passes through (AI, staff, appointment
+    // notices, cron retries): no WhatsApp on the plan (or a lapsed trial or
+    // plan) means no send -- owner decision 2026-11-03.
+    isWhatsappAllowed(supabase, outbound.business_id),
     // Decrypted here, only for the Authorization header (lib/whatsapp-token.ts).
     getWhatsappAccessToken(supabase, outbound.business_id),
     lastInboundAt(supabase, outbound.business_id, outbound.conversation_id),
   ]);
+
+  if (!allowed) {
+    await failPermanently(supabase, outbound, "whatsapp_not_allowed");
+    return { success: false, reason: "whatsapp_not_allowed" };
+  }
 
   if (!accessToken) {
     await failPermanently(supabase, outbound, "no_credentials");

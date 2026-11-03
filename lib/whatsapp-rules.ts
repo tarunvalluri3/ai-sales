@@ -168,6 +168,8 @@ export function whatsappStaffReplyNotice(reason: string | undefined): string | u
       return "Saved, but not sent: WhatsApp rejected our access. Reconnect WhatsApp on the WhatsApp page.";
     case "recipient_unreachable":
       return "Saved, but not sent: WhatsApp says this number can't receive messages.";
+    case "whatsapp_not_allowed":
+      return "Saved, but not sent: WhatsApp needs an active free trial or a Growth or Scale plan. See Billing.";
     default:
       return "Saved, but not sent: WhatsApp rejected the message. The conversation has been flagged.";
   }

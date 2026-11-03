@@ -60,7 +60,7 @@ type EntitlementSummary = {
   planKey: "starter" | "growth" | "scale";
   planName: string;
   status: string;
-  grandfathered: boolean;
+  noSubscription: boolean;
   isTrial: boolean;
   serving: boolean;
   notServingReason: string | null;
@@ -132,7 +132,7 @@ export function BillingPanel({
   const [scriptReady, setScriptReady] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  const isSubscribed = entitlement.hasPaymentMethod && !entitlement.grandfathered;
+  const isSubscribed = entitlement.hasPaymentMethod && !entitlement.noSubscription;
 
   const [startState, startFormAction, startPending] = useActionState<BillingActionState, FormData>(
     startCheckoutAction,
@@ -522,7 +522,7 @@ function CurrentPlanCard({
         <Fact
           label="Payment method"
           value={
-            entitlement.grandfathered || !entitlement.hasPaymentMethod
+            entitlement.noSubscription || !entitlement.hasPaymentMethod
               ? "None on file"
               : entitlement.billingInterval === "annual"
                 ? "Card, paid for the year"
@@ -572,10 +572,11 @@ function CurrentPlanCard({
         </p>
       ) : null}
 
-      {entitlement.grandfathered ? (
+      {entitlement.noSubscription ? (
         <p className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
-          You have been with us since before we introduced plans, so you are on Scale-level
-          entitlements at no charge. Nothing changes until you choose a plan yourself.
+          {entitlement.notServingReason === "subscription_unavailable"
+            ? "We could not load your plan just now, so AI replies are paused. Please refresh in a minute -- if this continues, contact support."
+            : "There is no plan on this account, so your AI is not replying to prospects. Choose a plan below to switch it on."}
         </p>
       ) : null}
     </section>
@@ -584,9 +585,12 @@ function CurrentPlanCard({
 
 function describeStatus(entitlement: EntitlementSummary): string {
   if (entitlement.isTrial) {
+    if (!entitlement.serving) {
+      return "Your free trial has ended, so your AI is not replying to prospects. Choose a plan to switch it back on.";
+    }
     return entitlement.hasPaymentMethod
       ? `Free trial. Your plan starts automatically when it ends on ${formatDate(entitlement.periodEnd)}.`
-      : `Free trial, with no payment method yet. It will stop on ${formatDate(entitlement.periodEnd)} unless you choose a plan.`;
+      : `Free trial -- no card needed. It stops on ${formatDate(entitlement.periodEnd)}, or sooner if you use all your trial replies, unless you choose a plan.`;
   }
   if (entitlement.status === "past_due") {
     const failed = entitlement.pastDueSince ? ` on ${formatDate(entitlement.pastDueSince)}` : "";
@@ -596,6 +600,9 @@ function describeStatus(entitlement: EntitlementSummary): string {
   }
   if (entitlement.status === "cancelled") {
     return `Cancelled. You keep full access until ${formatDate(entitlement.periodEnd)}.`;
+  }
+  if (entitlement.notServingReason === "trial_already_used") {
+    return "This organisation has already used its free trial, so your AI is not replying to prospects. Choose a plan to switch it on.";
   }
   if (entitlement.status === "expired") {
     return "This plan has ended, so your AI is not replying to prospects. Choose a plan to switch it back on.";

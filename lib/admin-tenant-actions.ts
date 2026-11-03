@@ -145,7 +145,7 @@ export async function changeTenantPlan(businessId: string, input: { planKey: Pla
   const { data: before } = await supabase.from("subscriptions").select("plan_key").eq("business_id", businessId).maybeSingle();
 
   if (!before) {
-    return { ok: false, error: "This tenant has no subscription row yet (it is on the grandfathered default) -- a plan change needs a real row, which this action does not create. Use Razorpay checkout or create one directly first." };
+    return { ok: false, error: "This tenant has no subscription row (no paid access) -- a plan change needs a real row, which this action does not create. Use Razorpay checkout or create one directly first." };
   }
 
   const { error } = await supabase.from("subscriptions").update({ plan_key: parsed.data.planKey }).eq("business_id", businessId);

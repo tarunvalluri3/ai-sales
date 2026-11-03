@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { connectWhatsappNumber, disconnectWhatsappNumber } from "@/lib/whatsapp";
-import { channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
+import { channelAllowed, channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -45,7 +45,7 @@ export async function connectWhatsappAction(
   // Disconnecting is deliberately NOT gated: a business must always be
   // able to detach its own Meta credentials, whatever it is paying for.
   const entitlement = await getEntitlementForBusiness(businessId);
-  if (!entitlement.channels.whatsapp) {
+  if (!channelAllowed(entitlement, "whatsapp")) {
     return { error: channelNotEntitledMessage("whatsapp", entitlement) };
   }
 

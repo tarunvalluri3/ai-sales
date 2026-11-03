@@ -319,10 +319,11 @@ test("access: Instagram is allowed when the plan includes it OR the business ove
   assert.equal(plans.applyChannelOverrides(on, { instagramEnabled: true }).instagram, true);
 });
 
-test("access: the override changes only Instagram, and no plan includes Instagram today", () => {
+test("access: the override changes only Instagram; Instagram has the same plan access as WhatsApp", () => {
   const starter = { website: true, whatsapp: false, instagram: false };
   assert.deepEqual(plans.applyChannelOverrides(starter, { instagramEnabled: true }), { website: true, whatsapp: false, instagram: true });
-  for (const key of plans.PLAN_KEYS) assert.equal(plans.PLANS[key].channels.instagram, false, key);
+  for (const key of plans.PLAN_KEYS) assert.equal(plans.PLANS[key].channels.instagram, plans.PLANS[key].channels.whatsapp, key);
+  assert.equal(plans.PLANS.starter.channels.instagram, false);
 });
 
 test("access: getEntitlement merges the override and reads it fail-closed", () => {

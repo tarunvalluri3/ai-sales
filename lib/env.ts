@@ -109,6 +109,11 @@ const envSchema = z.object({
   USD_TO_INR_RATE: z.string().regex(/^\d+(\.\d+)?$/, "must be a positive number").optional(),
   HEALTH_SCHEDULER_MAX_AGE_MINUTES: z.string().regex(/^\d+$/, "must be a positive integer (minutes)").optional(),
   PIPELINE_PART_B: z.string().optional(),
+  // Plan access and trials (2026-11-03, lib/entitlement-rules.ts). Both have
+  // safe defaults: 200 trial replies; keep the last known plan for 24 h when a
+  // subscription read fails (0 disables the fallback).
+  TRIAL_REPLY_QUOTA: z.string().regex(/^\d+$/, "must be a whole number 1-100000").optional(),
+  SUBSCRIPTION_LAST_KNOWN_MAX_HOURS: z.string().regex(/^\d+(\.\d+)?$/, "must be a number of hours 0-168").optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

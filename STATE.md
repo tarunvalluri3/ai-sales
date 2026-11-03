@@ -6,6 +6,18 @@ Last updated: 2026-11-03 (**Production readiness work from LAUNCH_AUDIT.md -- br
 
 ---
 
+## Production readiness round 2 -- 2026-11-03 -- branch `production-readiness`, NOT pushed, migration NOT applied
+
+**Item 1 DONE (plan access and trials).** Owner decisions: no-card trial with a hard reply cap; one trial per org (delete+recreate included); the trial includes website + WhatsApp + Instagram; WhatsApp and Instagram are on Growth/Scale only (not Starter); no subscription row = no paid access; a failed subscription read keeps the last known plan for 24 h (`SUBSCRIPTION_LAST_KNOWN_MAX_HOURS`), then no paid access, logged and alerted as `subscription_read_degraded`. The row-less test accounts were deliberately left alone, so they lose paid access.
+- `lib/entitlement-rules.ts` (pure, tested): entitlement from row, `channelAllowed` (serving AND channel), last-known store (caches rows and re-evaluates them at read time), config parsing. `lib/subscription.ts` reads the row and alerts via the new `lib/ops-alert.ts` (throttled email to `OPS_ALERT_EMAIL`).
+- Trial cap is `TRIAL_REPLY_QUOTA` (default **200**: unchanged from the cap advertised and confirmed on 2026-10-21, enough to try the agent on real prospects, and Gemini spend per trial stays bounded). If the reply count can't be read during a trial, the turn is refused (hard limit); paid plans stay fail-open.
+- WhatsApp gated in the webhook ingest, the send queue (`whatsapp_not_allowed` + staff notice), the connect action and the page; Instagram's gate now also requires `serving`.
+- Migration `20261121000000_trial_once_per_org.sql` (NOT applied): `trial_grants` (no FK, RLS forced, deny policy, backfilled from existing businesses) + replaced trial trigger (a second business for the same org gets an `expired` row). pgTAP `073` written, not run (CLI linked to prod).
+- Checkout without a row now creates an `expired` Starter placeholder (no free Scale). Onboarding plan step = "Your free trial is on, no card needed" with an optional paid plan; pricing page (now rendered per request) shows the configured trial cap, the trial section, and Instagram on Growth/Scale. GST-inclusive prices unchanged.
+- Checks: lint clean, typecheck clean, all 30 `test:*` suites pass (run with Supabase/Gemini/provider env removed). Build not run yet.
+
+**NOT done yet (next session, in this order):** item 2 (make the /apache soft-delete use the owner-delete Razorpay cancel/retry/alert path), 3 (Turnstile + per-IP/per-business limits + daily Gemini cap), 4 (configurable protected prod ref), 5 (migration timestamps: analysis so far says new migrations must be dated after `20261120000000` or `db push` rejects them as out of order; use `20261121…`+ and add an order check, never rename applied ones), 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: blocking local `next dev` against prod (with an override flag); recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
+
 ## Production readiness (LAUNCH_AUDIT.md items 1-9) -- 2026-11-03 -- branch `production-readiness`, NOT merged, NOT pushed, migrations NOT applied
 
 Worked from `LAUNCH_AUDIT.md` (left uncommitted, as asked; it now has a "Remediation update" section). **Safety:** `.env.local` and `supabase/.temp/project-ref` both target production `bykeztxvejpwfcxgsubm`, so no pgTAP, migration, seed or DB script was run; unit suites ran with Supabase/Gemini env removed; the build ran with the Sentry upload token, Supabase service key, Gemini keys and provider secrets blanked. No Gemini/Meta/WhatsApp/Razorpay/Clerk call was made.

@@ -143,7 +143,7 @@ export default async function BillingPage() {
           planKey: entitlement.planKey,
           planName: entitlement.planName,
           status: entitlement.status,
-          grandfathered: entitlement.grandfathered,
+          noSubscription: entitlement.noSubscription,
           isTrial: entitlement.isTrial,
           serving: entitlement.serving,
           notServingReason: entitlement.notServingReason,

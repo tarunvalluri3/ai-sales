@@ -18,8 +18,9 @@ export function PlatformConfigDisplay({ settings }: { settings: ReturnType<typeo
           <p className="text-lg font-semibold text-ds-text-primary">{settings.trialDays} days</p>
         </div>
         <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-          <p className="text-xs text-ds-text-muted">Trial reply quota</p>
+          <p className="text-xs text-ds-text-muted">Trial reply quota (TRIAL_REPLY_QUOTA)</p>
           <p className="text-lg font-semibold text-ds-text-primary">{settings.trialReplyQuota.toLocaleString()}</p>
+          <p className="text-2xs text-ds-text-muted">Last-known plan kept {settings.subscriptionLastKnownMaxHours} h on a read failure</p>
         </div>
         <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
           <p className="text-xs text-ds-text-muted">Past-due grace period</p>

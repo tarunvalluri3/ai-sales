@@ -14,8 +14,8 @@ import { getEntitlement } from "@/lib/subscription";
  * `trialing` and `active` serve; `past_due` serves until the grace period
  * (PAST_DUE_GRACE_DAYS) runs out; `cancelled` serves to the end of the period
  * already paid for; `expired` and an expired trial do not. A business with no
- * subscription row is a pre-billing tenant and serves (lib/subscription.ts's
- * GRANDFATHERED_PLAN_KEY).
+ * subscription row does NOT serve (owner decision 2026-11-03,
+ * lib/entitlement-rules.ts).
  *
  * Cached per serverless instance for a few seconds, the same way the widget
  * context is (lib/widget-auth.ts): it saves a database round trip on a busy
@@ -23,9 +23,9 @@ import { getEntitlement } from "@/lib/subscription";
  * this one within the TTL. Short on purpose -- a lapsed customer must stop
  * being served promptly, and a recovered one must come back promptly.
  *
- * Fails open on a read error, exactly like `getEntitlement`: a database blip
- * must never be the reason a paying customer's widget goes quiet. The error is
- * logged at "error" level there.
+ * On a read error this follows `getEntitlement`: the last known plan for up
+ * to SUBSCRIPTION_LAST_KNOWN_MAX_HOURS, otherwise not serving; logged and
+ * alerted there.
  */
 const SERVING_CACHE_TTL_MS = 15_000;
 const SERVING_CACHE_MAX_ENTRIES = 500;

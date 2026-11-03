@@ -23,12 +23,12 @@
  * below -- nothing is added on top at display or checkout time, and
  * Phase 17b's invoices must split the gross the same way (STATE.md).
  *
- * Channel entitlements are **data**, not code. Instagram is `false` on
- * every plan today -- not because the feature is missing (Phase 26 built
- * it) but because Meta App Review and Business Verification gate serving
- * an account this app does not itself manage (STATE.md). The day that
- * clears, Instagram ships on Growth and Scale by editing two booleans
- * below. No migration, no deploy-order problem, no second source of truth.
+ * Channel entitlements are **data**, not code. Owner decision 2026-11-03:
+ * Instagram has the same plan access as WhatsApp (Growth and Scale, not
+ * Starter), and the free trial includes all three channels (TRIAL_CHANNELS).
+ * Whether a Meta channel is switched on for this deployment at all (e.g.
+ * while Meta App Review is pending) is separate launch configuration, not a
+ * plan fact.
  */
 
 export const PLAN_KEYS = ["starter", "growth", "scale"] as const;
@@ -50,9 +50,18 @@ export type ChannelKey = (typeof CHANNEL_KEYS)[number];
  */
 export const GST_RATE_PERCENT = 18;
 
-/** Confirmed 2026-10-21: 14 days, 200 AI replies, one per organisation ever. */
+/**
+ * Confirmed 2026-10-21: 14 days, one per organisation ever (enforced across
+ * delete + recreate by trial_grants, migration 20261121000000). No card is
+ * required (owner decision 2026-11-03). TRIAL_DAYS must match the trigger's
+ * interval. TRIAL_REPLY_QUOTA is the DEFAULT hard cap; the server reads the
+ * configured value from the TRIAL_REPLY_QUOTA env var (lib/entitlement-rules.ts).
+ */
 export const TRIAL_DAYS = 14;
 export const TRIAL_REPLY_QUOTA = 200;
+
+/** Owner decision 2026-11-03: the free trial includes every channel. */
+export const TRIAL_CHANNELS: Readonly<Record<ChannelKey, boolean>> = { website: true, whatsapp: true, instagram: true };
 
 /**
  * Confirmed 2026-10-21: after a failed payment a business keeps serving
@@ -82,8 +91,9 @@ export type PlanDefinition = {
  * Prices, quotas, seats, taglines and feature lists are exactly the ones
  * the pricing page has published since 2026-10-19 (user-confirmed
  * 2026-10-21); this phase moved them, it did not change them. The
- * WhatsApp footnote marker is kept in Growth's feature list because the
- * page still renders that footnote underneath the cards.
+ * WhatsApp/Instagram footnote marker is kept in Growth's feature list because
+ * the page renders that footnote underneath the cards. Instagram was added to
+ * Growth and Scale on 2026-11-03 (owner decision: same access as WhatsApp).
  */
 export const PLANS = {
   starter: {
@@ -115,10 +125,11 @@ export const PLANS = {
     monthlyReplyQuota: 3_000,
     seatsLabel: "3 team members",
     featured: true,
-    channels: { website: true, whatsapp: true, instagram: false },
+    channels: { website: true, whatsapp: true, instagram: true },
     features: [
       "Everything in Starter",
       "WhatsApp Business messaging *",
+      "Instagram direct messages *",
       "Product and service recommendations with photos",
       "Appointment booking with availability rules",
       "Knowledge from file upload and website import (up to 200 documents)",
@@ -136,7 +147,7 @@ export const PLANS = {
     monthlyReplyQuota: 10_000,
     seatsLabel: "10 team members",
     featured: false,
-    channels: { website: true, whatsapp: true, instagram: false },
+    channels: { website: true, whatsapp: true, instagram: true },
     features: [
       "Everything in Growth",
       "Automation workflows with delays and conditions",
@@ -311,7 +322,7 @@ type AdvertisedMonthlyPricePaise = { starter: 149_900; growth: 399_900; scale: 9
 type AdvertisedAnnualPricePaise = { starter: 1_499_000; growth: 3_999_000; scale: 9_999_000 };
 type AdvertisedMonthlyReplyQuota = { starter: 1_000; growth: 3_000; scale: 10_000 };
 type AdvertisedWhatsappIncluded = { starter: false; growth: true; scale: true };
-type AdvertisedInstagramIncluded = { starter: false; growth: false; scale: false };
+type AdvertisedInstagramIncluded = { starter: false; growth: true; scale: true };
 
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
@@ -347,16 +358,17 @@ const _whatsappMatchesAdvertised: Exact<
   : "lib/plans.ts: WhatsApp's per-plan availability no longer matches what /pricing advertises" = true;
 void _whatsappMatchesAdvertised;
 
-/**
- * Instagram is advertised as included in *no* plan ("not included in any
- * plan above", /pricing). This asserts the registry still says the same
- * thing, and is the line to change -- together with the booleans above
- * and that page's copy -- on the day Meta App Review clears.
- */
-const _instagramIncludedInNoPlan: Exact<
+/** Instagram is advertised on Growth and Scale, the same as WhatsApp (2026-11-03). */
+const _instagramMatchesAdvertised: Exact<
   { [K in PlanKey]: (typeof PLANS)[K]["channels"]["instagram"] },
   AdvertisedInstagramIncluded
 > extends true
   ? true
-  : "lib/plans.ts: /pricing says Instagram is in no plan -- update that page's copy before enabling it here" = true;
-void _instagramIncludedInNoPlan;
+  : "lib/plans.ts: Instagram's per-plan availability no longer matches what /pricing advertises" = true;
+void _instagramMatchesAdvertised;
+
+// Instagram and WhatsApp share plan access (owner decision 2026-11-03).
+const _instagramSameAsWhatsapp: Exact<AdvertisedInstagramIncluded, AdvertisedWhatsappIncluded> extends true
+  ? true
+  : "lib/plans.ts: Instagram must have the same plan access as WhatsApp" = true;
+void _instagramSameAsWhatsapp;

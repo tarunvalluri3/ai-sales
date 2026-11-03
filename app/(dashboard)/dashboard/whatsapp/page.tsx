@@ -1,7 +1,7 @@
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
-import { channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
+import { channelAllowed, channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
 import { ConnectWhatsappForm, WHATSAPP_MANAGER_URL } from "./connect-whatsapp-form";
 import { WhatsappConnectionStatus } from "./whatsapp-connection-status";
 import { WhatsappSetupGuide } from "./whatsapp-setup-guide";
@@ -21,7 +21,7 @@ export default async function WhatsappPage() {
     getWhatsappConnectionForBusiness(businessId),
     getEntitlementForBusiness(businessId),
   ]);
-  const entitled = entitlement.channels.whatsapp;
+  const entitled = channelAllowed(entitlement, "whatsapp");
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -44,13 +44,13 @@ export default async function WhatsappPage() {
 
       {canEdit && entitled ? <WhatsappSetupGuide hasConnection={connection != null} /> : null}
 
-      {/* An already-connected number on a plan that no longer includes
-          WhatsApp keeps working and stays visible -- revoking a live sales
-          channel from under a business without telling it is worse than
-          charging it. It is told, and it can disconnect. */}
+      {/* An already-connected number without WhatsApp access (Starter, or a
+          lapsed trial/plan) stays visible and can be disconnected, but the
+          webhook and the send queue refuse it (owner decision 2026-11-03:
+          enforce the advertised plan limits), so the business is told. */}
       {connection && !entitled ? (
         <ChannelUpgradeNotice
-          message={`${channelNotEntitledMessage("whatsapp", entitlement)} This number is still connected and still receiving messages.`}
+          message={`${channelNotEntitledMessage("whatsapp", entitlement)} This number is still connected, but its messages are not being received or answered.`}
         />
       ) : null}
 

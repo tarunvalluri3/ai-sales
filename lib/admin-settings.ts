@@ -1,5 +1,6 @@
 import "server-only";
-import { ORDERED_PLANS, TRIAL_DAYS, TRIAL_REPLY_QUOTA, PAST_DUE_GRACE_DAYS } from "@/lib/plans";
+import { ORDERED_PLANS, TRIAL_DAYS, PAST_DUE_GRACE_DAYS } from "@/lib/plans";
+import { entitlementConfigFromEnv, lastKnownMaxAgeMsFromEnv } from "@/lib/entitlement-rules";
 import { GEMINI_PRICING } from "@/lib/gemini-pricing";
 
 /**
@@ -26,7 +27,9 @@ import { GEMINI_PRICING } from "@/lib/gemini-pricing";
 export function getPlatformSettingsSnapshot() {
   return {
     trialDays: TRIAL_DAYS,
-    trialReplyQuota: TRIAL_REPLY_QUOTA,
+    // Configured (TRIAL_REPLY_QUOTA env, default 200), not the code default.
+    trialReplyQuota: entitlementConfigFromEnv().trialReplyQuota,
+    subscriptionLastKnownMaxHours: lastKnownMaxAgeMsFromEnv() / 3_600_000,
     pastDueGraceDays: PAST_DUE_GRACE_DAYS,
     plans: ORDERED_PLANS.map((plan) => ({
       key: plan.key,

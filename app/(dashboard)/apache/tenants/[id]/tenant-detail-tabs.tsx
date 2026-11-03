@@ -132,8 +132,8 @@ function BillingTab({ detail }: { detail: TenantDetail }) {
   if (!sub) {
     return (
       <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-5 text-sm text-ds-text-secondary">
-        No subscription row -- this tenant predates billing (grandfathered on Scale-equivalent entitlements,
-        lib/subscription.ts&apos;s GRANDFATHERED_PLAN_KEY).
+        No subscription row -- this tenant has NO paid access (not serving, no WhatsApp/Instagram). Rows are
+        created by the trial trigger or at checkout (lib/entitlement-rules.ts).
       </div>
     );
   }
