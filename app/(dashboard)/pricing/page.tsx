@@ -159,8 +159,8 @@ export default function PricingPage() {
             </p>
             <p>
               When the trial ends, your AI stops replying to prospects until you choose a plan — nothing
-              is charged automatically. Each organisation gets one free trial, including if the business
-              is deleted and set up again.
+              is charged automatically. There is one free trial per person and one per organisation,
+              including if the business is deleted and set up again or a new organisation is created.
             </p>
           </Section>
 

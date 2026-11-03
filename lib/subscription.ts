@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
 import { sendOpsAlert } from "@/lib/ops-alert";
+import { TRIAL_ALREADY_USED_SHORT } from "@/lib/trial-messages";
 import { PLAN_KEYS, applyChannelOverrides, type ChannelKey } from "@/lib/plans";
 import {
   LastKnownEntitlementStore,
@@ -249,7 +250,7 @@ export function channelNotEntitledMessage(channel: ChannelKey, entitlement: Enti
   }
   if (!entitlement.serving) {
     return entitlement.notServingReason === "trial_already_used"
-      ? `${channelName} needs a Growth or Scale plan. This organisation has already used its free trial.`
+      ? `${channelName} needs a Growth or Scale plan. ${TRIAL_ALREADY_USED_SHORT}`
       : `${channelName} needs an active free trial or a Growth or Scale plan. Choose a plan to switch it on.`;
   }
   return `${channelName} is not included in your ${entitlement.planName} plan. Upgrade to Growth or Scale to connect it.`;

@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { BillingPanel } from "../../../dashboard/billing/billing-panel";
 import type { BillingIdentityValues } from "../../../dashboard/billing/billing-details";
 import { advanceOnboarding } from "../../actions";
+import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
 
 type PlanSummary = {
   key: "starter" | "growth" | "scale";
@@ -47,7 +48,7 @@ function formatDate(iso: string): string {
 function notServingMessage(reason: string | null): string {
   switch (reason) {
     case "trial_already_used":
-      return "This organisation has already used its free trial. Choose a plan to go live.";
+      return TRIAL_NOT_AVAILABLE_MESSAGE;
     case "trial_expired":
       return "Your free trial has ended. Choose a plan to go live.";
     case "subscription_unavailable":

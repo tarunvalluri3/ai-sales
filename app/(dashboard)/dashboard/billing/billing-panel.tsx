@@ -6,6 +6,7 @@ import Script from "next/script";
 import { useToast } from "../_components/toast";
 import { BillingDetailsFields, type BillingIdentityValues } from "./billing-details";
 import { GstBreakdown } from "./gst-breakdown";
+import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
 import {
   cancelSubscriptionAction,
   changePlanAction,
@@ -602,7 +603,7 @@ function describeStatus(entitlement: EntitlementSummary): string {
     return `Cancelled. You keep full access until ${formatDate(entitlement.periodEnd)}.`;
   }
   if (entitlement.notServingReason === "trial_already_used") {
-    return "This organisation has already used its free trial, so your AI is not replying to prospects. Choose a plan to switch it on.";
+    return `${TRIAL_NOT_AVAILABLE_MESSAGE} Until then your AI is not replying to prospects.`;
   }
   if (entitlement.status === "expired") {
     return "This plan has ended, so your AI is not replying to prospects. Choose a plan to switch it back on.";

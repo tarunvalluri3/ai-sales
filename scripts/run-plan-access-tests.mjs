@@ -282,3 +282,77 @@ test("launch copy lists only launched channels; server gates and pricing read th
   assert.match(pricing, /const launch = channelLaunchSwitchesFromEnv\(\);/);
   assert.match(pricing, /\(coming soon\)/);
 });
+
+// ------------------------------------- one trial per Clerk user (round 3, item 2)
+
+const userSql = () => read("supabase/migrations/20261124000200_trial_once_per_user.sql");
+const userFn = () => {
+  const sql = userSql();
+  return sql.slice(sql.indexOf("create or replace function"), sql.indexOf("$$;", sql.indexOf("create or replace function")));
+};
+
+test("trial per user: the user id comes from the verified session JWT, never from the client", () => {
+  const fn = userFn();
+  assert.match(fn, /v_user_id text := nullif\(btrim\(coalesce\(\(select auth\.jwt\(\)\) ->> 'sub', ''\)\), ''\);/);
+  assert.doesNotMatch(fn, /new\.(clerk_user_id|created_by)/, "no column the client could set");
+  assert.match(fn, /security definer\s*set search_path = public/);
+  // The insert that fires the trigger runs under the Clerk session token.
+  assert.match(read("lib/business.ts"), /export async function createBusinessForOrg[\s\S]*?const supabase = createServerSupabaseClient\(\);/);
+  assert.match(read("lib/supabase/server.ts"), /accessToken: async \(\) => \(await auth\(\)\)\.getToken\(\)/);
+});
+
+test("trial per user: primary-key grants make concurrent requests safe; a refused user never consumes the org", () => {
+  const sql = userSql();
+  const table = sql.slice(sql.indexOf("create table public.trial_user_grants"), sql.indexOf(");", sql.indexOf("create table public.trial_user_grants")));
+  assert.match(table, /clerk_user_id text primary key/);
+  assert.doesNotMatch(table, /references/, "survives business/org deletion");
+  const fn = userFn();
+  assert.match(fn, /on conflict \(clerk_org_id\) do nothing;\s*get diagnostics org_granted = row_count;/);
+  assert.match(fn, /on conflict \(clerk_user_id\) do nothing;\s*get diagnostics user_granted = row_count;/);
+  assert.match(fn, /if user_granted = 0 then[\s\S]*?delete from public\.trial_grants\s*where clerk_org_id = new\.clerk_org_id and first_business_id = new\.id;/);
+  assert.match(fn, /if org_granted = 1 and user_granted = 1 then[\s\S]*?'trialing'[\s\S]*?else[\s\S]*?'starter', 'expired', now\(\), now\(\) \+ interval '1 second'/);
+  assert.ok(fn.indexOf("interval '14 days'") > 0, "trial length unchanged");
+});
+
+test("trial per user: service-role only table (RLS forced, restrictive deny, no grants)", () => {
+  const sql = userSql();
+  assert.match(sql, /alter table public\.trial_user_grants enable row level security;/);
+  assert.match(sql, /alter table public\.trial_user_grants force row level security;/);
+  assert.match(sql, /revoke all on public\.trial_user_grants from anon, authenticated;/);
+  assert.match(sql, /create policy trial_user_grants_no_client_access[\s\S]*?as restrictive[\s\S]*?using \(false\)\s*with check \(false\)/);
+  assert.match(sql, /revoke all on function public\.create_trial_subscription_for_new_business\(\) from public, anon, authenticated;/);
+  assert.match(read("supabase/tests/database/076_trial_once_per_user.sql"), /select plan\(10\);/);
+});
+
+test("trial per user: a refused trial is the existing 'trial_already_used' state; paid plans and live trials are unaffected", () => {
+  const refused = rules.entitlementFromRow(
+    row({ status: "expired", trial_started_at: null, trial_ends_at: null, current_period_start: "2026-11-10T00:00:00Z", current_period_end: "2026-11-10T00:00:01Z" }),
+    NOW,
+    CONFIG,
+  );
+  assert.equal(refused.notServingReason, "trial_already_used");
+  assert.equal(refused.serving, false);
+  // A paid checkout on the refused row turns it into a normal paid plan.
+  const paidAfter = rules.entitlementFromRow(paidRow("growth"), NOW, CONFIG);
+  assert.equal(paidAfter.serving, true);
+  assert.equal(rules.channelAllowed(paidAfter, "whatsapp"), true);
+  // An existing trial row is read exactly as before.
+  const live = rules.entitlementFromRow(row(), NOW, CONFIG);
+  assert.equal(live.isTrial && live.serving, true);
+  // Only the trigger changed: nothing else in the app grants or refuses trials.
+  assert.doesNotMatch(read("lib/billing-checkout.ts"), /trial_user_grants/);
+});
+
+test("trial per user: clear message with the paid plans next to it, on onboarding, billing and channel gates", async () => {
+  const messages = await import(new URL("../lib/trial-messages.ts", import.meta.url).href);
+  assert.match(messages.TRIAL_NOT_AVAILABLE_MESSAGE, /one free trial per person and per organisation/);
+  assert.match(messages.TRIAL_NOT_AVAILABLE_MESSAGE, /Choose a paid plan/);
+  const step = read("app/(dashboard)/onboarding/_components/steps/plan-step.tsx");
+  assert.match(step, /case "trial_already_used":\s*return TRIAL_NOT_AVAILABLE_MESSAGE;/);
+  // Not on a trial -> the BillingPanel (plan picker + checkout) is shown open, not tucked away.
+  assert.match(step, /\) : \(\s*<>\s*\{gstNote\}\s*\{billingPanel\}\s*<\/>\s*\)\}/);
+  assert.match(read("app/(dashboard)/dashboard/billing/billing-panel.tsx"), /notServingReason === "trial_already_used"\) \{\s*return `\$\{TRIAL_NOT_AVAILABLE_MESSAGE\}/);
+  assert.match(read("lib/subscription.ts"), /needs a Growth or Scale plan\. \$\{TRIAL_ALREADY_USED_SHORT\}/);
+  assert.match(read("app/(dashboard)/pricing/page.tsx"), /one free trial per person and one per organisation/);
+  assert.doesNotMatch(read("lib/trial-messages.ts"), /import "server-only"/, "client components import it");
+});
