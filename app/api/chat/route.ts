@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
   // Missing/malformed -> treat the enforcing `ip` scope as not allowed (fail
   // closed, unchanged for that scope).
   if (!ipResults.get("ip")?.allowed) {
-    logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }, "error");
+    logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return withCors(
       jsonTooManyRequests(
         ipResults.get("ip")?.retryAfterSeconds ?? secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS),
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
   for (const scope of ["ip_subnet", "new_conversation_ip"] as const) {
     const result = ipResults.get(scope);
     if (result && resolveAbuseResponse(scope, result.allowed) === "reject_429") {
-      logEvent("rate_limit_exceeded", "unknown", { scope }, "error");
+      logEvent("rate_limit_exceeded", "unknown", { scope }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
       return withCors(
         jsonTooManyRequests(
           result.retryAfterSeconds ?? secondsUntilWindowEnd(Date.now(), SCOPE_LIMITS[scope].windowSeconds),
@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
     checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
   );
   if (!keyAllowed) {
-    logEvent("rate_limit_exceeded", business.businessId, { scope: "key" }, "error");
+    logEvent("rate_limit_exceeded", business.businessId, { scope: "key" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
   }
 
@@ -334,7 +334,7 @@ export async function POST(request: NextRequest) {
       checkAndIncrementRateLimit("conversation", conversationRowId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
     );
     if (!conversationAllowed) {
-      logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }, "error");
+      logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
       return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
     }
 

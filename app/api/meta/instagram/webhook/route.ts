@@ -213,7 +213,7 @@ async function ingestInboundMessage(
     return null;
   }
   if (!senderAllowed) {
-    logEvent("rate_limit_exceeded", businessId, { scope: "instagram_webhook" }, "error");
+    logEvent("rate_limit_exceeded", businessId, { scope: "instagram_webhook" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return null;
   }
 
@@ -258,7 +258,7 @@ async function ingestInboundMessage(
     ),
   ]);
   if (!conversationAllowed) {
-    logEvent("rate_limit_exceeded", businessId, { scope: "conversation" }, "error");
+    logEvent("rate_limit_exceeded", businessId, { scope: "conversation" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     await markInboundReplyStatus(supabase, "instagram", businessId, inbound.mid, "skipped");
     return null;
   }

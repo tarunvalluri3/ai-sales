@@ -83,3 +83,33 @@ test("the scheduler and billing panels are behind the platform-admin gate", () =
   assert.match(read("app/api/health/route.ts"), /import \{ runDeepHealthCheck \} from "@\/lib\/health";/);
   assert.match(page, /import \{ listOpenBillingCancellations, listSchedulerJobStatus \} from "@\/lib\/health";/);
 });
+
+const sentry = await import(new URL("../lib/sentry-config.ts", import.meta.url).href);
+
+test("Sentry tracing stays off by default and is bounded 0..1 when set", () => {
+  assert.equal(sentry.sentryTracesSampleRate(undefined), 0);
+  assert.equal(sentry.sentryTracesSampleRate(""), 0);
+  assert.equal(sentry.sentryTracesSampleRate("0.05"), 0.05);
+  assert.equal(sentry.sentryTracesSampleRate("5"), 1);
+  assert.equal(sentry.sentryTracesSampleRate("-1"), 0);
+  assert.equal(sentry.sentryTracesSampleRate("lots"), 0);
+});
+
+test("Sentry events carry the resolved environment", () => {
+  assert.equal(sentry.sentryEnvironment({ APP_ENV: "staging" }), "staging");
+  assert.equal(sentry.sentryEnvironment({ VERCEL_ENV: "production" }), "production");
+  assert.equal(sentry.sentryEnvironment({ APP_ENV: "bogus" }), "development");
+  for (const file of ["sentry.server.config.ts", "sentry.edge.config.ts"]) {
+    const source = read(file);
+    assert.match(source, /tracesSampleRate: sentryTracesSampleRate\(process\.env\.SENTRY_TRACES_SAMPLE_RATE\)/);
+    assert.match(source, /environment: sentryEnvironment\(process\.env\)/);
+  }
+});
+
+test("rate-limit rejections are logged, but never sent to Sentry (quota burn under abuse)", () => {
+  for (const file of ["app/api/chat/route.ts", "app/api/webhooks/whatsapp/route.ts", "app/api/meta/instagram/webhook/route.ts"]) {
+    const calls = [...read(file).matchAll(/logEvent\("rate_limit_exceeded"[^\n]*/g)].map((m) => m[0]);
+    assert.ok(calls.length >= 2, file);
+    for (const call of calls) assert.doesNotMatch(call, /"error"\)/, `${file}: ${call}`);
+  }
+});

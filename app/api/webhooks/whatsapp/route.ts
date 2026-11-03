@@ -190,7 +190,7 @@ async function ingestInboundMessage(
 
   const waIdAllowed = await checkAndIncrementRateLimit("whatsapp_webhook", message.from, WA_ID_LIMIT, RATE_LIMIT_WINDOW_SECONDS);
   if (!waIdAllowed) {
-    logEvent("rate_limit_exceeded", businessId, { scope: "whatsapp_webhook" }, "error");
+    logEvent("rate_limit_exceeded", businessId, { scope: "whatsapp_webhook" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return null;
   }
 
@@ -222,7 +222,7 @@ async function ingestInboundMessage(
     checkAndIncrementRateLimit("conversation", conversation.id, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
   ]);
   if (!conversationAllowed) {
-    logEvent("rate_limit_exceeded", businessId, { scope: "conversation" }, "error");
+    logEvent("rate_limit_exceeded", businessId, { scope: "conversation" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     await markInboundReplyStatus(supabase, "whatsapp", businessId, message.id, "skipped");
     return null;
   }
