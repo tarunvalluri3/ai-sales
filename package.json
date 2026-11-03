@@ -39,6 +39,7 @@
     "test:appointment-lifecycle": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-appointment-lifecycle-tests.mjs",
     "test:billing-cancellation": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-billing-cancellation-tests.mjs",
     "test:instagram-health": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-instagram-health-tests.mjs",
+    "test:observability": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-observability-tests.mjs",
     "instagram:enable": "node --env-file=.env.local scripts/instagram-access.mjs enable",
     "instagram:disable": "node --env-file=.env.local scripts/instagram-access.mjs disable",
     "seed:review-demo": "node --env-file=.env.local scripts/seed-review-demo.mjs",
