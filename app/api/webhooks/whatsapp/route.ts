@@ -30,6 +30,8 @@ import {
   runReplyWithFallback,
   type ReplyAttemptState,
 } from "@/lib/channel-reply-rules";
+import { extractWhatsappStatuses } from "@/lib/whatsapp-rules";
+import { recordWhatsappStatuses } from "@/lib/whatsapp-status";
 import type { Conversation } from "@/lib/supabase/types";
 
 /**
@@ -73,6 +75,7 @@ type WhatsappInboundMessage = { id?: string; from?: string; type?: string; text?
 type WhatsappWebhookValue = {
   metadata?: { phone_number_id?: string };
   messages?: WhatsappInboundMessage[];
+  statuses?: unknown[];
 };
 
 type WhatsappWebhookBody = {
@@ -127,6 +130,18 @@ export async function POST(request: NextRequest) {
   for (const value of values) {
     if (!value?.metadata?.phone_number_id) continue;
     const phoneNumberId = value.metadata.phone_number_id;
+
+    // Delivery receipts (sent / delivered / read / failed) for messages we
+    // sent -- a template paused after approval or an undeliverable number
+    // only shows up here (production readiness, item 4).
+    const statuses = extractWhatsappStatuses(value.statuses);
+    if (statuses.length > 0) {
+      try {
+        await recordWhatsappStatuses(supabase, phoneNumberId, statuses);
+      } catch (error) {
+        logAndGetUserMessage(error);
+      }
+    }
 
     for (const message of value.messages ?? []) {
       try {

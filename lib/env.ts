@@ -46,6 +46,15 @@ const envSchema = z.object({
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
+  // Production readiness (item 4): approved WhatsApp template names
+  // (lib/whatsapp-templates.ts). Each is optional: unset means "not approved
+  // yet", and a notice that needs it outside the 24-hour window fails visibly.
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, "must look like en or en_US").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_CONFIRMED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_DECLINED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_EXPIRED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
   // Instagram via Meta (lib/meta-graph.ts): Facebook Login by default,
   // Unified Login with META_IG_LOGIN_MODE=unified. Optional like the
   // WhatsApp pair: the connect route, callback and webhook each fail closed
