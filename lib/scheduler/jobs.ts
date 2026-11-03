@@ -15,6 +15,7 @@ import { computeDailyRollup } from "@/lib/analytics-rollup";
 import { recoverStuckInboundReplies } from "@/lib/inbound-reply-recovery";
 import { runAppointmentLifecycleSweep } from "@/lib/appointment-lifecycle";
 import { processPendingBillingCancellations } from "@/lib/billing-cancellation";
+import { runInstagramConnectionHealthCheck } from "@/lib/instagram-health";
 import type { ScheduledJob } from "@/lib/scheduler/runner";
 
 /**
@@ -67,6 +68,8 @@ export const SCHEDULED_JOBS: ScheduledJob[] = [
   { name: "appointment_lifecycle", schedule: { kind: "every", seconds: 5 * MINUTE }, timeoutMs: 50_000, run: () => runAppointmentLifecycleSweep() },
   { name: "url_refresh", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 55_000, retries: 0, run: refreshDueUrlKnowledgeSources },
   { name: "no_activity_workflows", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 40_000, run: runNoActivityWorkflowSweep },
+  // Dead Instagram tokens / removed Page subscriptions, found before a DM goes unanswered.
+  { name: "instagram_health", schedule: { kind: "every", seconds: 6 * 60 * MINUTE }, timeoutMs: 50_000, run: runInstagramConnectionHealthCheck },
   { name: "billing_lifecycle", schedule: { kind: "every", seconds: 60 * MINUTE }, timeoutMs: 50_000, run: () => runBillingLifecycleSweep() },
   // Deleted businesses whose Razorpay subscription is not confirmed cancelled
   // yet (each row has its own backoff; alerts on first failure and give-up).
