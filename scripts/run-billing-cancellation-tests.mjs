@@ -222,3 +222,10 @@ test("free-trial and card requirements were not changed (a product decision for 
     assert.doesNotMatch(read(file), /trial_ends_at|hasPaymentMethod|payment_method/);
   }
 });
+
+test("the privacy policy names Razorpay as a payment processor (production readiness item 8)", () => {
+  const privacy = read("app/(dashboard)/privacy/page.tsx");
+  const processors = privacy.slice(privacy.indexOf('title="Who processes data on our behalf"'), privacy.indexOf('title="Instagram and other Meta platforms"'));
+  assert.match(processors, /<strong>Razorpay<\/strong> — payment processing/);
+  assert.match(processors, /we do not see or store card or bank details/);
+});

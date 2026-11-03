@@ -39,7 +39,7 @@ export default function PrivacyPolicyPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-ds-text-primary">Privacy Policy</h1>
-          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-02</p>
+          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-03</p>
         </div>
 
         <Section title="Who this policy covers">
@@ -188,6 +188,13 @@ export default function PrivacyPolicyPage() {
             </li>
             <li>
               <strong>Resend</strong> — delivery of transactional and notification email to customers.
+            </li>
+            <li>
+              <strong>Razorpay</strong> — payment processing for our subscription plans and one-time
+              payments. Card, UPI and bank details, and the contact details entered at checkout, go
+              directly to Razorpay; we do not see or store card or bank details. We receive the payment
+              records we need for billing and tax invoices, such as the amount, status and Razorpay
+              payment and subscription identifiers.
             </li>
             <li>
               <strong>Vercel</strong> — application hosting and request logging.
