@@ -1,5 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
+import { clientIpFromHeaders, parseClientIpSource } from "@/lib/http/client-ip";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { AdminAuditLogMetadata } from "@/lib/supabase/types";
 
@@ -64,8 +65,9 @@ export async function recordAdminAuditLogEntry(
 /** Best-effort IP/user-agent extraction for a Server Action call (no NextRequest available there, unlike a route handler -- matches lib/http/widget-cors.ts's extractIp() convention). */
 async function readRequestContext(): Promise<{ ip: string | null; userAgent: string | null }> {
   const h = await headers();
-  const forwardedFor = h.get("x-forwarded-for");
-  const ip = forwardedFor?.split(",")[0]?.trim() || null;
+  // Same trusted-entry rule as extractIp() (CLIENT_IP_SOURCE, lib/http/client-ip.ts).
+  const resolved = clientIpFromHeaders((name) => h.get(name), parseClientIpSource(process.env.CLIENT_IP_SOURCE));
+  const ip = resolved === "unknown" ? null : resolved;
   const userAgent = h.get("user-agent");
   return { ip, userAgent };
 }

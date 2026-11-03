@@ -1,5 +1,6 @@
 import "server-only";
 import { NextRequest } from "next/server";
+import { clientIpFromHeaders, parseClientIpSource } from "@/lib/http/client-ip";
 
 /**
  * Shared CORS/origin/IP helpers for the public widget endpoints
@@ -50,9 +51,12 @@ export function extractOrigin(request: NextRequest): string | null {
  * controllable and this function's IP-scope rate limiting would no
  * longer be meaningful without re-checking this assumption first
  * (Phase 19b, docs/phase-19-audit-findings.md §6).
+ *
+ * Production readiness (item 9): that re-check is now config, not code --
+ * CLIENT_IP_SOURCE (lib/http/client-ip.ts) picks the trustworthy entry for
+ * the host: `xff-first` on Vercel (default, unchanged), `xff-last` or
+ * `x-real-ip` behind the VPS's nginx.
  */
 export function extractIp(request: NextRequest): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const first = forwardedFor?.split(",")[0]?.trim();
-  return first || "unknown";
+  return clientIpFromHeaders((name) => request.headers.get(name), parseClientIpSource(process.env.CLIENT_IP_SOURCE));
 }

@@ -47,6 +47,9 @@ const envSchema = z.object({
   // deletion). Optional: Sentry gets every one of them regardless.
   OPS_ALERT_EMAIL: z.email().optional(),
   NEXT_PUBLIC_APP_URL: z.url().optional(),
+  // Production readiness (item 9): which header holds the real client IP for
+  // per-IP rate limits (lib/http/client-ip.ts). Default xff-first (Vercel).
+  CLIENT_IP_SOURCE: z.enum(["xff-first", "xff-last", "x-real-ip"]).optional(),
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),

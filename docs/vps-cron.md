@@ -134,7 +134,8 @@ location = /api/cron/run {
   proxy_pass http://127.0.0.1:3000;
   proxy_read_timeout 90s;
   proxy_buffering off;
-  proxy_set_header X-Forwarded-For $remote_addr;   # overwrite, never append (rate limits trust the first entry)
+  proxy_set_header X-Real-IP $remote_addr;         # with CLIENT_IP_SOURCE=x-real-ip in the app env
+  proxy_set_header X-Forwarded-For $remote_addr;   # overwrite, never append
   proxy_set_header Host $host;
 }
 ```

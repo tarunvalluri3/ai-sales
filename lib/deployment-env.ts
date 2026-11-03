@@ -123,5 +123,11 @@ export function environmentWarnings(environment: AppEnvironment, env: Env): stri
   if (environment === "production" && env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_test_")) {
     warnings.push("APP_ENV is production but Clerk is a development instance (pk_test_ key).");
   }
+  if (environment === "production" && !env.VERCEL_ENV?.trim() && !env.NEXT_PUBLIC_APP_URL?.trim()) {
+    warnings.push(
+      "NEXT_PUBLIC_APP_URL is not set on a non-Vercel production server: links in emails fall back to https://ai-sales.vercel.app. " +
+        "Set it (at build time too -- NEXT_PUBLIC_* values are inlined into the build).",
+    );
+  }
   return warnings;
 }

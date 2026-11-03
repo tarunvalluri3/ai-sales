@@ -98,6 +98,7 @@ test("startup warnings: dev against the production DB, production on a Clerk dev
   const prodOnTestClerk = env.environmentWarnings("production", {
     NEXT_PUBLIC_SUPABASE_URL: PROD_URL,
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_abc",
+    NEXT_PUBLIC_APP_URL: "https://aipilot.waveswebstudio.in",
   });
   assert.equal(prodOnTestClerk.length, 1);
   assert.match(prodOnTestClerk[0], /pk_test_/);
@@ -234,4 +235,43 @@ test(".env.example is tracked and documents every variable lib/env.ts validates"
   for (const key of schemaKeys) {
     assert.match(example, new RegExp(`^#? ?${key}=`, "m"), `.env.example must document ${key}`);
   }
+});
+
+// ------------------------------------------------------------ VPS hardening
+
+const clientIp = await import(new URL("../lib/http/client-ip.ts", import.meta.url).href);
+const headersOf = (map) => (name) => map[name] ?? null;
+
+test("client IP: xff-first (Vercel default), xff-last (nginx appends), x-real-ip", () => {
+  const spoofed = headersOf({ "x-forwarded-for": "6.6.6.6, 203.0.113.9", "x-real-ip": "203.0.113.9" });
+  assert.equal(clientIp.clientIpFromHeaders(spoofed, "xff-first"), "6.6.6.6");
+  assert.equal(clientIp.clientIpFromHeaders(spoofed, "xff-last"), "203.0.113.9", "the entry nginx appended");
+  assert.equal(clientIp.clientIpFromHeaders(spoofed, "x-real-ip"), "203.0.113.9");
+  assert.equal(clientIp.clientIpFromHeaders(headersOf({}), "xff-last"), "unknown");
+  assert.equal(clientIp.clientIpFromHeaders(headersOf({ "x-forwarded-for": " , " }), "xff-first"), "unknown");
+  assert.equal(clientIp.clientIpFromHeaders(headersOf({}), "x-real-ip"), "unknown");
+});
+
+test("client IP source parsing defaults to xff-first", () => {
+  assert.equal(clientIp.parseClientIpSource(undefined), "xff-first");
+  assert.equal(clientIp.parseClientIpSource("xff-last"), "xff-last");
+  assert.equal(clientIp.parseClientIpSource("x-real-ip"), "x-real-ip");
+  assert.equal(clientIp.parseClientIpSource("bogus"), "xff-first");
+});
+
+test("every IP read goes through the configured source", () => {
+  assert.match(read("lib/http/widget-cors.ts"), /clientIpFromHeaders\(\(name\) => request\.headers\.get\(name\), parseClientIpSource\(process\.env\.CLIENT_IP_SOURCE\)\)/);
+  assert.match(read("lib/admin-audit-log.ts"), /clientIpFromHeaders\(\(name\) => h\.get\(name\), parseClientIpSource\(process\.env\.CLIENT_IP_SOURCE\)\)/);
+});
+
+test("a non-Vercel production server without NEXT_PUBLIC_APP_URL is warned about", () => {
+  const prodEnv = { NEXT_PUBLIC_SUPABASE_URL: PROD_URL, NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_x" };
+  assert.ok(env.environmentWarnings("production", prodEnv).some((w) => /NEXT_PUBLIC_APP_URL/.test(w)));
+  assert.equal(env.environmentWarnings("production", { ...prodEnv, NEXT_PUBLIC_APP_URL: "https://aipilot.waveswebstudio.in" }).length, 0);
+  assert.equal(env.environmentWarnings("production", { ...prodEnv, VERCEL_ENV: "production" }).length, 0, "Vercel supplies its own URL");
+});
+
+test("HSTS is sent on every route (a VPS gets no platform HSTS); SSE disables proxy buffering", () => {
+  assert.match(read("next.config.ts"), /\{ key: "Strict-Transport-Security", value: "max-age=31536000" \}/);
+  assert.match(read("app/api/chat/route.ts"), /"X-Accel-Buffering": "no"/);
 });

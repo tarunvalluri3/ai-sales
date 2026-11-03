@@ -50,6 +50,11 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          // Production readiness (LAUNCH_AUDIT.md §11/§15): Vercel adds HSTS on
+          // its own domains, a VPS doesn't. One year, this host only (no
+          // includeSubDomains/preload, so other *.waveswebstudio.in sites are
+          // unaffected). Browsers ignore it over plain http (local dev).
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
         ],
       },
       ...FRAME_DENY_SOURCES.map((source) => ({
