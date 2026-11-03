@@ -18,6 +18,8 @@ import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { canAgentServe } from "@/lib/agent-serving";
 import { isWhatsappAllowed } from "@/lib/subscription";
+import { parseTemplateStatusUpdates } from "@/lib/whatsapp-embedded-signup-rules";
+import { applyTemplateStatusUpdates } from "@/lib/whatsapp-template-sync";
 import { prepareProspectMessage, type PreparedProspectMessage } from "@/lib/guardrails/prepare-message";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
 import { resolveInputGuardrailAction } from "@/lib/guardrails/response-policy";
@@ -127,6 +129,17 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createServiceSupabaseClient();
+
+  // Template review results for a business's WABA (production readiness
+  // item 6): approved / rejected / paused ... shown on the WhatsApp page.
+  const templateUpdates = parseTemplateStatusUpdates(body);
+  if (templateUpdates.length > 0) {
+    try {
+      await applyTemplateStatusUpdates(supabase, templateUpdates);
+    } catch (error) {
+      logAndGetUserMessage(error);
+    }
+  }
 
   const values = (body.entry ?? []).flatMap((entry) => (entry.changes ?? []).map((change) => change.value));
 

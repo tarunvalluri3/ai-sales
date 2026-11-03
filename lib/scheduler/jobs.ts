@@ -17,6 +17,7 @@ import { runAppointmentLifecycleSweep } from "@/lib/appointment-lifecycle";
 import { processPendingBillingCancellations } from "@/lib/billing-cancellation";
 import { runInstagramConnectionHealthCheck } from "@/lib/instagram-health";
 import { resendUnsentDocumentEmails } from "@/lib/invoice-store";
+import { syncAllWhatsappTemplateStatuses } from "@/lib/whatsapp-template-sync";
 import type { ScheduledJob } from "@/lib/scheduler/runner";
 
 /**
@@ -71,6 +72,8 @@ export const SCHEDULED_JOBS: ScheduledJob[] = [
   { name: "no_activity_workflows", schedule: { kind: "every", seconds: 15 * MINUTE }, timeoutMs: 40_000, run: runNoActivityWorkflowSweep },
   // Dead Instagram tokens / removed Page subscriptions, found before a DM goes unanswered.
   { name: "instagram_health", schedule: { kind: "every", seconds: 6 * 60 * MINUTE }, timeoutMs: 50_000, run: runInstagramConnectionHealthCheck },
+  // WhatsApp template review status per business (the message_template_status_update webhook is the fast path).
+  { name: "whatsapp_template_sync", schedule: { kind: "every", seconds: 6 * 60 * MINUTE }, timeoutMs: 50_000, run: syncAllWhatsappTemplateStatuses },
   // Invoice / credit-note emails whose send failed (each still goes at most once).
   { name: "document_email_resend", schedule: { kind: "every", seconds: 60 * MINUTE }, timeoutMs: 50_000, retries: 0, run: resendUnsentDocumentEmails },
   { name: "billing_lifecycle", schedule: { kind: "every", seconds: 60 * MINUTE }, timeoutMs: 50_000, run: () => runBillingLifecycleSweep() },

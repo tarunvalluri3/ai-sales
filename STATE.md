@@ -51,7 +51,17 @@ Last updated: 2026-11-03 (**Production readiness work from LAUNCH_AUDIT.md -- br
 - `test:migration-order` (CI fetches `main`'s tip for it) fails on a new migration that sorts before main's newest, a duplicate version, or a bad name. All 9 migrations on this branch pass.
 - docs/deployment.md §2d.
 
-**NOT done yet (next session, in this order):** 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
+**Item 6 DONE in code, NOT live-tested (WhatsApp Embedded Signup v4 + per-business templates).** docs/whatsapp-embedded-signup.md has the flow and the exact Meta configuration list.
+- Meta docs read 2026-11-03: ES v2/v3 were deprecated 2026-10-15; v4 means a new FLB configuration with products selected.
+- "Connect with Facebook" (`embedded-signup-button.tsx`, shown when `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID`, `META_APP_ID`, `META_APP_SECRET` and `META_TOKEN_ENCRYPTION_KEY` are set). The manual form remains as a fallback.
+- Server, in order: code exchange → phone-in-WABA check → `subscribed_apps` → `register` with a random 6-digit PIN. The token and PIN are stored encrypted.
+- Every failure has its own owner-facing message. After the exchange, the connection is stored with `setup_step` and `setup_error`, plus a "Finish setup" retry that reuses the stored token.
+- Templates are submitted to each business's own WABA after signup or on demand. Status is shown per template and kept current by the `message_template_status_update` webhook, a 6-hourly `whatsapp_template_sync` job and a Refresh button. Rejected templates are not resubmitted automatically.
+- Migration `20261124000000` (NOT applied): connection columns, encrypted PIN, and `whatsapp_template_statuses` (owner SELECT own, no client writes). pgTAP `075` written, not run.
+- `test:whatsapp-embedded-signup` 16/16, all Graph calls mocked.
+- Sending still uses the `WHATSAPP_TEMPLATE_*` names, so set them to the suggested names.
+
+**NOT done yet (next session, in this order):** 7 (separate config switches for Instagram and WhatsApp). Also: recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
 
 ## Production readiness (LAUNCH_AUDIT.md items 1-9) -- 2026-11-03 -- branch `production-readiness`, NOT merged, NOT pushed, migrations NOT applied
 

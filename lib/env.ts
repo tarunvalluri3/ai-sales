@@ -76,6 +76,10 @@ const envSchema = z.object({
   META_WEBHOOK_VERIFY_TOKEN: z.string().min(16).optional(),
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/, "must look like v26.0").optional(),
   META_TOKEN_ENCRYPTION_KEY: z.string().min(32).optional(),
+  // WhatsApp Embedded Signup v4 (2026-11-03): the Facebook Login for Business
+  // configuration id. With META_APP_ID, META_APP_SECRET and the encryption key
+  // set, the WhatsApp page offers "Connect with Facebook"; otherwise only the manual form.
+  WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID: z.string().regex(/^\d+$/, "must be the numeric Facebook Login for Business configuration id").optional(),
   /**
    * Phase 17b: Razorpay. All six are `.optional()`, the same "degrade,
    * don't fail startup" posture as RESEND_API_KEY and the WhatsApp and

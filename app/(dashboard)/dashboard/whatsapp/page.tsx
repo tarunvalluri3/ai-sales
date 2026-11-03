@@ -1,12 +1,25 @@
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
-import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
+import { getWhatsappConnectionForBusiness, listWhatsappTemplateStatusesForBusiness } from "@/lib/whatsapp";
+import { getEmbeddedSignupClientConfig } from "@/lib/whatsapp-embedded-signup";
+import { templateLanguage, templateNameFor } from "@/lib/whatsapp-template-sync";
+import { WHATSAPP_TEMPLATES, type WhatsappTemplateKind } from "@/lib/whatsapp-templates";
+import { EmbeddedSignupButton } from "./embedded-signup-button";
+import { WhatsappTemplatesPanel, type TemplatePanelRow } from "./whatsapp-templates-panel";
 import { channelAllowed, channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
 import { ConnectWhatsappForm, WHATSAPP_MANAGER_URL } from "./connect-whatsapp-form";
 import { WhatsappConnectionStatus } from "./whatsapp-connection-status";
 import { WhatsappSetupGuide } from "./whatsapp-setup-guide";
 import { PermissionNotice } from "../_components/state-views";
 import { ChannelUpgradeNotice } from "../_components/channel-upgrade-notice";
+
+const TEMPLATE_PURPOSE: Record<WhatsappTemplateKind, string> = {
+  appointment_confirmed: "Appointment confirmed",
+  appointment_declined: "Appointment declined",
+  appointment_cancelled: "Appointment cancelled",
+  appointment_reminder: "Appointment reminder",
+  appointment_expired: "Booking request expired",
+};
 
 export default async function WhatsappPage() {
   const { businessId, orgRole } = await requireBusinessContext();
@@ -17,11 +30,27 @@ export default async function WhatsappPage() {
   // enforcement -- connectWhatsappAction refuses independently, so a
   // direct call to the Server Action is refused whether this page rendered
   // the form or not.
-  const [connection, entitlement] = await Promise.all([
+  const [connection, entitlement, templateStatuses] = await Promise.all([
     getWhatsappConnectionForBusiness(businessId),
     getEntitlementForBusiness(businessId),
+    listWhatsappTemplateStatusesForBusiness(businessId),
   ]);
   const entitled = channelAllowed(entitlement, "whatsapp");
+  // Production readiness item 6: Embedded Signup when it's configured on this
+  // deployment; the manual form stays available as a fallback.
+  const embeddedSignup = getEmbeddedSignupClientConfig();
+  const language = templateLanguage();
+  const templateRows: TemplatePanelRow[] = (Object.keys(WHATSAPP_TEMPLATES) as WhatsappTemplateKind[]).map((kind) => {
+    const name = templateNameFor(kind);
+    const row = templateStatuses.find((status) => status.template_name === name && status.language === language);
+    return {
+      name,
+      purpose: TEMPLATE_PURPOSE[kind],
+      status: row?.status ?? null,
+      rejectedReason: row?.rejected_reason ?? null,
+      lastError: row?.last_error ?? null,
+    };
+  });
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -59,10 +88,30 @@ export default async function WhatsappPage() {
       ) : !entitled ? (
         <ChannelUpgradeNotice message={channelNotEntitledMessage("whatsapp", entitlement)} />
       ) : canEdit ? (
-        <ConnectWhatsappForm />
+        embeddedSignup ? (
+          <div className="flex flex-col gap-4">
+            <EmbeddedSignupButton
+              appId={embeddedSignup.appId}
+              configId={embeddedSignup.configId}
+              graphVersion={embeddedSignup.graphVersion}
+            />
+            <details className="rounded-ds-lg border border-ds-border bg-ds-surface">
+              <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-ds-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent">
+                Already have a system-user token? Connect manually instead
+              </summary>
+              <div className="border-t border-ds-border p-5">
+                <ConnectWhatsappForm />
+              </div>
+            </details>
+          </div>
+        ) : (
+          <ConnectWhatsappForm />
+        )
       ) : (
         <PermissionNotice />
       )}
+
+      {connection && entitled ? <WhatsappTemplatesPanel rows={templateRows} canEdit={canEdit} /> : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
-import type { Conversation, WhatsappConnection } from "@/lib/supabase/types";
+import type { Conversation, WhatsappConnection, WhatsappTemplateStatusRow } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { createConversation } from "@/lib/conversations";
 import { whatsappTokenColumns } from "@/lib/whatsapp-token";
@@ -274,4 +274,20 @@ export async function getOrCreateWhatsappConversation(
   }
 
   return createConversation(supabase, businessId, WHATSAPP_CONVERSATION_SOURCE, null, waId);
+}
+
+/**
+ * This business's WhatsApp template review statuses (production readiness
+ * item 6), read with the Clerk-session client under the select-own-business
+ * policy. Empty when there are none or the table doesn't exist yet (migration
+ * 20261124000000 not applied) -- the panel then shows "Not submitted yet".
+ */
+export async function listWhatsappTemplateStatusesForBusiness(businessId: string): Promise<WhatsappTemplateStatusRow[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("whatsapp_template_statuses")
+    .select("*")
+    .eq("business_id", businessId);
+  if (error) return [];
+  return (data ?? []) as WhatsappTemplateStatusRow[];
 }

@@ -76,6 +76,11 @@ jobs:
         # Turnstile verification (fetch mocked). Pure.
         run: npm run test:chat-protection
 
+      - name: WhatsApp Embedded Signup tests
+        # Signup postMessage parsing, the onboarding steps and every failure
+        # path, template submission/status parsing. Graph calls are mocked.
+        run: npm run test:whatsapp-embedded-signup
+
       - name: Migration order check
         # Some migrations are future-dated and already applied in production;
         # a new one must sort after main's newest or `supabase db push` refuses
