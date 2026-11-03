@@ -275,3 +275,8 @@ test("HSTS is sent on every route (a VPS gets no platform HSTS); SSE disables pr
   assert.match(read("next.config.ts"), /\{ key: "Strict-Transport-Security", value: "max-age=31536000" \}/);
   assert.match(read("app/api/chat/route.ts"), /"X-Accel-Buffering": "no"/);
 });
+
+test("no unauthenticated dev/review pages ship (LAUNCH_AUDIT.md §11: /dev/fragments was public)", async () => {
+  const { existsSync } = await import("node:fs");
+  assert.equal(existsSync(path.join(ROOT, "app", "(dashboard)", "dev")), false);
+});
