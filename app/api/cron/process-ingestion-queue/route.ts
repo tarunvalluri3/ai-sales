@@ -12,6 +12,7 @@ import { processWorkflowRuns, runNoActivityWorkflowSweep } from "@/lib/workflow-
 import { runBillingLifecycleSweep } from "@/lib/billing-lifecycle";
 import { processAnswerBankJobs } from "@/lib/answer-bank/generate";
 import { computeDailyRollup } from "@/lib/analytics-rollup";
+import { recoverStuckInboundReplies } from "@/lib/inbound-reply-recovery";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
       billingLifecycle,
       answerBank,
       analyticsRollup,
+      inboundReplyRecovery,
     ] = await Promise.all([
       processIngestionQueue(),
       processWebhookDeliveries(),
@@ -99,6 +101,9 @@ export async function GET(request: NextRequest) {
       // "one shared route, not one cron per queue" reason as everything
       // else above.
       computeDailyRollup(),
+      // Production readiness item 2: inbound WhatsApp/Instagram messages whose
+      // reply never finished (lib/inbound-reply-recovery.ts).
+      recoverStuckInboundReplies(),
     ]);
     return jsonSuccess({
       ingestion,
@@ -114,6 +119,7 @@ export async function GET(request: NextRequest) {
       billingLifecycle,
       answerBank,
       analyticsRollup,
+      inboundReplyRecovery,
     });
   } catch (error) {
     return jsonError(logAndGetUserMessage(error), 500);

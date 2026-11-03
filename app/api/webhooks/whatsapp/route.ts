@@ -17,13 +17,20 @@ import {
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
 import { canAgentServe } from "@/lib/agent-serving";
-import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
+import { prepareProspectMessage, type PreparedProspectMessage } from "@/lib/guardrails/prepare-message";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
 import { resolveInputGuardrailAction } from "@/lib/guardrails/response-policy";
 import { countAbuseStrikes } from "@/lib/guardrails/events";
 import { logEvent } from "@/lib/logger";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
+import { markInboundReplyStatus, reportChannelReplyFailure } from "@/lib/channel-reply-failure";
+import {
+  REPLY_FAILED_FALLBACK_MESSAGE,
+  runReplyWithFallback,
+  type ReplyAttemptState,
+} from "@/lib/channel-reply-rules";
+import type { Conversation } from "@/lib/supabase/types";
 
 /**
  * Phase 16's inbound WhatsApp receiver -- the WhatsApp analog of
@@ -33,6 +40,19 @@ import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
  * conversation/message/AI/lead/escalation services the widget uses --
  * per docs/phases.md's Phase 16 hard constraint, this must never become a
  * second AI system.
+ *
+ * Production readiness (item 2, LAUNCH_AUDIT.md §1/§7/§13): same shape as the
+ * Instagram webhook now.
+ *  - Before the 200: verify, de-duplicate (the dedup row is written first, so a
+ *    Meta redelivery is a no-op and can never produce a duplicate reply),
+ *    store the inbound message. Meta gets its 200 without waiting on Gemini.
+ *  - In after(): gates, then the AI/canned reply. ANY failure (every Gemini
+ *    error, not just timeouts, or a database error) is reported to Sentry
+ *    with its kind, the conversation is flagged for the team, and the
+ *    prospect gets the fixed fallback -- unless the real reply was already
+ *    queued. Each inbound row's `reply_status` records the outcome; a row left
+ *    `pending` (instance killed mid-reply) is picked up by the recovery sweep
+ *    (lib/inbound-reply-recovery.ts).
  */
 export const maxDuration = 60;
 
@@ -46,9 +66,13 @@ const HISTORY_LIMIT = 20;
 const NON_TEXT_REPLY =
   "I can only read text messages right now — could you type your question instead? Thanks for your patience.";
 
+type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
+
+type WhatsappInboundMessage = { id?: string; from?: string; type?: string; text?: { body?: string } };
+
 type WhatsappWebhookValue = {
   metadata?: { phone_number_id?: string };
-  messages?: { id?: string; from?: string; type?: string; text?: { body?: string } }[];
+  messages?: WhatsappInboundMessage[];
 };
 
 type WhatsappWebhookBody = {
@@ -101,11 +125,15 @@ export async function POST(request: NextRequest) {
   const values = (body.entry ?? []).flatMap((entry) => (entry.changes ?? []).map((change) => change.value));
 
   for (const value of values) {
-    if (!value?.metadata?.phone_number_id || !value.messages) continue;
+    if (!value?.metadata?.phone_number_id) continue;
+    const phoneNumberId = value.metadata.phone_number_id;
 
-    for (const message of value.messages) {
+    for (const message of value.messages ?? []) {
       try {
-        await handleInboundMessage(supabase, value.metadata.phone_number_id, message);
+        const ingested = await ingestInboundMessage(supabase, phoneNumberId, message);
+        if (ingested) {
+          after(() => replyToInboundMessage(supabase, ingested));
+        }
       } catch (error) {
         // A single malformed/failed message must never take down the rest
         // of the batch, and must never fail the webhook response itself
@@ -120,31 +148,43 @@ export async function POST(request: NextRequest) {
   return new Response(null, { status: 200 });
 }
 
-async function handleInboundMessage(
-  supabase: ReturnType<typeof createServiceSupabaseClient>,
+type IngestedWhatsappMessage = {
+  businessId: string;
+  phoneNumberId: string;
+  message: WhatsappInboundMessage & { id: string; from: string };
+  conversation: Conversation;
+  prepared: PreparedProspectMessage | null;
+  inboundContent: string;
+};
+
+/** Resolves the business, de-duplicates and stores the message. Returns null when nothing more should happen. */
+async function ingestInboundMessage(
+  supabase: ServiceSupabaseClient,
   phoneNumberId: string,
-  message: NonNullable<WhatsappWebhookValue["messages"]>[number],
-): Promise<void> {
-  if (!message.id || !message.from) return;
+  rawMessage: WhatsappInboundMessage,
+): Promise<IngestedWhatsappMessage | null> {
+  if (!rawMessage.id || !rawMessage.from) return null;
+  const message = rawMessage as IngestedWhatsappMessage["message"];
 
   const resolved = await resolveBusinessFromWhatsappPhoneNumberId(supabase, phoneNumberId);
   if (!resolved) {
     logEvent("whatsapp_unknown_phone_number_id", "unknown", {}, "error");
-    return;
+    return null;
   }
   const { businessId } = resolved;
 
   const waIdAllowed = await checkAndIncrementRateLimit("whatsapp_webhook", message.from, WA_ID_LIMIT, RATE_LIMIT_WINDOW_SECONDS);
   if (!waIdAllowed) {
     logEvent("rate_limit_exceeded", businessId, { scope: "whatsapp_webhook" }, "error");
-    return;
+    return null;
   }
 
   // Dedup: Meta retries a webhook on any non-2xx/timeout. Attempted before
-  // any other write so a redelivery is a pure no-op.
+  // any other write so a redelivery is a pure no-op -- including never
+  // replying twice to the same message.
   const { error: dedupError } = await supabase
     .from("whatsapp_inbound_messages")
-    .insert({ business_id: businessId, whatsapp_message_id: message.id });
+    .insert({ business_id: businessId, whatsapp_message_id: message.id, reply_status: "pending" });
   if (dedupError) {
     // 23505 = unique_violation -- already processed (or a concurrent
     // redelivery is processing it right now). Any other error is logged
@@ -152,31 +192,24 @@ async function handleInboundMessage(
     if (dedupError.code !== "23505") {
       logEvent("whatsapp_dedup_write_failed", businessId, {}, "error");
     }
-    return;
+    return null;
   }
-
-  // Phase 32 business_burst (log-only): one burst ceiling spanning all of a
-  // tenant's channels (widget + WhatsApp + Instagram), keyed on business_id,
-  // so a business cannot be hit on three paths at once with each counting
-  // separately. Loaded here after dedup -- so a Meta redelivery never inflates
-  // the bucket -- and the entitlement is reused as askSalesEmployee()'s
-  // prefetched quota below, so the trial-vs-normal ceiling (decision 3) costs
-  // no extra read. Log-only, so the verdict is not acted on yet.
-  const quota = await checkReplyQuota(supabase, businessId);
-  const burstProfile = selectBurstLimit(quota.entitlement.status);
-  await checkAndIncrementRateLimit("business_burst", businessId, burstProfile.limit, burstProfile.windowSeconds, businessId);
 
   const conversation = await getOrCreateWhatsappConversation(supabase, businessId, message.from);
 
-  const conversationAllowed = await checkAndIncrementRateLimit(
-    "conversation",
-    conversation.id,
-    CONVERSATION_LIMIT,
-    RATE_LIMIT_WINDOW_SECONDS,
-  );
+  const [, conversationAllowed] = await Promise.all([
+    // Lets the recovery sweep find the conversation if the reply is lost.
+    supabase
+      .from("whatsapp_inbound_messages")
+      .update({ conversation_id: conversation.id })
+      .eq("business_id", businessId)
+      .eq("whatsapp_message_id", message.id),
+    checkAndIncrementRateLimit("conversation", conversation.id, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+  ]);
   if (!conversationAllowed) {
     logEvent("rate_limit_exceeded", businessId, { scope: "conversation" }, "error");
-    return;
+    await markInboundReplyStatus(supabase, "whatsapp", businessId, message.id, "skipped");
+    return null;
   }
 
   const isText = message.type === "text" && typeof message.text?.body === "string";
@@ -196,11 +229,52 @@ async function handleInboundMessage(
   // message. See STATE.md's decision record for the full reasoning.
   await recordConversationConsent(supabase, businessId, conversation.id);
 
+  return { businessId, phoneNumberId, message, conversation, prepared, inboundContent };
+}
+
+/**
+ * Everything after the 200, through the shared orchestration
+ * (lib/channel-reply-rules.ts runReplyWithFallback). Never throws: any failure
+ * -- every Gemini error, not only a timeout, or a database error -- is
+ * reported (Sentry + alertable `whatsapp_reply_failed`), the conversation is
+ * flagged for the team, the fixed fallback goes to the prospect unless the
+ * real reply was already queued, and the inbound row's reply_status records it.
+ */
+async function replyToInboundMessage(supabase: ServiceSupabaseClient, ingested: IngestedWhatsappMessage): Promise<void> {
+  const { businessId, message, conversation } = ingested;
+  await runReplyWithFallback({
+    answer: (state) => answerInboundMessage(supabase, ingested, state),
+    reportFailure: async (error, state) => {
+      await reportChannelReplyFailure({
+        supabase,
+        channel: "whatsapp",
+        businessId,
+        conversationId: conversation.id,
+        clerkOrgId: state.clerkOrgId,
+        error,
+        stage: "ai_reply",
+      });
+    },
+    sendFallback: () => sendFallbackReply(supabase, ingested),
+    markStatus: (status) => markInboundReplyStatus(supabase, "whatsapp", businessId, message.id, status),
+    onFallbackError: () =>
+      logEvent("whatsapp_reply_fallback_failed", businessId, { conversationId: conversation.id }, "error"),
+  });
+}
+
+async function answerInboundMessage(
+  supabase: ServiceSupabaseClient,
+  ingested: IngestedWhatsappMessage,
+  state: ReplyAttemptState,
+): Promise<"replied" | "skipped"> {
+  const { businessId, phoneNumberId, message, conversation, prepared, inboundContent } = ingested;
+  const isText = prepared !== null;
+
   if (conversation.control === "human") {
     // A human already owns this thread -- no automated reply, AI or
-    // canned, while they're in control. The inbound message above is
-    // still persisted so staff see it.
-    return;
+    // canned, while they're in control. The inbound message is still
+    // persisted so staff see it.
+    return "skipped";
   }
 
   // Billing hardening: a subscription that no longer lets the agent serve
@@ -209,7 +283,7 @@ async function handleInboundMessage(
   // owner still sees the lead in the dashboard and no lead is lost.
   if (!(await canAgentServe(businessId))) {
     logEvent("whatsapp_agent_not_serving", businessId, { conversationId: conversation.id });
-    return;
+    return "skipped";
   }
 
   // The shared channel gate (lib/business-ai-context.ts): a suspended,
@@ -224,13 +298,23 @@ async function handleInboundMessage(
       { conversationId: conversation.id, reason: contextResult.reason },
       expected ? "info" : "error",
     );
-    return;
+    return "skipped";
   }
   const businessContext = contextResult.context;
+  state.clerkOrgId = businessContext.clerkOrgId;
+
+  // Phase 32 business_burst (log-only): one burst ceiling spanning all of a
+  // tenant's channels, keyed on business_id. Counted after dedup, so a Meta
+  // redelivery never inflates it; the entitlement is reused as
+  // askSalesEmployee()'s prefetched quota below.
+  const quota = await checkReplyQuota(supabase, businessId);
+  const burstProfile = selectBurstLimit(quota.entitlement.status);
+  await checkAndIncrementRateLimit("business_burst", businessId, burstProfile.limit, burstProfile.windowSeconds, businessId);
 
   if (!isText) {
     await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, NON_TEXT_REPLY);
-    return;
+    state.replyQueued = true;
+    return "replied";
   }
 
   // Guardrails Phase 5: when an input check is ENFORCING (lib/guardrails/config.ts; none
@@ -243,7 +327,8 @@ async function handleInboundMessage(
   if (inputAction.kind !== "none") {
     await flagConversationNeedsAttention(supabase, businessId, conversation.id, businessContext.clerkOrgId);
     await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, inputAction.reply);
-    return;
+    state.replyQueued = true;
+    return "replied";
   }
 
   const history = await listRecentMessages(supabase, businessId, conversation.id, HISTORY_LIMIT);
@@ -283,6 +368,11 @@ async function handleInboundMessage(
     response.grounded,
   );
 
+  await sendReply(supabase, businessId, conversation.id, assistantMessageRow.id, phoneNumberId, message.from, response.answer);
+  state.replyQueued = true;
+
+  // ---- Everything below runs after the reply has been queued. ----
+
   if (!response.grounded && !response.escalate) {
     const { error: unansweredError } = await supabase
       .from("unanswered_questions")
@@ -297,26 +387,27 @@ async function handleInboundMessage(
     logEvent("whatsapp_escalation_triggered", businessId, { conversationId: conversation.id });
   }
 
-  await sendReply(supabase, businessId, conversation.id, assistantMessageRow.id, phoneNumberId, message.from, response.answer);
-
   // Phase 17a: the same quota reminder dispatch the website widget's chat
   // route does. This reply was counted against the same plan quota, so the
-  // same 50/60/70/80/90/100% thresholds have to fire for it -- a business
-  // selling mostly over WhatsApp must not be the one that never hears it
-  // is running out. In after() so Meta's webhook acknowledgement is never
-  // held up by an outbound email.
-  after(() =>
-    sendUsageReminderIfDue(
-      supabase,
-      businessId,
-      response.quotaSnapshot,
-      response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
-    ),
+  // same 50/60/70/80/90/100% thresholds have to fire for it.
+  await sendUsageReminderIfDue(
+    supabase,
+    businessId,
+    response.quotaSnapshot,
+    response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
   );
+
+  return "replied";
+}
+
+/** The fixed "our team will get back to you" reply after a failure (inside the 24h window by construction). */
+async function sendFallbackReply(supabase: ServiceSupabaseClient, ingested: IngestedWhatsappMessage): Promise<void> {
+  const { businessId, phoneNumberId, message, conversation } = ingested;
+  await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, REPLY_FAILED_FALLBACK_MESSAGE);
 }
 
 async function sendCannedReply(
-  supabase: ReturnType<typeof createServiceSupabaseClient>,
+  supabase: ServiceSupabaseClient,
   businessId: string,
   conversationId: string,
   phoneNumberId: string,
@@ -328,7 +419,7 @@ async function sendCannedReply(
 }
 
 async function sendReply(
-  supabase: ReturnType<typeof createServiceSupabaseClient>,
+  supabase: ServiceSupabaseClient,
   businessId: string,
   conversationId: string,
   messageId: string,
@@ -344,7 +435,7 @@ async function sendReply(
     phoneNumberId,
     content,
   });
-  // Best-effort inline attempt -- a failure here is not fatal, the shared
-  // daily cron sweep (processWhatsappOutboundMessages) retries it.
+  // Best-effort inline attempt -- a failure here is not fatal, the
+  // scheduler's sweep (processWhatsappOutboundMessages) retries it.
   await sendWhatsappOutboundMessage(outbound.id);
 }

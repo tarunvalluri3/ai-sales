@@ -56,6 +56,7 @@ import { SearchKnowledgeBaseInputSchema } from "@/lib/tools/search-knowledge-bas
 import {
   CHAT_AI_DEADLINE_MS,
   CHAT_MODEL_CALL_TIMEOUT_MS,
+  CHAT_MODEL_MAX_RETRIES,
   CHAT_TOOL_TIMEOUT_MS,
 } from "@/lib/chat-timeouts";
 
@@ -574,6 +575,10 @@ export function getChatModel(): ChatGoogleGenerativeAI {
     temperature: 0.2,
     // Explicit, in one place (lib/guardrails/safety.ts), for every chat call.
     safetySettings: GEMINI_SAFETY_SETTINGS,
+    // Production readiness (LAUNCH_AUDIT.md §12): LangChain's default is 6
+    // retries with exponential backoff, which can't finish inside the
+    // per-call abort and hammers a throttled key. See lib/chat-timeouts.ts.
+    maxRetries: CHAT_MODEL_MAX_RETRIES,
   });
 }
 

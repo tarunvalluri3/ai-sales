@@ -65,6 +65,13 @@ jobs:
         # that .env.example documents every validated variable. Pure.
         run: npm run test:env-safety
 
+      - name: Failed-reply handling tests
+        # Production readiness item 2: every Gemini error is classified and
+        # reported, the WhatsApp/Instagram fallback + needs_attention flag,
+        # no duplicate reply on a Meta redelivery, bounded LangChain retries,
+        # and the stuck-reply recovery decisions. Pure, mocks only.
+        run: npm run test:reply-failure
+
       - name: Plan pricing / GST arithmetic tests
         # Phase 17a: prices are GST-inclusive and the taxable/CGST/SGST/IGST
         # split is derived from them (lib/plans.ts). Money-and-tax arithmetic

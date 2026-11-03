@@ -33,6 +33,7 @@
     "test:feature-flags-rules": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-feature-flags-rules-tests.mjs",
     "test:admin-impersonation-rules": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-admin-impersonation-rules-tests.mjs",
     "test:env-safety": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-env-safety-tests.mjs",
+    "test:reply-failure": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-reply-failure-tests.mjs",
     "instagram:enable": "node --env-file=.env.local scripts/instagram-access.mjs enable",
     "instagram:disable": "node --env-file=.env.local scripts/instagram-access.mjs disable",
     "seed:review-demo": "node --env-file=.env.local scripts/seed-review-demo.mjs",

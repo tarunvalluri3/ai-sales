@@ -93,7 +93,8 @@ for (const channel of ["whatsapp", "instagram"]) {
     const aiCall = source.indexOf("await askSalesEmployee(");
     assert.ok(firstReply > gate, "no canned reply is sent before the gate");
     assert.ok(aiCall > gate, "no AI call happens before the gate");
-    assert.match(source.slice(gate, firstReply), /if \(!contextResult\.ok\) \{[\s\S]*?return(?: \{[^}]*\})?;\s*\}/);
+    // `return;`, `return { ... };` or (WhatsApp, production readiness item 2) `return "skipped";`.
+    assert.match(source.slice(gate, firstReply), /if \(!contextResult\.ok\) \{[\s\S]*?return(?: \{[^}]*\}| "\w+")?;\s*\}/);
   });
 }
 

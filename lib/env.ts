@@ -87,6 +87,7 @@ const envSchema = z.object({
   CHAT_AI_DEADLINE_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
   CHAT_MODEL_CALL_TIMEOUT_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
   CHAT_TOOL_TIMEOUT_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
+  CHAT_MODEL_MAX_RETRIES: z.string().regex(/^\d+$/, "must be 0-3").optional(),
   CATALOG_PREFETCH: z.string().optional(),
   PIPELINE_PART_B: z.string().optional(),
 });
