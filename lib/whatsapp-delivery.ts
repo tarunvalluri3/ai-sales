@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/logger";
 import { AppError } from "@/lib/errors";
 import { flagConversationNeedsAttention } from "@/lib/conversations";
+import { getWhatsappAccessToken } from "@/lib/whatsapp-token";
 import {
   buildWhatsappPayload,
   classifyWhatsappSendError,
@@ -251,16 +252,13 @@ async function deliverWhatsappOutboundRow(
   supabase: ServiceSupabaseClient,
   outbound: WhatsappOutboundRow,
 ): Promise<WhatsappSendResult> {
-  const [{ data: credentials }, lastInbound] = await Promise.all([
-    supabase
-      .from("whatsapp_credentials")
-      .select("access_token")
-      .eq("business_id", outbound.business_id)
-      .maybeSingle<{ access_token: string }>(),
+  const [accessToken, lastInbound] = await Promise.all([
+    // Decrypted here, only for the Authorization header (lib/whatsapp-token.ts).
+    getWhatsappAccessToken(supabase, outbound.business_id),
     lastInboundAt(supabase, outbound.business_id, outbound.conversation_id),
   ]);
 
-  if (!credentials) {
+  if (!accessToken) {
     await failPermanently(supabase, outbound, "no_credentials");
     return { success: false, reason: "no_credentials" };
   }
@@ -280,7 +278,7 @@ async function deliverWhatsappOutboundRow(
   let sentAs: "text" | "template" = decision.kind;
   let outcome = await postToGraph(
     outbound.phone_number_id,
-    credentials.access_token,
+    accessToken,
     decision.kind === "text"
       ? buildWhatsappPayload(outbound.to_wa_id, { kind: "text", text: outbound.content })
       : buildWhatsappPayload(outbound.to_wa_id, { kind: "template", template: decision.template }),
@@ -292,7 +290,7 @@ async function deliverWhatsappOutboundRow(
     sentAs = "template";
     outcome = await postToGraph(
       outbound.phone_number_id,
-      credentials.access_token,
+      accessToken,
       buildWhatsappPayload(outbound.to_wa_id, { kind: "template", template }),
     );
   }

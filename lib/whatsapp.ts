@@ -4,6 +4,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Conversation, WhatsappConnection } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { createConversation } from "@/lib/conversations";
+import { whatsappTokenColumns } from "@/lib/whatsapp-token";
 
 type ServiceSupabaseClient = ReturnType<typeof createServiceSupabaseClient>;
 
@@ -127,10 +128,19 @@ export async function connectWhatsappNumber(
   const supabase = createServiceSupabaseClient();
   const nowIso = new Date().toISOString();
 
-  const { error: credentialsError } = await supabase.from("whatsapp_credentials").upsert(
-    { business_id: businessId, access_token: input.accessToken, token_updated_at: nowIso },
+  // Production readiness (item 9): encrypted at rest like Instagram's token
+  // (lib/whatsapp-token.ts). Falls back to the plaintext column only if
+  // migration 20261120000000 isn't applied yet (42703 = undefined column).
+  let { error: credentialsError } = await supabase.from("whatsapp_credentials").upsert(
+    { business_id: businessId, ...whatsappTokenColumns(input.accessToken), token_updated_at: nowIso },
     { onConflict: "business_id" },
   );
+  if (credentialsError?.code === "42703") {
+    ({ error: credentialsError } = await supabase.from("whatsapp_credentials").upsert(
+      { business_id: businessId, access_token: input.accessToken, token_updated_at: nowIso },
+      { onConflict: "business_id" },
+    ));
+  }
 
   if (credentialsError) {
     throw new AppError(

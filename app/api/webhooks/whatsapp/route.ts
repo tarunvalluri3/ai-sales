@@ -31,6 +31,7 @@ import {
   type ReplyAttemptState,
 } from "@/lib/channel-reply-rules";
 import { extractWhatsappStatuses } from "@/lib/whatsapp-rules";
+import { resolveVerificationChallenge } from "@/lib/meta-instagram-rules";
 import { recordWhatsappStatuses } from "@/lib/whatsapp-status";
 import type { Conversation } from "@/lib/supabase/types";
 
@@ -96,12 +97,13 @@ function verifySignature(rawBody: string, signatureHeader: string | null, appSec
 /** Meta's one-time webhook verification handshake, run once when the callback URL is registered in the Meta App dashboard. */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const mode = params.get("hub.mode");
-  const token = params.get("hub.verify_token");
-  const challenge = params.get("hub.challenge");
-
-  const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
-  if (!verifyToken || mode !== "subscribe" || token !== verifyToken || !challenge) {
+  // Production readiness (item 9): the same constant-time, fail-closed check
+  // the Instagram webhook uses (was a plain `!==` comparison).
+  const challenge = resolveVerificationChallenge(
+    { mode: params.get("hub.mode"), token: params.get("hub.verify_token"), challenge: params.get("hub.challenge") },
+    process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN,
+  );
+  if (challenge === null) {
     return new Response("Forbidden", { status: 403 });
   }
 

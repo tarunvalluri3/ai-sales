@@ -250,3 +250,53 @@ test("migration adds template + delivery-status columns without new tables or gr
   assert.doesNotMatch(sql, /^\s*(create table|grant)\b/im, "statements only, not comments");
   assert.match("  grant select on x to y;", /^\s*(create table|grant)\b/im, "the check itself can fail");
 });
+
+// ------------------------------------------------- tokens at rest (item 9)
+
+const tokenRules = await import(new URL("../lib/whatsapp-token-rules.ts", import.meta.url).href);
+const { randomBytes } = await import("node:crypto");
+const KEY = randomBytes(32);
+const TOKEN = "EAAG-test-system-user-token";
+
+test("tokens: new tokens are written encrypted (never plaintext) when a key is configured", () => {
+  const stored = tokenRules.sealWhatsappToken(TOKEN, KEY);
+  assert.equal(stored.access_token, null);
+  assert.match(stored.access_token_encrypted, /^v1\./);
+  assert.ok(!stored.access_token_encrypted.includes(TOKEN));
+  assert.deepEqual(tokenRules.openWhatsappToken(stored, KEY), { token: TOKEN, reencrypt: null });
+});
+
+test("tokens: a legacy plaintext row still works and is re-encrypted on first read", () => {
+  const opened = tokenRules.openWhatsappToken({ access_token: TOKEN, access_token_encrypted: null }, KEY);
+  assert.equal(opened.token, TOKEN);
+  assert.equal(opened.reencrypt.access_token, null);
+  assert.equal(tokenRules.openWhatsappToken(opened.reencrypt, KEY).token, TOKEN);
+});
+
+test("tokens: no key -> plaintext keeps working (no outage), encrypted rows are refused", () => {
+  assert.deepEqual(tokenRules.sealWhatsappToken(TOKEN, null), { access_token: TOKEN, access_token_encrypted: null });
+  assert.deepEqual(tokenRules.openWhatsappToken({ access_token: TOKEN, access_token_encrypted: null }, null), { token: TOKEN, reencrypt: null });
+  const sealed = tokenRules.sealWhatsappToken(TOKEN, KEY);
+  assert.deepEqual(tokenRules.openWhatsappToken(sealed, null), { token: null, reason: "no_key" });
+});
+
+test("tokens: a wrong key or tampered blob is 'undecryptable', never a crash; empty rows are 'missing'", () => {
+  const sealed = tokenRules.sealWhatsappToken(TOKEN, KEY);
+  assert.deepEqual(tokenRules.openWhatsappToken(sealed, randomBytes(32)), { token: null, reason: "undecryptable" });
+  assert.deepEqual(tokenRules.openWhatsappToken({ access_token: null, access_token_encrypted: "v1.x.y.z" }, KEY), { token: null, reason: "undecryptable" });
+  assert.deepEqual(tokenRules.openWhatsappToken(null, KEY), { token: null, reason: "missing" });
+  assert.deepEqual(tokenRules.openWhatsappToken({ access_token: null, access_token_encrypted: null }, KEY), { token: null, reason: "missing" });
+});
+
+test("tokens: writes and the send path go through the encryption helper; the verify token check is constant-time", () => {
+  assert.match(read("lib/whatsapp.ts"), /\.\.\.whatsappTokenColumns\(input\.accessToken\)/);
+  const delivery = read("lib/whatsapp-delivery.ts");
+  assert.match(delivery, /getWhatsappAccessToken\(supabase, outbound\.business_id\)/);
+  assert.doesNotMatch(delivery, /\.select\("access_token"\)/);
+  const webhook = read("app/api/webhooks/whatsapp/route.ts");
+  assert.match(webhook, /resolveVerificationChallenge\(/);
+  assert.doesNotMatch(webhook, /token !== verifyToken/);
+  for (const call of read("lib/whatsapp-token.ts").matchAll(/logEvent\(([^;]*?)\);/gs)) {
+    assert.doesNotMatch(call[1], /opened\.token|plaintext|access_token\b/, "never logs a token");
+  }
+});
