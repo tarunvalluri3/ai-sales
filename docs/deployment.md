@@ -25,7 +25,7 @@ Staging and production currently point at the **same Clerk application** and the
 
 ### 1b. The production guard (scripts and tests)
 
-`.env.local` and the CLI link on the developer machine pointed at **production** (LAUNCH_AUDIT.md §3). Every script and test that can touch Supabase now goes through `scripts/lib/production-guard.mjs`, which uses the same production-ref list as the app (`lib/deployment-env.ts`: `bykeztxvejpwfcxgsubm` built in, plus `PRODUCTION_SUPABASE_PROJECT_REFS`):
+`.env.local` and the CLI link on the developer machine pointed at **production** (LAUNCH_AUDIT.md §3). Every script and test that can touch Supabase now goes through `scripts/lib/production-guard.mjs`, which uses the same production-ref list as the app (`lib/deployment-env.ts`: `bykeztxvejpwfcxgsubm` built in, plus every ref in the committed `supabase/production-project-refs.txt`, plus `PRODUCTION_SUPABASE_PROJECT_REFS`). **Moving production to a new project (e.g. another region): add the new ref to `supabase/production-project-refs.txt` and commit it BEFORE pointing anything at the new project; keep the old ref listed until that project is deleted.**
 - every `npm run test:*` suite preloads it (`--import ./scripts/lib/test-env-guard.mjs`) — no override;
 - `npm test` (pgTAP) checks both `NEXT_PUBLIC_SUPABASE_URL` and `supabase/.temp/project-ref` — no override;
 - `credit-note`, `instagram:enable|disable`, `seed:review-demo`, `eval` and the `measure-*` scripts refuse production unless run with **both** `--allow-production` and `--confirm-production-ref=<ref>`.

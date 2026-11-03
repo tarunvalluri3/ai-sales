@@ -34,7 +34,9 @@ Last updated: 2026-11-03 (**Production readiness work from LAUNCH_AUDIT.md -- br
 - Migration `20261123000000` (NOT applied) adds 3 rate-limit scopes.
 - Checks: lint, typecheck, all 31 suites pass.
 
-**NOT done yet (next session, in this order):** item 4 (configurable protected prod ref), 5 (migration timestamps: analysis so far says new migrations must be dated after `20261120000000` or `db push` rejects them as out of order; use `20261121…`+ and add an order check, never rename applied ones), 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: blocking local `next dev` against prod (with an override flag); recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
+**Item 4 DONE (configurable protected production ref).** New committed `supabase/production-project-refs.txt`. Every script and test guard merges it with the built-in `bykeztxvejpwfcxgsubm` and `PRODUCTION_SUPABASE_PROJECT_REFS` (`lib/production-refs-file.ts`). Before this, an env-only ref didn't protect `npm test` or the unit runners, which never load `.env.local`. The file and the env var only ever ADD refs; the current ref stays built in. To move production: add the new ref to that file and commit it before pointing anything at the new project. `test:env-safety` 29/29.
+
+**NOT done yet (next session, in this order):** 5 (migration timestamps: analysis so far says new migrations must be dated after `20261120000000` or `db push` rejects them as out of order; use `20261121…`+ and add an order check, never rename applied ones), 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: blocking local `next dev` against prod (with an override flag); recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
 
 ## Production readiness (LAUNCH_AUDIT.md items 1-9) -- 2026-11-03 -- branch `production-readiness`, NOT merged, NOT pushed, migrations NOT applied
 

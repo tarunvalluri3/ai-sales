@@ -7,8 +7,9 @@
  *
  * What counts as production is decided by lib/deployment-env.ts -- the same
  * file the app uses at startup -- so the two can never disagree. A target is
- * production when its project ref is the built-in production ref or is listed
- * in PRODUCTION_SUPABASE_PROJECT_REFS. Two targets are checked:
+ * production when its project ref is the built-in production ref, is listed in
+ * the committed supabase/production-project-refs.txt, or is listed in
+ * PRODUCTION_SUPABASE_PROJECT_REFS. Two targets are checked:
  *   - NEXT_PUBLIC_SUPABASE_URL (anything using supabase-js), and
  *   - optionally the Supabase CLI link, supabase/.temp/project-ref (anything
  *     using `supabase db query --linked`, i.e. the pgTAP runner).
@@ -27,6 +28,10 @@ import { fileURLToPath } from "node:url";
 const { supabaseProjectRefFromUrl, isProductionSupabaseRef } = await import(
   new URL("../../lib/deployment-env.ts", import.meta.url).href
 );
+// The committed list (supabase/production-project-refs.txt) is ALWAYS merged
+// in: the test runners and `npm test` don't load .env.local, so an env-only
+// ref for a new production project would not protect them (item 4, 2026-11-03).
+const { withCommittedProductionRefs } = await import(new URL("../../lib/production-refs-file.ts", import.meta.url).href);
 
 const DEFAULT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -76,7 +81,7 @@ export function checkNotProductionTarget({
   root = DEFAULT_ROOT,
 }) {
   const linkedRef = checkLinkedProject ? linkedSupabaseRef(root) : null;
-  const evaluation = evaluateSupabaseTarget({ env, linkedRef, checkLinkedProject });
+  const evaluation = evaluateSupabaseTarget({ env: withCommittedProductionRefs(env, root), linkedRef, checkLinkedProject });
   if (!evaluation.production) return { ...evaluation, overridden: false };
 
   const productionTargets = evaluation.targets.filter((target) => target.production);

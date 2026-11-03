@@ -280,3 +280,44 @@ test("no unauthenticated dev/review pages ship (LAUNCH_AUDIT.md §11: /dev/fragm
   const { existsSync } = await import("node:fs");
   assert.equal(existsSync(path.join(ROOT, "app", "(dashboard)", "dev")), false);
 });
+
+// ------------------------------------- configurable production ref (item 4, 2026-11-03)
+
+const refsFile = await import(new URL("../lib/production-refs-file.ts", import.meta.url).href);
+const NEW_REGION_REF = "zyxwvutsrqponmlkjihg";
+
+test("committed refs file: comments/blank lines ignored, junk dropped, the current ref is listed", () => {
+  assert.deepEqual(refsFile.parseProductionRefs(`# comment\n\n ${NEW_REGION_REF} # new region\nnot-a-ref\nABCDEFGHIJKLMNOPQRST\n`), [
+    NEW_REGION_REF,
+    "abcdefghijklmnopqrst",
+  ]);
+  assert.ok(refsFile.parseProductionRefs(read("supabase/production-project-refs.txt")).includes(PROD_REF));
+  assert.ok(env.BUILT_IN_PRODUCTION_SUPABASE_REFS.includes(PROD_REF), "the current ref stays built in");
+});
+
+test("guard: a NEW production ref in the committed file is refused with NO env var set (CLI link and URL)", () => {
+  const root = fakeLinkedRoot(NEW_REGION_REF);
+  writeFileSync(path.join(root, "supabase", "production-project-refs.txt"), `${PROD_REF}\n${NEW_REGION_REF}\n`);
+  assert.throws(
+    () => guard.checkNotProductionTarget({ scriptName: "pgTAP", env: {}, argv: [], checkLinkedProject: true, root }),
+    new RegExp(NEW_REGION_REF),
+  );
+  assert.throws(
+    () => guard.checkNotProductionTarget({ scriptName: "seed", env: { NEXT_PUBLIC_SUPABASE_URL: `https://${NEW_REGION_REF}.supabase.co` }, argv: [], root }),
+    /PRODUCTION/,
+  );
+  // The old ref is still protected even if someone drops it from the file.
+  writeFileSync(path.join(root, "supabase", "production-project-refs.txt"), `${NEW_REGION_REF}\n`);
+  assert.throws(() => guard.checkNotProductionTarget({ scriptName: "seed", env: { NEXT_PUBLIC_SUPABASE_URL: PROD_URL }, argv: [], root }));
+  // Without the file the new ref is NOT production (proves the file is what protects it).
+  assert.equal(
+    guard.checkNotProductionTarget({ scriptName: "seed", env: { NEXT_PUBLIC_SUPABASE_URL: `https://${NEW_REGION_REF}.supabase.co` }, argv: [], root: fakeLinkedRoot(null) }).production,
+    false,
+  );
+});
+
+test("the env var still adds refs on top of the file", () => {
+  const merged = refsFile.withCommittedProductionRefs({ PRODUCTION_SUPABASE_PROJECT_REFS: STAGING_REF }, ROOT);
+  assert.ok(env.isProductionSupabaseRef(STAGING_REF, merged));
+  assert.ok(env.isProductionSupabaseRef(PROD_REF, merged));
+});

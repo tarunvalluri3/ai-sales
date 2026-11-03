@@ -28,6 +28,11 @@ export const APP_ENVIRONMENTS: readonly AppEnvironment[] = ["development", "stag
  * guard still works when nobody remembered to set
  * `PRODUCTION_SUPABASE_PROJECT_REFS`; that variable adds refs, it never removes
  * this one. (`bykeztxvejpwfcxgsubm` is production per docs/deployment.md §1.)
+ *
+ * A NEW production project (e.g. moved to another region): add its ref to the
+ * committed supabase/production-project-refs.txt (read by every script/test
+ * guard and the local `next dev` block -- lib/production-refs-file.ts) and to
+ * PRODUCTION_SUPABASE_PROJECT_REFS on the servers. Keep this one listed.
  */
 export const BUILT_IN_PRODUCTION_SUPABASE_REFS: readonly string[] = ["bykeztxvejpwfcxgsubm"];
 
