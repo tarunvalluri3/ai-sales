@@ -229,3 +229,16 @@ test("the privacy policy names Razorpay as a payment processor (production readi
   assert.match(processors, /<strong>Razorpay<\/strong> — payment processing/);
   assert.match(processors, /we do not see or store card or bank details/);
 });
+
+test("unsent invoice/credit-note emails are re-sent through the once-only ledger (item 9)", () => {
+  const store = read("lib/invoice-store.ts");
+  const sweep = store.slice(store.indexOf("export async function resendUnsentDocumentEmails("));
+  assert.match(sweep, /if \(!process\.env\.RESEND_API_KEY\) return result;/, "no claim-and-release churn without an email provider");
+  assert.match(sweep, /\.from\("billing_notice_sends"\)\.select\("notice_key"\)\.in\("notice_key", keys\)/);
+  assert.match(sweep, /if \(sent\.has\(`invoice:\$\{invoice\.id\}`\)\) continue;\s*await emailInvoice\(supabase, invoice\);/);
+  assert.match(sweep, /if \(sent\.has\(`credit_note:\$\{note\.id\}`\)\) continue;\s*await emailCreditNote\(supabase, note\);/);
+  // emailInvoice itself still claims before sending, so a race can't double-send.
+  const emailInvoice = store.slice(store.indexOf("async function emailInvoice("), store.indexOf("async function emailCreditNote("));
+  assert.ok(emailInvoice.indexOf("claimDocumentNotice(") < emailInvoice.indexOf("sendEmail("));
+  assert.match(read("lib/scheduler/jobs.ts"), /name: "document_email_resend", schedule: \{ kind: "every", seconds: 60 \* MINUTE \}, timeoutMs: [\d_]+, retries: 0, run: resendUnsentDocumentEmails/);
+});
