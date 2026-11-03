@@ -32,7 +32,7 @@ const { boundedRetries, CHAT_MODEL_MAX_RETRIES, CHAT_MODEL_MAX_RETRIES_CEILING }
 const rules = await import(new URL("../lib/channel-reply-rules.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 function httpError(status, message = "boom") {
   return Object.assign(new Error(message), { status });

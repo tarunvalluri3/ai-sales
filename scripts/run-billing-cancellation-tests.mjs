@@ -28,7 +28,7 @@ const rules = await import(new URL("../lib/billing-cancellation-rules.ts", impor
 const { processRazorpayEvent } = await import(new URL("../lib/razorpay-webhook.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const DELETED_SUB = "sub_deleted_business";
 

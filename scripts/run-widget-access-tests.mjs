@@ -27,7 +27,7 @@ const { chatRequestBodySchema } = await import(
   new URL("../lib/schemas/widget-chat-request.ts", import.meta.url).href
 );
 
-const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8");
+const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const ORIGIN = "https://client-rho-sage.vercel.app";
 const activeKey = { status: "active", allowed_origins: [ORIGIN] };

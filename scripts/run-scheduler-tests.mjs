@@ -26,7 +26,7 @@ const runner = await import(new URL("../lib/scheduler/runner.ts", import.meta.ur
 const auth = await import(new URL("../lib/scheduler/auth.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const at = (iso) => new Date(iso);
 

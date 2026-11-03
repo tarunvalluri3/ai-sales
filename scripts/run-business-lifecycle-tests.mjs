@@ -33,7 +33,7 @@ const { evaluateWidgetAccess, widgetRejectionStatus } = await import(
 const { needsPublishedRestamp } = await import(new URL("../lib/agent-published.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const LIVE = "11111111-1111-1111-1111-111111111111";
 const active = { status: "active", deleted_at: null, live_version_id: LIVE };

@@ -23,7 +23,7 @@ const {
   resolveInputGuardrailAction,
 } = policy;
 
-const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8");
+const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 const signal = (type) => ({ type, rule: "test", action: "logged", mode: "log_only" });
 const LOG_ONLY = { injection: "log_only", abuse: "log_only" };
 const ENFORCE = { injection: "enforce", abuse: "enforce" };

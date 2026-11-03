@@ -25,7 +25,7 @@ const env = await import(new URL("../lib/deployment-env.ts", import.meta.url).hr
 const guard = await import(new URL("./lib/production-guard.mjs", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const PROD_REF = "bykeztxvejpwfcxgsubm";
 const STAGING_REF = "abcdefghijklmnopqrst";

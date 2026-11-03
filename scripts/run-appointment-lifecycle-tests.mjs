@@ -25,7 +25,7 @@ register("./alias-resolver-hooks.mjs", import.meta.url);
 const rules = await import(new URL("../lib/appointment-lifecycle-rules.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;

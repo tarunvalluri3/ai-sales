@@ -23,7 +23,7 @@ register("./alias-resolver-hooks.mjs", import.meta.url);
 const { isAppSubscribed, judgeHealthProbe } = await import(new URL("../lib/instagram-health-rules.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const APP_ID = "1876820120425285";
 const facebook = { checkSubscription: true, appId: APP_ID };

@@ -20,7 +20,7 @@ register("./alias-resolver-hooks.mjs", import.meta.url);
 const rules = await import(new URL("../lib/meta-instagram-rules.ts", import.meta.url).href);
 const tokenCrypto = await import(new URL("../lib/token-crypto.ts", import.meta.url).href);
 
-const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const SECRET = "test_meta_app_secret_123";
 const sign = (body, secret = SECRET) => `sha256=${crypto.createHmac("sha256", secret).update(body).digest("hex")}`;

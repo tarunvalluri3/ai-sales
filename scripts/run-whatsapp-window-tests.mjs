@@ -25,7 +25,7 @@ const rules = await import(new URL("../lib/whatsapp-rules.ts", import.meta.url).
 const templates = await import(new URL("../lib/whatsapp-templates.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const HOUR = 60 * 60 * 1000;
 const NOW = new Date("2026-11-03T12:00:00Z");
