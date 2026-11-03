@@ -18,6 +18,11 @@ const MAX_BREACH_NOTIFICATIONS_PER_BUSINESS = 5;
 
 export type SlaRoutingResult = { checked: number; escalated: number };
 
+/** PostgREST `or` filter: never escalated, or last escalated before the current SLA window began. */
+export function slaReescalationFilter(overdueBeforeIso: string): string {
+  return `sla_escalated_at.is.null,sla_escalated_at.lt.${overdueBeforeIso}`;
+}
+
 /**
  * SLA-based escalation routing sweep (Phase 24) -- part of the shared
  * daily cron backstop rather than its own trigger. (It stayed daily
@@ -35,6 +40,12 @@ export type SlaRoutingResult = { checked: number; escalated: number };
  * should not "breach" repeatedly while no one is working) -- an
  * unconfigured business (no business_hours rows) is always-open, so
  * this still functions with zero setup.
+ *
+ * Production readiness (item 3): this now runs every few minutes from the
+ * scheduler, so a conversation is escalated at most ONCE PER SLA PERIOD
+ * (`conversations.sla_escalated_at`, migration 20261116000000). Before, every
+ * run re-assigned and re-notified every overdue conversation -- harmless once
+ * a day, a notification storm every five minutes.
  */
 export async function runSlaEscalationSweep(): Promise<SlaRoutingResult> {
   const supabase = createServiceSupabaseClient();
@@ -65,6 +76,8 @@ export async function runSlaEscalationSweep(): Promise<SlaRoutingResult> {
       .eq("business_id", business.id)
       .eq("needs_attention", true)
       .lt("attention_flagged_at", overdueBefore)
+      // Not escalated within the last SLA period (see the header).
+      .or(slaReescalationFilter(overdueBefore))
       .limit(MAX_CONVERSATIONS_PER_RUN);
 
     if (!overdue) continue;
@@ -75,11 +88,21 @@ export async function runSlaEscalationSweep(): Promise<SlaRoutingResult> {
 
     for (const conversation of overdue) {
       const nextAssignee = await assignNextTeamMember(business.id, business.clerk_org_id);
-      if (!nextAssignee || nextAssignee === conversation.assigned_to_user_id) continue;
+      if (!nextAssignee || nextAssignee === conversation.assigned_to_user_id) {
+        // Nobody else to route to: still record the check so the next run
+        // waits a full SLA period instead of asking again in five minutes.
+        await supabase
+          .from("conversations")
+          .update({ sla_escalated_at: new Date().toISOString() })
+          .eq("business_id", business.id)
+          .eq("id", conversation.id);
+        continue;
+      }
 
       await supabase
         .from("conversations")
-        .update({ assigned_to_user_id: nextAssignee })
+        .update({ assigned_to_user_id: nextAssignee, sla_escalated_at: new Date().toISOString() })
+        .eq("business_id", business.id)
         .eq("id", conversation.id);
 
       escalated++;
