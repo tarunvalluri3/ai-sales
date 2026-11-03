@@ -64,6 +64,16 @@ Phase 19's audit flagged that `npm test` required a human's locally-linked `supa
 
 ---
 
+### 2d. Migration timestamps
+
+Migrations from `20261104000000` to `20261123000000` are dated in the **future** (relative to 2026-11-03), and some are already applied in production.
+- `npx supabase migration new` uses the current time, so a migration made with it today would sort before those.
+- `supabase db push` (CI on staging, and §3 for production) refuses a local migration that sorts before the last one applied remotely, unless you pass `--include-all`. That flag applies it out of order, so never use it to work around this.
+
+- **Create migrations with `npm run migration:new -- <snake_case_name>`.** It uses the later of now and the newest file + 1 minute. Once real time passes the newest file, that is simply "now" again.
+- **Never rename a migration that may be applied anywhere.** The version is the key in the remote history table, so a renamed file is pushed as a *new* migration.
+- CI runs `npm run test:migration-order`. It fails if a branch adds a migration that sorts before `main`'s newest one, and also checks for duplicate versions and bad names.
+
 ## 3. Migration promotion: staging → production
 
 Every migration already lands on staging automatically, as part of CI (§2). Promoting to production is a **separate, deliberate, manual step** — never automatic — because production holds real tenant data and staging's automatic-push model is not an acceptable safety bar for it.

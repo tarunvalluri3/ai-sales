@@ -64,6 +64,7 @@ jobs:
         # production-Supabase guard every script and test runs through, and
         # that .env.example documents every validated variable. Pure.
         run: npm run test:env-safety
+
       - name: Plan access and trial tests
         # Production readiness 2026-11-03: no-card trial with a hard cap, one
         # trial per org, WhatsApp/Instagram on Growth/Scale only, no row = no
@@ -74,6 +75,14 @@ jobs:
         # Configurable rate limits, per-business limit, daily Gemini caps and
         # Turnstile verification (fetch mocked). Pure.
         run: npm run test:chat-protection
+
+      - name: Migration order check
+        # Some migrations are future-dated and already applied in production;
+        # a new one must sort after main's newest or `supabase db push` refuses
+        # it. The shallow checkout has no main ref, so fetch just its tip.
+        run: |
+          git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main || true
+          npm run test:migration-order
 
       - name: Failed-reply handling tests
         # Production readiness item 2: every Gemini error is classified and

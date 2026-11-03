@@ -42,7 +42,16 @@ Last updated: 2026-11-03 (**Production readiness work from LAUNCH_AUDIT.md -- br
 - **Your current `.env.local` points at production, so `npm run dev` now refuses until it points at staging.**
 - `test:env-safety` 31/31. Verified only by unit tests: plain Node can't load next.config.ts outside Next.
 
-**NOT done yet (next session, in this order):** 5 (migration timestamps: analysis so far says new migrations must be dated after `20261120000000` or `db push` rejects them as out of order; use `20261121…`+ and add an order check, never rename applied ones), 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: blocking local `next dev` against prod (with an override flag); recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
+**Item 1 tests added later (`84ed075`):** `test:plan-access` 16/16, run by CI.
+
+**Item 5 DONE (migration timestamps), and nothing renamed.**
+- Migrations `20261104…20261123` are future-dated; prod has applied at least `…20261113`.
+- `supabase migration new` today would produce `20261103…`, which sorts before them. `db push` (CI on staging, and the manual prod push) REFUSES that unless you pass `--include-all`, which would apply it out of order. So it would block rather than be silently skipped.
+- Fix: `npm run migration:new -- <name>` uses the later of now and the newest file + 1 min.
+- `test:migration-order` (CI fetches `main`'s tip for it) fails on a new migration that sorts before main's newest, a duplicate version, or a bad name. All 9 migrations on this branch pass.
+- docs/deployment.md §2d.
+
+**NOT done yet (next session, in this order):** 6 (WhatsApp Embedded Signup), 7 (separate config switches for Instagram and WhatsApp). Also: recording post-appointment follow-ups and staff re-engagement templates as post-launch work; the final build; the LAUNCH_AUDIT.md update.
 
 ## Production readiness (LAUNCH_AUDIT.md items 1-9) -- 2026-11-03 -- branch `production-readiness`, NOT merged, NOT pushed, migrations NOT applied
 

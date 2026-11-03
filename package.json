@@ -41,6 +41,7 @@
     "test:instagram-health": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-instagram-health-tests.mjs",
     "test:observability": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-observability-tests.mjs",
     "test:chat-protection": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-chat-protection-tests.mjs",
+    "test:migration-order": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-migration-order-tests.mjs",
     "test:plan-access": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-plan-access-tests.mjs",
     "instagram:enable": "node --env-file=.env.local scripts/instagram-access.mjs enable",
     "instagram:disable": "node --env-file=.env.local scripts/instagram-access.mjs disable",
@@ -48,7 +49,8 @@
     "credit-note": "node --conditions=react-server --env-file=.env.local scripts/issue-credit-note.mjs",
     "eval": "node --env-file=.env.local scripts/run-evals.mjs",
     "eval:redteam": "node --env-file=.env.local scripts/run-evals.mjs --suite=redteam",
-    "loadtest": "node --env-file=.env.local scripts/run-load-test.mjs"
+    "loadtest": "node --env-file=.env.local scripts/run-load-test.mjs",
+    "migration:new": "node scripts/new-migration.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.7.3",
