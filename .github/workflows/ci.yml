@@ -64,6 +64,16 @@ jobs:
         # production-Supabase guard every script and test runs through, and
         # that .env.example documents every validated variable. Pure.
         run: npm run test:env-safety
+      - name: Plan access and trial tests
+        # Production readiness 2026-11-03: no-card trial with a hard cap, one
+        # trial per org, WhatsApp/Instagram on Growth/Scale only, no row = no
+        # paid access, last-known plan on read failure. Pure.
+        run: npm run test:plan-access
+
+      - name: Public chat protection tests
+        # Configurable rate limits, per-business limit, daily Gemini caps and
+        # Turnstile verification (fetch mocked). Pure.
+        run: npm run test:chat-protection
 
       - name: Failed-reply handling tests
         # Production readiness item 2: every Gemini error is classified and
