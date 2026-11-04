@@ -6,6 +6,22 @@ Last updated: 2026-11-03 (**Production readiness round 3 (final patch) on branch
 
 ---
 
+## Launch audit and reply speed -- 2026-11-04 -- working tree on `production-readiness`, NOT committed, NOT pushed, NOT deployed
+
+**Found:** the live VPS (`aipilot.waveswebstudio.in`, uptime check 2026-11-04) serves code from before this branch: `/api/health?deep=1` has no checks, `/pricing` and `/privacy` show old copy, and the Sentry environment reads `vercel-production`. See `docs/launch-runbook.md` for the launch order.
+
+**Changed:**
+- `/api/chat`: IP limit and widget auth overlap; the conversation limit overlaps the key limit (existing conversation) or the writes (new conversation); Turnstile in `log` mode runs in `after()`; a checked widget key + origin is reused for 30 s in-process (was 15 s, warm-up only), `WIDGET_CONTEXT_CACHE_TTL_MS`, 0 = off. **Trade-off:** a revoked key, removed origin or new publish can take 30 s to apply; rejected IPs now also cost the auth reads.
+- WhatsApp webhook: same prefetch design as Instagram, plus instant answers, the embedding cache, a turn timer and stage metrics. It previously ran about 12 serial round trips before the model.
+- Instagram connect: new `permissions_missing` error when no Page came back and `pages_show_list` or `instagram_basic` was not granted. The cause of the GR Engineers failure is NOT confirmed: no error code or log line has been seen.
+- Privacy page names Google Cloud instead of Vercel (**owner to review**). Homepage preview label uses the real domain.
+- `docs/meta-app-review.md`: `whatsapp_business_management` is required; pilot-tester path added.
+- New: `scripts/backup-database.sh` (never run), `docs/launch-runbook.md`.
+
+**Checks (cloud copy holding only the files needed, no secrets, no live calls):** `tsc` clean on the changed routes and everything they import. Passing: chat-perf 9/9, daily-reply-limit 20/20, chat-protection 12/12, meta-instagram 78/78, reply-failure 30/30, whatsapp-window 23/23, chat-streaming 12/12. widget-access 11/15; the 4 failures hit files absent from that copy.
+
+**NOT run:** lint, full typecheck, build, the other suites, pgTAP, any real latency measurement. Speed gains are unmeasured. The Seoul distance is the leading explanation, from code and earlier measurements; the VPS region and stage timings still need confirming (runbook section 2).
+
 ## Production readiness round 3 (final patch) -- 2026-11-03 -- branch `production-readiness`, NOT pushed, migrations NOT applied
 
 **Safety:** `.env.local` (`NEXT_PUBLIC_SUPABASE_URL`) and `supabase/.temp/project-ref` both still target PRODUCTION `bykeztxvejpwfcxgsubm`, so no pgTAP, migration, seed or DB script was run. Unit suites ran with Supabase, Gemini, Clerk, Razorpay, Meta and Turnstile secrets removed. No Gemini, Meta, Razorpay, Clerk or Turnstile call was made. Nothing pushed, merged or deployed. `LAUNCH_AUDIT.md` left uncommitted.

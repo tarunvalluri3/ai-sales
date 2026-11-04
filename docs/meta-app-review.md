@@ -39,9 +39,12 @@ Show: business signs in → Instagram page → "Before you connect" steps → Co
 | Permission | Why |
 |---|---|
 | `whatsapp_business_messaging` | Receive messages on our webhook and send replies/templates (`POST /<PHONE_NUMBER_ID>/messages`) — `lib/whatsapp-delivery.ts` |
-| `whatsapp_business_management` | Only if we later create templates or read WABA details via API. Today templates are submitted by hand in WhatsApp Manager, so this can wait. |
+| `whatsapp_business_management` | Embedded Signup and template submission: reads the WABA, subscribes the app, submits and syncs templates through the API (`lib/whatsapp-embedded-signup.ts`, `lib/whatsapp-template-sync.ts`). Required before other businesses can connect. |
 
 Each connected business's WABA must also be subscribed to our app and have the templates in `lib/whatsapp-templates.ts` approved (see LAUNCH_AUDIT.md handoff).
+
+## Letting a pilot client connect before App Review finishes
+Permissions with Standard Access only work for people with a role on the app. Add the client's Facebook user under App Dashboard → App Roles → Roles (Tester), and have them accept the invite at developers.facebook.com/requests. They can then connect while the review is pending. This does not scale to public signups, so Advanced Access is still required for launch.
 
 ## Also required before going Live
 Business Verification, App Mode = Live, and the WhatsApp display name approved for each number.
