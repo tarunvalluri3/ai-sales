@@ -31,6 +31,11 @@
 //
 // Run through npm so it gets .env.local and the react-server condition that
 // `server-only` modules need (see package.json "credit-note").
+import { guardAgainstProduction, isProductionGuardFlag } from "./lib/production-guard.mjs";
+
+// Production readiness: refuses to touch the production Supabase project unless explicitly confirmed (scripts/lib/production-guard.mjs).
+guardAgainstProduction({ scriptName: "credit-note", allowOverride: true });
+
 import { register } from "node:module";
 
 register("./alias-resolver-hooks.mjs", import.meta.url);
@@ -52,7 +57,9 @@ class Exit extends Error {
   }
 }
 
-function parseArgs(argv) {
+function parseArgs(rawArgv) {
+  // The production guard's own flags (scripts/lib/production-guard.mjs) are handled there.
+  const argv = rawArgv.filter((token) => !isProductionGuardFlag(token));
   const out = { flags: new Set(), values: {} };
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];

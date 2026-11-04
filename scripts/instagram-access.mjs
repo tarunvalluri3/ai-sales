@@ -9,6 +9,11 @@
 // .env.local; prints which Supabase project it acts on, never a secret.
 // Instagram is allowed when the plan includes it OR this flag is true, so
 // `disable` only removes the override -- it never takes away a plan's channel.
+import { guardAgainstProduction } from "./lib/production-guard.mjs";
+
+// Production readiness: refuses to touch the production Supabase project unless explicitly confirmed (scripts/lib/production-guard.mjs).
+guardAgainstProduction({ scriptName: "instagram:enable / instagram:disable", allowOverride: true });
+
 import {
   createServiceClient,
   describeSupabaseTarget,

@@ -36,4 +36,8 @@ export const chatRequestBodySchema = z.object({
   // suggested-question chip. Client-supplied, so it is analytics only -- the
   // server decides what to serve from the message text itself, never from this.
   suggested: z.boolean().optional(),
+  // Production readiness item 3: a Cloudflare Turnstile token from the widget
+  // iframe, verified server-side only when a new conversation starts
+  // (lib/chat-protection.ts). Absent from older embeds and when Turnstile is off.
+  turnstileToken: z.string().min(1).max(2048).optional(),
 });

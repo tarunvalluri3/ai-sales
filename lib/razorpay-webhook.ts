@@ -229,6 +229,17 @@ export type RazorpayWebhookDeps = {
   releaseEvent(eventId: string): Promise<void>;
   findSubscriptionByRazorpayId(razorpaySubscriptionId: string): Promise<BillingSubscriptionRow | null>;
   findSubscriptionByBusinessId(businessId: string): Promise<BillingSubscriptionRow | null>;
+  /**
+   * Production readiness (item 6): called for a subscription event that
+   * matches no live business. Returns true when the subscription belonged to
+   * a business that was deleted (and handles it: alert on a charge, confirm
+   * a cancellation). Optional so existing callers/tests are unaffected.
+   */
+  handleDeletedBusinessEvent?(
+    razorpaySubscriptionId: string,
+    event: string,
+    payment: { id: string | null; amountPaise: number | null },
+  ): Promise<boolean>;
   updateSubscription(businessId: string, patch: BillingSubscriptionPatch): Promise<void>;
   sendNotice(
     kind: BillingNoticeKind,
@@ -278,7 +289,9 @@ export type WebhookOutcome =
    */
   | "stale"
   /** Verified, but we could not tell which business it belongs to. */
-  | "unresolved";
+  | "unresolved"
+  /** For a subscription whose business was deleted (billing_cancellations knows it). */
+  | "deleted_business";
 
 /* ------------------------------------------------------------------ *
  * Helpers
@@ -458,6 +471,21 @@ async function dispatch(
   if (!subscriptionEntity) {
     deps.log("razorpay_webhook_missing_subscription_entity", businessId ?? "unknown", { event }, "error");
     return "unresolved";
+  }
+
+  // Production readiness (item 6, extended 2026-11-03 to /apache deletes):
+  // a subscription whose business was deleted -- by the owner (row cascaded
+  // away) OR soft-deleted by a platform admin (row still present) -- is
+  // remembered in public.billing_cancellations. Checked BEFORE the normal
+  // path, so a charge after an admin soft-delete is alerted on instead of
+  // being applied to a dead tenant's subscription. A charge after deletion
+  // is never refunded automatically (lib/billing-cancellation.ts).
+  if (deps.handleDeletedBusinessEvent) {
+    const handled = await deps.handleDeletedBusinessEvent(subscriptionEntity.id, event, {
+      id: body.payload.payment?.entity.id ?? null,
+      amountPaise: body.payload.payment?.entity.amount ?? null,
+    });
+    if (handled) return "deleted_business";
   }
 
   if (!resolved) {

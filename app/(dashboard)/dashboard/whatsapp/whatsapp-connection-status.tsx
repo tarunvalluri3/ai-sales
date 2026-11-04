@@ -6,6 +6,18 @@ import { disconnectWhatsappAction, type WhatsappActionState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { ConnectWhatsappForm } from "./connect-whatsapp-form";
 import { Badge, type BadgeTone } from "../_components/badge";
+import { onboardingFailureMessage, type OnboardingFailureCode } from "@/lib/whatsapp-embedded-signup-rules";
+import { FinishSetupButton } from "./finish-setup-button";
+
+const SETUP_FAILURE_CODES: readonly OnboardingFailureCode[] = [
+  "exchange_failed",
+  "phone_not_in_waba",
+  "phone_lookup_failed",
+  "subscribe_failed",
+  "register_failed",
+  "register_rate_limited",
+  "register_pin_mismatch",
+];
 
 const initialState: WhatsappActionState = {};
 
@@ -53,6 +65,14 @@ export function WhatsappConnectionStatus({
   const [state, formAction, isPending] = useActionState(disconnectWhatsappAction, initialState);
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // Production readiness item 6: a number connected through Embedded Signup
+  // whose automatic setup stopped at a step shows that step's message and a
+  // "Finish setup" retry instead of the manual-token wording.
+  const viaSignup = connection.onboarding_method === "embedded_signup";
+  const setupFailure =
+    viaSignup && connection.setup_error && (SETUP_FAILURE_CODES as readonly string[]).includes(connection.setup_error)
+      ? (connection.setup_error as OnboardingFailureCode)
+      : null;
 
   if (editing) {
     return (
@@ -86,9 +106,10 @@ export function WhatsappConnectionStatus({
               Connected {new Date(connection.connected_at).toLocaleString()}
             </p>
           ) : null}
-          {connection.access_token_last4 ? (
+          {connection.access_token_last4 && !viaSignup ? (
             <p className="text-xs text-ds-text-muted">Token ending in {connection.access_token_last4}</p>
           ) : null}
+          {viaSignup ? <p className="text-xs text-ds-text-muted">Connected with Facebook (Embedded Signup)</p> : null}
         </div>
         {confirming ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
@@ -117,6 +138,7 @@ export function WhatsappConnectionStatus({
           </div>
         ) : (
           <div className="flex items-center gap-2">
+            {viaSignup ? null : (
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -126,6 +148,7 @@ export function WhatsappConnectionStatus({
             >
               Edit connection
             </button>
+            )}
             <button
               type="button"
               onClick={() => setConfirming(true)}
@@ -138,7 +161,14 @@ export function WhatsappConnectionStatus({
           </div>
         )}
       </div>
-      {connection.status === "error" && connection.last_error ? (
+      {setupFailure ? (
+        <div className="flex flex-col gap-2">
+          <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+            {onboardingFailureMessage(setupFailure)}
+          </p>
+          {canEdit ? <FinishSetupButton /> : null}
+        </div>
+      ) : connection.status === "error" && connection.last_error ? (
         <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           {describeConnectionError(connection.last_error)}
         </p>

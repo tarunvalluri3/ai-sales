@@ -7,6 +7,7 @@
 // through Clerk's Backend API with CLERK_SECRET_KEY, never from anything the
 // user typed except the email itself. Secrets are read from env and never
 // printed.
+import { isProductionGuardFlag } from "./production-guard.mjs";
 import { createClient } from "@supabase/supabase-js";
 
 export const PRODUCTION_SUPABASE_REF = "bykeztxvejpwfcxgsubm";
@@ -27,7 +28,9 @@ export function requireEnv(names, npmScript) {
 }
 
 /** `--email a@b.c --org org_123` style flags. Unknown flags are refused. */
-export function parseFlags(argv, allowed) {
+export function parseFlags(rawArgv, allowed) {
+  // The production guard's own flags (scripts/lib/production-guard.mjs) are not ours.
+  const argv = rawArgv.filter((token) => !isProductionGuardFlag(token));
   const values = {};
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];

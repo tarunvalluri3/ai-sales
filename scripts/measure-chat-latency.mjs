@@ -21,6 +21,11 @@
  * the real p50/p95 come from production rows after a week of traffic, kept
  * clearly separate in the report.
  */
+import { guardAgainstProduction } from "./lib/production-guard.mjs";
+
+// Production readiness: refuses to touch the production Supabase project unless explicitly confirmed (scripts/lib/production-guard.mjs).
+guardAgainstProduction({ scriptName: "measure-chat-latency", allowOverride: true });
+
 import { createClient } from "@supabase/supabase-js";
 import { requireProdConfirmation } from "./lib/usage-guard.mjs";
 

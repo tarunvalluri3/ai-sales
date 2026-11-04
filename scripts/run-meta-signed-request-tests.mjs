@@ -95,7 +95,7 @@ test("a correctly signed non-JSON payload is rejected", () => {
 // pin the contract structurally: verify first, 401 on failure, no logging of
 // the request, and the deletion confirmation shape Meta requires.
 test("callback routes verify before acting and never log request content", async () => {
-  const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+  const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
   for (const route of ["app/api/meta/deauthorize/route.ts", "app/api/meta/data-deletion/route.ts"]) {
     const source = read(route);
     assert.match(source, /verifyMetaSignedRequest/);

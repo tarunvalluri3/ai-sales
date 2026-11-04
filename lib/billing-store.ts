@@ -13,6 +13,7 @@ import { issueCreditNoteForRefund, issueInvoiceForPayment } from "@/lib/invoice-
 import { billingNoticeKey, type BillingNoticeKind } from "@/lib/billing-notices";
 import { PLAN_KEYS, type PlanKey } from "@/lib/plans";
 import { SUBSCRIPTION_STATUSES } from "@/lib/subscription";
+import { handleDeletedBusinessEvent } from "@/lib/billing-cancellation";
 import type {
   BillingSubscriptionPatch,
   BillingSubscriptionRow,
@@ -292,6 +293,8 @@ export function createRazorpayWebhookDeps(supabase: ServiceClient): RazorpayWebh
     releaseEvent: (eventId) => releaseWebhookEvent(supabase, eventId),
     findSubscriptionByRazorpayId: (id) => findBillingSubscriptionByRazorpayId(supabase, id),
     findSubscriptionByBusinessId: (businessId) => readBillingSubscription(supabase, businessId),
+    handleDeletedBusinessEvent: (razorpaySubscriptionId, event, payment) =>
+      handleDeletedBusinessEvent(supabase, razorpaySubscriptionId, event, payment),
     updateSubscription: (businessId, patch) => updateBillingSubscription(supabase, businessId, patch),
     sendNotice: (kind, row, context) => sendBillingNotice(supabase, kind, row, context),
     recordAudit: (businessId, action, metadata) =>

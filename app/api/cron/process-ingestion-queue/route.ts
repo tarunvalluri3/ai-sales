@@ -1,121 +1,18 @@
-import { NextRequest } from "next/server";
-import { jsonError, jsonSuccess } from "@/lib/api-response";
-import { processIngestionQueue } from "@/lib/ingestion-queue";
-import { processWebhookDeliveries } from "@/lib/webhook-delivery";
-import { processWhatsappOutboundMessages } from "@/lib/whatsapp-delivery";
-import { processInstagramOutboundMessages } from "@/lib/instagram-delivery";
-import { refreshDueUrlKnowledgeSources } from "@/lib/url-ingestion";
-import { runSlaEscalationSweep } from "@/lib/sla-routing";
-import { sendDailyDigestEmails } from "@/lib/notifications";
-import { runStalledLeadFollowUpSweep } from "@/lib/stalled-leads";
-import { processWorkflowRuns, runNoActivityWorkflowSweep } from "@/lib/workflow-engine";
-import { runBillingLifecycleSweep } from "@/lib/billing-lifecycle";
-import { processAnswerBankJobs } from "@/lib/answer-bank/generate";
-import { computeDailyRollup } from "@/lib/analytics-rollup";
-import { logAndGetUserMessage } from "@/lib/errors";
+import type { NextRequest } from "next/server";
+import { handleSchedulerTrigger } from "@/lib/scheduler/trigger";
 
 /**
- * `refreshDueUrlKnowledgeSources()` fetches up to 5 URLs sequentially per
- * run and can now fall back to a real headless-browser render
- * (lib/browser-render.ts) for JS-rendered sites -- extended to match
- * `/api/chat`'s existing `maxDuration` so several slow renders in one sweep
- * don't risk the platform's default timeout.
+ * Legacy path kept because vercel.json's daily cron (`0 4 * * *`, the only
+ * schedule Vercel Hobby accepts) calls it with `Authorization: Bearer
+ * $CRON_SECRET`. Production readiness (item 3): it now runs the same
+ * scheduler as /api/cron/run (lib/scheduler/), instead of 13 sweeps in one
+ * Promise.all -- each job isolated, locked, timed out and retried on its own.
+ * The once-a-day jobs keep their 04:00 UTC slot, so a Vercel-only deployment
+ * behaves as before; a VPS crontab calling /api/cron/run every few minutes
+ * adds the frequent queue/retry/SLA/appointment runs (docs/vps-cron.md).
  */
 export const maxDuration = 60;
 
-/**
- * Daily Vercel Cron backstop, shared across every background queue this
- * app has (vercel.json) -- the normal-latency path for each is its own
- * `after()` call right after the triggering write (knowledge ingestion:
- * app/(dashboard)/dashboard/knowledge/actions.ts; webhook delivery:
- * lib/tools/request-callback.ts; URL source refresh has no immediate
- * trigger, since it's inherently a scheduled/periodic thing, not
- * request-triggered). This route only exists to sweep up anything an
- * immediate trigger missed (a crashed function, a retry still in
- * backoff) -- one shared daily route, not one cron job per queue, since
- * Vercel's Hobby plan caps cron jobs and each one to once a day. The
- * handoff/lead email digest (lib/notifications.ts, Phase 25b) has no
- * immediate trigger at all -- it's inherently a once-a-day summary, so
- * this route IS its primary trigger, not just a backstop. Same for the
- * stalled-lead follow-up sweep (lib/stalled-leads.ts) -- "gone quiet
- * for N days" is only ever true once a day, not something an immediate
- * trigger could meaningfully fire on.
- *
- * Vercel signs cron-triggered requests with `Authorization: Bearer
- * $CRON_SECRET` when that env var is set (Vercel's own documented
- * convention) -- checked here so this route can't be used by an
- * arbitrary caller to force repeated Gemini-calling/webhook-firing runs.
- * Fails closed: no CRON_SECRET configured means no request is ever
- * accepted, not an open endpoint.
- */
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
-
-  if (!secret || authHeader !== `Bearer ${secret}`) {
-    return jsonError("Not found.", 404);
-  }
-
-  try {
-    const [
-      ingestion,
-      webhooks,
-      whatsappOutbound,
-      instagramOutbound,
-      urlRefresh,
-      slaRouting,
-      notificationDigest,
-      stalledLeadFollowUp,
-      workflowRuns,
-      workflowNoActivitySweep,
-      billingLifecycle,
-      answerBank,
-      analyticsRollup,
-    ] = await Promise.all([
-      processIngestionQueue(),
-      processWebhookDeliveries(),
-      processWhatsappOutboundMessages(),
-      processInstagramOutboundMessages(),
-      refreshDueUrlKnowledgeSources(),
-      runSlaEscalationSweep(),
-      sendDailyDigestEmails(),
-      runStalledLeadFollowUpSweep(),
-      processWorkflowRuns(),
-      runNoActivityWorkflowSweep(),
-      // Phase 17b: the four billing facts only a clock notices -- a 5-day
-      // grace running out, an annual term coming up (annual is a one-time
-      // order, so nothing renews itself), a trial ending with no payment
-      // method, and a finished period whose stored status has not caught
-      // up. Folded in here rather than given its own cron entry because
-      // Vercel's Hobby plan caps cron jobs, which is the same reason every
-      // other queue above shares this route.
-      runBillingLifecycleSweep(),
-      // Instant answers: backstop for the after() kick that follows a content
-      // change (lib/answer-bank/generate.ts) -- regenerates stale stored
-      // answers and purges expired cached query embeddings.
-      processAnswerBankJobs(),
-      // Phase 33 Stop 3: yesterday's (IST) per-business analytics rollup
-      // for the /apache Analytics page -- folded in here for the same
-      // "one shared route, not one cron per queue" reason as everything
-      // else above.
-      computeDailyRollup(),
-    ]);
-    return jsonSuccess({
-      ingestion,
-      webhooks,
-      whatsappOutbound,
-      instagramOutbound,
-      urlRefresh,
-      slaRouting,
-      notificationDigest,
-      stalledLeadFollowUp,
-      workflowRuns,
-      workflowNoActivitySweep,
-      billingLifecycle,
-      answerBank,
-      analyticsRollup,
-    });
-  } catch (error) {
-    return jsonError(logAndGetUserMessage(error), 500);
-  }
+  return handleSchedulerTrigger(request);
 }

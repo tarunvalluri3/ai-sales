@@ -104,3 +104,26 @@ export const CHAT_MODEL_CALL_TIMEOUT_MS = positiveIntEnv("CHAT_MODEL_CALL_TIMEOU
  * and the brief's "never skip a tool to save time").
  */
 export const CHAT_TOOL_TIMEOUT_MS = positiveIntEnv("CHAT_TOOL_TIMEOUT_MS", 15_000);
+
+/**
+ * How many times LangChain retries ONE failed Gemini chat call (production
+ * readiness, LAUNCH_AUDIT.md §12). Unset, @langchain/core's AsyncCaller
+ * retries 6 times with exponential backoff (~1s, 2s, 4s ... 32s, randomised),
+ * which can never finish inside CHAT_MODEL_CALL_TIMEOUT_MS and multiplies load
+ * on a key that is already throttled. One retry absorbs a single transient
+ * 5xx (backoff ~1-2 s) while staying well inside the per-call abort, which
+ * bounds both attempts together. LangChain already does not retry 4xx
+ * (400/401/403/404) or a 429 without a short Retry-After.
+ *
+ * Bounded to 0..3 so a bad value can't reintroduce the runaway default.
+ */
+export const CHAT_MODEL_MAX_RETRIES_CEILING = 3;
+
+export function boundedRetries(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.min(parsed, CHAT_MODEL_MAX_RETRIES_CEILING);
+}
+
+export const CHAT_MODEL_MAX_RETRIES = boundedRetries(process.env.CHAT_MODEL_MAX_RETRIES, 1);

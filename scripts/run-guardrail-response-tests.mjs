@@ -23,7 +23,7 @@ const {
   resolveInputGuardrailAction,
 } = policy;
 
-const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8");
+const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 const signal = (type) => ({ type, rule: "test", action: "logged", mode: "log_only" });
 const LOG_ONLY = { injection: "log_only", abuse: "log_only" };
 const ENFORCE = { injection: "enforce", abuse: "enforce" };
@@ -164,7 +164,8 @@ test("wiring: WhatsApp and Instagram flag the conversation, send the fixed reply
     const branch = source.slice(policyAt, modelAt);
     assert.match(branch, /flagConversationNeedsAttention\(/);
     assert.ok(branch.includes(send), `${file}: sends the fixed reply`);
-    assert.match(branch, /return(?: \{[^}]*\})?;/);
+    // `return;`, `return { ... };` or (WhatsApp, production readiness item 2) `return "replied";`.
+    assert.match(branch, /return(?: \{[^}]*\}| "\w+")?;/);
   }
 });
 

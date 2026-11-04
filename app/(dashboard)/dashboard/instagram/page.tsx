@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { getInstagramConnectionForBusiness, getInstagramPendingSelection } from "@/lib/instagram";
-import { channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
+import { channelAllowed, channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
 import { ConnectInstagramButton } from "./connect-instagram-button";
 import { InstagramConnectionStatus } from "./instagram-connection-status";
 import { InstagramSetupGuide } from "./instagram-setup-guide";
@@ -28,7 +28,7 @@ export default async function InstagramPage({
     // Read only under the caller's own business_id.
     canEdit && selectionId ? getInstagramPendingSelection(businessId, selectionId) : Promise.resolve(null),
   ]);
-  const entitled = entitlement.channels.instagram;
+  const entitled = channelAllowed(entitlement, "instagram");
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
@@ -62,17 +62,13 @@ export default async function InstagramPage({
       {connection && !entitled ? (
         <ChannelUpgradeNotice
           message={`${channelNotEntitledMessage("instagram", entitlement)} This account is still connected, but its messages are not being received or answered.`}
-          showPlansLink={false}
         />
       ) : null}
 
       {choices ? null : connection ? (
         <InstagramConnectionStatus connection={connection} canEdit={canEdit} />
       ) : !entitled ? (
-        <ChannelUpgradeNotice
-          message={channelNotEntitledMessage("instagram", entitlement)}
-          showPlansLink={false}
-        />
+        <ChannelUpgradeNotice message={channelNotEntitledMessage("instagram", entitlement)} />
       ) : canEdit ? (
         <ConnectInstagramButton />
       ) : (

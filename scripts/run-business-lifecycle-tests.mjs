@@ -33,7 +33,7 @@ const { evaluateWidgetAccess, widgetRejectionStatus } = await import(
 const { needsPublishedRestamp } = await import(new URL("../lib/agent-published.ts", import.meta.url).href);
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8");
+const read = (relative) => readFileSync(path.join(ROOT, relative), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const LIVE = "11111111-1111-1111-1111-111111111111";
 const active = { status: "active", deleted_at: null, live_version_id: LIVE };
@@ -84,16 +84,17 @@ test("reinstate repair applies only to an active, live row with no published_at"
 for (const channel of ["whatsapp", "instagram"]) {
   test(`${channel}: the channel gate runs before ANY reply and returns when it refuses`, () => {
     const source = read(channel === "instagram" ? "app/api/meta/instagram/webhook/route.ts" : `app/api/webhooks/${channel}/route.ts`);
-    // Instagram starts the read early (2026-11-02 latency pass) and gates on its result later,
-    // so the gate is the `if (!contextResult.ok)` check, not the call site.
+    // Both webhooks start the read early (Instagram 2026-11-02, WhatsApp 2026-11-04 latency
+    // passes) and gate on its result later, so the gate is the `if (!contextResult.ok)` check.
     assert.ok(source.includes("loadBusinessAiContext(businessId)"), "webhook loads its context through loadBusinessAiContext");
-    const gate = channel === "instagram" ? source.indexOf("if (!contextResult.ok)") : source.indexOf("await loadBusinessAiContext(businessId)");
+    const gate = source.indexOf("if (!contextResult.ok)");
     assert.ok(gate > 0, "the webhook gates on the context result");
     const firstReply = source.indexOf("await sendCannedReply(");
     const aiCall = source.indexOf("await askSalesEmployee(");
     assert.ok(firstReply > gate, "no canned reply is sent before the gate");
     assert.ok(aiCall > gate, "no AI call happens before the gate");
-    assert.match(source.slice(gate, firstReply), /if \(!contextResult\.ok\) \{[\s\S]*?return(?: \{[^}]*\})?;\s*\}/);
+    // `return;`, `return { ... };` or (WhatsApp, production readiness item 2) `return "skipped";`.
+    assert.match(source.slice(gate, firstReply), /if \(!contextResult\.ok\) \{[\s\S]*?return(?: \{[^}]*\}| "\w+")?;\s*\}/);
   });
 }
 

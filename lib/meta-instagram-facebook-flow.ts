@@ -22,7 +22,13 @@ import { isPermissionError, PAGE_SUBSCRIBED_FIELDS, permissionNamedInError } fro
  * code, the app secret or message text.
  */
 
-export type FacebookFlowError = "exchange_failed" | "long_lived_failed" | "me_failed" | "pages_failed" | "no_linked_pages";
+export type FacebookFlowError =
+  | "exchange_failed"
+  | "long_lived_failed"
+  | "me_failed"
+  | "pages_failed"
+  | "no_linked_pages"
+  | "permissions_missing";
 
 export type LinkedPage = {
   pageId: string;
@@ -50,6 +56,8 @@ const ID_PATTERN = /^\d{1,32}$/;
 /** Safety cap on /me/accounts paging (100 Pages per page). */
 const MAX_ACCOUNT_PAGES = 10;
 export const PAGE_FIELDS = "id,name,access_token,instagram_business_account{id,username}";
+/** Without these, /me/accounts cannot return a Page with its linked Instagram account. */
+const PAGE_DISCOVERY_PERMISSIONS = ["pages_show_list", "instagram_basic"] as const;
 
 const pageSchema = z.object({
   id: z.string().regex(ID_PATTERN),
@@ -175,6 +183,22 @@ export async function discoverFacebookPages(input: FacebookDiscoverInput): Promi
   });
 
   if (pages.length === 0) {
+    // Tell a person who has not linked a Page apart from a login that did not
+    // grant access. A failed read keeps the original answer.
+    const permissions = await graph<unknown>("GET", "/me/permissions", { token: userToken });
+    const parsedPermissions = permissions.ok ? permissionsSchema.safeParse(permissions.data) : null;
+    const granted = parsedPermissions?.success
+      ? parsedPermissions.data.data.filter((row) => row.status === "granted").map((row) => row.permission)
+      : null;
+    const missing = granted ? PAGE_DISCOVERY_PERMISSIONS.filter((name) => !granted.includes(name)) : [];
+    if (missing.length > 0) {
+      log(
+        "ig_connect_failed",
+        { step: "pages", reason: "permissions_missing", pageCount: totalPages, missing: missing.join(",") },
+        "error",
+      );
+      return { ok: false, error: "permissions_missing" };
+    }
     log("ig_connect_failed", { step: "pages", reason: "no_linked_pages", pageCount: totalPages }, "error");
     return { ok: false, error: "no_linked_pages" };
   }

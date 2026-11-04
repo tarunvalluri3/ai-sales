@@ -1,7 +1,8 @@
 import { after, NextRequest } from "next/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
-import { selectBurstLimit } from "@/lib/abuse-limits";
+import { selectBurstLimit, SOFT_LIMIT_MESSAGE } from "@/lib/abuse-limits";
+import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import { checkReplyQuota, type ReplyQuotaStatus } from "@/lib/usage-limit";
 import { isInstagramAllowed } from "@/lib/subscription";
 import {
@@ -38,6 +39,12 @@ import { finalizeTurnMetrics, writeDeferredTurnMetrics } from "@/lib/ai-response
 import { logEvent } from "@/lib/logger";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
+import { markInboundReplyStatus, reportChannelReplyFailure } from "@/lib/channel-reply-failure";
+import {
+  REPLY_FAILED_FALLBACK_MESSAGE,
+  runReplyWithFallback,
+  type ReplyAttemptState,
+} from "@/lib/channel-reply-rules";
 import type { Conversation } from "@/lib/supabase/types";
 import {
   summarizeInstagramReplyTiming,
@@ -207,7 +214,7 @@ async function ingestInboundMessage(
     return null;
   }
   if (!senderAllowed) {
-    logEvent("rate_limit_exceeded", businessId, { scope: "instagram_webhook" }, "error");
+    logEvent("rate_limit_exceeded", businessId, { scope: "instagram_webhook" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return null;
   }
 
@@ -215,7 +222,7 @@ async function ingestInboundMessage(
   // insert happens before any other write, so a redelivery is a no-op.
   const { error: dedupError } = await supabase
     .from("instagram_inbound_messages")
-    .insert({ business_id: businessId, instagram_message_id: inbound.mid });
+    .insert({ business_id: businessId, instagram_message_id: inbound.mid, reply_status: "pending" });
   if (dedupError) {
     // 23505 = already processed (or being processed). Any other error is
     // logged but still treated as "don't double-process".
@@ -252,7 +259,8 @@ async function ingestInboundMessage(
     ),
   ]);
   if (!conversationAllowed) {
-    logEvent("rate_limit_exceeded", businessId, { scope: "conversation" }, "error");
+    logEvent("rate_limit_exceeded", businessId, { scope: "conversation" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
+    await markInboundReplyStatus(supabase, "instagram", businessId, inbound.mid, "skipped");
     return null;
   }
 
@@ -323,12 +331,45 @@ async function replyToInboundMessage(
   // Fire-and-forget work, awaited only at the very end so it completes
   // inside this invocation without ever delaying the reply.
   const background: Promise<unknown>[] = [];
-
   try {
-    const result = await answerInboundMessage(supabase, inbound, ingested, milestones, background);
-    outcome = result.outcome;
-    model = result.model;
-    sent = result.sent;
+    // Production readiness (item 2), the shared orchestration
+    // (lib/channel-reply-rules.ts runReplyWithFallback): ANY failure -- every
+    // Gemini error, not just a timeout, or a database error -- is reported
+    // (Sentry + an alertable `instagram_reply_failed` event), the conversation
+    // is flagged for the team, and the prospect gets the fixed fallback unless
+    // the real reply was already queued. The 24-hour window still applies to
+    // it (deliverInstagramOutbound); it is always open for a message that
+    // arrived seconds ago.
+    await runReplyWithFallback({
+      answer: async (state) => {
+        const result = await answerInboundMessage(supabase, inbound, ingested, milestones, background, state);
+        outcome = result.outcome;
+        model = result.model;
+        sent = result.sent;
+        const noReplySent = outcome === "daily_limit" && sent === null;
+        return outcome === "human_control" || outcome === "not_serving" || noReplySent ? "skipped" : "replied";
+      },
+      reportFailure: async (error, state) => {
+        outcome = "error";
+        await reportChannelReplyFailure({
+          supabase,
+          channel: "instagram",
+          businessId,
+          conversationId: conversation.id,
+          clerkOrgId: state.clerkOrgId,
+          error,
+          stage: "ai_reply",
+        });
+      },
+      sendFallback: async () => {
+        sent = await sendFallbackReply(supabase, inbound, ingested);
+      },
+      markStatus: (status) => markInboundReplyStatus(supabase, "instagram", businessId, inbound.mid, status),
+      onFallbackError: () => {
+        sent = false;
+        logEvent("instagram_reply_fallback_failed", businessId, { conversationId: conversation.id }, "error");
+      },
+    });
   } finally {
     logEvent(
       "ig_reply_timing",
@@ -356,6 +397,7 @@ async function answerInboundMessage(
   ingested: IngestedMessage,
   milestones: InstagramReplyMilestones,
   background: Promise<unknown>[],
+  state: ReplyAttemptState,
 ): Promise<AnswerResult> {
   const { businessId, conversation, prepared, inboundContent, timer, prefetch } = ingested;
   const instagramBusinessAccountId = inbound.accountId;
@@ -406,6 +448,7 @@ async function answerInboundMessage(
     return { outcome: "not_serving", model: null, sent: null };
   }
   const businessContext = contextResult.context;
+  state.clerkOrgId = businessContext.clerkOrgId;
   milestones.contextLoadedAtMs = timer.elapsedMs();
 
   // A reply is coming: show "Seen" and "typing..." right away (Instagram
@@ -414,6 +457,7 @@ async function answerInboundMessage(
 
   if (!isText) {
     const result = await sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, inbound.senderId, NON_TEXT_REPLY, timer);
+    state.replyQueued = true;
     milestones.metaSendReturnedAtMs = timer.elapsedMs();
     return { outcome: "canned", model: null, sent: result.success };
   }
@@ -423,6 +467,7 @@ async function answerInboundMessage(
   const inputAction = resolveInputGuardrailAction(prepared?.signals ?? [], abuseStrikes);
   if (inputAction.kind !== "none") {
     const result = await sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, inbound.senderId, inputAction.reply, timer);
+    state.replyQueued = true;
     milestones.metaSendReturnedAtMs = timer.elapsedMs();
     await flagConversationNeedsAttention(supabase, businessId, conversation.id, businessContext.clerkOrgId);
     return { outcome: "canned", model: null, sent: result.success };
@@ -438,6 +483,29 @@ async function answerInboundMessage(
     suggestedQuestions: businessContext.suggestedQuestions,
     suggestedClick: false,
   };
+
+  // Round 3, item 1: the daily AI reply caps shared with the website and
+  // WhatsApp. Reached once per inbound message (the dedup insert stops a Meta
+  // redelivery first). Over a cap (or the counter can't be read): no Gemini
+  // call, the conversation is flagged, and the notice goes out at most once
+  // per conversation per day, only inside the 24-hour window.
+  const dailyLimit = await timer.time("rate_limit_gemini_daily", () =>
+    checkDailyReplyLimit({
+      supabase,
+      channel: "instagram",
+      businessId,
+      conversationId: conversation.id,
+      clerkOrgId: businessContext.clerkOrgId,
+      inboundAtMs: inbound.sentAtMs ?? null,
+    }),
+  );
+  if (!dailyLimit.allowed) {
+    if (dailyLimit.notice !== "send") return { outcome: "daily_limit", model: null, sent: null };
+    const result = await sendCannedReply(supabase, businessId, conversation.id, instagramBusinessAccountId, inbound.senderId, SOFT_LIMIT_MESSAGE, timer);
+    state.replyQueued = true;
+    milestones.metaSendReturnedAtMs = timer.elapsedMs();
+    return { outcome: "daily_limit", model: null, sent: result.success };
+  }
 
   // The same function, system prompt, grounding rules, model and history cap
   // as the widget's JSON path (app/api/chat/route.ts).
@@ -490,6 +558,7 @@ async function answerInboundMessage(
     response.answer,
     timer,
   );
+  state.replyQueued = true;
   milestones.metaSendReturnedAtMs = timer.elapsedMs();
 
   // ---- Everything below runs after the reply has been sent. ----
@@ -535,6 +604,25 @@ async function answerInboundMessage(
     model: usedModel ? (process.env.GEMINI_CHAT_MODEL ?? null) : null,
     sent: sendResult.success,
   };
+}
+
+/** The fixed "our team will get back to you" reply after a failure. Returns whether it reached Meta. */
+async function sendFallbackReply(
+  supabase: ServiceSupabaseClient,
+  inbound: InboundMessage,
+  ingested: IngestedMessage,
+): Promise<boolean> {
+  const { businessId, conversation, timer } = ingested;
+  const result = await sendCannedReply(
+    supabase,
+    businessId,
+    conversation.id,
+    inbound.accountId,
+    inbound.senderId,
+    REPLY_FAILED_FALLBACK_MESSAGE,
+    timer,
+  );
+  return result.success;
 }
 
 async function sendCannedReply(

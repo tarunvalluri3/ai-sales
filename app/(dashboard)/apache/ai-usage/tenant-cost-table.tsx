@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { DataTable, TableRow, TableCell, type SortState } from "@/app/(dashboard)/dashboard/_components/data-table";
 import { Badge } from "@/app/(dashboard)/dashboard/_components/badge";
-import { USD_TO_INR_RATE } from "@/lib/gemini-pricing";
 import { formatPaiseAsInr2dp } from "@/lib/invoice-format";
 import type { TenantCostMargin } from "@/lib/admin-ai-usage";
 
@@ -15,7 +14,8 @@ const COLUMNS = [
   { key: "costPercentOfRevenue", label: "Cost / revenue", sortable: true, align: "right" as const },
 ];
 
-export function TenantCostTable({ tenants }: { tenants: TenantCostMargin[] }) {
+// usdToInrRate comes from the server page: it is server config (USD_TO_INR_RATE), unreadable in a client component.
+export function TenantCostTable({ tenants, usdToInrRate }: { tenants: TenantCostMargin[]; usdToInrRate: number }) {
   const [sort, setSort] = useState<SortState>({ key: "costUsd", direction: "desc" });
 
   const sorted = useMemo(() => {
@@ -48,7 +48,7 @@ export function TenantCostTable({ tenants }: { tenants: TenantCostMargin[] }) {
           </TableCell>
           <TableCell>{t.planName}</TableCell>
           <TableCell align="right">
-            ${t.costUsd.toFixed(3)} <span className="text-ds-text-muted">(≈ {formatPaiseAsInr2dp(Math.round(t.costUsd * USD_TO_INR_RATE * 100))})</span>
+            ${t.costUsd.toFixed(3)} <span className="text-ds-text-muted">(≈ {formatPaiseAsInr2dp(Math.round(t.costUsd * usdToInrRate * 100))})</span>
           </TableCell>
           <TableCell align="right">{formatPaiseAsInr2dp(t.revenuePaise)}</TableCell>
           <TableCell align="right">{t.costPercentOfRevenue === null ? "—" : `${t.costPercentOfRevenue.toFixed(1)}%`}</TableCell>

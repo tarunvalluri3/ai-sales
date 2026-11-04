@@ -4,6 +4,7 @@ import { resolveBusinessBrandingFromWidgetKey } from "@/lib/widget-auth";
 import { isWithinBusinessHours } from "@/lib/business-hours";
 import { getWidgetStrings } from "@/lib/widget-i18n";
 import { WidgetApp } from "./_components/widget-app";
+import { chatProtectionConfigFromEnv } from "@/lib/chat-protection";
 
 /**
  * This page carries a live, per-business widget key in its query string
@@ -31,6 +32,10 @@ export default async function WidgetEmbedPage({
   }
 
   const strings = getWidgetStrings(branding.language);
+  // Item 3: the public site key only (never the secret), and only when
+  // Turnstile is switched on (TURNSTILE_MODE=log|enforce with both keys).
+  const protection = chatProtectionConfigFromEnv();
+  const turnstileSiteKey = protection.turnstile.mode !== "off" ? protection.turnstile.siteKey : null;
   const supabase = createServiceSupabaseClient();
   const isOpenNow = await isWithinBusinessHours(supabase, branding.businessId);
   const greeting = isOpenNow
@@ -48,6 +53,7 @@ export default async function WidgetEmbedPage({
       ctaText={branding.ctaText ?? strings.defaultCta}
       suggestedQuestions={branding.suggestedQuestions}
       privacyPolicyUrl={branding.privacyPolicyUrl}
+      turnstileSiteKey={turnstileSiteKey}
     />
   );
 }

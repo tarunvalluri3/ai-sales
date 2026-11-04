@@ -93,23 +93,15 @@ function requireConfig() {
  *
  * Every business created from Phase 17b onwards has one already -- the
  * `businesses_create_trial_subscription` trigger makes it in the same
- * transaction as the business itself. This covers the one case that
- * trigger cannot: a **grandfathered tenant**, created before billing
- * existed, which by Phase 17a's design has no row at all and is therefore
- * resolved to Scale entitlements on a calendar month.
+ * transaction as the business itself. This covers a business created before
+ * billing existed, which has no row.
  *
- * The row written here **encodes exactly that grandfathered state** --
- * Scale, active, the current UTC calendar month -- so inserting it changes
- * nothing whatsoever for that tenant. It is a materialisation of the
- * default, not a new deal. Two things it deliberately does *not* do:
- *
- * - It does not start a trial. `trial_started_at` is write-once, so a trial
- *   granted here would be permanent, and a tenant that has been using the
- *   product for months is not entitled to one. It is also the wrong
- *   direction: a trial's cap is 200 replies, which would *reduce* a
- *   grandfathered tenant's quota from 10,000.
- * - It does not set `plan_key` to whatever they are about to buy. Nothing
- *   is bought yet.
+ * Since 2026-11-03 a missing row means NO paid access (lib/entitlement-rules.ts),
+ * so the row written here is an `expired` Starter placeholder with no trial:
+ * it grants nothing on its own, and because there is no trial to defer to,
+ * the checkout that follows charges on authorisation (firstChargeAtFor). It
+ * never starts a trial (one per organisation, trial_grants) and never sets
+ * `plan_key` to what they are about to buy -- nothing is bought yet.
  */
 async function ensureSubscriptionRow(
   supabase: ServiceClient,
@@ -119,18 +111,14 @@ async function ensureSubscriptionRow(
   if (existing) return existing;
 
   const now = new Date();
-  const periodStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString();
-
   const { error } = await supabase.from("subscriptions").insert({
     business_id: businessId,
-    // GRANDFATHERED_PLAN_KEY in lib/subscription.ts. Kept identical on
-    // purpose: this row must be indistinguishable from the absent-row
-    // default it replaces.
-    plan_key: "scale",
-    status: "active",
-    current_period_start: periodStart,
-    current_period_end: periodEnd,
+    plan_key: "starter",
+    status: "expired",
+    // subscriptions_period_dates_present needs a period on a non-trial row;
+    // a one-second one in the past-ish never serves.
+    current_period_start: now.toISOString(),
+    current_period_end: new Date(now.getTime() + 1_000).toISOString(),
   });
 
   // A concurrent checkout (two tabs) can have inserted it already. Not an
@@ -150,7 +138,7 @@ async function ensureSubscriptionRow(
       "billing_subscription_row_missing_after_insert",
     );
   }
-  logEvent("billing_grandfathered_row_materialised", businessId, { planKey: row.plan_key });
+  logEvent("billing_placeholder_row_created", businessId, { planKey: row.plan_key });
   return row;
 }
 
@@ -161,8 +149,8 @@ async function ensureSubscriptionRow(
  * The confirmed decision is that a payment method is required at signup,
  * so the mandate is authenticated now and `start_at` defers the money to
  * trial end. Razorpay **rejects a `start_at` in the past**, so a trial
- * that has already run out (or a grandfathered tenant, which never had
- * one) gets no `start_at` at all and is charged on authorisation -- which
+ * that has already run out (or a business with no trial left, e.g.
+ * one whose organisation already used it) gets no `start_at` at all and is charged on authorisation -- which
  * is the honest behaviour: there is no free period left to honour.
  */
 function firstChargeAtFor(row: BillingSubscriptionRow, now: Date): number | null {

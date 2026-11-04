@@ -6,6 +6,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Conversation, InstagramConnection } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { logEvent, type LogMetadata } from "@/lib/logger";
+import { alertOwnerIntegrationDisconnected } from "@/lib/integration-alerts";
 import { createConversation } from "@/lib/conversations";
 import { discoverInstagramAccounts, graphFailureMetadata } from "@/lib/meta-instagram-connect-flow";
 import {
@@ -78,6 +79,7 @@ export type InstagramConnectError =
   | "pages_failed"
   | "no_accounts"
   | "no_linked_pages"
+  | "permissions_missing"
   | "account_in_use"
   | "subscribe_failed"
   | "subscribe_permission"
@@ -575,7 +577,7 @@ export async function markInstagramConnectionRevoked(
   businessId: string,
 ): Promise<void> {
   await supabase.from("instagram_credentials").delete().eq("business_id", businessId);
-  await supabase
+  const { data: changed } = await supabase
     .from("instagram_connections")
     .update({
       status: "disconnected",
@@ -583,8 +585,15 @@ export async function markInstagramConnectionRevoked(
       last_error: "token_revoked",
       updated_at: new Date().toISOString(),
     })
-    .eq("business_id", businessId);
+    .eq("business_id", businessId)
+    .eq("status", "connected")
+    .select("id");
   logEvent("instagram_token_revoked", businessId, {}, "error");
+  // Production readiness (item 7): tell the owner -- once, on the transition
+  // from connected (a later failing send finds it already disconnected).
+  if (changed && changed.length > 0) {
+    await alertOwnerIntegrationDisconnected(supabase, businessId, "instagram", "token_revoked");
+  }
 }
 
 

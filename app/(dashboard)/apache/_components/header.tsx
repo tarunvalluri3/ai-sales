@@ -1,6 +1,7 @@
 import { UserButton } from "@clerk/nextjs";
 import { Search } from "lucide-react";
 import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
+import { resolveAppEnvironment } from "@/lib/deployment-env";
 
 /**
  * The /apache top bar: global search (wired to the Tenants page's `q`
@@ -41,8 +42,13 @@ export function AdminHeader() {
 }
 
 function resolveEnvironmentLabel(): "Production" | "Staging" | "Development" {
-  const vercelEnv = process.env.VERCEL_ENV;
-  if (vercelEnv === "production") return "Production";
-  if (vercelEnv === "preview") return "Staging";
+  let environment: string = "development";
+  try {
+    environment = resolveAppEnvironment(process.env).environment;
+  } catch {
+    // An invalid APP_ENV already fails server startup (lib/env.ts).
+  }
+  if (environment === "production") return "Production";
+  if (environment === "staging") return "Staging";
   return "Development";
 }

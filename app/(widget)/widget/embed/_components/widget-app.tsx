@@ -5,6 +5,7 @@ import { AnimatePresence } from "motion/react";
 import { useWidgetChat } from "../_lib/use-widget-chat";
 import { parseFromParentMessage, postToParent } from "../_lib/post-message";
 import { useViewportHeight } from "../_lib/use-viewport-height";
+import { useTurnstile } from "../_lib/use-turnstile";
 import { LauncherButton } from "./launcher-button";
 import { Panel } from "./panel";
 import type { WidgetStrings } from "@/lib/widget-i18n";
@@ -26,6 +27,7 @@ export function WidgetApp({
   ctaText,
   suggestedQuestions,
   privacyPolicyUrl,
+  turnstileSiteKey = null,
 }: {
   businessName: string;
   language: WidgetLanguage;
@@ -36,12 +38,15 @@ export function WidgetApp({
   ctaText: string;
   suggestedQuestions: string[];
   privacyPolicyUrl: string | null;
+  /** Set only when TURNSTILE_MODE is log or enforce (app/(widget)/widget/embed/page.tsx). */
+  turnstileSiteKey?: string | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewport, setViewport] = useState({ width: 1280, height: 800 });
   const launcherButtonRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
-  const chat = useWidgetChat(strings);
+  const { attachContainer: attachTurnstile, takeToken: takeTurnstileToken, enabled: turnstileEnabled } = useTurnstile(turnstileSiteKey);
+  const chat = useWidgetChat(strings, { takeTurnstileToken });
   const visualViewportHeight = useViewportHeight();
 
   useEffect(() => {
@@ -108,7 +113,11 @@ export function WidgetApp({
     >
       <AnimatePresence initial={false} mode="wait">
         {isOpen ? (
-          <div key="panel" className="h-full w-full p-0 sm:p-0">
+          <div key="panel" className="relative h-full w-full p-0 sm:p-0">
+            {turnstileEnabled ? (
+              // Turnstile's challenge, shown only when Cloudflare needs an interaction.
+              <div ref={attachTurnstile} className="absolute inset-x-4 bottom-24 z-10 flex justify-center" />
+            ) : null}
             <Panel
               businessName={businessName}
               strings={strings}

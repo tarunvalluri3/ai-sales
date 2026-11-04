@@ -1,0 +1,15 @@
+# PRODUCTION Supabase project refs, one per line ("#" starts a comment).
+#
+# Every script/test guard (scripts/lib/production-guard.mjs) and the local
+# `next dev` block (next.config.ts) refuse a target listed here. Committed on
+# purpose, so the protection doesn't depend on an env var that the test runners
+# and `npm test` never load. Refs are not secrets: each is visible in the public
+# NEXT_PUBLIC_SUPABASE_URL.
+#
+# When you create a NEW production project (e.g. in another region), ADD its
+# ref here BEFORE pointing anything at it, and keep the old one until that
+# project is deleted. The current ref is also built into lib/deployment-env.ts,
+# so removing it from this file never unprotects it.
+# PRODUCTION_SUPABASE_PROJECT_REFS (env, comma-separated) can add more.
+
+bykeztxvejpwfcxgsubm

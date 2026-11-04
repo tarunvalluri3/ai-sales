@@ -30,7 +30,11 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}
       SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SUPABASE_SECRET_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # Production readiness: CI is the staging environment. The production
+      # GEMINI_API_KEY is deliberately NOT passed any more (LAUNCH_AUDIT.md §3):
+      # nothing in CI calls Gemini -- lint, typecheck, the pure unit suites,
+      # the build and pgTAP make no model call.
+      APP_ENV: staging
       GEMINI_CHAT_MODEL: ${{ secrets.GEMINI_CHAT_MODEL }}
       GEMINI_EMBEDDING_MODEL: ${{ secrets.GEMINI_EMBEDDING_MODEL }}
       GEMINI_EMBEDDING_DIMENSION: ${{ secrets.GEMINI_EMBEDDING_DIMENSION }}
@@ -54,6 +58,84 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      - name: Environment safety tests
+        # Production readiness (LAUNCH_AUDIT.md §3/§15): APP_ENV resolution, the
+        # production-Supabase guard every script and test runs through, and
+        # that .env.example documents every validated variable. Pure.
+        run: npm run test:env-safety
+
+      - name: Plan access and trial tests
+        # Production readiness 2026-11-03: no-card trial with a hard cap, one
+        # trial per org, WhatsApp/Instagram on Growth/Scale only, no row = no
+        # paid access, last-known plan on read failure. Pure.
+        run: npm run test:plan-access
+
+      - name: Public chat protection tests
+        # Configurable rate limits, per-business limit, daily Gemini caps and
+        # Turnstile verification (fetch mocked). Pure.
+        run: npm run test:chat-protection
+
+      - name: Daily AI reply limit tests
+        # Round 3: shared per-business/overall daily caps on website, WhatsApp
+        # and Instagram; fail closed; one alert/notice. Side effects mocked. Pure.
+        run: npm run test:daily-reply-limit
+
+      - name: WhatsApp Embedded Signup tests
+        # Signup postMessage parsing, the onboarding steps and every failure
+        # path, template submission/status parsing. Graph calls are mocked.
+        run: npm run test:whatsapp-embedded-signup
+
+      - name: Migration order check
+        # Some migrations are future-dated and already applied in production;
+        # a new one must sort after main's newest or `supabase db push` refuses
+        # it. The shallow checkout has no main ref, so fetch just its tip.
+        run: |
+          git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main || true
+          npm run test:migration-order
+
+      - name: Failed-reply handling tests
+        # Production readiness item 2: every Gemini error is classified and
+        # reported, the WhatsApp/Instagram fallback + needs_attention flag,
+        # no duplicate reply on a Meta redelivery, bounded LangChain retries,
+        # and the stuck-reply recovery decisions. Pure, mocks only.
+        run: npm run test:reply-failure
+
+      - name: Scheduler tests
+        # Production readiness item 3: when each job is due, leases so
+        # overlapping triggers never double-run a job, retries/timeouts/
+        # isolation, the repeated-failure alert, trigger auth, and that
+        # vercel.json stays daily-only. Pure, in-memory lease store.
+        run: npm run test:scheduler
+
+      - name: WhatsApp 24-hour window and template tests
+        # Production readiness item 4: text vs approved template vs visible
+        # failure outside the window, Graph error classification and retry
+        # policy, template config, status callbacks. Pure.
+        run: npm run test:whatsapp-window
+
+      - name: Appointment reminder and expiry tests
+        # Production readiness item 5: 24 h / 1 h reminder windows, pending
+        # expiry (48 h / 2 h before start), dedup-ledger claim before every
+        # send, business time zone in labels. Pure.
+        run: npm run test:appointment-lifecycle
+
+      - name: Billing cancellation on delete tests
+        # Production readiness item 6: which deletions need a Razorpay
+        # cancellation, retry/alert policy, and the webhook's handling of
+        # charges/cancellations for a deleted business. Pure.
+        run: npm run test:billing-cancellation
+
+      - name: Instagram connection health tests
+        # Production readiness item 7: revoked-token / removed-Page-subscription
+        # detection, self-healing re-subscribe, owner alerted once. Pure.
+        run: npm run test:instagram-health
+
+      - name: Observability tests
+        # Production readiness item 9: deep health verdicts (503 on database
+        # down / stopped scheduler), secret-gated details, admin-gated panels,
+        # Sentry noise and tracing settings. Pure.
+        run: npm run test:observability
 
       - name: Plan pricing / GST arithmetic tests
         # Phase 17a: prices are GST-inclusive and the taxable/CGST/SGST/IGST

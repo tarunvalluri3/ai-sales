@@ -23,7 +23,7 @@ import {
 
 const ctx = { otherTenantNames: ["Ghost Test Co.", "GifTeeCo", "GR ENGINEERS"], allowedHosts: ["waveswebstudio.in", "localhost"] };
 const REFUSAL = "I'm here to help with information about Acme Test Co.'s products and services. Would you like to hear about Test Product - 1 or our Knowledge Sync Test Service?";
-const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8");
+const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 // ------------------------------------------------------------------ catalog
 

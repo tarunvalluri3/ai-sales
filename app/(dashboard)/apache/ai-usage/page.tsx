@@ -52,7 +52,7 @@ export default async function ApacheAiUsagePage({ searchParams }: { searchParams
         </div>
       ) : null}
 
-      <TenantCostTable tenants={tenantCosts} />
+      <TenantCostTable tenants={tenantCosts} usdToInrRate={USD_TO_INR_RATE} />
 
       <p className="text-xs text-ds-text-muted">
         Cache hit rate is not shown -- lib/response-cache.ts doesn&apos;t currently log a hit/miss event anywhere

@@ -501,3 +501,67 @@ export async function issueCreditNoteForRefundNow(
   return issueCreditNoteForRefund(createCreditNoteServiceDeps(createServiceSupabaseClient()), refund);
 }
 
+
+/* ------------------------------------------------------------------ *
+ * Re-sending document emails that never went out
+ * ------------------------------------------------------------------ */
+
+/** How far back the re-send sweep looks: older documents are left for a human. */
+const RESEND_LOOKBACK_DAYS = 14;
+const RESEND_BATCH = 50;
+
+export type DocumentEmailResendResult = { invoicesChecked: number; creditNotesChecked: number; resent: number };
+
+/**
+ * Production readiness (item 9; LAUNCH_AUDIT.md §9 "no re-send for failed
+ * invoice emails"). emailInvoice()/emailCreditNote() claim their
+ * `billing_notice_sends` row before sending and RELEASE it when the send
+ * fails -- but nothing ever tried again (Razorpay doesn't redeliver a
+ * webhook we answered 200). This sweep, run hourly by the scheduler, finds
+ * recent invoices/credit notes with no claim and sends them through the same
+ * once-only functions, so a document is still emailed at most once.
+ * Without RESEND_API_KEY it does nothing (it would only claim-and-release).
+ */
+export async function resendUnsentDocumentEmails(): Promise<DocumentEmailResendResult> {
+  const result: DocumentEmailResendResult = { invoicesChecked: 0, creditNotesChecked: 0, resent: 0 };
+  if (!process.env.RESEND_API_KEY) return result;
+
+  const supabase = createServiceSupabaseClient();
+  const since = new Date(Date.now() - RESEND_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+  const [invoices, creditNotes] = await Promise.all([
+    supabase.from("invoices").select("*").gte("issued_at", since).order("issued_at", { ascending: true }).limit(RESEND_BATCH),
+    supabase.from("credit_notes").select("*").gte("issued_at", since).order("issued_at", { ascending: true }).limit(RESEND_BATCH),
+  ]);
+  if (invoices.error || creditNotes.error) {
+    logEvent("document_email_resend_read_failed", "unknown", {}, "error");
+    return result;
+  }
+
+  const invoiceRows = (invoices.data ?? []).map((row) => parseInvoiceRow(row));
+  const creditNoteRows = (creditNotes.data ?? []).map((row) => parseCreditNoteRow(row));
+  result.invoicesChecked = invoiceRows.length;
+  result.creditNotesChecked = creditNoteRows.length;
+
+  const keys = [...invoiceRows.map((row) => `invoice:${row.id}`), ...creditNoteRows.map((row) => `credit_note:${row.id}`)];
+  if (keys.length === 0) return result;
+  const { data: claimed, error: claimedError } = await supabase.from("billing_notice_sends").select("notice_key").in("notice_key", keys);
+  if (claimedError) {
+    logEvent("document_email_resend_ledger_read_failed", "unknown", {}, "error");
+    return result;
+  }
+  const sent = new Set((claimed ?? []).map((row: { notice_key: string }) => row.notice_key));
+
+  for (const invoice of invoiceRows) {
+    if (sent.has(`invoice:${invoice.id}`)) continue;
+    await emailInvoice(supabase, invoice);
+    result.resent++;
+  }
+  for (const note of creditNoteRows) {
+    if (sent.has(`credit_note:${note.id}`)) continue;
+    await emailCreditNote(supabase, note);
+    result.resent++;
+  }
+  if (result.resent > 0) logEvent("document_email_resend_attempted", "system", { attempted: result.resent });
+  return result;
+}

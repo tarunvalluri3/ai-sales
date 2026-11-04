@@ -20,7 +20,7 @@ register("./alias-resolver-hooks.mjs", import.meta.url);
 const rules = await import(new URL("../lib/meta-instagram-rules.ts", import.meta.url).href);
 const tokenCrypto = await import(new URL("../lib/token-crypto.ts", import.meta.url).href);
 
-const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 
 const SECRET = "test_meta_app_secret_123";
 const sign = (body, secret = SECRET) => `sha256=${crypto.createHmac("sha256", secret).update(body).digest("hex")}`;
@@ -319,15 +319,17 @@ test("access: Instagram is allowed when the plan includes it OR the business ove
   assert.equal(plans.applyChannelOverrides(on, { instagramEnabled: true }).instagram, true);
 });
 
-test("access: the override changes only Instagram, and no plan includes Instagram today", () => {
+test("access: the override changes only Instagram; Instagram has the same plan access as WhatsApp", () => {
   const starter = { website: true, whatsapp: false, instagram: false };
   assert.deepEqual(plans.applyChannelOverrides(starter, { instagramEnabled: true }), { website: true, whatsapp: false, instagram: true });
-  for (const key of plans.PLAN_KEYS) assert.equal(plans.PLANS[key].channels.instagram, false, key);
+  for (const key of plans.PLAN_KEYS) assert.equal(plans.PLANS[key].channels.instagram, plans.PLANS[key].channels.whatsapp, key);
+  assert.equal(plans.PLANS.starter.channels.instagram, false);
 });
 
 test("access: getEntitlement merges the override and reads it fail-closed", () => {
   const subscription = read("lib/subscription.ts");
-  assert.match(subscription, /applyChannelOverrides\(planEntitlement\.channels, \{ instagramEnabled \}\)/);
+  // Item 7 (2026-11-03): launch switches apply first, then the override.
+  assert.match(subscription, /applyChannelOverrides\(applyLaunchSwitches\(planEntitlement\.channels, channelLaunchSwitchesFromEnv\(\)\), \{\s*instagramEnabled,\s*\}\)/);
   assert.match(subscription, /\.select\("instagram_enabled"\)[\s\S]*?if \(error\) \{[\s\S]*?return false;/);
   assert.match(subscription, /return data\?\.instagram_enabled === true;/);
 });
@@ -736,6 +738,32 @@ test("facebook mode: zero Pages with Instagram -> no_linked_pages", async () => 
   assert.deepEqual(unlinked.result, { ok: false, error: "no_linked_pages" });
   assert.equal(unlinked.events.at(-1), "ig_connect_failed");
   assertNoFbSecrets(unlinked.lines);
+});
+
+test("facebook mode: no Pages because a permission was not granted -> permissions_missing, not a link-your-Page message", async () => {
+  const declined = await runFbFlow({
+    ...fbRoutes(ok({ data: [] })),
+    "GET /me/permissions": ok({
+      data: [
+        { permission: "pages_show_list", status: "declined" },
+        { permission: "instagram_basic", status: "granted" },
+      ],
+    }),
+  });
+  assert.deepEqual(declined.result, { ok: false, error: "permissions_missing" });
+  assert.equal(declined.events.at(-1), "ig_connect_failed");
+  assertNoFbSecrets(declined.lines);
+  const granted = await runFbFlow({
+    ...fbRoutes(ok({ data: [] })),
+    "GET /me/permissions": ok({
+      data: [
+        { permission: "pages_show_list", status: "granted" },
+        { permission: "instagram_basic", status: "granted" },
+      ],
+    }),
+  });
+  assert.deepEqual(granted.result, { ok: false, error: "no_linked_pages" });
+  assert.match(read("app/(dashboard)/dashboard/instagram/instagram-oauth-result.tsx"), /\bpermissions_missing:/);
 });
 
 test("facebook mode: each failing step has its own code (exchange, long-lived, me, pages)", async () => {

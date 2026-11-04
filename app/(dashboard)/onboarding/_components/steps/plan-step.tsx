@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { BillingPanel } from "../../../dashboard/billing/billing-panel";
 import type { BillingIdentityValues } from "../../../dashboard/billing/billing-details";
 import { advanceOnboarding } from "../../actions";
+import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
+import { trialVsStarterNote, type ConnectedMetaChannels } from "@/lib/plan-channel-copy";
 
 type PlanSummary = {
   key: "starter" | "growth" | "scale";
@@ -19,7 +21,7 @@ type EntitlementSummary = {
   planKey: "starter" | "growth" | "scale";
   planName: string;
   status: string;
-  grandfathered: boolean;
+  noSubscription: boolean;
   isTrial: boolean;
   serving: boolean;
   notServingReason: string | null;
@@ -34,13 +36,40 @@ type EntitlementSummary = {
   graceUntil: string | null;
 };
 
+/** Customers are India-only for v1, so dates are shown in IST (same as the billing page). */
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  });
+}
+
+function notServingMessage(reason: string | null): string {
+  switch (reason) {
+    case "trial_already_used":
+      return TRIAL_NOT_AVAILABLE_MESSAGE;
+    case "trial_expired":
+      return "Your free trial has ended. Choose a plan to go live.";
+    case "subscription_unavailable":
+      return "We could not load your plan just now. Refresh in a minute -- if it keeps happening, contact support.";
+    default:
+      return "Choose a plan to go live.";
+  }
+}
+
 /**
- * Stage 5: "Plan & billing". Embeds the real `BillingPanel` unchanged --
- * plan selection, Razorpay checkout and billing identity all stay exactly
- * what /dashboard/billing already ships, so nothing about payments is
- * reimplemented for the wizard. Every price here is GST-INCLUSIVE
- * (lib/plans.ts), so this step says "incl. GST", not the pasted spec's
- * "exclusive of GST" -- that line would have been a fabricated price.
+ * Stage 5: "Plan & billing". Owner decision 2026-11-03: the trial needs NO
+ * card, so while the trial is active this step is a confirmation ("your free
+ * trial is on") with paying now as an option, not a payment wall. When there
+ * is no trial (already used by this organisation, ended, or no plan at all)
+ * it shows the real `BillingPanel`, unchanged -- plan selection, Razorpay
+ * checkout and billing identity stay exactly what /dashboard/billing ships.
+ *
+ * The server is the authority: Continue only works when advanceOnboarding's
+ * recheck finds the entitlement serving (lib/onboarding-steps.ts `plan`).
+ * Every price is GST-INCLUSIVE (lib/plans.ts).
  */
 export function PlanStep({
   configured,
@@ -50,6 +79,11 @@ export function PlanStep({
   plans,
   gstRatePercent,
   supplierStateName,
+  trialReplyQuota,
+  trialDays,
+  trialChannels,
+  metaChannelNames,
+  connectedChannels,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -58,7 +92,15 @@ export function PlanStep({
   plans: PlanSummary[];
   gstRatePercent: number;
   supplierStateName: string;
+  trialReplyQuota: number;
+  trialDays: number;
+  /** e.g. "your website widget, WhatsApp and Instagram" -- only the launched channels. */
+  trialChannels: string;
+  /** Launched Meta channels ("WhatsApp and Instagram"), or null when none is launched. */
+  metaChannelNames: string | null;
+  connectedChannels: ConnectedMetaChannels;
 }) {
+  const starterNote = trialVsStarterNote(metaChannelNames);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +109,7 @@ export function PlanStep({
   // this step complete -- the server-side recheck in advanceOnboarding is.
   const [confirming, setConfirming] = useState(false);
   const valid = entitlement.serving;
+  const onTrial = entitlement.isTrial && entitlement.serving;
 
   function handleContinue() {
     setError(null);
@@ -80,22 +123,78 @@ export function PlanStep({
     });
   }
 
+  const gstNote = (
+    <p className="text-xs text-ds-text-muted">
+      Every price includes {gstRatePercent}% GST -- the split is shown under each amount, and nothing is added at checkout.
+    </p>
+  );
+
+  const billingPanel = (
+    <BillingPanel
+      configured={configured}
+      entitlement={entitlement}
+      usage={usage}
+      identity={identity}
+      plans={plans}
+      gstRatePercent={gstRatePercent}
+      supplierStateName={supplierStateName}
+      onConfirmingChange={setConfirming}
+      metaChannelNames={metaChannelNames}
+      connectedChannels={connectedChannels}
+    />
+  );
+
   return (
     <div className="flex flex-col gap-6">
-      <p className="text-xs text-ds-text-muted">
-        Every price includes {gstRatePercent}% GST -- the split is shown under each amount, and nothing is added at checkout.
-      </p>
+      {onTrial ? (
+        <section
+          aria-labelledby="trial-heading"
+          className="flex flex-col gap-3 rounded-ds-lg border border-ds-accent bg-ds-surface-elevated p-5"
+        >
+          <h2 id="trial-heading" className="text-base font-semibold text-ds-text-primary">
+            Your free trial is on -- no card needed
+          </h2>
+          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-ds-text-secondary">
+            <li>
+              {trialDays} days or {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first
+              {entitlement.trialEndsAt ? ` (ends ${formatDate(entitlement.trialEndsAt)})` : ""}.
+            </li>
+            <li>Includes {trialChannels}.</li>
+            {starterNote ? <li className="font-medium text-ds-text-primary">{starterNote}</li> : null}
+            <li>
+              {usage.degraded
+                ? "Replies used: unavailable right now."
+                : `Replies used so far: ${usage.repliesUsed.toLocaleString("en-IN")} of ${usage.replyQuota.toLocaleString("en-IN")}.`}
+            </li>
+            <li>When it ends, your AI stops replying until you choose a plan. Nothing is charged automatically.</li>
+          </ul>
+        </section>
+      ) : (
+        <p
+          role="status"
+          className="rounded-ds-sm border border-ds-border bg-ds-surface px-4 py-3 text-sm text-ds-text-secondary"
+        >
+          {notServingMessage(entitlement.notServingReason)}
+        </p>
+      )}
 
-      <BillingPanel
-        configured={configured}
-        entitlement={entitlement}
-        usage={usage}
-        identity={identity}
-        plans={plans}
-        gstRatePercent={gstRatePercent}
-        supplierStateName={supplierStateName}
-        onConfirmingChange={setConfirming}
-      />
+      {onTrial ? (
+        <details className="group rounded-ds-lg border border-ds-border bg-ds-surface">
+          <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent">
+            <span className="group-open:hidden">Choose a paid plan now (optional)</span>
+            <span className="hidden group-open:inline">Hide plans</span>
+          </summary>
+          <div className="flex flex-col gap-4 border-t border-ds-border p-5">
+            {gstNote}
+            {billingPanel}
+          </div>
+        </details>
+      ) : (
+        <>
+          {gstNote}
+          {billingPanel}
+        </>
+      )}
 
       {error ? (
         <p role="alert" className="text-sm text-ds-danger">
@@ -114,16 +213,16 @@ export function PlanStep({
         <div className="flex items-center gap-3">
           {!valid ? (
             <span className="text-xs text-ds-text-muted">
-              {configured ? "Choose a plan to continue" : "Nothing to configure on this deployment -- continue"}
+              {configured ? "Choose a plan to continue" : "Payments are not set up on this deployment yet"}
             </span>
           ) : null}
           <button
             type="button"
             onClick={handleContinue}
-            disabled={isPending || confirming || (!valid && configured)}
+            disabled={isPending || confirming || !valid}
             className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
           >
-            {isPending ? "Saving…" : "Continue"}
+            {isPending ? "Saving…" : onTrial ? "Continue with the free trial" : "Continue"}
           </button>
         </div>
       </div>

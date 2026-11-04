@@ -37,6 +37,13 @@ import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 import { CORS_HEADERS } from "@/lib/http/widget-cors";
 import { clientWantsStream, encodeStreamEvent, CHAT_STREAM_CONTENT_TYPE, type ChatStreamEvent } from "@/lib/chat-stream";
 import { logEvent } from "@/lib/logger";
+import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
+import {
+  CHAT_RATE_LIMIT_WINDOW_SECONDS,
+  chatProtectionConfigFromEnv,
+  turnstileDecision,
+  verifyTurnstileToken,
+} from "@/lib/chat-protection";
 import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 import { dispatchNotification } from "@/lib/notification-dispatch";
 import { getAppUrl } from "@/lib/app-url";
@@ -85,10 +92,11 @@ const _maxDurationMatchesSharedContract: typeof maxDuration extends typeof CHAT_
   : "app/api/chat/route.ts maxDuration must equal CHAT_SERVER_MAX_DURATION_SECONDS in lib/chat-timeouts.ts" = true;
 void _maxDurationMatchesSharedContract;
 
-const RATE_LIMIT_WINDOW_SECONDS = 300;
-const IP_LIMIT = 30;
-const KEY_LIMIT = 120;
-const CONVERSATION_LIMIT = 20;
+// Production readiness item 3: the limits are configurable (CHAT_IP_LIMIT,
+// CHAT_KEY_LIMIT, CHAT_CONVERSATION_LIMIT, CHAT_BUSINESS_LIMIT, the daily
+// Gemini turn caps and TURNSTILE_*), with the previous values as defaults.
+// See lib/chat-protection.ts and docs/abuse-protection.md.
+const RATE_LIMIT_WINDOW_SECONDS = CHAT_RATE_LIMIT_WINDOW_SECONDS;
 const HISTORY_LIMIT = 20;
 
 /**
@@ -132,6 +140,10 @@ export async function POST(request: NextRequest) {
   // `latency_ms`, whose clock started after the quota check, the cache
   // read, the embedding call and the vector search had already run.
   const timer = new TurnTimer();
+  const protection = chatProtectionConfigFromEnv();
+  const IP_LIMIT = protection.ipLimit;
+  const KEY_LIMIT = protection.keyLimit;
+  const CONVERSATION_LIMIT = protection.conversationLimit;
   let body: unknown;
   try {
     body = await request.json();
@@ -193,11 +205,16 @@ export async function POST(request: NextRequest) {
       windowSeconds: SCOPE_LIMITS.new_conversation_ip.windowSeconds,
     });
   }
+  // VPS latency pass (2026-11-04): widget auth is a read, so it overlaps the IP
+  // limit instead of following it. The IP verdict is still acted on first, and a
+  // rejected request discards the auth result; an auth failure surfaces below.
+  const widgetAuth = timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin, { useWarmCache: true }));
+  widgetAuth.catch(() => undefined);
   const ipResults = await timer.time("rate_limit_ip_batch", () => checkRateLimitsBatch(ipChecks));
   // Missing/malformed -> treat the enforcing `ip` scope as not allowed (fail
   // closed, unchanged for that scope).
   if (!ipResults.get("ip")?.allowed) {
-    logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }, "error");
+    logEvent("rate_limit_exceeded", "unknown", { scope: "ip" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return withCors(
       jsonTooManyRequests(
         ipResults.get("ip")?.retryAfterSeconds ?? secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS),
@@ -211,7 +228,7 @@ export async function POST(request: NextRequest) {
   for (const scope of ["ip_subnet", "new_conversation_ip"] as const) {
     const result = ipResults.get(scope);
     if (result && resolveAbuseResponse(scope, result.allowed) === "reject_429") {
-      logEvent("rate_limit_exceeded", "unknown", { scope }, "error");
+      logEvent("rate_limit_exceeded", "unknown", { scope }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
       return withCors(
         jsonTooManyRequests(
           result.retryAfterSeconds ?? secondsUntilWindowEnd(Date.now(), SCOPE_LIMITS[scope].windowSeconds),
@@ -222,7 +239,7 @@ export async function POST(request: NextRequest) {
 
   let business: WidgetBusinessContext;
   try {
-    business = await timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin, { useWarmCache: true }));
+    business = await widgetAuth;
   } catch (error) {
     if (error instanceof WidgetAuthError) {
       // Generic body to the browser (docs/security.md §10); the real reason,
@@ -275,12 +292,62 @@ export async function POST(request: NextRequest) {
     : null;
   earlyHistory?.catch(() => undefined);
 
-  const keyAllowed = await timer.time("rate_limit_key", () =>
-    checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+  // VPS latency pass (2026-11-04): an existing conversation's limit overlaps the
+  // key/business limits. It is still acted on before any write. A brand-new
+  // conversation can't be over its limit, so its first count overlaps the writes.
+  const existingConversationLimit = conversationId
+    ? timer.time("rate_limit_conversation", () =>
+        checkAndIncrementRateLimit("conversation", conversationId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+      )
+    : null;
+  existingConversationLimit?.catch(() => undefined);
+
+  // Per widget key (fail-closed, unchanged) and per business across all its
+  // keys (item 3: enforcing, fail-open), in one round trip.
+  const [keyAllowed, businessAllowed] = await timer.time("rate_limit_key", () =>
+    Promise.all([
+      checkAndIncrementRateLimit("key", widgetKey, KEY_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+      checkAndIncrementRateLimit("business", business.businessId, protection.businessLimit, RATE_LIMIT_WINDOW_SECONDS),
+    ]),
   );
-  if (!keyAllowed) {
-    logEvent("rate_limit_exceeded", business.businessId, { scope: "key" }, "error");
+  if (!keyAllowed || !businessAllowed) {
+    logEvent("rate_limit_exceeded", business.businessId, { scope: keyAllowed ? "business" : "key" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
     return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
+  }
+
+  // Cloudflare Turnstile (item 3), only when a NEW conversation starts: the
+  // token is single-use and valid for 5 minutes, and an existing conversation
+  // is already held by the per-conversation limit. TURNSTILE_MODE=log records
+  // the result without blocking; enforce refuses a missing/invalid token
+  // (Cloudflare itself being unavailable is allowed and logged).
+  if (!conversationId && protection.turnstile.mode !== "off" && protection.turnstile.secretKey) {
+    const runTurnstile = async () => {
+      const turnstile = await verifyTurnstileToken({
+        token: parsed.data.turnstileToken,
+        secretKey: protection.turnstile.secretKey!,
+        remoteIp: ip,
+        expectedHostname: protection.turnstile.expectedHostname,
+      });
+      const decision = turnstileDecision(protection.turnstile.mode, turnstile);
+      logEvent("turnstile_verified", business.businessId, {
+        mode: protection.turnstile.mode,
+        ok: turnstile.ok,
+        reason: turnstile.ok ? null : turnstile.reason,
+        errorCodes: turnstile.ok ? null : turnstile.errorCodes.join(","),
+        hostname: turnstile.hostname,
+        decision,
+      });
+      return decision;
+    };
+    if (protection.turnstile.mode === "log") {
+      // Log mode can never refuse, so the visitor does not wait for Cloudflare.
+      after(() => runTurnstile().then(() => undefined, () => undefined));
+    } else {
+      const decision = await timer.time("turnstile_verify", runTurnstile);
+      if (decision === "reject") {
+        return withCors(jsonError("Please refresh the page and try again.", 403));
+      }
+    }
   }
 
   // Start the question's embedding NOW -- widget auth and the per-key rate
@@ -330,11 +397,8 @@ export async function POST(request: NextRequest) {
     // Read out before the closure below, which would otherwise widen
     // `conversation` back to possibly-null and need an assertion.
     const conversationRowId = conversation.id;
-    const conversationAllowed = await timer.time("rate_limit_conversation", () =>
-      checkAndIncrementRateLimit("conversation", conversationRowId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
-    );
-    if (!conversationAllowed) {
-      logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }, "error");
+    if (existingConversationLimit && !(await existingConversationLimit)) {
+      logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
       return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
     }
 
@@ -392,6 +456,12 @@ export async function POST(request: NextRequest) {
       // Returns 0 without a query unless the abuse check is enforcing.
       countAbuseStrikes(supabase, business.businessId, conversationRowId),
       servingCheck,
+      // A new conversation's first count (see existingConversationLimit above).
+      existingConversationLimit
+        ? null
+        : timer.time("rate_limit_conversation", () =>
+            checkAndIncrementRateLimit("conversation", conversationRowId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+          ),
     ]);
 
     // The subscription no longer lets this agent serve (lapsed past grace,
@@ -643,6 +713,34 @@ export async function POST(request: NextRequest) {
           escalate: true,
           control: conversation.control,
           asOf: guardrailMessageRow.created_at,
+        }),
+      );
+    }
+
+    // Round 3, item 1: the daily AI reply caps, shared with WhatsApp and
+    // Instagram (lib/daily-reply-limit.ts). Counted here -- after human
+    // control, serving and the guardrail canned reply -- so only a turn that
+    // would really produce an AI reply is counted. Over a cap, or if the
+    // counter can't be read, no model call is made: the visitor gets the fixed
+    // "a person will follow up" reply (the response to their own request), the
+    // conversation is flagged and the owner is alerted once per cap per day.
+    const dailyLimit = await timer.time("rate_limit_gemini_daily", () =>
+      checkDailyReplyLimit({
+        supabase,
+        channel: "website",
+        businessId: business.businessId,
+        conversationId: conversationRowId,
+        clerkOrgId: business.clerkOrgId,
+        inboundAtMs: null,
+      }),
+    );
+    if (!dailyLimit.allowed) {
+      return withCors(
+        jsonSuccess({
+          conversationId: conversation.id,
+          answer: SOFT_LIMIT_MESSAGE,
+          escalate: true,
+          asOf: userMessageRow.created_at,
         }),
       );
     }

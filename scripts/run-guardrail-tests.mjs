@@ -265,7 +265,7 @@ test("prepare: a clean message produces no signals and is returned unchanged", (
 // uses nothing else. These assertions pin that wiring, so a later edit that
 // reads the raw field again fails here instead of silently bypassing masking.
 
-const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8");
+const read = (relative) => readFileSync(new URL(`../${relative}`, import.meta.url), "utf8").replace(/\r\n/g, "\n"); // line-ending agnostic (CRLF checkouts)
 const occurrences = (haystack, needle) => haystack.split(needle).length - 1;
 
 test("wiring: the widget route reads the raw message exactly once, into prepareProspectMessage", () => {

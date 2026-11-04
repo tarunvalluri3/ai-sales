@@ -5,7 +5,11 @@ import { revalidatePath } from "next/cache";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { connectWhatsappNumber, disconnectWhatsappNumber } from "@/lib/whatsapp";
-import { channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
+import { completeEmbeddedSignup, retryEmbeddedSignupSetup } from "@/lib/whatsapp-embedded-signup";
+import { submitWhatsappTemplates, syncWhatsappTemplateStatuses } from "@/lib/whatsapp-template-sync";
+import { createServiceSupabaseClient } from "@/lib/supabase/service";
+import { after } from "next/server";
+import { channelAllowed, channelNotEntitledMessage, getEntitlementForBusiness } from "@/lib/subscription";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
 
@@ -45,7 +49,7 @@ export async function connectWhatsappAction(
   // Disconnecting is deliberately NOT gated: a business must always be
   // able to detach its own Meta credentials, whatever it is paying for.
   const entitlement = await getEntitlementForBusiness(businessId);
-  if (!entitlement.channels.whatsapp) {
+  if (!channelAllowed(entitlement, "whatsapp")) {
     return { error: channelNotEntitledMessage("whatsapp", entitlement) };
   }
 
@@ -118,4 +122,125 @@ export async function disconnectWhatsappAction(
 
   revalidatePath("/dashboard/whatsapp");
   return { success: true };
+}
+
+/* ------------------------------------------------------------------ *
+ * Embedded Signup + templates (production readiness item 6, 2026-11-03).
+ * Each action: org:admin, WhatsApp allowed on the plan (or trial), Zod-checked
+ * input, business from the session (never the client).
+ * ------------------------------------------------------------------ */
+
+export type EmbeddedSignupActionResult =
+  | { ok: true; complete: boolean; message: string | null }
+  | { ok: false; error: string };
+
+const embeddedSignupSchema = z.object({
+  code: z.string().trim().min(10).max(2048),
+  wabaId: z.string().regex(/^\d{1,32}$/),
+  phoneNumberId: z.string().regex(/^\d{1,32}$/),
+  metaBusinessId: z.string().regex(/^\d{1,32}$/).nullable(),
+});
+
+async function requireWhatsappAdmin(): Promise<{ businessId: string; userId: string } | { error: string }> {
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) return { error: authError };
+  const entitlement = await getEntitlementForBusiness(businessId);
+  if (!channelAllowed(entitlement, "whatsapp")) return { error: channelNotEntitledMessage("whatsapp", entitlement) };
+  return { businessId, userId };
+}
+
+export async function completeWhatsappEmbeddedSignupAction(input: {
+  code: string;
+  wabaId: string;
+  phoneNumberId: string;
+  metaBusinessId: string | null;
+}): Promise<EmbeddedSignupActionResult> {
+  const context = await requireWhatsappAdmin();
+  if ("error" in context) return { ok: false, error: context.error };
+  const parsed = embeddedSignupSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "The signup didn't return the details we need. Please try again." };
+
+  let outcome;
+  try {
+    outcome = await completeEmbeddedSignup(context.businessId, parsed.data);
+  } catch (error) {
+    return { ok: false, error: logAndGetUserMessage(error) };
+  }
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+
+  await recordAuditLogEntry(context.businessId, context.userId, "whatsapp_connection.created", "whatsapp_connection", outcome.connection.id);
+  if (outcome.complete) {
+    // Submit our appointment templates to the new WABA right away (each needs
+    // Meta's review); the status panel shows the result.
+    const businessId = context.businessId;
+    after(async () => {
+      await submitWhatsappTemplates(createServiceSupabaseClient(), businessId).catch((error: unknown) => logAndGetUserMessage(error));
+    });
+  }
+  revalidatePath("/dashboard/whatsapp");
+  return { ok: true, complete: outcome.complete, message: outcome.message };
+}
+
+export async function retryWhatsappSetupAction(): Promise<EmbeddedSignupActionResult> {
+  const context = await requireWhatsappAdmin();
+  if ("error" in context) return { ok: false, error: context.error };
+  let outcome;
+  try {
+    outcome = await retryEmbeddedSignupSetup(context.businessId);
+  } catch (error) {
+    return { ok: false, error: logAndGetUserMessage(error) };
+  }
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  revalidatePath("/dashboard/whatsapp");
+  return { ok: true, complete: outcome.complete, message: outcome.message };
+}
+
+export type TemplateActionResult = { ok: true; message: string } | { ok: false; error: string };
+
+export async function submitWhatsappTemplatesAction(): Promise<TemplateActionResult> {
+  const context = await requireWhatsappAdmin();
+  if ("error" in context) return { ok: false, error: context.error };
+  try {
+    const result = await submitWhatsappTemplates(createServiceSupabaseClient(), context.businessId);
+    revalidatePath("/dashboard/whatsapp");
+    if (!result.ok) {
+      return {
+        ok: false,
+        error:
+          result.reason === "not_connected"
+            ? "Connect WhatsApp first."
+            : `Meta didn't let us read your templates${result.metaMessage ? `: ${result.metaMessage}` : "."}`,
+      };
+    }
+    if (result.submitted.length === 0 && result.failed.length === 0) return { ok: true, message: "All templates are already submitted." };
+    return {
+      ok: true,
+      message:
+        result.failed.length > 0
+          ? `Submitted ${result.submitted.length}; ${result.failed.length} couldn't be submitted (see below).`
+          : `Submitted ${result.submitted.length} for Meta's review. Approval usually takes minutes to a day.`,
+    };
+  } catch (error) {
+    return { ok: false, error: logAndGetUserMessage(error) };
+  }
+}
+
+export async function refreshWhatsappTemplatesAction(): Promise<TemplateActionResult> {
+  const { businessId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) return { ok: false, error: authError };
+  try {
+    const result = await syncWhatsappTemplateStatuses(createServiceSupabaseClient(), businessId);
+    revalidatePath("/dashboard/whatsapp");
+    if (!result.ok) {
+      return {
+        ok: false,
+        error: result.reason === "not_connected" ? "Connect WhatsApp first." : `Meta didn't let us read your templates${result.metaMessage ? `: ${result.metaMessage}` : "."}`,
+      };
+    }
+    return { ok: true, message: "Template status refreshed." };
+  } catch (error) {
+    return { ok: false, error: logAndGetUserMessage(error) };
+  }
 }

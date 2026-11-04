@@ -3,9 +3,17 @@
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
+import { AlertTriangle } from "lucide-react";
 import { useToast } from "../_components/toast";
 import { BillingDetailsFields, type BillingIdentityValues } from "./billing-details";
 import { GstBreakdown } from "./gst-breakdown";
+import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
+import {
+  planChannelsLabel,
+  starterChannelLossWarning,
+  trialVsStarterNote,
+  type ConnectedMetaChannels,
+} from "@/lib/plan-channel-copy";
 import {
   cancelSubscriptionAction,
   changePlanAction,
@@ -60,7 +68,7 @@ type EntitlementSummary = {
   planKey: "starter" | "growth" | "scale";
   planName: string;
   status: string;
-  grandfathered: boolean;
+  noSubscription: boolean;
   isTrial: boolean;
   serving: boolean;
   notServingReason: string | null;
@@ -113,6 +121,8 @@ export function BillingPanel({
   gstRatePercent,
   supplierStateName,
   onConfirmingChange,
+  metaChannelNames,
+  connectedChannels,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -123,16 +133,25 @@ export function BillingPanel({
   supplierStateName: string;
   /** Lets a host (the onboarding plan step) hold its Continue button while the server verifies a payment. */
   onConfirmingChange?: (confirming: boolean) => void;
+  /** Launched Meta channels, e.g. "WhatsApp and Instagram" (lib/plan-channel-copy.ts); null = none launched. */
+  metaChannelNames: string | null;
+  /** WhatsApp / Instagram connected right now, for the "you'd lose it on Starter" warning. */
+  connectedChannels: ConnectedMetaChannels;
 }) {
   const router = useRouter();
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [interval, setInterval] = useState<"monthly" | "annual">(entitlement.billingInterval ?? "monthly");
   const [selectedPlan, setSelectedPlan] = useState(entitlement.planKey);
+  // Round 3, item 3: picking Starter with WhatsApp/Instagram connected needs
+  // an explicit "I understand" first. Reset whenever the selection changes.
+  const [starterLossAcknowledged, setStarterLossAcknowledged] = useState(false);
+  const starterWarning = starterChannelLossWarning(selectedPlan, connectedChannels);
+  const trialNote = entitlement.isTrial ? trialVsStarterNote(metaChannelNames) : null;
   const [scriptReady, setScriptReady] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
-  const isSubscribed = entitlement.hasPaymentMethod && !entitlement.grandfathered;
+  const isSubscribed = entitlement.hasPaymentMethod && !entitlement.noSubscription;
 
   const [startState, startFormAction, startPending] = useActionState<BillingActionState, FormData>(
     startCheckoutAction,
@@ -339,6 +358,7 @@ export function BillingPanel({
             Upgrades take effect straight away and you pay only the difference for the rest of your
             period. Downgrades take effect at your next renewal, so you keep what you have paid for.
           </p>
+          {trialNote ? <p className="text-sm font-medium text-ds-text-primary">{trialNote}</p> : null}
         </div>
 
         <fieldset className="flex flex-col gap-2">
@@ -371,7 +391,10 @@ export function BillingPanel({
               <li key={plan.key}>
                 <button
                   type="button"
-                  onClick={() => setSelectedPlan(plan.key)}
+                  onClick={() => {
+                    setSelectedPlan(plan.key);
+                    setStarterLossAcknowledged(false);
+                  }}
                   aria-pressed={selected}
                   className={`flex w-full flex-col gap-1 rounded-ds-md border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
                     selected
@@ -399,6 +422,9 @@ export function BillingPanel({
                     {plan.monthlyReplyQuota.toLocaleString("en-IN")} AI replies / month ·{" "}
                     {plan.seatsLabel}
                   </span>
+                  <span className="text-2xs font-medium text-ds-text-secondary">
+                    {planChannelsLabel(plan.key, metaChannelNames)}
+                  </span>
                 </button>
               </li>
             );
@@ -416,6 +442,27 @@ export function BillingPanel({
             idPrefix="checkout"
           />
 
+          {starterWarning ? (
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+            >
+              <p className="flex items-start gap-2 text-sm text-ds-text-primary">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+                <span>{starterWarning}</span>
+              </p>
+              <label className="flex items-start gap-2 text-sm text-ds-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={starterLossAcknowledged}
+                  onChange={(event) => setStarterLossAcknowledged(event.target.checked)}
+                  className="mt-0.5 size-4 accent-ds-accent"
+                />
+                <span>I understand and still want Starter.</span>
+              </label>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="submit"
@@ -425,6 +472,7 @@ export function BillingPanel({
                 startPending ||
                 changePending ||
                 checkoutOpen ||
+                (starterWarning !== null && !starterLossAcknowledged) ||
                 (selectedPlan === entitlement.planKey && isSubscribed && interval === entitlement.billingInterval)
               }
               className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
@@ -522,7 +570,7 @@ function CurrentPlanCard({
         <Fact
           label="Payment method"
           value={
-            entitlement.grandfathered || !entitlement.hasPaymentMethod
+            entitlement.noSubscription || !entitlement.hasPaymentMethod
               ? "None on file"
               : entitlement.billingInterval === "annual"
                 ? "Card, paid for the year"
@@ -572,10 +620,11 @@ function CurrentPlanCard({
         </p>
       ) : null}
 
-      {entitlement.grandfathered ? (
+      {entitlement.noSubscription ? (
         <p className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
-          You have been with us since before we introduced plans, so you are on Scale-level
-          entitlements at no charge. Nothing changes until you choose a plan yourself.
+          {entitlement.notServingReason === "subscription_unavailable"
+            ? "We could not load your plan just now, so AI replies are paused. Please refresh in a minute -- if this continues, contact support."
+            : "There is no plan on this account, so your AI is not replying to prospects. Choose a plan below to switch it on."}
         </p>
       ) : null}
     </section>
@@ -584,9 +633,12 @@ function CurrentPlanCard({
 
 function describeStatus(entitlement: EntitlementSummary): string {
   if (entitlement.isTrial) {
+    if (!entitlement.serving) {
+      return "Your free trial has ended, so your AI is not replying to prospects. Choose a plan to switch it back on.";
+    }
     return entitlement.hasPaymentMethod
       ? `Free trial. Your plan starts automatically when it ends on ${formatDate(entitlement.periodEnd)}.`
-      : `Free trial, with no payment method yet. It will stop on ${formatDate(entitlement.periodEnd)} unless you choose a plan.`;
+      : `Free trial -- no card needed. It stops on ${formatDate(entitlement.periodEnd)}, or sooner if you use all your trial replies, unless you choose a plan.`;
   }
   if (entitlement.status === "past_due") {
     const failed = entitlement.pastDueSince ? ` on ${formatDate(entitlement.pastDueSince)}` : "";
@@ -596,6 +648,9 @@ function describeStatus(entitlement: EntitlementSummary): string {
   }
   if (entitlement.status === "cancelled") {
     return `Cancelled. You keep full access until ${formatDate(entitlement.periodEnd)}.`;
+  }
+  if (entitlement.notServingReason === "trial_already_used") {
+    return `${TRIAL_NOT_AVAILABLE_MESSAGE} Until then your AI is not replying to prospects.`;
   }
   if (entitlement.status === "expired") {
     return "This plan has ended, so your AI is not replying to prospects. Choose a plan to switch it back on.";

@@ -87,6 +87,17 @@ export function estimateCallCostUsd(
  * explicit, dated assumption -- not a live FX feed -- re-confirm
  * periodically; it never affects what a tenant is charged, only how this
  * internal admin page displays a cost comparison.
+ *
+ * Production readiness (item 9): overridable with the USD_TO_INR_RATE env
+ * var (a positive number) so the assumption can be updated without a
+ * deploy of new code. Server-side only: client components get it as a prop.
  */
-export const USD_TO_INR_RATE = 89;
+export const DEFAULT_USD_TO_INR_RATE = 89;
+
+export function parseUsdToInrRate(raw: string | undefined): number {
+  const parsed = raw === undefined ? NaN : Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_USD_TO_INR_RATE;
+}
+
+export const USD_TO_INR_RATE = parseUsdToInrRate(process.env.USD_TO_INR_RATE);
 export const USD_TO_INR_RATE_EFFECTIVE_FROM = "2026-11-02";

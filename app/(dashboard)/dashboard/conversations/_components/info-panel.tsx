@@ -25,6 +25,7 @@ const APPOINTMENT_STATUS_TONE: Record<AppointmentStatus, "accent" | "success" | 
   cancelled: "muted",
   completed: "success",
   no_show: "danger",
+  expired: "muted",
 };
 
 /**

@@ -2,14 +2,21 @@ import Link from "next/link";
 import {
   GST_RATE_PERCENT,
   ORDERED_PLANS,
+  TRIAL_DAYS,
   formatPaiseAsInr,
   formatReplyQuota,
 } from "@/lib/plans";
+import { channelLaunchSwitchesFromEnv, describeLaunchedTrialChannels, entitlementConfigFromEnv } from "@/lib/entitlement-rules";
 import { MicroChip } from "@/components/marketing/fragments/_shared";
+import { launchedMetaChannelNames, planChannelsLabel, trialVsStarterNote } from "@/lib/plan-channel-copy";
 
 export const metadata = {
   title: "Pricing | Waves AI Pilot",
 };
+
+// Rendered per request so the advertised trial limit is the CONFIGURED one
+// (TRIAL_REPLY_QUOTA), i.e. exactly what lib/entitlement-rules.ts enforces.
+export const dynamic = "force-dynamic";
 
 /**
  * Required by Razorpay's merchant-activation website check ("Pricing
@@ -42,18 +49,28 @@ export const metadata = {
  * reply, so the three plans correspond to roughly 4M / 12M / 40M tokens a
  * month.
  *
- * Channel honesty (Consumer Protection Act, 2019 -- advertising a
- * capability that cannot be delivered is an unfair trade practice):
- * WhatsApp genuinely works but requires the customer's own Meta
- * credentials, so it carries a footnote rather than a bare tick.
- * Instagram cannot work for a customer's account until Meta App Review
- * and Business Verification clear, so it is listed as limited release and
- * is NOT included in any paid plan's feature list. Both statements are now
- * enforced as data, in the registry's per-plan `channels` map, which is
- * also what gates the connect flows.
+ * Channel honesty (Consumer Protection Act, 2019): WhatsApp and Instagram
+ * are on Growth and Scale (owner decision 2026-11-03: same plan access), both
+ * using the customer's own Meta accounts, so they carry a footnote rather
+ * than a bare tick. The free trial (no card, all three channels, one per
+ * organisation) is described from lib/plans.ts + the configured trial limit,
+ * the same values lib/entitlement-rules.ts enforces.
  */
 
 export default function PricingPage() {
+  const { trialReplyQuota } = entitlementConfigFromEnv();
+  // Item 7: a channel switched off for launch is shown as "coming soon", never
+  // sold as available -- the same switch the server enforces.
+  const launch = channelLaunchSwitchesFromEnv();
+  const trialChannels = describeLaunchedTrialChannels(launch);
+  // Round 3, item 3: the trial has WhatsApp/Instagram, Starter does not.
+  const metaNames = launchedMetaChannelNames(launch);
+  const starterNote = trialVsStarterNote(metaNames);
+  const featureLabel = (feature: string): string => {
+    if (feature.startsWith("WhatsApp") && !launch.whatsapp) return `${feature.replace(" *", "")} (coming soon)`;
+    if (feature.startsWith("Instagram") && !launch.instagram) return `${feature.replace(" *", "")} (coming soon)`;
+    return feature;
+  };
   return (
     <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
@@ -64,8 +81,9 @@ export default function PricingPage() {
           </span>
           <h1 className="text-3xl font-semibold text-ds-text-primary">Pricing</h1>
           <p className="text-sm leading-relaxed text-ds-text-secondary">
-            One AI sales employee, grounded in your own business. Start with a 14-day free trial — no
-            card required. Cancel any time.
+            One AI sales employee, grounded in your own business. Start with a {TRIAL_DAYS}-day free
+            trial — no card required, up to {trialReplyQuota.toLocaleString("en-IN")} AI replies, on{" "}
+            {trialChannels}. Cancel any time.
           </p>
           <p className="text-2xs text-ds-text-muted">
             All prices are in Indian Rupees and inclusive of {GST_RATE_PERCENT}% GST — the price you
@@ -109,6 +127,7 @@ export default function PricingPage() {
                   {formatReplyQuota(plan.monthlyReplyQuota)}
                 </p>
                 <p className="text-ds-text-secondary">{plan.seatsLabel}</p>
+                <p className="text-ds-text-secondary">{planChannelsLabel(plan.key, metaNames)}</p>
               </div>
 
               <ul className="flex flex-1 flex-col gap-2 text-sm text-ds-text-secondary">
@@ -117,7 +136,7 @@ export default function PricingPage() {
                     <span aria-hidden="true" className="text-ds-accent">
                       ✓
                     </span>
-                    <span>{feature}</span>
+                    <span>{featureLabel(feature)}</span>
                   </li>
                 ))}
               </ul>
@@ -137,21 +156,44 @@ export default function PricingPage() {
         </div>
 
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+          <Section title="Free trial">
+            <p>
+              Every new business starts with a free trial. No card is needed. It lasts {TRIAL_DAYS} days
+              or {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first, and includes{" "}
+              {trialChannels}.
+            </p>
+            {starterNote ? <p className="font-medium text-ds-text-primary">{starterNote}</p> : null}
+            <p>
+              When the trial ends, your AI stops replying to prospects until you choose a plan — nothing
+              is charged automatically. There is one free trial per person and one per organisation,
+              including if the business is deleted and set up again or a new organisation is created.
+            </p>
+          </Section>
+
           <Section title="* About WhatsApp and Instagram">
             <p>
               <strong>WhatsApp</strong> messaging on the Growth and Scale plans works through the
               official Meta WhatsApp Business Platform, using <em>your own</em> WhatsApp Business
-              account and credentials. You will need a Meta Business account and a phone number
-              dedicated to it; we guide you through the setup and there is no extra charge from us.
-              Meta may charge you separately for conversations under its own pricing.
+              account. You will need a Meta Business account and a phone number dedicated to it; we
+              guide you through the setup and there is no extra charge from us. Meta may charge you
+              separately for conversations under its own pricing.
             </p>
             <p>
-              <strong>Instagram</strong> direct messaging is built and in limited release, but it
-              requires approval from Meta before it can serve an account we do not ourselves manage.
-              That approval is outside our control, so Instagram is{" "}
-              <strong>not included in any plan above</strong>. Ask us about it and we will tell you
-              honestly where it stands.
+              <strong>Instagram</strong> direct messaging on the Growth and Scale plans uses{" "}
+              <em>your own</em> Instagram professional account, linked to a Facebook Page. Starter
+              includes neither WhatsApp nor Instagram.
             </p>
+            {!launch.whatsapp || !launch.instagram ? (
+              <p>
+                {!launch.whatsapp && !launch.instagram
+                  ? "WhatsApp and Instagram are"
+                  : !launch.whatsapp
+                    ? "WhatsApp is"
+                    : "Instagram is"}{" "}
+                <strong>coming soon</strong>: we&apos;re waiting for Meta&apos;s approval. They switch on for
+                Growth, Scale and trial accounts as soon as it arrives.
+              </p>
+            ) : null}
           </Section>
 
           <Section title="What counts as an AI reply">

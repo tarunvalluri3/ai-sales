@@ -26,8 +26,11 @@ export type InstagramReplyMilestones = {
   metaSendReturnedAtMs: number | null;
 };
 
-/** How the turn ended. `ai` = a model reply; `instant` = answer bank / cache / replay with no model call. */
-export type InstagramReplyOutcome = "ai" | "instant" | "canned" | "not_serving" | "human_control" | "error";
+/**
+ * How the turn ended. `ai` = a model reply; `instant` = answer bank / cache / replay with no model call;
+ * `daily_limit` = a daily AI reply cap blocked it (no model call; the notice may or may not have been sent).
+ */
+export type InstagramReplyOutcome = "ai" | "instant" | "canned" | "not_serving" | "human_control" | "daily_limit" | "error";
 
 export type InstagramReplyTimingInput = {
   conversationId: string;

@@ -30,6 +30,8 @@ export type WidgetSendMessage = {
   consentGiven: boolean;
   /** Set when the text came from a suggested-question chip. Analytics only; the server never trusts it to pick an answer. */
   suggested?: boolean;
+  /** Cloudflare Turnstile token (production readiness item 3); verified server-side for a new conversation. */
+  turnstileToken?: string;
 };
 
 /**

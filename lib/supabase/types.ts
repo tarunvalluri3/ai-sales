@@ -313,7 +313,7 @@ export type LeadTag = {
  * its time) or, once its time has passed, marked 'completed'/'no_show'
  * (2026-09-10 follow-up -- whether the meeting actually happened).
  */
-export type AppointmentStatus = "pending" | "confirmed" | "declined" | "cancelled" | "completed" | "no_show";
+export type AppointmentStatus = "pending" | "confirmed" | "declined" | "cancelled" | "completed" | "no_show" | "expired";
 
 export type Appointment = {
   id: string;
@@ -436,6 +436,24 @@ export type WhatsappConnection = {
   access_token_last4: string | null;
   created_at: string;
   updated_at: string | null;
+  // Migration 20261124000000 (Embedded Signup). Optional: absent until applied.
+  onboarding_method?: "manual" | "embedded_signup";
+  setup_step?: "token_exchanged" | "phone_verified" | "waba_subscribed" | "complete" | null;
+  setup_error?: string | null;
+  meta_business_id?: string | null;
+};
+
+export type WhatsappTemplateStatusRow = {
+  business_id: string;
+  waba_id: string;
+  template_name: string;
+  language: string;
+  status: string;
+  category: string | null;
+  rejected_reason: string | null;
+  meta_template_id: string | null;
+  last_error: string | null;
+  updated_at: string;
 };
 
 export type InstagramConnectionStatus = "pending" | "connected" | "error" | "disconnected";

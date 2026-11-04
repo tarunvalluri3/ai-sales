@@ -1,5 +1,11 @@
 import "server-only";
 import { z } from "zod";
+import {
+  environmentWarnings,
+  geminiKeyVariableFor,
+  isAmbiguousProductionServer,
+  resolveAppEnvironment,
+} from "@/lib/deployment-env";
 
 /**
  * Validates every environment variable currently required by an
@@ -11,6 +17,16 @@ import { z } from "zod";
  * value -- only the name of a missing/invalid variable.
  */
 const envSchema = z.object({
+  // Production readiness (LAUNCH_AUDIT.md §3/§15): the explicit deployment
+  // environment. Optional so existing Vercel deploys keep working through
+  // VERCEL_ENV, but REQUIRED on a non-Vercel production server -- see
+  // isAmbiguousProductionServer() below. lib/deployment-env.ts resolves it.
+  APP_ENV: z.enum(["development", "staging", "production"]).optional(),
+  // Extra production Supabase refs (comma-separated) for the script/test
+  // guard and the startup warnings. The current production ref is built in.
+  PRODUCTION_SUPABASE_PROJECT_REFS: z.string().optional(),
+  // Emergency-only override for the local next dev block (next.config.ts): the exact production ref.
+  ALLOW_DEV_AGAINST_PRODUCTION: z.string().optional(),
   CLERK_SECRET_KEY: z.string().min(1),
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
   NEXT_PUBLIC_SUPABASE_URL: z.string().min(1),
@@ -28,10 +44,26 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().min(1).optional(),
   NOTIFICATION_EMAIL_FROM: z.string().min(1).optional(),
   RESEND_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // Production readiness (item 6): where operational alerts are emailed
+  // (a deleted customer's subscription not cancelled, a charge after
+  // deletion). Optional: Sentry gets every one of them regardless.
+  OPS_ALERT_EMAIL: z.email().optional(),
   NEXT_PUBLIC_APP_URL: z.url().optional(),
+  // Production readiness (item 9): which header holds the real client IP for
+  // per-IP rate limits (lib/http/client-ip.ts). Default xff-first (Vercel).
+  CLIENT_IP_SOURCE: z.enum(["xff-first", "xff-last", "x-real-ip"]).optional(),
   LOCAL_CHROMIUM_PATH: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
+  // Production readiness (item 4): approved WhatsApp template names
+  // (lib/whatsapp-templates.ts). Each is optional: unset means "not approved
+  // yet", and a notice that needs it outside the 24-hour window fails visibly.
+  WHATSAPP_TEMPLATE_LANGUAGE: z.string().regex(/^[a-z]{2,3}(_[A-Z]{2})?$/, "must look like en or en_US").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_CONFIRMED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_DECLINED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_CANCELLED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_REMINDER: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
+  WHATSAPP_TEMPLATE_APPOINTMENT_EXPIRED: z.string().regex(/^[a-z0-9_]{1,512}$/, "lowercase letters, digits and underscores").optional(),
   // Instagram via Meta (lib/meta-graph.ts): Facebook Login by default,
   // Unified Login with META_IG_LOGIN_MODE=unified. Optional like the
   // WhatsApp pair: the connect route, callback and webhook each fail closed
@@ -44,6 +76,10 @@ const envSchema = z.object({
   META_WEBHOOK_VERIFY_TOKEN: z.string().min(16).optional(),
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/, "must look like v26.0").optional(),
   META_TOKEN_ENCRYPTION_KEY: z.string().min(32).optional(),
+  // WhatsApp Embedded Signup v4 (2026-11-03): the Facebook Login for Business
+  // configuration id. With META_APP_ID, META_APP_SECRET and the encryption key
+  // set, the WhatsApp page offers "Connect with Facebook"; otherwise only the manual form.
+  WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID: z.string().regex(/^\d+$/, "must be the numeric Facebook Login for Business configuration id").optional(),
   /**
    * Phase 17b: Razorpay. All six are `.optional()`, the same "degrade,
    * don't fail startup" posture as RESEND_API_KEY and the WhatsApp and
@@ -67,6 +103,39 @@ const envSchema = z.object({
   RAZORPAY_PLAN_STARTER_MONTHLY: z.string().min(1).optional(),
   RAZORPAY_PLAN_GROWTH_MONTHLY: z.string().min(1).optional(),
   RAZORPAY_PLAN_SCALE_MONTHLY: z.string().min(1).optional(),
+  // Operational tuning read elsewhere with their own safe defaults
+  // (lib/chat-timeouts.ts, lib/catalog-prefetch.ts, lib/rag.ts); listed here so
+  // a malformed value is caught at startup and all of them are documented.
+  CHAT_AI_DEADLINE_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
+  CHAT_MODEL_CALL_TIMEOUT_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
+  CHAT_TOOL_TIMEOUT_MS: z.string().regex(/^\d+$/, "must be a positive integer (ms)").optional(),
+  CHAT_MODEL_MAX_RETRIES: z.string().regex(/^\d+$/, "must be 0-3").optional(),
+  CATALOG_PREFETCH: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.string().regex(/^(0(\.\d+)?|1(\.0+)?)$/, "must be between 0 and 1").optional(),
+  USD_TO_INR_RATE: z.string().regex(/^\d+(\.\d+)?$/, "must be a positive number").optional(),
+  HEALTH_SCHEDULER_MAX_AGE_MINUTES: z.string().regex(/^\d+$/, "must be a positive integer (minutes)").optional(),
+  PIPELINE_PART_B: z.string().optional(),
+  // Plan access and trials (2026-11-03, lib/entitlement-rules.ts). Both have
+  // safe defaults: 200 trial replies; keep the last known plan for 24 h when a
+  // subscription read fails (0 disables the fallback).
+  TRIAL_REPLY_QUOTA: z.string().regex(/^\d+$/, "must be a whole number 1-100000").optional(),
+  SUBSCRIPTION_LAST_KNOWN_MAX_HOURS: z.string().regex(/^\d+(\.\d+)?$/, "must be a number of hours 0-168").optional(),
+  // Public-chat protection (2026-11-03, lib/chat-protection.ts, docs/abuse-protection.md).
+  // All optional with the previous limits as defaults; Turnstile is off unless
+  // TURNSTILE_MODE is log|enforce AND both keys are set.
+  CHAT_IP_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  CHAT_KEY_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  CHAT_CONVERSATION_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  CHAT_BUSINESS_LIMIT: z.string().regex(/^\d+$/, "must be a whole number (per 5 minutes)").optional(),
+  GEMINI_DAILY_TURN_CAP_PER_BUSINESS: z.string().regex(/^\d+$/, "must be a whole number (0 = no cap)").optional(),
+  GEMINI_DAILY_TURN_CAP_GLOBAL: z.string().regex(/^\d+$/, "must be a whole number (0 = no cap)").optional(),
+  TURNSTILE_MODE: z.enum(["off", "log", "enforce"]).optional(),
+  // Launch switches (item 7): turn WhatsApp or Instagram off for the whole
+  // deployment while its Meta approval is pending. Default on.
+  CHANNEL_WHATSAPP_ENABLED: z.enum(["true", "false", "on", "off", "1", "0", "yes", "no"]).optional(),
+  CHANNEL_INSTAGRAM_ENABLED: z.enum(["true", "false", "on", "off", "1", "0", "yes", "no"]).optional(),
+  TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+  TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -81,9 +150,9 @@ if (!parsed.success) {
 }
 
 /**
- * Which Gemini key this process actually uses -- production (Vercel's own
- * VERCEL_ENV, set on every deploy) uses GEMINI_API_KEY; every other
- * environment (local dev, Vercel preview) uses GEMINI_API_KEY_DEV. Missing
+ * Which Gemini key this process actually uses -- production uses
+ * GEMINI_API_KEY; every other environment (local dev, staging, Vercel
+ * preview) uses GEMINI_API_KEY_DEV. Missing
  * the one this environment needs fails loudly here, at startup, rather
  * than silently falling back to the production key (the exact accidental
  * spend the token-burn audit, STATE.md, found no safeguard against).
@@ -96,16 +165,52 @@ if (!parsed.success) {
  * this module (Next.js's documented startup order), so the reassignment
  * below always happens first.
  */
-const isProductionEnvironment = process.env.VERCEL_ENV === "production";
-const resolvedGeminiApiKey = isProductionEnvironment ? parsed.data.GEMINI_API_KEY : parsed.data.GEMINI_API_KEY_DEV;
+//
+// Production readiness (LAUNCH_AUDIT.md §15): the environment now comes from
+// APP_ENV first, then VERCEL_ENV (lib/deployment-env.ts). A production server
+// with NEITHER -- a VPS running `next start` without APP_ENV -- refuses to
+// start: before this it silently used the dev key and mis-tagged usage rows.
+if (isAmbiguousProductionServer(process.env)) {
+  throw new Error(
+    "APP_ENV is not set on a production server (NODE_ENV=production, no VERCEL_ENV). " +
+      "Set APP_ENV=production (or staging) explicitly. See .env.example.",
+  );
+}
+
+const appEnvironment = resolveAppEnvironment(process.env).environment;
+const geminiKeyVariable = geminiKeyVariableFor(appEnvironment);
+const resolvedGeminiApiKey =
+  geminiKeyVariable === "GEMINI_API_KEY" ? parsed.data.GEMINI_API_KEY : parsed.data.GEMINI_API_KEY_DEV;
 
 if (!resolvedGeminiApiKey) {
   throw new Error(
-    isProductionEnvironment
+    geminiKeyVariable === "GEMINI_API_KEY"
       ? "Missing required environment variable: GEMINI_API_KEY (production). See .env.example and docs/security.md §5."
-      : "Missing required environment variable: GEMINI_API_KEY_DEV. Every non-production environment (local dev, Vercel preview) uses this, never GEMINI_API_KEY -- see .env.example and docs/security.md §5.",
+      : `Missing required environment variable: GEMINI_API_KEY_DEV. Every non-production environment (here: ${appEnvironment}) uses this, never GEMINI_API_KEY -- see .env.example and docs/security.md §5.`,
   );
 }
 process.env.GEMINI_API_KEY = resolvedGeminiApiKey;
+// Normalised so modules that can't import this server-only file (the usage
+// ledger, the /apache header) see the same answer.
+process.env.APP_ENV = appEnvironment;
 
-export const env = { ...parsed.data, GEMINI_API_KEY: resolvedGeminiApiKey };
+// Turnstile asked for but not fully configured: it stays off (never blocks).
+if (
+  (parsed.data.TURNSTILE_MODE === "log" || parsed.data.TURNSTILE_MODE === "enforce") &&
+  (!parsed.data.TURNSTILE_SITE_KEY || !parsed.data.TURNSTILE_SECRET_KEY)
+) {
+  console.warn(
+    JSON.stringify({
+      event: "env_target_warning",
+      level: "warn",
+      message: "TURNSTILE_MODE is set but TURNSTILE_SITE_KEY or TURNSTILE_SECRET_KEY is missing, so Turnstile is OFF.",
+    }),
+  );
+}
+
+// Names only, never values: e.g. local dev pointed at the production database.
+for (const warning of environmentWarnings(appEnvironment, process.env)) {
+  console.warn(JSON.stringify({ event: "env_target_warning", level: "warn", message: warning }));
+}
+
+export const env = { ...parsed.data, APP_ENV: appEnvironment, GEMINI_API_KEY: resolvedGeminiApiKey };

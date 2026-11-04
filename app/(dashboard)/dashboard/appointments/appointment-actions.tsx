@@ -76,7 +76,7 @@ export function AppointmentActions({
     if (noShowState.success) toast({ title: SUCCESS_MESSAGE.no_show, variant: "success" });
   }, [noShowState, toast]);
 
-  if (status === "declined" || status === "cancelled" || status === "completed" || status === "no_show") {
+  if (status === "declined" || status === "cancelled" || status === "completed" || status === "no_show" || status === "expired") {
     return null;
   }
 

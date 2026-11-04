@@ -11,10 +11,13 @@ import { listBusinessHours } from "@/lib/business-hours";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
 import { getInstagramConnectionForBusiness } from "@/lib/instagram";
-import { getEntitlementForBusiness, getBillingIdentityForBusiness, channelNotEntitledMessage } from "@/lib/subscription";
+import { getEntitlementForBusiness, getBillingIdentityForBusiness, channelNotEntitledMessage, channelAllowed } from "@/lib/subscription";
 import { checkReplyQuota } from "@/lib/usage-limit";
 import { isRazorpayConfigured } from "@/lib/razorpay";
-import { ORDERED_PLANS, GST_RATE_PERCENT } from "@/lib/plans";
+import { ORDERED_PLANS, GST_RATE_PERCENT, TRIAL_DAYS } from "@/lib/plans";
+import { channelLaunchSwitchesFromEnv, describeLaunchedTrialChannels, entitlementConfigFromEnv } from "@/lib/entitlement-rules";
+import { connectedMetaChannelsFrom } from "@/lib/connected-meta-channels";
+import { launchedMetaChannelNames, type ConnectedMetaChannels } from "@/lib/plan-channel-copy";
 import { SUPPLIER } from "@/lib/invoice-config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { loadReadinessReport, getFaqGeneratedDocStatuses } from "@/lib/onboarding-readiness-data";
@@ -221,8 +224,8 @@ export default async function OnboardingPage({
               isPublished={isAgentPublished(business)}
               whatsapp={whatsapp}
               instagram={instagram}
-              whatsappEntitled={entitlement.channels.whatsapp}
-              instagramEntitled={entitlement.channels.instagram}
+              whatsappEntitled={channelAllowed(entitlement, "whatsapp")}
+              instagramEntitled={channelAllowed(entitlement, "instagram")}
               whatsappUpgradeMessage={channelNotEntitledMessage("whatsapp", entitlement)}
               instagramUpgradeMessage={channelNotEntitledMessage("instagram", entitlement)}
             />
@@ -232,9 +235,12 @@ export default async function OnboardingPage({
       case "plan":
         return {
           eyebrow: "Step 5 of 6 · Plan & billing",
-          heading: "Choose how you pay",
-          description: "Upgrades take effect straight away; downgrades at your next renewal.",
-          content: await buildPlanStep(businessId, business.name, entitlement),
+          heading: entitlement.isTrial && entitlement.serving ? "Start free -- no card needed" : "Choose a plan",
+          description:
+            entitlement.isTrial && entitlement.serving
+              ? "Your free trial is already active. Choose a paid plan now or any time before it ends."
+              : "Upgrades take effect straight away; downgrades at your next renewal.",
+          content: await buildPlanStep(businessId, business.name, entitlement, connectedMetaChannelsFrom(whatsapp, instagram)),
           footer: null,
         };
       case "review":
@@ -333,6 +339,7 @@ async function buildPlanStep(
   businessId: string,
   businessName: string,
   entitlement: Awaited<ReturnType<typeof getEntitlementForBusiness>>,
+  connectedChannels: ConnectedMetaChannels,
 ) {
   const supabase = createServerSupabaseClient();
   const [quota, identity] = await Promise.all([
@@ -354,7 +361,7 @@ async function buildPlanStep(
         planKey: entitlement.planKey,
         planName: entitlement.planName,
         status: entitlement.status,
-        grandfathered: entitlement.grandfathered,
+        noSubscription: entitlement.noSubscription,
         isTrial: entitlement.isTrial,
         serving: entitlement.serving,
         notServingReason: entitlement.notServingReason,
@@ -380,6 +387,11 @@ async function buildPlanStep(
       }))}
       gstRatePercent={GST_RATE_PERCENT}
       supplierStateName={SUPPLIER.stateName}
+      trialReplyQuota={entitlementConfigFromEnv().trialReplyQuota}
+      trialDays={TRIAL_DAYS}
+      trialChannels={describeLaunchedTrialChannels(channelLaunchSwitchesFromEnv())}
+      metaChannelNames={launchedMetaChannelNames(channelLaunchSwitchesFromEnv())}
+      connectedChannels={connectedChannels}
     />
   );
 }

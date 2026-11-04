@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { buildInstagramConnectUrl } from "@/lib/instagram";
-import { getEntitlementForBusiness } from "@/lib/subscription";
+import { channelAllowed, getEntitlementForBusiness } from "@/lib/subscription";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 /**
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   // The page hides the button when not entitled; this route refuses on its
   // own because an admin could navigate to it by hand.
   const entitlement = await getEntitlementForBusiness(businessId);
-  if (!entitlement.channels.instagram) {
+  if (!channelAllowed(entitlement, "instagram")) {
     return back("error=not_entitled");
   }
 

@@ -89,7 +89,12 @@ const STATUS_VERB: Record<AppointmentStatusForEmail, string> = {
  * said so -- the business had no way to know it needed to pick up the phone.
  */
 function reachabilitySentence(result: AppointmentStatusNotifyResult, contactPhone: string | null): string {
-  const channel = result.channelReply === "sent" ? " We did reply in the chat instead." : "";
+  const channel =
+    result.channelReply === "sent"
+      ? " We did reply in the chat instead."
+      : result.channelReply === "not_delivered"
+        ? " Our chat reply could NOT be delivered either (outside WhatsApp/Instagram's 24-hour reply window, with no approved template)."
+        : "";
   const phone = contactPhone ? ` You can reach them on ${contactPhone}.` : "";
 
   switch (result.prospectEmail) {

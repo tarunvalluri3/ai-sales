@@ -7,6 +7,8 @@ import { recordAdminAuditLogEntry } from "@/lib/admin-audit-log";
 import { restampPublishedIfMissing } from "@/lib/agent-published-repair";
 import { checkAdminMutationRateLimit } from "@/lib/admin-rate-limit";
 import { PLAN_KEYS, type PlanKey } from "@/lib/plans";
+import { recordCancellationForAdminDeletion, type DeletionBillingOutcome } from "@/lib/billing-cancellation";
+import { AppError } from "@/lib/errors";
 
 /**
  * Phase 33 Stop 2 (docs/phases.md): tenant lifecycle Server Actions. Every
@@ -24,6 +26,23 @@ import { PLAN_KEYS, type PlanKey } from "@/lib/plans";
  */
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Records + attempts the Razorpay cancellation before an admin delete (the
+ * owner-delete path, lib/billing-cancellation.ts). Only a failure to write the
+ * durable record refuses the delete; a failed cancel is retried and alerted.
+ */
+async function cancelBillingBeforeAdminDelete(
+  businessId: string,
+  reason: "admin_soft_deleted" | "admin_hard_deleted",
+): Promise<{ ok: true; outcome: DeletionBillingOutcome } | { ok: false; error: string }> {
+  try {
+    return { ok: true, outcome: await recordCancellationForAdminDeletion(businessId, reason) };
+  } catch (error) {
+    if (error instanceof AppError) return { ok: false, error: error.userMessage };
+    return { ok: false, error: "Could not record the Razorpay cancellation, so nothing was deleted. Please try again." };
+  }
+}
 
 const reasonSchema = z.string().trim().min(3, "A reason is required.").max(500);
 
@@ -145,7 +164,7 @@ export async function changeTenantPlan(businessId: string, input: { planKey: Pla
   const { data: before } = await supabase.from("subscriptions").select("plan_key").eq("business_id", businessId).maybeSingle();
 
   if (!before) {
-    return { ok: false, error: "This tenant has no subscription row yet (it is on the grandfathered default) -- a plan change needs a real row, which this action does not create. Use Razorpay checkout or create one directly first." };
+    return { ok: false, error: "This tenant has no subscription row (no paid access) -- a plan change needs a real row, which this action does not create. Use Razorpay checkout or create one directly first." };
   }
 
   const { error } = await supabase.from("subscriptions").update({ plan_key: parsed.data.planKey }).eq("business_id", businessId);
@@ -238,6 +257,13 @@ export async function softDeleteTenant(businessId: string, reason: string): Prom
   const { data: before } = await supabase.from("businesses").select("deleted_at").eq("id", businessId).maybeSingle();
   if (before?.deleted_at) return { ok: false, error: "This tenant is already soft-deleted." };
 
+  // Same Razorpay path as the owner's delete (lib/billing-cancellation.ts):
+  // record + cancel immediately, retried and alerted. Refused only if the
+  // durable record can't be written -- never soft-delete a tenant we can't
+  // guarantee to stop charging.
+  const billing = await cancelBillingBeforeAdminDelete(businessId, "admin_soft_deleted");
+  if (!billing.ok) return billing;
+
   const { error } = await supabase
     .from("businesses")
     .update({ deleted_at: new Date().toISOString(), deletion_reason: reasonCheck.data })
@@ -247,7 +273,7 @@ export async function softDeleteTenant(businessId: string, reason: string): Prom
 
   await recordAdminAuditLogEntry(admin.user_id, "tenant.soft_deleted", "business", businessId, {
     businessId,
-    after: { deletion_reason: reasonCheck.data },
+    after: { deletion_reason: reasonCheck.data, razorpay_cancellation: billing.outcome },
   });
   return { ok: true };
 }
@@ -283,6 +309,10 @@ export async function hardDeleteTenant(businessId: string, input: { confirmName:
     return { ok: false, error: "The typed name does not match this tenant's exact name." };
   }
 
+  // A soft-deleted tenant was already recorded; the upsert is idempotent.
+  const billing = await cancelBillingBeforeAdminDelete(businessId, "admin_hard_deleted");
+  if (!billing.ok) return billing;
+
   await recordAdminAuditLogEntry(admin.user_id, "tenant.hard_deleted", "business", businessId, {
     businessId,
     before: {
@@ -291,7 +321,7 @@ export async function hardDeleteTenant(businessId: string, input: { confirmName:
       contact_email: business.contact_email,
       contact_phone: business.contact_phone,
     },
-    after: { reason: parsed.data.reason },
+    after: { reason: parsed.data.reason, razorpay_cancellation: billing.outcome },
   });
 
   const { error } = await supabase.from("businesses").delete().eq("id", businessId);

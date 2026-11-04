@@ -58,7 +58,7 @@ export type TenantCostMargin = {
   planName: string;
   costUsd: number;
   revenuePaise: number;
-  /** Cost as a percent of what this tenant pays, in the window -- null if the tenant has no subscription row (grandfathered, no plan price to compare against). */
+  /** Cost as a percent of what this tenant pays, in the window -- null if the tenant has no subscription row (no paid access, no plan price to compare against). */
   costPercentOfRevenue: number | null;
   /** True once costPercentOfRevenue crosses the flag threshold (approved brief: "flag tenants whose cost exceeds X% of what they pay"). */
   flagged: boolean;
@@ -98,8 +98,9 @@ export async function getPerTenantCostMargin(windowDays: number): Promise<Tenant
   const rows: TenantCostMargin[] = [];
   for (const [businessId, costUsd] of costByBusinessId) {
     const sub = subscriptionByBusinessId.get(businessId);
-    const planKey = sub?.planKey ?? "scale"; // grandfathered default (lib/subscription.ts's GRANDFATHERED_PLAN_KEY)
-    const revenuePaise = sub ? monthlyValuePaise(planKey, sub.periodStart, sub.periodEnd) : PLANS[planKey].monthlyPricePaise;
+    // No row = no paid access (lib/entitlement-rules.ts), so no revenue to compare against.
+    const planKey = sub?.planKey ?? "starter";
+    const revenuePaise = sub ? monthlyValuePaise(planKey, sub.periodStart, sub.periodEnd) : 0;
     const revenueUsd = (revenuePaise / 100) / USD_TO_INR_RATE;
     const costPercentOfRevenue = revenueUsd > 0 ? (costUsd / revenueUsd) * 100 : null;
 

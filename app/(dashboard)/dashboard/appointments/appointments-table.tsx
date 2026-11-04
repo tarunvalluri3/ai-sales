@@ -14,6 +14,7 @@ const STATUS_TONE: Record<AppointmentStatus, BadgeTone> = {
   cancelled: "muted",
   completed: "success",
   no_show: "danger",
+  expired: "muted",
 };
 
 const COLUMNS: DataTableColumn[] = [

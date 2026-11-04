@@ -2,9 +2,355 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-11-02 (**Instagram reply latency pass + `ig_reply_timing` log, "Allow message access" guide step, track-record grounding rule for every channel** -- MERGED as PR #145 (`28c0d18`), CI green; see the first section below; no migration. **Previous note:** **Instagram Page subscribe now uses `subscribed_fields=feed`** (no more Messenger fields / `pages_messaging`) -- MERGED as PR #143 (`021990c`); see the first section below; no migration. **Previous note:** **Instagram Page-subscribe diagnostics** -- MERGED as PR #141 (`104b8b5`), deployed; `ig_connect_failed` now carries Meta's real `error.message`/`error_user_msg`, `/me/permissions` is logged before subscribing, and a reason names a permission only when Meta's text does; see the first section below; no migration. **Previous note:** **Instagram switched to "Instagram API with Facebook Login"** (`META_IG_LOGIN_MODE`, default `facebook`; Unified Login kept behind the flag) -- MERGED as PR #139 (`7651cf7`), see the first section below; migration `20261114000000` NOT yet applied to production. **Previous note:** **Instagram connect `error=no_accounts` fix: step logging + debug_token fallback** -- MERGED as PR #137 (`7506aba`), see the first section below; no migration. **Previous note:** **Per-business Instagram override** (`businesses.instagram_enabled`) -- MERGED as PR #135 (`89ddd90`), CI green; see the first section below; migration `20261113000000` APPLIED to production by the user. **Previous note:** **Instagram moved to Instagram API with Unified Login** -- MERGED as PR #133 (`6b42e7b`), CI green; migration `20261112000000` NOT yet applied to production; see the first section below. **Previous note, 2026-11-01:** **Publish never set `published_at` -- widget chat 401 for every newly published business, dashboard stuck on widget-settings. MERGED to `main` as PR #127 (`cb82dea`, CI green incl. pgTAP 062), deployed to production; migration `20261110000000` APPLIED to production by the user.** Follow-up: **suspension now stops every AI channel** (WhatsApp/Instagram leaked) -- MERGED as PR #128 (`7dfe8ac`, CI green incl. pgTAP 063), no migration. **Production migration history verified 2026-11-01 (`npx supabase migration list --linked`): every local migration applied, no mismatches, last `20261110000000`** -- this also confirms `20261109000000` (Manufacturing) is applied. `main` is the only branch, local and `origin`. See the first two sections below. **Previous note:** **"Manufacturing" added as a business type/industry option** -- migration `20261109000000` now applied (see above), see its section below. **Previous note, 2026-10-29:** **MERGED to `main` as PR #122** (`da818e3`, CI green): onboarding wizard, Draft -> Publish -> Live agent versions and billing hardening are all committed -- the "NOT committed" notes below are superseded. Migration `20261107000000` applied by the user; migration `20261108000000` APPLIED to production by the user (2026-10-29, `db push --linked`; applied per the user, not re-verified via `migration list` by this session). `main` is the only branch, local and `origin`. **Previous note:** billing hardening built -- see the first section below; **previous note:** Draft -> Publish -> Live agent versions built -- **previous note:** onboarding wizard: missing column grant fixed + applied via `db push`, plus 4 manual-testing bugfixes -- see the "Onboarding wizard: missing column grant + manual-testing bugfixes" section just below). **Previous note:** onboarding wizard UI rebuild, NOT committed -- see the "Onboarding wizard UI rebuild" section further below. **Previous note:** onboarding route guard + resume, NOT committed -- see the "Onboarding route guard + resume" section further below for files/migration/assumptions. **Previous note:** Phase 33 Stop 5, Platform Tools -- Support/Announcements/Feature Flags/Settings/Audit Log UI, the FINAL stop of Phase 33 -- MERGED to `main` as PR #120, migration `20261105000000` promoted to production -- see that section further down. **Phase 33 (the whole 5-stop `/apache` platform admin panel) is now fully built**, though its whole-phase exit criteria are not yet live-verified (see that section's "Waiting on the user"). `main` is again the only branch, local and `origin` -- every Phase 33 stop branch (1-5) confirmed merged, then deleted. **Previous note:** Phase 33 Stop 4 MERGED to `main` (PR #119, CI green) -- this STATE.md entry was stale (said "PR not yet opened") until this update; confirmed merged via `git log` (`89cd130` merge commit) before starting Stop 5. See that section further down. **Previous note:** Phase 33 Stop 3 MERGED to `main` 2026-10-28 (PR #118, CI green first try) and verified via `npm test` (pgTAP 060 passed) -- see that section further down. **Previous note:** Phase 33 Stop 2 MERGED to `main` 2026-10-28 (PR #117, after one CI-caught pgTAP fixture bug fixed before merge) and verified via `npm test` (pgTAP 059 passed) -- see that section further down. **Previous note:** Phase 33 Stop 1 MERGED to `main` 2026-10-28 (PR #116) and live-verified by the owner -- see that section further down. **Previous note:** the token-burn audit + its 4-commit follow-up on branch `feat/gemini-usage-audit`, PR pending -- see that section further down. **Previous note:** the guardrails programme's final STATE.md note and the marketing homepage redesign both merged to `main` via PR #113 -- see the landing-page section. **Current state:** `main` is the only branch, local and `origin` -- every other branch (`docs/state-guardrails-merged`, `feat/answer-bank`, `feat/guardrails-phase-1..6`, a leftover worktree at `ai-sales-guardrails`) was confirmed fully merged, then deleted; no open PRs; chat latency Steps 1-4 merged 2026-10-27 but not yet measured in production, working tree otherwise clean, all 102 migrations applied to production (`migration list --linked`: no mismatches, last `20261029000200`). Most recent work, newest first: **Phase 32 abuse rate limiting Stages A-C** (log-only, MERGED as PR #96 / `a2bd5b3`; Stages D-E not built) and **widget token streaming** (MERGED as PR #95 / `fb16a29`; production TTFT and edge no-buffering now MEASURED -- see the streaming entry). **2026-10-27: supplier address and SAC `998314` filled in `lib/invoice-config.ts` (merged to `main` in the same PR as Phase 32 Stages D-E; deploys with it).** **2026-10-27: Phase 32 Stages D (tiered 429/soft response) and E (client `clientElapsedMs` bot signal) built, all still log-only/dormant; `new_conversation_ip` raised to 30/h.** **`Retry-After` now sent on `/api/chat` 429s (branch/PR pending merge); owner's CA confirmed SAC 998314.** Open items are listed in each entry's "Waiting on the user" and in the Backlog (§8). **Older per-change summaries that used to be stacked on this line ("Prior note: ...") are not lost -- every one has its own dated section below, and the full previous header is in git history (`git show a2bd5b3:STATE.md | head -5`).**
+Last updated: 2026-11-03 (**Production readiness round 3 (final patch) on branch `production-readiness` (3 more commits + this STATE update), NOT merged, NOT pushed; 12 migrations (`20261115000000`-`20261124000200`) written but NOT applied anywhere; nothing deployed.** Daily AI reply caps on every channel, one trial per Clerk user, trial-vs-Starter messaging; the round 3 section below has the CURRENT handoff list and decisions (supersedes round 2's). **Previous note:** **Production readiness round 2 on branch `production-readiness` (9 more commits, 25 total), NOT merged, NOT pushed; 10 migrations (`20261115000000`-`20261124000000`) written but NOT applied anywhere; nothing deployed.** No-card trial + plan gating, /apache delete cancels Razorpay, chat protection (limits, daily Gemini caps, Turnstile), configurable prod-ref guard, `next dev` against prod blocked, migration ordering, WhatsApp Embedded Signup v4, channel launch switches. The first section below has the current handoff list and decisions; it supersedes round 1's. **Local dev and the Supabase CLI still point at PRODUCTION** -- every script/test now refuses to run against it. **Previous note:** 2026-11-02 (**Instagram reply latency pass + `ig_reply_timing` log, "Allow message access" guide step, track-record grounding rule for every channel** -- MERGED as PR #145 (`28c0d18`), CI green; see the first section below; no migration. **Previous note:** **Instagram Page subscribe now uses `subscribed_fields=feed`** (no more Messenger fields / `pages_messaging`) -- MERGED as PR #143 (`021990c`); see the first section below; no migration. **Previous note:** **Instagram Page-subscribe diagnostics** -- MERGED as PR #141 (`104b8b5`), deployed; `ig_connect_failed` now carries Meta's real `error.message`/`error_user_msg`, `/me/permissions` is logged before subscribing, and a reason names a permission only when Meta's text does; see the first section below; no migration. **Previous note:** **Instagram switched to "Instagram API with Facebook Login"** (`META_IG_LOGIN_MODE`, default `facebook`; Unified Login kept behind the flag) -- MERGED as PR #139 (`7651cf7`), see the first section below; migration `20261114000000` NOT yet applied to production. **Previous note:** **Instagram connect `error=no_accounts` fix: step logging + debug_token fallback** -- MERGED as PR #137 (`7506aba`), see the first section below; no migration. **Previous note:** **Per-business Instagram override** (`businesses.instagram_enabled`) -- MERGED as PR #135 (`89ddd90`), CI green; see the first section below; migration `20261113000000` APPLIED to production by the user. **Previous note:** **Instagram moved to Instagram API with Unified Login** -- MERGED as PR #133 (`6b42e7b`), CI green; migration `20261112000000` NOT yet applied to production; see the first section below. **Previous note, 2026-11-01:** **Publish never set `published_at` -- widget chat 401 for every newly published business, dashboard stuck on widget-settings. MERGED to `main` as PR #127 (`cb82dea`, CI green incl. pgTAP 062), deployed to production; migration `20261110000000` APPLIED to production by the user.** Follow-up: **suspension now stops every AI channel** (WhatsApp/Instagram leaked) -- MERGED as PR #128 (`7dfe8ac`, CI green incl. pgTAP 063), no migration. **Production migration history verified 2026-11-01 (`npx supabase migration list --linked`): every local migration applied, no mismatches, last `20261110000000`** -- this also confirms `20261109000000` (Manufacturing) is applied. `main` is the only branch, local and `origin`. See the first two sections below. **Previous note:** **"Manufacturing" added as a business type/industry option** -- migration `20261109000000` now applied (see above), see its section below. **Previous note, 2026-10-29:** **MERGED to `main` as PR #122** (`da818e3`, CI green): onboarding wizard, Draft -> Publish -> Live agent versions and billing hardening are all committed -- the "NOT committed" notes below are superseded. Migration `20261107000000` applied by the user; migration `20261108000000` APPLIED to production by the user (2026-10-29, `db push --linked`; applied per the user, not re-verified via `migration list` by this session). `main` is the only branch, local and `origin`. **Previous note:** billing hardening built -- see the first section below; **previous note:** Draft -> Publish -> Live agent versions built -- **previous note:** onboarding wizard: missing column grant fixed + applied via `db push`, plus 4 manual-testing bugfixes -- see the "Onboarding wizard: missing column grant + manual-testing bugfixes" section just below). **Previous note:** onboarding wizard UI rebuild, NOT committed -- see the "Onboarding wizard UI rebuild" section further below. **Previous note:** onboarding route guard + resume, NOT committed -- see the "Onboarding route guard + resume" section further below for files/migration/assumptions. **Previous note:** Phase 33 Stop 5, Platform Tools -- Support/Announcements/Feature Flags/Settings/Audit Log UI, the FINAL stop of Phase 33 -- MERGED to `main` as PR #120, migration `20261105000000` promoted to production -- see that section further down. **Phase 33 (the whole 5-stop `/apache` platform admin panel) is now fully built**, though its whole-phase exit criteria are not yet live-verified (see that section's "Waiting on the user"). `main` is again the only branch, local and `origin` -- every Phase 33 stop branch (1-5) confirmed merged, then deleted. **Previous note:** Phase 33 Stop 4 MERGED to `main` (PR #119, CI green) -- this STATE.md entry was stale (said "PR not yet opened") until this update; confirmed merged via `git log` (`89cd130` merge commit) before starting Stop 5. See that section further down. **Previous note:** Phase 33 Stop 3 MERGED to `main` 2026-10-28 (PR #118, CI green first try) and verified via `npm test` (pgTAP 060 passed) -- see that section further down. **Previous note:** Phase 33 Stop 2 MERGED to `main` 2026-10-28 (PR #117, after one CI-caught pgTAP fixture bug fixed before merge) and verified via `npm test` (pgTAP 059 passed) -- see that section further down. **Previous note:** Phase 33 Stop 1 MERGED to `main` 2026-10-28 (PR #116) and live-verified by the owner -- see that section further down. **Previous note:** the token-burn audit + its 4-commit follow-up on branch `feat/gemini-usage-audit`, PR pending -- see that section further down. **Previous note:** the guardrails programme's final STATE.md note and the marketing homepage redesign both merged to `main` via PR #113 -- see the landing-page section. **Current state:** `main` is the only branch, local and `origin` -- every other branch (`docs/state-guardrails-merged`, `feat/answer-bank`, `feat/guardrails-phase-1..6`, a leftover worktree at `ai-sales-guardrails`) was confirmed fully merged, then deleted; no open PRs; chat latency Steps 1-4 merged 2026-10-27 but not yet measured in production, working tree otherwise clean, all 102 migrations applied to production (`migration list --linked`: no mismatches, last `20261029000200`). Most recent work, newest first: **Phase 32 abuse rate limiting Stages A-C** (log-only, MERGED as PR #96 / `a2bd5b3`; Stages D-E not built) and **widget token streaming** (MERGED as PR #95 / `fb16a29`; production TTFT and edge no-buffering now MEASURED -- see the streaming entry). **2026-10-27: supplier address and SAC `998314` filled in `lib/invoice-config.ts` (merged to `main` in the same PR as Phase 32 Stages D-E; deploys with it).** **2026-10-27: Phase 32 Stages D (tiered 429/soft response) and E (client `clientElapsedMs` bot signal) built, all still log-only/dormant; `new_conversation_ip` raised to 30/h.** **`Retry-After` now sent on `/api/chat` 429s (branch/PR pending merge); owner's CA confirmed SAC 998314.** Open items are listed in each entry's "Waiting on the user" and in the Backlog (§8). **Older per-change summaries that used to be stacked on this line ("Prior note: ...") are not lost -- every one has its own dated section below, and the full previous header is in git history (`git show a2bd5b3:STATE.md | head -5`).**
 
 ---
+
+## Launch audit and reply speed -- 2026-11-04 -- merged to `main` via PR #147, NOT deployed, migrations NOT applied to production
+
+**Merge (2026-11-04):** `production-readiness` (rounds 1-3 + this section) merged to `main` through PR #147 after CI went green; the branch was deleted. First CI run failed one structural test (`test:business-lifecycle` looked for the old WhatsApp `await loadBusinessAiContext` call shape); the test now finds the `if (!contextResult.ok)` gate for both webhooks, and the gate was confirmed to run before every canned or AI reply. Second CI run failed pgTAP `075`: migration `20261124000000` had the check `template_name ~ '^[a-z0-9_]{1,512}$'`, which Postgres rejects at row-check time (repetition cap 255), so **every insert into `whatsapp_template_statuses` failed**. New migration `20261124000300_fix_whatsapp_template_name_check.sql` replaces it with `~ '^[a-z0-9_]+$' and char_length <= 512`; pgTAP 075 gained a 513-character rejection case. **Apply it to production together with 20261124000000.** `LAUNCH_AUDIT.md` stays local and uncommitted (public repo).
+
+**Found:** the live VPS (`aipilot.waveswebstudio.in`, uptime check 2026-11-04) serves code from before this branch: `/api/health?deep=1` has no checks, `/pricing` and `/privacy` show old copy, and the Sentry environment reads `vercel-production`. See `docs/launch-runbook.md` for the launch order.
+
+**Changed:**
+- `/api/chat`: IP limit and widget auth overlap; the conversation limit overlaps the key limit (existing conversation) or the writes (new conversation); Turnstile in `log` mode runs in `after()`; a checked widget key + origin is reused for 30 s in-process (was 15 s, warm-up only), `WIDGET_CONTEXT_CACHE_TTL_MS`, 0 = off. **Trade-off:** a revoked key, removed origin or new publish can take 30 s to apply; rejected IPs now also cost the auth reads.
+- WhatsApp webhook: same prefetch design as Instagram, plus instant answers, the embedding cache, a turn timer and stage metrics. It previously ran about 12 serial round trips before the model.
+- Instagram connect: new `permissions_missing` error when no Page came back and `pages_show_list` or `instagram_basic` was not granted. The cause of the GR Engineers failure is NOT confirmed: no error code or log line has been seen.
+- Privacy page names Google Cloud instead of Vercel (**owner to review**). Homepage preview label uses the real domain.
+- `docs/meta-app-review.md`: `whatsapp_business_management` is required; pilot-tester path added.
+- New: `scripts/backup-database.sh` (never run), `docs/launch-runbook.md`.
+
+**Checks (cloud copy holding only the files needed, no secrets, no live calls):** `tsc` clean on the changed routes and everything they import. Passing: chat-perf 9/9, daily-reply-limit 20/20, chat-protection 12/12, meta-instagram 78/78, reply-failure 30/30, whatsapp-window 23/23, chat-streaming 12/12. widget-access 11/15; the 4 failures hit files absent from that copy.
+
+**NOT run:** lint, full typecheck, build, the other suites, pgTAP, any real latency measurement. Speed gains are unmeasured. The Seoul distance is the leading explanation, from code and earlier measurements; the VPS region and stage timings still need confirming (runbook section 2).
+
+## Production readiness round 3 (final patch) -- 2026-11-03 -- branch `production-readiness`, NOT pushed, migrations NOT applied
+
+**Safety:** `.env.local` (`NEXT_PUBLIC_SUPABASE_URL`) and `supabase/.temp/project-ref` both still target PRODUCTION `bykeztxvejpwfcxgsubm`, so no pgTAP, migration, seed or DB script was run. Unit suites ran with Supabase, Gemini, Clerk, Razorpay, Meta and Turnstile secrets removed. No Gemini, Meta, Razorpay, Clerk or Turnstile call was made. Nothing pushed, merged or deployed. `LAUNCH_AUDIT.md` left uncommitted.
+
+**Item 1 DONE (`8292d7f`): daily AI reply caps on website, WhatsApp and Instagram.**
+- One pair of UTC-day counters for all three channels: `gemini_daily_business` (per business) and `gemini_daily_global` (overall). Shared module `lib/daily-reply-limit.ts`; rules in `lib/daily-reply-limit-rules.ts`.
+- Defaults: 1,000 per business (unchanged), **5,000 overall (was 20,000)**. Still `GEMINI_DAILY_TURN_CAP_PER_BUSINESS` / `GEMINI_DAILY_TURN_CAP_GLOBAL`, 0 = off.
+- Counted once per AI reply, right before the model call: after human control, the serving check, and the guardrail/non-text canned replies. On WhatsApp and Instagram this is after the inbound dedup insert, so a retried webhook never counts twice. The widget no longer counts turns that never reach the AI (human control, not serving).
+- Over a cap: no Gemini call, conversation flagged, `gemini_daily_cap_reached` alert + email **once per cap per UTC day**. Only the request whose atomic increment returns exactly cap + 1 alerts, so it is never repeated per message or per server.
+- Counter can't be read: **fail closed**. Handled exactly like over the limit, logged (`gemini_daily_cap_blocked`, info, every message) and alerted (`gemini_daily_counter_unavailable`, throttled hourly per process).
+- Notice ("a member of our team ... will follow up"):
+  - Website: returned as the reply to each blocked message, because the visitor is waiting on that request.
+  - WhatsApp and Instagram: at most once per conversation per UTC day, using the new `gemini_cap_notice` counter.
+  - Sent only inside the 24-hour window, measured from the prospect's message timestamp.
+  - If the notice counter can't be read, no notice is sent, so it can never repeat.
+- Migration `20261124000100_daily_reply_limit_notice_scope` (NOT applied): adds the `gemini_cap_notice` scope. Without it the cap still works, but WhatsApp/Instagram prospects get no notice.
+- New suite `test:daily-reply-limit` 20/20 (in CI): verdicts, the once-a-day alert, the window, and mocked failure paths (counter null/throws, flag throws, notice counter throws, late delivery), plus the wiring order on all three channels.
+
+**Item 2 DONE (`b589fc3`): one free trial per Clerk user, as well as per organisation.**
+- Migration `20261124000200_trial_once_per_user` (NOT applied): `trial_user_grants` (PK `clerk_user_id`, no FK, RLS forced, restrictive deny, no client grants).
+- The trial trigger takes the user from the verified session JWT (`auth.jwt()->>'sub'`) of the business insert, never from the client.
+- Concurrency: primary-key inserts in the insert's transaction mean two simultaneous requests yield exactly one trial. A user who is refused does not use up the new organisation's grant.
+- An insert with no `sub` (service role/SQL) keeps the org-only rule. No email-domain rule.
+- A refused trial is the existing `expired` row / `trial_already_used`, so paid checkout is unchanged. Existing trials and paid plans are untouched.
+- No backfill is possible (businesses never stored their creator). This gap doesn't matter if the new production project starts empty (decision below).
+- Copy (`lib/trial-messages.ts`): "one free trial per person and per organisation", with the paid plans shown right below it (onboarding, billing, channel gates, pricing).
+- pgTAP `076` written, not run. `test:plan-access` +5.
+
+**Item 3 DONE (`f934420`): trial vs Starter messaging.**
+- Pricing, the onboarding trial step and the billing plan picker share `lib/plan-channel-copy.ts`.
+  - Every plan card shows its channels.
+  - The trial sections say the trial includes WhatsApp and Instagram but Starter does not.
+  - Only launched channels are named (`CHANNEL_*_ENABLED`).
+- Picking Starter while WhatsApp or Instagram is connected shows a warning. The pay/move button stays disabled until "I understand and still want Starter" is ticked, and the question is asked again after any change of selection. If the connections can't be read, a generic warning is shown instead.
+- Prices and plan access are unchanged; tests assert this. `test:plan-access` +7 (30 total).
+
+### Round 3 checks (2026-11-03)
+- Before each commit: `npm run lint` clean, `npm run typecheck` clean, and all `test:*` suites passed with secrets removed. After the final commit: 36 suites, 852 tests, 0 failures.
+- `npm run build`: exit 0. Every `.env.local` key was overridden with a placeholder, a fake Supabase URL, and empty Sentry DSN/auth token. The build log has no warnings and no production ref.
+- **NOT run:**
+  - `npm test` (pgTAP 067-076): the CLI is linked to PRODUCTION.
+  - `npm run eval` / redteam / loadtest: they make live Gemini calls.
+  - Any live Meta, Razorpay, Clerk, Turnstile or Gemini call.
+  - `next dev`: blocked against prod by design.
+  - A browser check of the new copy and the Starter warning.
+
+### Migrations written, NOT applied anywhere (apply in order)
+`20261115000000` … `20261124000000` (rounds 1-2), `20261124000100_daily_reply_limit_notice_scope`, `20261124000200_trial_once_per_user`. New table this round: `trial_user_grants` (deny-all, service role only). pgTAP 067-076 cover them.
+
+### Decisions recorded (owner, 2026-11-03)
+- Daily caps: 1,000 replies per business and 5,000 overall, covering website + WhatsApp + Instagram, failing closed.
+- One trial per Clerk user and per organisation; no email-domain limit.
+- **Rejected WhatsApp templates are reworded centrally**: edit the body in `lib/whatsapp-templates.ts`, then resubmit to every business through the existing submit path. There are no per-business template names.
+- **The new Supabase production project starts EMPTY.** No `pg_dump`/`pg_restore` from the current project; existing test accounts sign up again. This also removes the trial-per-user backfill gap and the row-less test-account question.
+- **Turnstile starts in `log` mode at launch.** Switch to `enforce` once a real customer site shows no false blocks in `turnstile_verified`.
+
+### Handoff list, in order (supersedes round 2's)
+1. **Make local dev safe:** staging values in `.env.local` (`otmeqswvlmorxvjocaru`), `npx supabase link --project-ref otmeqswvlmorxvjocaru`, a separate `GEMINI_API_KEY_DEV`. `npm run dev` refuses until you do.
+2. **Review the branch:** trial/pricing/Starter copy, the onboarding trial step, the privacy text (round 1), docs/whatsapp-embedded-signup.md, docs/abuse-protection.md. Then push and open the PR. CI applies the 12 migrations to staging and runs pgTAP 067-076 and every suite.
+3. **Evals and a load test on staging:** `npm run eval`, the red-team runner and the load test against staging with `GEMINI_API_KEY_DEV` (live Gemini calls, so estimate the call count first). Fix anything that regresses before going further.
+4. **New Supabase production project (starts empty):**
+   - Create it.
+   - Add its ref to `supabase/production-project-refs.txt`, then commit and merge. Do this BEFORE linking or pointing anything at it, and keep the old ref listed.
+   - `npx supabase link` to it, then `db push` all migrations (interactive).
+   - Enable the pg_cron jobs and check them, then relink staging.
+   - No data is moved.
+5. **New Clerk production instance:** `pk_live_…` / `sk_live_…` with your domain's DNS records, Organizations on, Supabase JWT integration as on dev, then your platform-admin account with MFA added to `platform_admins` on the new database.
+6. **Production env on the VPS:**
+   - Everything in round 2's list: `APP_ENV=production`, the new Supabase/Clerk keys, `PRODUCTION_SUPABASE_PROJECT_REFS`, the paid `GEMINI_API_KEY`, `CRON_SECRET`, `NEXT_PUBLIC_APP_URL` at build, `OPS_ALERT_EMAIL`, `CLIENT_IP_SOURCE=x-real-ip`, `LOCAL_CHROMIUM_PATH`, the Meta secrets, Razorpay, Resend.
+   - Plus `TURNSTILE_MODE=log` and its two keys.
+   - `CHANNEL_*_ENABLED=false` for any Meta channel not approved yet. The daily caps default to 1,000/5,000, so set them only to change them.
+7. **Deploy, then start the scheduler:** a crontab/systemd timer every 2 min calling `POST /api/cron/run` (docs/vps-cron.md).
+8. **Razorpay live mode** (moved before verification):
+   - Live keys, live plan ids (`RAZORPAY_PLAN_*`), the live webhook and its secret, per the earlier STATE entries.
+   - Set a Google budget alert on the Gemini project.
+9. **Verify:**
+   - `/api/health?deep=1` returns 200 and `/apache/jobs` shows the Scheduler.
+   - `/pricing` shows the trial cap, the channels per plan and the trial-vs-Starter note.
+   - A new user gets a no-card trial. Delete + recreate the org, or create a second org as the same user, and no second trial is offered: you get the "one free trial per person and per organisation" message and the plans.
+   - A Starter business can't connect WhatsApp. Picking Starter with a channel connected shows the warning.
+10. **Full new-customer test on production with a real payment:**
+    - Sign up as a brand-new user and finish onboarding.
+    - Start the trial, then pay for a plan with a real card.
+    - Check the GST invoice email and the billing page, and that the AI replies.
+    - Then cancel/refund per your process.
+11. **Restore test:** once the first daily backup of the new project exists, restore it into a temporary Supabase project. Check that the key tables (`businesses`, `subscriptions`, `conversations`, `messages`, `trial_grants`, `trial_user_grants`) and the row counts are there, then delete the temporary project. Never point the app or a script at it.
+12. **Meta** (docs/whatsapp-embedded-signup.md, docs/meta-app-review.md):
+    - Tech Provider status and Business Verification.
+    - Advanced Access and Live mode.
+    - The Embedded Signup v4 FLB configuration.
+    - Webhooks: `messages`, `message_template_status_update`, `account_update`, plus the Instagram fields.
+13. **WhatsApp templates:** set the five `WHATSAPP_TEMPLATE_APPOINTMENT_*` env vars to the suggested names. If Meta rejects one, reword it centrally in `lib/whatsapp-templates.ts` and resubmit (decision above).
+14. **Live Embedded Signup + template submission test BEFORE WhatsApp opens to customers:**
+    - Run one real signup with your own WABA and number through "Connect with Facebook".
+    - Confirm the phone registers, the templates are submitted and reach APPROVED on the WhatsApp page, and that an inbound message gets an AI reply.
+    - Only then set `CHANNEL_WHATSAPP_ENABLED` on.
+15. **Instagram:** when App Review lands, set `CHANNEL_INSTAGRAM_ENABLED` on.
+16. **Cloudflare Turnstile:** it is already in `log` mode from step 6. Watch `turnstile_verified` on a real customer site; with no false blocks, switch to `enforce`.
+17. **Sentry alert rules:** round 2's list plus `gemini_daily_counter_unavailable`. Filter on `environment:production`.
+18. **UptimeRobot** on `/api/health?deep=1`.
+
+### Decisions still needed from the owner
+- Confirm the trial cap of 200 AI replies (`TRIAL_REPLY_QUOTA`), unchanged since 2026-10-21.
+- Item 1 widget behaviour: a blocked website visitor gets the notice on every blocked message, because each message is a live request waiting for a reply. WhatsApp and Instagram get it once per conversation per day. Say if the website should be silent after the first notice instead.
+
+### Known limitations (round 3)
+- The daily cap counts a reply attempt, including an instant (answer-bank) answer, and an attempt whose model call then fails. Over-cap messages keep incrementing a counter that is already past the cap, which is harmless.
+- The website check is now one sequential counter round trip just before the AI call (it used to overlap other reads), adding one small RPC to widget latency. It was not measured.
+- The per-process alert throttle for counter outages resets on restart.
+- The trial refusal message can't say which rule (person or organisation) refused, because the database stores only the outcome.
+- pgTAP 067-076 have never run. No E2E or browser test of the new copy or warning.
+
+## Production readiness round 2 -- 2026-11-03 -- branch `production-readiness`, NOT pushed, migration NOT applied
+
+**Item 1 DONE (plan access and trials).** Owner decisions: no-card trial with a hard reply cap; one trial per org (delete+recreate included); the trial includes website + WhatsApp + Instagram; WhatsApp and Instagram are on Growth/Scale only (not Starter); no subscription row = no paid access; a failed subscription read keeps the last known plan for 24 h (`SUBSCRIPTION_LAST_KNOWN_MAX_HOURS`), then no paid access, logged and alerted as `subscription_read_degraded`. The row-less test accounts were deliberately left alone, so they lose paid access.
+- `lib/entitlement-rules.ts` (pure, tested): entitlement from row, `channelAllowed` (serving AND channel), last-known store (caches rows and re-evaluates them at read time), config parsing. `lib/subscription.ts` reads the row and alerts via the new `lib/ops-alert.ts` (throttled email to `OPS_ALERT_EMAIL`).
+- Trial cap is `TRIAL_REPLY_QUOTA` (default **200**: unchanged from the cap advertised and confirmed on 2026-10-21, enough to try the agent on real prospects, and Gemini spend per trial stays bounded). If the reply count can't be read during a trial, the turn is refused (hard limit); paid plans stay fail-open.
+- WhatsApp gated in the webhook ingest, the send queue (`whatsapp_not_allowed` + staff notice), the connect action and the page; Instagram's gate now also requires `serving`.
+- Migration `20261121000000_trial_once_per_org.sql` (NOT applied): `trial_grants` (no FK, RLS forced, deny policy, backfilled from existing businesses) + replaced trial trigger (a second business for the same org gets an `expired` row). pgTAP `073` written, not run (CLI linked to prod).
+- Checkout without a row now creates an `expired` Starter placeholder (no free Scale). Onboarding plan step = "Your free trial is on, no card needed" with an optional paid plan; pricing page (now rendered per request) shows the configured trial cap, the trial section, and Instagram on Growth/Scale. GST-inclusive prices unchanged.
+- Checks: lint clean, typecheck clean, all 30 `test:*` suites pass (run with Supabase/Gemini/provider env removed). Build not run yet.
+
+**Item 2 DONE (/apache deletes cancel Razorpay).** `softDeleteTenant` and `hardDeleteTenant` now call `recordCancellationForAdminDeletion` (same record → immediate cancel → retry/backoff → alert path as the owner's delete) BEFORE deleting, and refuse if the durable record can't be written. Previously a soft-deleted tenant kept its subscription row, so later charges were applied silently. The Razorpay webhook now checks `billing_cancellations` BEFORE the normal path, so a charge after a soft-delete is alerted, not applied. The "charged after deletion" email now has payment id, amount, customer id, who deleted, when, and refund steps; it never refunds. Migration `20261122000000` (NOT applied) adds reasons `admin_soft_deleted`/`admin_hard_deleted`; pgTAP `074` written, not run. A soft-deleted tenant's mandate is cancelled, so if one is ever un-deleted by hand it must check out again. Checks: lint, typecheck, all 30 suites pass (`test:billing-cancellation` 20/20).
+
+**Item 3 DONE (public chat abuse protection; no Vercel BotID, the app is moving to a VPS).** `lib/chat-protection.ts` (pure, `test:chat-protection` 14/14), docs/abuse-protection.md.
+- Limits are configurable, defaults unchanged: `CHAT_IP_LIMIT` 30, `CHAT_KEY_LIMIT` 120, `CHAT_CONVERSATION_LIMIT` 20 per 5 min.
+- New ENFORCING per-business limit `CHAT_BUSINESS_LIMIT` (300 per 5 min, fails open).
+- Daily Gemini turn caps on the widget: `GEMINI_DAILY_TURN_CAP_PER_BUSINESS` (1000) and `GEMINI_DAILY_TURN_CAP_GLOBAL` (20000), counted per UTC day; 0 turns a cap off.
+  - Over a cap there is no model call: the visitor gets the fixed "a person will follow up" reply, the conversation is flagged, and `gemini_daily_cap_reached` is alerted.
+  - The caps fail open.
+- Cloudflare Turnstile is `TURNSTILE_MODE=off|log|enforce` (default off) with `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`.
+  - It renders inside OUR widget iframe, so only the app domain is a Turnstile hostname (free plan: 10 hostnames per widget, "any hostname" is Enterprise-only).
+  - The token travels iframe → loader → `/api/chat` and is verified only for a new conversation.
+  - Enforce mode refuses a missing, invalid or wrong-hostname token with a 403. A Cloudflare outage is allowed through.
+  - Cloudflare's docs don't state which hostname is checked inside a cross-origin iframe, so run `log` on a real customer page before enforcing.
+- `sendOpsAlert` is now throttled: one error and one email per window, info after that.
+- Phase 32 abuse scopes and guardrails are still LOG-ONLY (owner decision); how to switch each one to enforcing is in docs/abuse-protection.md.
+- Migration `20261123000000` (NOT applied) adds 3 rate-limit scopes.
+- Checks: lint, typecheck, all 31 suites pass.
+
+**Item 4 DONE (configurable protected production ref).** New committed `supabase/production-project-refs.txt`. Every script and test guard merges it with the built-in `bykeztxvejpwfcxgsubm` and `PRODUCTION_SUPABASE_PROJECT_REFS` (`lib/production-refs-file.ts`). Before this, an env-only ref didn't protect `npm test` or the unit runners, which never load `.env.local`. The file and the env var only ever ADD refs; the current ref stays built in. To move production: add the new ref to that file and commit it before pointing anything at the new project. `test:env-safety` 29/29.
+
+**Local `next dev` against production is BLOCKED (owner decision).**
+- `next.config.ts` (development-server phase only) throws when `NEXT_PUBLIC_SUPABASE_URL` is a production ref (built-in, committed file or env).
+- Emergency override: `ALLOW_DEV_AGAINST_PRODUCTION=<exact ref>`. A bare `true` or a different ref is refused. Builds and production servers are unaffected.
+- **Your current `.env.local` points at production, so `npm run dev` now refuses until it points at staging.**
+- `test:env-safety` 31/31. Verified only by unit tests: plain Node can't load next.config.ts outside Next.
+
+**Item 1 tests added later (`84ed075`):** `test:plan-access` 16/16, run by CI.
+
+**Item 5 DONE (migration timestamps), and nothing renamed.**
+- Migrations `20261104…20261123` are future-dated; prod has applied at least `…20261113`.
+- `supabase migration new` today would produce `20261103…`, which sorts before them. `db push` (CI on staging, and the manual prod push) REFUSES that unless you pass `--include-all`, which would apply it out of order. So it would block rather than be silently skipped.
+- Fix: `npm run migration:new -- <name>` uses the later of now and the newest file + 1 min.
+- `test:migration-order` (CI fetches `main`'s tip for it) fails on a new migration that sorts before main's newest, a duplicate version, or a bad name. All 9 migrations on this branch pass.
+- docs/deployment.md §2d.
+
+**Item 6 DONE in code, NOT live-tested (WhatsApp Embedded Signup v4 + per-business templates).** docs/whatsapp-embedded-signup.md has the flow and the exact Meta configuration list.
+- Meta docs read 2026-11-03: ES v2/v3 were deprecated 2026-10-15; v4 means a new FLB configuration with products selected.
+- "Connect with Facebook" (`embedded-signup-button.tsx`, shown when `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID`, `META_APP_ID`, `META_APP_SECRET` and `META_TOKEN_ENCRYPTION_KEY` are set). The manual form remains as a fallback.
+- Server, in order: code exchange → phone-in-WABA check → `subscribed_apps` → `register` with a random 6-digit PIN. The token and PIN are stored encrypted.
+- Every failure has its own owner-facing message. After the exchange, the connection is stored with `setup_step` and `setup_error`, plus a "Finish setup" retry that reuses the stored token.
+- Templates are submitted to each business's own WABA after signup or on demand. Status is shown per template and kept current by the `message_template_status_update` webhook, a 6-hourly `whatsapp_template_sync` job and a Refresh button. Rejected templates are not resubmitted automatically.
+- Migration `20261124000000` (NOT applied): connection columns, encrypted PIN, and `whatsapp_template_statuses` (owner SELECT own, no client writes). pgTAP `075` written, not run.
+- `test:whatsapp-embedded-signup` 16/16, all Graph calls mocked.
+- Sending still uses the `WHATSAPP_TEMPLATE_*` names, so set them to the suggested names.
+
+**Item 7 DONE (independent launch switches).**
+- `CHANNEL_WHATSAPP_ENABLED` and `CHANNEL_INSTAGRAM_ENABLED`: false/off/0/no turns the channel off for the whole deployment; the default is on.
+- Applied inside `getEntitlement` (`applyLaunchSwitches`), so every server gate follows them: connect, webhooks, send queues, onboarding, Embedded Signup. The owner sees "isn't available yet -- waiting for Meta's approval".
+- The per-business Instagram override still works while Instagram is off, which is what the App Review test account needs.
+- Pricing and the trial copy list only the launched channels and mark the others "(coming soon)".
+- Launch scope unchanged: website + WhatsApp + Instagram.
+- `test:plan-access` now 18/18.
+
+**Post-launch work (owner decision 2026-11-03: NOT built, do after launch):**
+- **Post-appointment follow-ups**: a message after a completed appointment (thank-you, review or next-booking ask). This needs a WhatsApp template per WABA too.
+- **Staff re-engagement templates**: a WhatsApp template so a staff reply can reach a customer outside the 24-hour window. Today the reply is saved, a visible "not sent" notice shows, and the conversation is flagged.
+
+### Round 2 commits (oldest first)
+`0b1e232` plan access + trials · `88a34be` /apache deletes cancel Razorpay · `4f86603` chat protection (limits, daily Gemini caps, Turnstile) · `c179301` committed production-ref list · `fa7e012` local `next dev` against prod blocked · `84ed075` plan-access tests + CI · `098ebfc` migration ordering · `07b9eaa` WhatsApp Embedded Signup + templates · `e8fdcb5` channel launch switches.
+
+### Round 2 checks (2026-11-03, final)
+- `npm run lint`: clean. `npm run typecheck`: clean. All 34 `test:*` suites pass, run with Supabase, Gemini, Clerk and provider secrets removed from the environment. New suites: plan-access 18, chat-protection 14, migration-order 6, whatsapp-embedded-signup 16; env-safety is now 31.
+- `npm run build`: exit 0. It ran with every secret replaced by a placeholder, a fake Supabase URL and an empty Sentry token. The only log noise is prerender queries failing against the fake URL, which proves no production contact.
+- **NOT run:**
+  - `npm test` (pgTAP 067-075): the CLI is linked to PRODUCTION, so these run only on staging via CI.
+  - `npm run eval` / redteam / loadtest: they make live Gemini calls.
+  - Any live Meta, Razorpay, Clerk, Turnstile or Gemini call.
+  - `next dev`: it is blocked against the prod `.env.local` by design.
+
+### Migrations written, NOT applied anywhere (apply in order)
+`20261115000000` … `20261120000000` (round 1), `20261121000000_trial_once_per_org`, `20261122000000_billing_cancellation_admin_reasons`, `20261123000000_chat_protection_rate_limit_scopes`, `20261124000000_whatsapp_embedded_signup`. New tables: `trial_grants` (deny-all), `whatsapp_template_statuses` (owner SELECT own only). pgTAP 073-075 cover them.
+
+### New env vars (round 2; all optional, safe defaults)
+- Trials and plans: `TRIAL_REPLY_QUOTA` (200), `SUBSCRIPTION_LAST_KNOWN_MAX_HOURS` (24).
+- Chat limits: `CHAT_IP_LIMIT` (30), `CHAT_KEY_LIMIT` (120), `CHAT_CONVERSATION_LIMIT` (20), `CHAT_BUSINESS_LIMIT` (300).
+- Daily Gemini caps: `GEMINI_DAILY_TURN_CAP_PER_BUSINESS` (1000), `GEMINI_DAILY_TURN_CAP_GLOBAL` (20000).
+- Turnstile: `TURNSTILE_MODE` (off), `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`.
+- WhatsApp: `WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID`.
+- Launch switches: `CHANNEL_WHATSAPP_ENABLED`, `CHANNEL_INSTAGRAM_ENABLED` (on).
+- Dev only: `ALLOW_DEV_AGAINST_PRODUCTION`.
+
+### Handoff list, in order (SUPERSEDED by round 3 above)
+1. **Make local dev safe.**
+   - Put staging values in `.env.local` (`otmeqswvlmorxvjocaru`) and run `npx supabase link --project-ref otmeqswvlmorxvjocaru`. Use a separate `GEMINI_API_KEY_DEV`.
+   - `npm run dev` refuses to start until you do.
+2. **Review the branch:** the trial and pricing copy, the onboarding trial step, the privacy text (round 1), and docs/whatsapp-embedded-signup.md. Then push and open the PR.
+   - CI applies the 10 migrations to staging and runs pgTAP 067-075 and the new suites.
+3. **New Supabase production project** (if moving region, e.g. Mumbai next to the VPS):
+   - Create the project.
+   - Add its ref to `supabase/production-project-refs.txt`, commit, and merge. Do this BEFORE linking or pointing anything at it; keep the old ref listed.
+   - `npx supabase link` to it, then `db push` all migrations (interactive).
+   - Move data from the old project (`pg_dump`/`pg_restore` of the public schema and storage) if existing tenants must carry over.
+   - Enable the pg_cron jobs and check them.
+   - Relink staging afterwards.
+   - **If you stay on the current project:** run `npx supabase migration list --linked` first (`20261112000000`/`20261114000000` may be unapplied), then `db push` `20261115000000` → `20261124000000`.
+4. **New Clerk production instance:**
+   - Create the instance (`pk_live_…`, `sk_live_…`) with your domain's DNS records.
+   - Turn Organizations on and set up the Supabase JWT integration the same way as the dev instance.
+   - Re-create your platform-admin account with MFA and add it to `platform_admins` on the new database.
+   - Existing users don't carry over, so test accounts must sign up again.
+5. **Production env on the VPS:**
+   - Core: `APP_ENV=production`, the new Supabase and Clerk keys, `PRODUCTION_SUPABASE_PROJECT_REFS` (the new ref), `GEMINI_API_KEY` (a paid Google project).
+   - Scheduler and URLs: `CRON_SECRET`, `NEXT_PUBLIC_APP_URL=https://aipilot.waveswebstudio.in` (at build), `OPS_ALERT_EMAIL`.
+   - VPS specifics: `CLIENT_IP_SOURCE=x-real-ip`, `LOCAL_CHROMIUM_PATH`.
+   - Meta: `META_TOKEN_ENCRYPTION_KEY`, `META_APP_ID`, `META_APP_SECRET`, `WHATSAPP_APP_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`.
+   - Razorpay keys, Resend.
+   - `CHANNEL_*_ENABLED=false` for any Meta channel not approved yet.
+6. **Deploy, then start the scheduler**: a crontab or systemd timer every 2 min calling `POST /api/cron/run` (docs/vps-cron.md).
+7. **Verify:**
+   - `/api/health?deep=1` returns 200 and `/apache/jobs` shows the Scheduler.
+   - `/pricing` shows the trial cap and channels.
+   - A new org gets a no-card trial; delete and recreate gives no second trial.
+   - A Starter business can't connect WhatsApp.
+8. **Meta (see docs/whatsapp-embedded-signup.md and docs/meta-app-review.md):**
+   - Tech Provider status and Business Verification.
+   - Advanced Access for `whatsapp_business_management`, `whatsapp_business_messaging` and the Instagram permissions; app in Live mode.
+   - A new Facebook Login for Business configuration for WhatsApp Embedded Signup (v4), with Client OAuth settings and allowed domains.
+   - Webhooks: `messages`, `message_template_status_update`, `account_update`, plus the Instagram fields.
+   - When each approval lands, set that `CHANNEL_*_ENABLED` back on.
+9. **WhatsApp templates:** set the five `WHATSAPP_TEMPLATE_APPOINTMENT_*` env vars to the suggested names. Each business's templates are submitted at signup; watch their status on its WhatsApp page.
+10. **Cloudflare Turnstile:**
+    - Create the widget with your app domain as hostname and set the keys.
+    - Run `TURNSTILE_MODE=log`, check `turnstile_verified` on a real customer site, then switch to `enforce`.
+11. **Sentry alert rules:** round 1's list, plus `subscription_read_degraded`, `gemini_daily_cap_reached`, `whatsapp_embedded_signup_failed`, `whatsapp_template_submit_failed`, `whatsapp_send_blocked`. Filter on `environment:production`.
+12. **UptimeRobot** on `/api/health?deep=1`.
+13. **Razorpay live mode** per earlier entries; set a Google budget alert on the Gemini project.
+
+### Decisions still needed from the owner (round 2; ANSWERED 2026-11-03, see round 3 above)
+- Confirm the defaults: trial cap 200 replies; daily Gemini caps 1000 per business and 20000 overall. Should the daily caps also cover WhatsApp and Instagram? Today they cover the website widget only.
+- When to switch Turnstile from log to enforce. This comes after the live hostname check.
+- The two row-less test accounts lose paid access on deploy. Is that OK as left, or should they get rows?
+- Trial abuse through new Clerk organisations: today it's one trial per org only. Do you want a per-user or per-email-domain limit?
+- Rejected WhatsApp templates: reword them centrally, or allow per-business names?
+- Region move: carry existing data to the new Supabase project, or start the new one empty?
+
+### Known limitations (round 2)
+- Embedded Signup and template submission have never run against Meta; the first real signup is the end-to-end test.
+- `account_update` webhooks are not processed. The template sync job covers 50 businesses per run.
+- Sending uses the configured `WHATSAPP_TEMPLATE_*` names, not each business's approval status. A business whose templates aren't approved yet gets a visible "not sent".
+- The last-known plan cache is per process: after a restart there is no fallback until the first successful read.
+- pgTAP 067-075 have never run. No route-level integration or E2E tests exist.
+
+## Production readiness (LAUNCH_AUDIT.md items 1-9) -- 2026-11-03 -- branch `production-readiness`, NOT merged, NOT pushed, migrations NOT applied
+
+Worked from `LAUNCH_AUDIT.md` (left uncommitted, as asked; it now has a "Remediation update" section). **Safety:** `.env.local` and `supabase/.temp/project-ref` both target production `bykeztxvejpwfcxgsubm`, so no pgTAP, migration, seed or DB script was run; unit suites ran with Supabase/Gemini env removed; the build ran with the Sentry upload token, Supabase service key, Gemini keys and provider secrets blanked. No Gemini/Meta/WhatsApp/Razorpay/Clerk call was made.
+
+**Owner decisions taken (2026-11-03, asked up front):** reminders 24 h and 1 h before confirmed appointments; pending bookings expire 48 h after booking or 2 h before start, whichever first; deleting a business cancels its Razorpay subscription immediately. Free-trial/card rules NOT touched.
+
+**Commits (oldest first):**
+1. `3e3316a` env: `lib/deployment-env.ts` (APP_ENV -> VERCEL_ENV -> development; production refs incl. built-in `bykeztxvejpwfcxgsubm` + `PRODUCTION_SUPABASE_PROJECT_REFS`); `lib/env.ts` picks the Gemini key from it and refuses a `next start` server with neither APP_ENV nor VERCEL_ENV; startup `env_target_warning` lines (names only). `scripts/lib/production-guard.mjs`: every `test:*` preloads it (no override); `npm test` also checks the CLI link; ops/eval scripts need `--allow-production --confirm-production-ref=<ref>`. `.env.example` un-ignored and complete; CI `APP_ENV=staging`, prod `GEMINI_API_KEY` no longer passed. docs/deployment.md §1/§1b/§2a corrected.
+2. `8cc5ea3` failed replies: `runReplyWithFallback` (lib/channel-reply-rules.ts) for WhatsApp + Instagram -- any failure -> Sentry (tag `reply_failure_kind`) + `<channel>_reply_failed` + needs_attention + fixed fallback unless the reply was queued; `lib/gemini-errors.ts`; `CHAT_MODEL_MAX_RETRIES` (default 1, cap 3) on getChatModel; WhatsApp acks Meta before the AI turn; migration `20261115000000` (reply_status + `claim_stuck_inbound_replies`) + recovery sweep (never re-runs the AI).
+3. `87dbd44` scheduler: `lib/scheduler/*`, `POST|GET /api/cron/run` (Bearer CRON_SECRET >= 16 chars, constant-time, `?jobs=`), leases in `scheduled_job_runs` (migration `20261116000000`, RLS forced + deny policy), timeouts, in-run retry, `scheduler_job_failing` after 3 failures, `release_stale_queue_claims`, SLA sweep once per SLA period (`conversations.sla_escalated_at`). Daily jobs keep 04:00 UTC; digest at-most-once. `vercel.json` unchanged (daily). docs/vps-cron.md.
+4. `08dd768` WhatsApp window: send-time decision text / approved template / visible failure (`whatsapp_send_blocked`, flagged); 131047 -> template once; error classes (only 5xx/throttle/network retry); status callbacks; staff-reply notice; appointment notices carry templates; migration `20261117000000`.
+5. `cd5f1be` appointments: `lib/appointment-lifecycle.ts` (every 5 min) -- expiry (`expire_stale_pending_appointments`, skip locked; owner gets >= 1 h for short-notice bookings) notifying prospect + owner + workflow + Copilot supersede; 24 h / 1 h reminders; `appointment_notifications` ledger claimed before every send; status `expired` in UI maps; migration `20261118000000`.
+6. `9bc6fb6` billing: `billing_cancellations` (no FK, survives the cascade; migration `20261119000000`) written before delete + immediate cancel; retries (10, ~8.5 h) + alerts (`billing_cancellation_failed`/`_gave_up`, `OPS_ALERT_EMAIL`); webhook `deleted_business` outcome, `billing_charge_after_deletion` alert.
+7. `2985d06` Instagram: 6-hourly health check (token + Page subscription, self-healing re-subscribe), owner emailed once on disconnect; docs/meta-app-review.md.
+8. `071e2c1` privacy: Razorpay named as payment processor; Last updated 2026-11-03. **Needs the owner's review.**
+9. `61bb132` tests line-ending agnostic (`test:meta-instagram` now 77/77 on Windows).
+10. `25e2030` `/api/health?deep=1` + `/apache/jobs` Scheduler and billing-cancellation panels.
+11. `da56a23` rate-limit logs off Sentry; `SENTRY_TRACES_SAMPLE_RATE` (default 0); Sentry `environment`.
+12. `9e35cd2` `CLIENT_IP_SOURCE`; HSTS; NEXT_PUBLIC_APP_URL startup warning.
+13. `bd7a4f1` WhatsApp tokens encrypted at rest (lazy re-encryption; migration `20261120000000`); constant-time WhatsApp verify token.
+14. `8f94754` `USD_TO_INR_RATE`; analytics rollup excludes sandbox leads/bookings.
+15. `ee11005` deleted public `/dev/fragments`.
+16. `ff3c445` hourly re-send of failed invoice/credit-note emails.
+
+**Checks (2026-11-03, final):** `npm run lint` clean; `npm run typecheck` clean; all 30 `test:*` suites pass (11 new: env-safety 26, reply-failure 30, scheduler 25, whatsapp-window 23, appointment-lifecycle 17, billing-cancellation 16, instagram-health 6, observability 13; plus every existing suite, `test:meta-instagram` 77/77); `npm run build` exit 0. **Not run:** `npm test` (pgTAP 067-072 -- CLI linked to production; CI runs them on staging), `npm run eval`/redteam/loadtest (live Gemini).
+
+**Migrations (NOT applied):** `20261115000000_inbound_reply_tracking`, `20261116000000_scheduler_job_runs`, `20261117000000_whatsapp_window_and_templates`, `20261118000000_appointment_lifecycle`, `20261119000000_billing_cancellations`, `20261120000000_whatsapp_token_encryption`. New tables (`scheduled_job_runs`, `appointment_notifications`, `billing_cancellations`) have RLS enabled + forced, an explicit restrictive deny policy and no client grants.
+
+**New env vars:** `APP_ENV` (required on a VPS), `PRODUCTION_SUPABASE_PROJECT_REFS`, `CHAT_MODEL_MAX_RETRIES`, `WHATSAPP_TEMPLATE_LANGUAGE` + `WHATSAPP_TEMPLATE_APPOINTMENT_{CONFIRMED,DECLINED,CANCELLED,REMINDER,EXPIRED}`, `OPS_ALERT_EMAIL`, `HEALTH_SCHEDULER_MAX_AGE_MINUTES`, `SENTRY_TRACES_SAMPLE_RATE`, `CLIENT_IP_SOURCE`, `USD_TO_INR_RATE`. Existing ones that now matter more: `CRON_SECRET` (>= 16 chars), `META_TOKEN_ENCRYPTION_KEY` (also encrypts WhatsApp tokens), `NEXT_PUBLIC_APP_URL` (VPS build), `LOCAL_CHROMIUM_PATH` (VPS system Chromium).
+
+### Handoff list, in order (SUPERSEDED by round 2 above)
+
+1. **Make local dev safe:** staging values in `.env.local` (`otmeqswvlmorxvjocaru`), `npx supabase link --project-ref otmeqswvlmorxvjocaru`, a separate `GEMINI_API_KEY_DEV`.
+2. **Review the branch** (esp. the privacy text), push it and open the PR. CI applies the 6 migrations to staging and runs pgTAP 067-072 there. CI needs no new secret.
+3. **Production migrations BEFORE deploying the code:** `npx supabase migration list --linked` against prod first (STATE says `20261112000000`/`20261114000000` may be unapplied), then apply `20261115000000` through `20261120000000` (`db push --linked`, interactive), then relink staging.
+4. **Production env** (Vercel and/or VPS): `APP_ENV=production`, `CRON_SECRET` (`openssl rand -base64 32`), `META_TOKEN_ENCRYPTION_KEY` set, `NEXT_PUBLIC_APP_URL=https://aipilot.waveswebstudio.in` (at build), `OPS_ALERT_EMAIL`, on the VPS `CLIENT_IP_SOURCE=x-real-ip` and `LOCAL_CHROMIUM_PATH=/usr/bin/chromium`. Vercel-only: `HEALTH_SCHEDULER_MAX_AGE_MINUTES=1500`.
+5. **Merge/deploy.**
+6. **Scheduler trigger:** VPS crontab or systemd timer every 2 min calling `POST /api/cron/run` (docs/vps-cron.md). While still on Vercel Hobby, any external cron can call the same URL.
+7. **Verify:** `/api/cron/run` returns job statuses (404 without the header); `/api/health?deep=1` is 200; `/apache/jobs` shows the Scheduler table.
+8. **WhatsApp templates** (category UTILITY, language `en`) -- submit in **each connected business's WABA**, then set the env names: `appointment_confirmed`, `appointment_declined`, `appointment_cancelled`, `appointment_reminder`, `appointment_expired` (exact bodies + examples in `lib/whatsapp-templates.ts`). Until set, notices outside 24 h fail visibly instead of sending.
+9. **Meta App Review / dashboard:** Advanced Access for `instagram_basic`, `instagram_manage_messages`, `pages_show_list`, `pages_manage_metadata`, `pages_read_engagement`, `business_management`; WhatsApp `whatsapp_business_messaging`; all six in the Facebook Login config; Instagram webhook fields `messages, messaging_postbacks, message_reactions, messaging_seen`; WhatsApp webhook now also uses `statuses` (already part of the `messages` field). See docs/meta-app-review.md.
+10. **Sentry alert rules** on: `scheduler_job_failing`, `scheduler_job_failed`, `cron_secret_too_short`, `whatsapp_reply_failed`, `instagram_reply_failed`, `whatsapp_send_blocked`, `whatsapp_delivery_failed`, `*_delivery_dead_lettered`, `billing_cancellation_failed`, `billing_cancellation_gave_up`, `billing_charge_after_deletion`, `instagram_token_revoked`; filter `environment:production`.
+11. **UptimeRobot** -> `https://aipilot.waveswebstudio.in/api/health?deep=1`.
+12. **Accounts:** Clerk production instance (`pk_live_`), Supabase Pro + PITR and one restore drill, Razorpay live mode per the earlier STATE entries, Google budget alert on the Gemini project.
+
+### Decisions needed from the owner (round 1; ANSWERED 2026-11-03, see round 2 above)
+- Payment method at signup / trial without a card (onboarding billing step = `entitlement.serving`) -- unchanged, as asked.
+- One trial per Clerk org across delete+recreate; "no subscription row or read error = Scale" (billing fails open).
+- Gate WhatsApp on plan (Starter is advertised without it; enforcing would cut off any Starter/trial business using it).
+- Put Instagram on a plan, or keep it override-only.
+- Post-appointment follow-up message (what, when).
+- A WhatsApp re-engagement template for staff replies outside 24 h (today: visible "not sent" notice).
+- Refunds for any charge after deletion (alerted, never automatic).
+- When to switch the log-only abuse/guardrail scopes to enforcing; Turnstile/BotID; CSP.
+- Whether local `next dev` against production should be blocked outright (today: a startup warning).
+
+### Known limitations
+- pgTAP 067-072 have never run (CI will run them on staging).
+- WhatsApp templates are per-WABA; the app can't create them (no `whatsapp_business_management` flow) -- each business must have them approved under the configured names.
+- An outbound send whose Graph call timed out after Meta accepted it can still be retried (rare duplicate); the stale-claim reaper has the same edge.
+- Platform-admin soft-delete (`/apache`) does not cancel Razorpay (only the owner's permanent delete does).
+- Reminders that fall inside a scheduler outage longer than their window are skipped, by design.
+- No route-level integration tests or E2E test yet; many checks are source-shape assertions, as elsewhere in this repo.
 
 ## Instagram reply speed, message-access guide step, no invented track record -- 2026-11-02 -- MERGED (PR #145, `28c0d18`, CI green incl. pgTAP on staging), no migration
 

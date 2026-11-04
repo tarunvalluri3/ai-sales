@@ -30,6 +30,7 @@ import type { RemoveTagState } from "../_components/tag-chip";
 import type { ConversationControl, LeadTag, Message } from "@/lib/supabase/types";
 import { getWhatsappConnectionForBusiness, WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { createWhatsappOutboundMessage, sendWhatsappOutboundMessage } from "@/lib/whatsapp-delivery";
+import { whatsappStaffReplyNotice } from "@/lib/whatsapp-rules";
 import { getInstagramConnectionForBusiness, INSTAGRAM_CONVERSATION_SOURCE } from "@/lib/instagram";
 import { createInstagramOutboundMessage, sendInstagramOutboundMessage } from "@/lib/instagram-delivery";
 import { dispatchWorkflowTrigger, resolveWorkflowTargetFromConversation } from "@/lib/workflow-engine";
@@ -171,12 +172,17 @@ export async function sendHumanReplyAction(
   // AI-reply path uses (app/api/webhooks/whatsapp/route.ts), no parallel
   // send mechanism. Best-effort: a failed send here must not fail the
   // staff member's reply itself, since the message is already saved and
-  // visible in the transcript regardless -- the shared daily cron sweep
-  // retries it.
+  // visible in the transcript regardless -- the scheduler's sweep retries
+  // it. Production readiness (item 4): a free-form staff reply can't be sent
+  // as a template, so outside WhatsApp's 24-hour window it is not sent and
+  // the staff member is told why (same as Instagram below).
+  let notice: string | undefined;
   if (conversation.source === WHATSAPP_CONVERSATION_SOURCE && conversation.visitor_id) {
     try {
       const connection = await getWhatsappConnectionForBusiness(businessId);
-      if (connection?.status === "connected") {
+      if (connection?.status !== "connected") {
+        notice = "Saved, but not sent: WhatsApp is not connected. Reconnect it on the WhatsApp page.";
+      } else {
         const serviceSupabase = createServiceSupabaseClient();
         const outbound = await createWhatsappOutboundMessage(serviceSupabase, {
           businessId,
@@ -186,7 +192,8 @@ export async function sendHumanReplyAction(
           phoneNumberId: connection.phone_number_id,
           content: parsed.data.content,
         });
-        await sendWhatsappOutboundMessage(outbound.id);
+        const sent = await sendWhatsappOutboundMessage(outbound.id);
+        notice = whatsappStaffReplyNotice(sent.reason);
       }
     } catch (error) {
       logAndGetUserMessage(error);
@@ -198,7 +205,6 @@ export async function sendHumanReplyAction(
   // Phase 26 shipped, so a staff reply during human takeover saved to the
   // transcript but never reached the prospect on Instagram (found via the
   // user's own live test, STATE.md Phase 26 follow-up #5).
-  let notice: string | undefined;
   if (conversation.source === INSTAGRAM_CONVERSATION_SOURCE && conversation.visitor_id) {
     try {
       const connection = await getInstagramConnectionForBusiness(businessId);
