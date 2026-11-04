@@ -135,18 +135,24 @@ type WidgetKeyRow = {
 };
 
 /**
- * Per-instance, short-lived cache of fully-authorized widget contexts, filled
- * ONLY by the widget-open warm-up (/api/chat/warm) and read ONLY by
- * /api/chat (`useWarmCache`). An entry exists solely because the exact
- * (key, origin) pair just passed every check below, so a hit is as good as
- * the lookup it replaces -- except that a key revoked, an origin removed or a
- * business unpublished inside the TTL still resolves from a warm instance
- * until the entry expires. 15s is the accepted window; entries are never
- * written by the chat route itself, so ordinary traffic gets no such window.
- * In-memory and per serverless instance: a miss (cold instance, another
- * instance, expiry) just does the normal lookup.
+ * Per-process, short-lived cache of fully-authorized widget contexts, filled by
+ * the widget-open warm-up (/api/chat/warm) and by a successful /api/chat lookup,
+ * and read ONLY by /api/chat (`useWarmCache`). An entry exists solely because
+ * the exact (key, origin) pair just passed every check below, so a hit is as
+ * good as the lookup it replaces -- except that a key revoked, an origin
+ * removed, a business unpublished or a new agent version published inside the
+ * TTL is not seen until the entry expires.
+ *
+ * VPS latency pass (2026-11-04): a long-running server can reuse this across a
+ * conversation's messages, which removes two database round trips from each hit.
+ * The window went from 15s to 30s, adjustable with WIDGET_CONTEXT_CACHE_TTL_MS
+ * (0 turns reuse off; the warm-up then expires immediately). A miss just does
+ * the normal lookup.
  */
-const WARM_CONTEXT_TTL_MS = 15_000;
+const WARM_CONTEXT_TTL_MS = (() => {
+  const parsed = Number.parseInt(process.env.WIDGET_CONTEXT_CACHE_TTL_MS ?? "", 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 30_000;
+})();
 const WARM_CONTEXT_MAX_ENTRIES = 200;
 const warmContexts = new Map<string, { expiresAt: number; context: WidgetBusinessContext }>();
 
@@ -172,7 +178,11 @@ function readWarmContext(key: string, origin: string | null): WidgetBusinessCont
  */
 export async function warmWidgetBusinessContext(key: string, origin: string | null): Promise<void> {
   const context = await resolveBusinessFromWidgetKey(key, origin, { touchLastUsed: false });
-  if (!origin) return;
+  rememberWarmContext(key, origin, context);
+}
+
+function rememberWarmContext(key: string, origin: string | null, context: WidgetBusinessContext): void {
+  if (!origin || WARM_CONTEXT_TTL_MS === 0) return;
   const now = Date.now();
   if (warmContexts.size >= WARM_CONTEXT_MAX_ENTRIES) {
     for (const [cacheKey, entry] of warmContexts) {
@@ -244,7 +254,7 @@ export async function resolveBusinessFromWidgetKey(
 
   const config = liveSource.snapshot.config;
 
-  return {
+  const context: WidgetBusinessContext = {
     businessId: data.business_id,
     businessName: config.name,
     clerkOrgId: data.businesses.clerk_org_id,
@@ -260,6 +270,8 @@ export async function resolveBusinessFromWidgetKey(
     suggestedQuestions: config.persona.suggestedQuestions,
     liveSource,
   };
+  if (options.useWarmCache) rememberWarmContext(key, origin, context);
+  return context;
 }
 
 export type WidgetBranding = {

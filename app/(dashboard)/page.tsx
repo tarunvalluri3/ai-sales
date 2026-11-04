@@ -306,7 +306,7 @@ export default function HomePage() {
           </Reveal>
           <Reveal delay={0.1}>
             <Parallax strength={24} className="relative mt-10">
-              <BrowserFrame urlLabel="app.wavesaipilot.in/dashboard/conversations">
+              <BrowserFrame urlLabel="aipilot.waveswebstudio.in/dashboard/conversations">
                 <Image
                   src="/marketing/dashboard-conversations.png"
                   alt="Waves AI Pilot dashboard, open conversation showing a handoff to a staff member and the AI-generated summary and tags"

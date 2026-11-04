@@ -39,7 +39,7 @@ export default function PrivacyPolicyPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-semibold text-ds-text-primary">Privacy Policy</h1>
-          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-03</p>
+          <p className="text-sm text-ds-text-muted">Last updated: 2026-11-04</p>
         </div>
 
         <Section title="Who this policy covers">
@@ -197,7 +197,7 @@ export default function PrivacyPolicyPage() {
               payment and subscription identifiers.
             </li>
             <li>
-              <strong>Vercel</strong> — application hosting and request logging.
+              <strong>Google Cloud</strong> — application hosting and request logging.
             </li>
             <li>
               <strong>Meta Platforms</strong> — only where a customer connects WhatsApp or Instagram,

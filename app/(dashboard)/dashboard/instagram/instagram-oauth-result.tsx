@@ -13,6 +13,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   pages_failed: "Facebook completed the login but wouldn't list your Facebook Pages. Please try again.",
   no_linked_pages:
     "Link your Instagram professional account to a Facebook Page, then try again. When Facebook asks, choose that Page.",
+  permissions_missing:
+    "Facebook didn't share the access we need. Try again and keep every permission ticked. If this keeps happening, your account may need access while Meta's review of our app is pending, so please contact support.",
   me_failed: "Meta completed the login but wouldn't tell us which business connected. Please try again.",
   accounts_failed: "Meta completed the login but wouldn't list the shared Instagram accounts. Please try again.",
   account_in_use: "That Instagram account is already connected to another business on AI Sales. Disconnect it there first.",

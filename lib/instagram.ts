@@ -79,6 +79,7 @@ export type InstagramConnectError =
   | "pages_failed"
   | "no_accounts"
   | "no_linked_pages"
+  | "permissions_missing"
   | "account_in_use"
   | "subscribe_failed"
   | "subscribe_permission"

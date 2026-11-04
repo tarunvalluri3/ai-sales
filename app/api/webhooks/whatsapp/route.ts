@@ -5,8 +5,8 @@ import { checkAndIncrementRateLimit } from "@/lib/rate-limit";
 import { selectBurstLimit, SOFT_LIMIT_MESSAGE } from "@/lib/abuse-limits";
 import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import { whatsappTimestampToMs } from "@/lib/daily-reply-limit-rules";
-import { checkReplyQuota } from "@/lib/usage-limit";
-import { isExpectedRefusal, loadBusinessAiContext } from "@/lib/business-ai-context";
+import { checkReplyQuota, type ReplyQuotaStatus } from "@/lib/usage-limit";
+import { isExpectedRefusal, loadBusinessAiContext, type BusinessAiContextResult } from "@/lib/business-ai-context";
 import {
   getOrCreateWhatsappConversation,
   resolveBusinessFromWhatsappPhoneNumberId,
@@ -18,6 +18,11 @@ import {
 } from "@/lib/conversations";
 import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee } from "@/lib/rag";
+import { embedQueryWithCache } from "@/lib/answer-bank/store";
+import { kickAnswerBankRefresh } from "@/lib/answer-bank/generate";
+import type { InstantContext } from "@/lib/answer-bank/decision";
+import { TurnTimer } from "@/lib/turn-timings";
+import { finalizeTurnMetrics, writeDeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { canAgentServe } from "@/lib/agent-serving";
 import { isWhatsappAllowed } from "@/lib/subscription";
 import { parseTemplateStatusUpdates } from "@/lib/whatsapp-embedded-signup-rules";
@@ -181,7 +186,25 @@ export async function POST(request: NextRequest) {
   return new Response(null, { status: 200 });
 }
 
+const ignoreRejection = () => undefined;
+
+/**
+ * Reads started during ingest and awaited by the reply, so their round trips
+ * overlap the ingest writes instead of following them (the same design as the
+ * Instagram webhook). The reply awaits the original promises, so a real failure
+ * still surfaces there and goes through the fallback path.
+ */
+type ReplyPrefetch = {
+  context: Promise<BusinessAiContextResult>;
+  serving: Promise<boolean>;
+  quota: Promise<ReplyQuotaStatus>;
+  queryEmbedding: Promise<number[]> | undefined;
+  storeQueryEmbedding: () => (() => Promise<void>) | null;
+};
+
 type IngestedWhatsappMessage = {
+  timer: TurnTimer;
+  prefetch: ReplyPrefetch;
   businessId: string;
   phoneNumberId: string;
   message: WhatsappInboundMessage & { id: string; from: string };
@@ -240,7 +263,18 @@ async function ingestInboundMessage(
     return null;
   }
 
-  const conversation = await getOrCreateWhatsappConversation(supabase, businessId, message.from);
+  // From here on this message will be stored, so start the reply's reads now.
+  const timer = new TurnTimer(Date.now());
+  const context = timer.time("context_load", () => loadBusinessAiContext(businessId));
+  context.catch(ignoreRejection);
+  const serving = timer.time("serving_check", () => canAgentServe(businessId));
+  serving.catch(ignoreRejection);
+  const quota = timer.time("quota_check", () => checkReplyQuota(supabase, businessId));
+  quota.catch(ignoreRejection);
+
+  const conversation = await timer.time("conversation_lookup", () =>
+    getOrCreateWhatsappConversation(supabase, businessId, message.from),
+  );
 
   const [, conversationAllowed] = await Promise.all([
     // Lets the recovery sweep find the conversation if the reply is lost.
@@ -266,15 +300,47 @@ async function ingestInboundMessage(
     after(() => recordGuardrailSignals(businessId, conversation.id, "whatsapp", prepared.signals));
   }
 
-  await createMessage(supabase, businessId, conversation.id, "user", inboundContent);
+  // Every rate limit has passed, so start the question's embedding now (reusing
+  // a cached one for a repeated question). A turn that never reaches retrieval
+  // just drops it.
+  let storeQueryEmbedding: (() => Promise<void>) | null = null;
+  let queryEmbedding: Promise<number[]> | undefined;
+  if (prepared && !prepared.empty) {
+    const embedStartedAt = Date.now();
+    const embedded = embedQueryWithCache(supabase, businessId, prepared.text);
+    queryEmbedding = embedded.then((result) => result.embedding);
+    queryEmbedding.catch(ignoreRejection);
+    embedded.then(
+      (result) => {
+        storeQueryEmbedding = result.store;
+        timer.record("embedding_prefetch", Date.now() - embedStartedAt);
+      },
+      ignoreRejection,
+    );
+  }
 
   // WhatsApp's own platform opt-in (a prospect messaging the business
   // number in the first place) stands in for the widget's consent
   // checkbox -- recorded unconditionally, idempotently, on every inbound
   // message. See STATE.md's decision record for the full reasoning.
-  await recordConversationConsent(supabase, businessId, conversation.id);
+  // Independent writes, so they run together.
+  await timer.time("user_message_write", () =>
+    Promise.all([
+      createMessage(supabase, businessId, conversation.id, "user", inboundContent),
+      recordConversationConsent(supabase, businessId, conversation.id),
+    ]),
+  );
 
-  return { businessId, phoneNumberId, message, conversation, prepared, inboundContent };
+  return {
+    timer,
+    prefetch: { context, serving, quota, queryEmbedding, storeQueryEmbedding: () => storeQueryEmbedding },
+    businessId,
+    phoneNumberId,
+    message,
+    conversation,
+    prepared,
+    inboundContent,
+  };
 }
 
 /**
@@ -312,7 +378,7 @@ async function answerInboundMessage(
   ingested: IngestedWhatsappMessage,
   state: ReplyAttemptState,
 ): Promise<"replied" | "skipped"> {
-  const { businessId, phoneNumberId, message, conversation, prepared, inboundContent } = ingested;
+  const { businessId, phoneNumberId, message, conversation, prepared, inboundContent, timer, prefetch } = ingested;
   const isText = prepared !== null;
 
   if (conversation.control === "human") {
@@ -326,7 +392,20 @@ async function answerInboundMessage(
   // sends NO reply at all -- not the AI's, not a canned one. The inbound
   // message above is already stored (and the conversation exists), so the
   // owner still sees the lead in the dashboard and no lead is lost.
-  if (!(await canAgentServe(businessId))) {
+  // Every gate read was started during ingest; this mostly just collects them.
+  // History is read after the user message write, so it ends with this turn's
+  // message (what isFirstTurn() and the duplicate-submit guard rely on).
+  const historyRead = timer.time("history_fetch", () => listRecentMessages(supabase, businessId, conversation.id, HISTORY_LIMIT));
+  historyRead.catch(ignoreRejection);
+  const [agentServing, contextResult, quota, abuseStrikes] = await Promise.all([
+    prefetch.serving,
+    prefetch.context,
+    prefetch.quota,
+    // Guardrails Phase 5: 0 without a query unless the abuse check is enforcing.
+    isText ? countAbuseStrikes(supabase, businessId, conversation.id) : Promise.resolve(0),
+  ]);
+
+  if (!agentServing) {
     logEvent("whatsapp_agent_not_serving", businessId, { conversationId: conversation.id });
     return "skipped";
   }
@@ -334,7 +413,6 @@ async function answerInboundMessage(
   // The shared channel gate (lib/business-ai-context.ts): a suspended,
   // soft-deleted or unpublished business sends NO reply of any kind -- checked
   // before the canned non-text reply too. The inbound message is stored above.
-  const contextResult = await loadBusinessAiContext(businessId);
   if (!contextResult.ok) {
     const expected = isExpectedRefusal(contextResult.reason);
     logEvent(
@@ -350,11 +428,11 @@ async function answerInboundMessage(
 
   // Phase 32 business_burst (log-only): one burst ceiling spanning all of a
   // tenant's channels, keyed on business_id. Counted after dedup, so a Meta
-  // redelivery never inflates it; the entitlement is reused as
-  // askSalesEmployee()'s prefetched quota below.
-  const quota = await checkReplyQuota(supabase, businessId);
+  // redelivery never inflates it. Its verdict is not used here, so it does not
+  // hold up the reply.
   const burstProfile = selectBurstLimit(quota.entitlement.status);
-  await checkAndIncrementRateLimit("business_burst", businessId, burstProfile.limit, burstProfile.windowSeconds, businessId);
+  const burstCount = checkAndIncrementRateLimit("business_burst", businessId, burstProfile.limit, burstProfile.windowSeconds, businessId);
+  burstCount.catch(ignoreRejection);
 
   if (!isText) {
     await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, NON_TEXT_REPLY);
@@ -365,10 +443,7 @@ async function answerInboundMessage(
   // Guardrails Phase 5: when an input check is ENFORCING (lib/guardrails/config.ts; none
   // is yet) the prospect gets a fixed reply, the conversation is flagged for a human,
   // and the model is never called. Repeated abuse ends the AI's replies for good.
-  const inputAction = resolveInputGuardrailAction(
-    prepared?.signals ?? [],
-    await countAbuseStrikes(supabase, businessId, conversation.id),
-  );
+  const inputAction = resolveInputGuardrailAction(prepared?.signals ?? [], abuseStrikes);
   if (inputAction.kind !== "none") {
     await flagConversationNeedsAttention(supabase, businessId, conversation.id, businessContext.clerkOrgId);
     await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, inputAction.reply);
@@ -382,14 +457,16 @@ async function answerInboundMessage(
   // cap (or the counter can't be read): no Gemini call, the conversation is
   // flagged, and the prospect gets the notice at most once per conversation
   // per day, only inside the 24-hour window.
-  const dailyLimit = await checkDailyReplyLimit({
-    supabase,
-    channel: "whatsapp",
-    businessId,
-    conversationId: conversation.id,
-    clerkOrgId: businessContext.clerkOrgId,
-    inboundAtMs: whatsappTimestampToMs(message.timestamp),
-  });
+  const dailyLimit = await timer.time("rate_limit_gemini_daily", () =>
+    checkDailyReplyLimit({
+      supabase,
+      channel: "whatsapp",
+      businessId,
+      conversationId: conversation.id,
+      clerkOrgId: businessContext.clerkOrgId,
+      inboundAtMs: whatsappTimestampToMs(message.timestamp),
+    }),
+  );
   if (!dailyLimit.allowed) {
     if (dailyLimit.notice !== "send") return "skipped";
     await sendCannedReply(supabase, businessId, conversation.id, phoneNumberId, message.from, SOFT_LIMIT_MESSAGE);
@@ -397,7 +474,18 @@ async function answerInboundMessage(
     return "replied";
   }
 
-  const history = await listRecentMessages(supabase, businessId, conversation.id, HISTORY_LIMIT);
+  const history = await historyRead;
+
+  // Instant answers (greeting / suggested question / catalog / FAQ), exactly as
+  // the widget and Instagram serve them. `published` is true by construction:
+  // loadBusinessAiContext() refuses an unpublished business.
+  const instant: InstantContext = {
+    businessName: businessContext.businessName,
+    enabled: true,
+    published: true,
+    suggestedQuestions: businessContext.suggestedQuestions,
+    suggestedClick: false,
+  };
 
   const response = await askSalesEmployee(
     supabase,
@@ -412,26 +500,28 @@ async function answerInboundMessage(
       recommendProductsEnabled: businessContext.recommendProductsEnabled,
       appointmentsEnabled: businessContext.appointmentsEnabled,
     },
-    // No per-turn timer on this path (webhook, not a prospect's live wait);
-    // reuse the entitlement already loaded for the burst check so quota is not
-    // read twice (same net reads as before Phase 32).
-    undefined,
+    timer,
     quota,
-    undefined,
-    undefined,
-    false,
+    prefetch.queryEmbedding,
+    instant,
+    // The metrics row is written after the reply is sent (below).
+    true,
     "webhook_whatsapp",
     businessContext.liveSource,
   );
 
-  const assistantMessageRow = await createMessage(
-    supabase,
-    businessId,
-    conversation.id,
-    "assistant",
-    response.answer,
-    response.sourceChunkIds,
-    response.grounded,
+  const assistantMessageRow = await timer.time("assistant_message_write", () =>
+    createMessage(
+      supabase,
+      businessId,
+      conversation.id,
+      "assistant",
+      response.answer,
+      response.sourceChunkIds,
+      response.grounded,
+      null,
+      response.answerSource ?? "ai",
+    ),
   );
 
   await sendReply(supabase, businessId, conversation.id, assistantMessageRow.id, phoneNumberId, message.from, response.answer);
@@ -453,6 +543,21 @@ async function answerInboundMessage(
     logEvent("whatsapp_escalation_triggered", businessId, { conversationId: conversation.id });
   }
 
+  // The metrics row carries the full stage breakdown, send included. Follow-up
+  // work never changes the reply, so a failure here is only logged.
+  const pendingEmbeddingWrite = prefetch.storeQueryEmbedding();
+  const followUps = await Promise.allSettled([
+    response.metricsDraft
+      ? writeDeferredTurnMetrics(supabase, response.metricsDraft, timer)
+      : finalizeTurnMetrics(supabase, response.metricsRowId, businessId, timer),
+    pendingEmbeddingWrite ? pendingEmbeddingWrite() : Promise.resolve(),
+    response.instantMissReason === "no_fresh_entry" ? kickAnswerBankRefresh(businessId) : Promise.resolve(),
+    burstCount,
+  ]);
+  if (followUps.some((result) => result.status === "rejected")) {
+    logEvent("whatsapp_reply_follow_up_failed", businessId, { conversationId: conversation.id }, "error");
+  }
+
   // Phase 17a: the same quota reminder dispatch the website widget's chat
   // route does. This reply was counted against the same plan quota, so the
   // same 50/60/70/80/90/100% thresholds have to fire for it.
@@ -460,7 +565,7 @@ async function answerInboundMessage(
     supabase,
     businessId,
     response.quotaSnapshot,
-    response.quotaSnapshot.repliesUsed + (response.metricsRowId ? 1 : 0),
+    response.quotaSnapshot.repliesUsed + (response.metricsRowId || response.metricsDraft ? 1 : 0),
   );
 
   return "replied";

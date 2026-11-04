@@ -205,6 +205,11 @@ export async function POST(request: NextRequest) {
       windowSeconds: SCOPE_LIMITS.new_conversation_ip.windowSeconds,
     });
   }
+  // VPS latency pass (2026-11-04): widget auth is a read, so it overlaps the IP
+  // limit instead of following it. The IP verdict is still acted on first, and a
+  // rejected request discards the auth result; an auth failure surfaces below.
+  const widgetAuth = timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin, { useWarmCache: true }));
+  widgetAuth.catch(() => undefined);
   const ipResults = await timer.time("rate_limit_ip_batch", () => checkRateLimitsBatch(ipChecks));
   // Missing/malformed -> treat the enforcing `ip` scope as not allowed (fail
   // closed, unchanged for that scope).
@@ -234,7 +239,7 @@ export async function POST(request: NextRequest) {
 
   let business: WidgetBusinessContext;
   try {
-    business = await timer.time("widget_auth", () => resolveBusinessFromWidgetKey(widgetKey, origin, { useWarmCache: true }));
+    business = await widgetAuth;
   } catch (error) {
     if (error instanceof WidgetAuthError) {
       // Generic body to the browser (docs/security.md §10); the real reason,
@@ -287,6 +292,16 @@ export async function POST(request: NextRequest) {
     : null;
   earlyHistory?.catch(() => undefined);
 
+  // VPS latency pass (2026-11-04): an existing conversation's limit overlaps the
+  // key/business limits. It is still acted on before any write. A brand-new
+  // conversation can't be over its limit, so its first count overlaps the writes.
+  const existingConversationLimit = conversationId
+    ? timer.time("rate_limit_conversation", () =>
+        checkAndIncrementRateLimit("conversation", conversationId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+      )
+    : null;
+  existingConversationLimit?.catch(() => undefined);
+
   // Per widget key (fail-closed, unchanged) and per business across all its
   // keys (item 3: enforcing, fail-open), in one round trip.
   const [keyAllowed, businessAllowed] = await timer.time("rate_limit_key", () =>
@@ -306,25 +321,32 @@ export async function POST(request: NextRequest) {
   // the result without blocking; enforce refuses a missing/invalid token
   // (Cloudflare itself being unavailable is allowed and logged).
   if (!conversationId && protection.turnstile.mode !== "off" && protection.turnstile.secretKey) {
-    const turnstile = await timer.time("turnstile_verify", () =>
-      verifyTurnstileToken({
+    const runTurnstile = async () => {
+      const turnstile = await verifyTurnstileToken({
         token: parsed.data.turnstileToken,
         secretKey: protection.turnstile.secretKey!,
         remoteIp: ip,
         expectedHostname: protection.turnstile.expectedHostname,
-      }),
-    );
-    const decision = turnstileDecision(protection.turnstile.mode, turnstile);
-    logEvent("turnstile_verified", business.businessId, {
-      mode: protection.turnstile.mode,
-      ok: turnstile.ok,
-      reason: turnstile.ok ? null : turnstile.reason,
-      errorCodes: turnstile.ok ? null : turnstile.errorCodes.join(","),
-      hostname: turnstile.hostname,
-      decision,
-    });
-    if (decision === "reject") {
-      return withCors(jsonError("Please refresh the page and try again.", 403));
+      });
+      const decision = turnstileDecision(protection.turnstile.mode, turnstile);
+      logEvent("turnstile_verified", business.businessId, {
+        mode: protection.turnstile.mode,
+        ok: turnstile.ok,
+        reason: turnstile.ok ? null : turnstile.reason,
+        errorCodes: turnstile.ok ? null : turnstile.errorCodes.join(","),
+        hostname: turnstile.hostname,
+        decision,
+      });
+      return decision;
+    };
+    if (protection.turnstile.mode === "log") {
+      // Log mode can never refuse, so the visitor does not wait for Cloudflare.
+      after(() => runTurnstile().then(() => undefined, () => undefined));
+    } else {
+      const decision = await timer.time("turnstile_verify", runTurnstile);
+      if (decision === "reject") {
+        return withCors(jsonError("Please refresh the page and try again.", 403));
+      }
     }
   }
 
@@ -375,10 +397,7 @@ export async function POST(request: NextRequest) {
     // Read out before the closure below, which would otherwise widen
     // `conversation` back to possibly-null and need an assertion.
     const conversationRowId = conversation.id;
-    const conversationAllowed = await timer.time("rate_limit_conversation", () =>
-      checkAndIncrementRateLimit("conversation", conversationRowId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
-    );
-    if (!conversationAllowed) {
+    if (existingConversationLimit && !(await existingConversationLimit)) {
       logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
       return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
     }
@@ -437,6 +456,12 @@ export async function POST(request: NextRequest) {
       // Returns 0 without a query unless the abuse check is enforcing.
       countAbuseStrikes(supabase, business.businessId, conversationRowId),
       servingCheck,
+      // A new conversation's first count (see existingConversationLimit above).
+      existingConversationLimit
+        ? null
+        : timer.time("rate_limit_conversation", () =>
+            checkAndIncrementRateLimit("conversation", conversationRowId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),
+          ),
     ]);
 
     // The subscription no longer lets this agent serve (lapsed past grace,
