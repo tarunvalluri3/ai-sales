@@ -3,7 +3,7 @@
 -- the new connection columns' checks hold; credentials stay unreadable.
 
 begin;
-select plan(7);
+select plan(8);
 create temporary table _tap_results (line text);
 grant insert on _tap_results to authenticated, service_role;
 
@@ -25,6 +25,12 @@ insert into _tap_results select throws_ok(
   $$ insert into public.whatsapp_template_statuses (business_id, waba_id, template_name, language, status)
      values ('00000000-0000-0000-0000-0000000075a1', '111', 'Bad Name', 'en', 'PENDING') $$,
   '23514', null, 'template names must be Meta-shaped'
+);
+
+insert into _tap_results select throws_ok(
+  $$ insert into public.whatsapp_template_statuses (business_id, waba_id, template_name, language, status)
+     values ('00000000-0000-0000-0000-0000000075a1', '111', repeat('a', 513), 'en', 'PENDING') $$,
+  '23514', null, 'template names are at most 512 characters'
 );
 
 set local role authenticated;
