@@ -22,10 +22,10 @@ export default function GlobalError({
 
   return (
     <html lang="en">
-      <body className="flex min-h-screen items-center justify-center bg-[#100f0c] px-6 text-center text-[#f5f3ec]">
+      <body className="flex min-h-screen items-center justify-center px-6 text-center" style={{ background: "#0c0c0b", color: "#f5f4f0", fontFamily: "system-ui, sans-serif" }}>
         <div>
           <h1 className="text-lg font-medium">Something went wrong.</h1>
-          <p className="mt-2 text-sm text-[#a8a496]">
+          <p className="mt-2 text-sm" style={{ color: "#a6a49c" }}>
             The error has been reported. Please try again.
           </p>
         </div>

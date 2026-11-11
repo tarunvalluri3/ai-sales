@@ -1,72 +1,99 @@
 @import "tailwindcss";
 
+/*
+ * Waves Web Studio design system. Dark is the default; the light theme only
+ * flips token values under [data-theme="light"] on <html> (set before first
+ * paint by the inline script in layout.tsx, persisted in localStorage).
+ * Signal Red is identical in both themes: a signal, never a surface.
+ * Legacy --ds-* names are kept as aliases until the final cleanup phase.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
 
-  /*
-   * Premium design system: deep warm charcoal + warm ivory + electric lime,
-   * modeled on the Zajno "Smart Energy Dashboard" reference. Body background
-   * stays light for now -- flipping it globally would make every not-yet-
-   * restyled page (later-stage CRUD pages, sign-in/up) use hardcoded
-   * light-mode text on a dark body and go illegible. Only components that
-   * opt into these tokens explicitly go dark until each surface's own stage
-   * lands.
-   */
-  --ds-bg: #100f0c;
-  --ds-surface: #17150f;
-  --ds-surface-elevated: #1e1b13;
-  --ds-surface-soft: #262218;
-  --ds-ivory: #f3ede0;
-  --ds-ivory-muted: #e7ddc8;
-  --ds-on-ivory: #1c1912;
+  --ds-bg: #0c0c0b;
+  --ds-surface: #111110;
+  --ds-surface-raised: #171614;
+  --ds-surface-elevated: #171614;
+  --ds-surface-soft: #1d1c1a;
+  --ds-border: #2a2926;
+  --ds-border-strong: #3f3e39;
 
-  /* Electric lime/chartreuse -- the one strong accent. Used selectively, never as a background wash. */
-  --ds-accent: #d7f24e;
-  --ds-accent-strong: #e8ff5e;
-  --ds-accent-muted: #9aab5c;
-  --ds-accent-soft-bg: rgba(215, 242, 78, 0.14);
-  --ds-accent-on: #14130c;
+  --ds-text-primary: #f5f4f0;
+  --ds-text-secondary: #a6a49c;
+  --ds-text-muted: #78766e;
+  --ds-text-faint: #78766e;
+  --ds-text-label-faint: #5c5a54;
 
-  --ds-text-primary: #f2ede1;
-  --ds-text-secondary: #a8a190;
-  /* Lightened from #746e5f (~3.6:1, failed WCAG AA) to clear 4.5:1 against
-     every surface tier this token appears on (--ds-surface through
-     --ds-surface-soft), while staying visibly dimmer than --ds-text-secondary
-     and holding the same warm hue direction. */
-  --ds-text-muted: #948d79;
-  --ds-border: rgba(242, 237, 225, 0.1);
-  --ds-border-strong: rgba(242, 237, 225, 0.18);
+  /* Primary button: paper fill / ink text in dark. */
+  --ds-primary: #f5f4f0;
+  --ds-primary-hover: #e9e7e0;
+  --ds-primary-on: #111110;
 
-  --ds-success: #9ecb4f;
-  --ds-success-bg: rgba(158, 203, 79, 0.14);
-  --ds-warning: #d9a94f;
-  --ds-warning-bg: rgba(217, 169, 79, 0.14);
-  --ds-danger: #e0664f;
-  --ds-danger-bg: rgba(224, 102, 79, 0.14);
-  /* Dark ink for text on the saturated --ds-danger background -- same role
-     and value as --ds-accent-on, reused for its own AA-verified contrast
-     (~5.5:1) rather than the hardcoded `text-white` this replaced (~3.4:1). */
-  --ds-danger-on: #14130c;
+  /* Fixed ink/paper, for surfaces that must not flip with the theme. */
+  --ds-ivory: #f5f4f0;
+  --ds-ivory-muted: #e7e5de;
+  --ds-on-ivory: #111110;
 
-  /* Compact editorial type scale -- restrained, a few sizes beyond Tailwind's defaults. */
+  --ds-accent: #dc2626;
+  --ds-accent-strong: #ef4444;
+  --ds-accent-muted: #b91c1c;
+  --ds-accent-soft-bg: rgba(220, 38, 38, 0.12);
+  --ds-accent-on: #ffffff;
+
+  --ds-success: #8fa67e;
+  --ds-success-bg: rgba(143, 166, 126, 0.12);
+  --ds-warning: #c9a15a;
+  --ds-warning-bg: rgba(201, 161, 90, 0.12);
+  --ds-danger: #dc2626;
+  --ds-danger-bg: rgba(220, 38, 38, 0.12);
+  --ds-danger-on: #ffffff;
+
   --ds-text-2xs: 0.6875rem;
-  --ds-tracking-wide: 0.04em;
+  --ds-tracking-wide: 0.14em;
 
-  /* Radii -- subtle, not the default Tailwind "rounded-2xl" pill look. */
-  --ds-radius-sm: 0.375rem;
-  --ds-radius-md: 0.625rem;
-  --ds-radius-lg: 0.875rem;
+  /* Sharp corners everywhere; only floating panels are rounded. */
+  --ds-radius-sm: 0;
+  --ds-radius-md: 0;
+  --ds-radius-lg: 0;
+  --ds-radius-float: 1rem;
+  --ds-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.45);
+  --ds-scrim: rgba(0, 0, 0, 0.6);
 
-  /*
-   * Shared brand primary -- the dashboard's electric lime accent. The
-   * public widget keeps its own separate indigo token until its own
-   * redesign stage lands -- an intentional, temporary mismatch between the
-   * two surfaces until that stage lands.
-   */
-  --dashboard-primary: var(--ds-accent);
-  --dashboard-primary-hover: var(--ds-accent-strong);
-  --dashboard-on-primary: var(--ds-accent-on);
+  --dashboard-primary: var(--ds-primary);
+  --dashboard-primary-hover: var(--ds-primary-hover);
+  --dashboard-on-primary: var(--ds-primary-on);
+
+  --background: var(--ds-bg);
+  --foreground: var(--ds-text-primary);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --ds-bg: #f5f4f0;
+  --ds-surface: #ffffff;
+  --ds-surface-raised: #fafaf8;
+  --ds-surface-elevated: #fafaf8;
+  --ds-surface-soft: #f0efea;
+  --ds-border: #dcdad2;
+  --ds-border-strong: #bdbbb2;
+
+  --ds-text-primary: #111110;
+  --ds-text-secondary: #78766e;
+  --ds-text-muted: #5c5952;
+  --ds-text-faint: #5c5952;
+  --ds-text-label-faint: #78766e;
+
+  --ds-primary: #111110;
+  --ds-primary-hover: #2a2926;
+  --ds-primary-on: #f5f4f0;
+
+  --ds-success: #4f6b45;
+  --ds-success-bg: rgba(79, 107, 69, 0.12);
+  --ds-warning: #8a6a2a;
+  --ds-warning-bg: rgba(138, 106, 42, 0.12);
+
+  --ds-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.16);
 }
 
 @theme inline {
@@ -78,8 +105,12 @@
 
   --color-ds-bg: var(--ds-bg);
   --color-ds-surface: var(--ds-surface);
+  --color-ds-surface-raised: var(--ds-surface-raised);
   --color-ds-surface-elevated: var(--ds-surface-elevated);
   --color-ds-surface-soft: var(--ds-surface-soft);
+  --color-ds-primary: var(--ds-primary);
+  --color-ds-primary-hover: var(--ds-primary-hover);
+  --color-ds-primary-on: var(--ds-primary-on);
   --color-ds-ivory: var(--ds-ivory);
   --color-ds-ivory-muted: var(--ds-ivory-muted);
   --color-ds-on-ivory: var(--ds-on-ivory);
@@ -91,6 +122,8 @@
   --color-ds-text-primary: var(--ds-text-primary);
   --color-ds-text-secondary: var(--ds-text-secondary);
   --color-ds-text-muted: var(--ds-text-muted);
+  --color-ds-text-faint: var(--ds-text-faint);
+  --color-ds-text-label-faint: var(--ds-text-label-faint);
   --color-ds-border: var(--ds-border);
   --color-ds-border-strong: var(--ds-border-strong);
   --color-ds-success: var(--ds-success);
@@ -100,6 +133,7 @@
   --color-ds-danger: var(--ds-danger);
   --color-ds-danger-bg: var(--ds-danger-bg);
   --color-ds-danger-on: var(--ds-danger-on);
+  --color-ds-scrim: var(--ds-scrim);
 
   --text-2xs: var(--ds-text-2xs);
   --tracking-wide-ds: var(--ds-tracking-wide);
@@ -107,9 +141,13 @@
   --radius-ds-sm: var(--ds-radius-sm);
   --radius-ds-md: var(--ds-radius-md);
   --radius-ds-lg: var(--ds-radius-lg);
+  --radius-ds-float: var(--ds-radius-float);
+  --shadow-float: var(--ds-shadow-float);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Hanken Grotesk: display, headings, body. Space Grotesk: technical voice. */
+  --font-sans: var(--font-hanken), system-ui, sans-serif;
+  --font-label: var(--font-space), system-ui, sans-serif;
+  --font-mono: var(--font-space), ui-monospace, monospace;
 
   /* Ambient homepage dot-grid drift -- very slow, one grid cell per loop. */
   --animate-dot-drift: dot-drift 50s linear infinite;
@@ -127,17 +165,14 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-hanken), system-ui, sans-serif;
 }
 
-/* Minimal, thin scrollbars everywhere (sidebar, tables' overflow-x-auto,
-   the page itself) instead of the OS default -- Firefox via scrollbar-*,
-   Chromium/WebKit via ::-webkit-scrollbar. A subtle neutral tone that
-   reads acceptably on both the light body and the dashboard's dark
-   surfaces, rather than two separate themed variants. */
+/* Minimal, thin square scrollbars everywhere (sidebar, tables'
+   overflow-x-auto, the page itself). */
 html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(120, 113, 97, 0.35) transparent;
+  scrollbar-color: var(--ds-border-strong) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -150,12 +185,11 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(120, 113, 97, 0.35);
-  border-radius: 9999px;
+  background-color: var(--ds-border-strong);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(120, 113, 97, 0.55);
+  background-color: var(--ds-text-label-faint);
 }
 
 /* Opt out of even the minimal scrollbar above for a specific element (e.g.
@@ -167,4 +201,34 @@ html {
 
 .scrollbar-hidden::-webkit-scrollbar {
   display: none;
+}
+
+/* Space Grotesk "technical voice" label style, shared by nav, badges, tables. */
+.ds-label {
+  font-family: var(--font-space), system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* Theme toggle: show the icon for the theme you would switch to. */
+:root[data-theme="light"] .ds-theme-sun {
+  display: none;
+}
+
+:root:not([data-theme="light"]) .ds-theme-moon {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
