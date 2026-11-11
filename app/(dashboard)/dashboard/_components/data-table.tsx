@@ -78,7 +78,7 @@ export function DataTable<T>({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto rounded-ds-lg border border-ds-border">
+      <div className="overflow-x-auto border border-ds-border">
         {/* No min-w-max here: it forces min-width:max-content, which
             defeats the fr-based column sizing above and forces horizontal
             scroll even on a viewport wide enough for the grid to shrink to
@@ -98,13 +98,13 @@ export function DataTable<T>({
                   key={column.key}
                   role="columnheader"
                   aria-sort={ariaSort}
-                  className={`flex items-center gap-1 border-b border-ds-border bg-ds-surface-soft px-3 py-2 text-2xs font-semibold tracking-wide-ds text-ds-text-secondary uppercase ${alignClass}`}
+                  className={`flex items-center gap-1 ds-label border-b border-ds-border px-3 py-3 text-ds-text-muted ${alignClass}`}
                 >
                   {isSortable ? (
                     <button
                       type="button"
                       onClick={() => handleHeaderClick(column)}
-                      className="flex items-center gap-1 transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                      className="flex items-center gap-1 transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                     >
                       {column.label}
                       {isCurrent ? (
@@ -148,7 +148,7 @@ export function DataTable<T>({
               onClick={() => setPage((current) => Math.max(0, current - 1))}
               disabled={currentPage === 0}
               aria-label="Previous page"
-              className="flex size-7 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="flex size-7 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               <ChevronLeft className="size-4" aria-hidden="true" />
             </button>
@@ -160,7 +160,7 @@ export function DataTable<T>({
               onClick={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
               disabled={currentPage >= totalPages - 1}
               aria-label="Next page"
-              className="flex size-7 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="flex size-7 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               <ChevronRight className="size-4" aria-hidden="true" />
             </button>

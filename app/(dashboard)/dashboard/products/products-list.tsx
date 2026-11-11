@@ -58,7 +58,7 @@ export function ProductsList({
             ) : null}
           </TableCell>
           <TableCell align="right">
-            {product.price ? <span className="font-semibold text-ds-accent">${product.price}</span> : "—"}
+            {product.price ? <span className="font-medium text-ds-accent">${product.price}</span> : "—"}
           </TableCell>
           <TableCell align="right">
             <div className="flex items-center justify-end gap-3">
@@ -67,14 +67,14 @@ export function ProductsList({
                   <button
                     type="button"
                     onClick={() => onEdit(product.id)}
-                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                    className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                   >
                     Edit
                   </button>
                 ) : (
                   <Link
                     href={`/dashboard/products/${product.id}/edit`}
-                    className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                    className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                   >
                     Edit
                   </Link>

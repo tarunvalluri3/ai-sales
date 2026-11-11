@@ -36,15 +36,15 @@ export function AiCapabilitiesForm({
   const [open, setOpen] = useState(!initialRecommendProductsEnabled && !initialAppointmentsEnabled);
 
   return (
-    <form action={formAction} className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <form action={formAction} className="flex w-full flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           aria-expanded={open}
         >
-          <h2 className="text-lg font-semibold text-ds-text-primary">AI capabilities</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">AI capabilities</h2>
           <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
         </button>
         <p className="text-sm text-ds-text-secondary">
@@ -148,7 +148,7 @@ export function AiCapabilitiesForm({
         type="submit"
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Saving…" : "Save AI capabilities"}
       </button>

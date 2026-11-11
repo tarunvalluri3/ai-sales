@@ -21,13 +21,13 @@ export default async function ProfilePage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Business profile</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Business profile</h1>
         <p className="text-sm text-ds-text-secondary">
           This is what your AI sales employee tells prospects about who you are.
         </p>
       </div>
 
-      <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex w-full max-w-lg flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         <ProfileForm
           initialName={business.name}
           initialBusinessType={business.business_type}

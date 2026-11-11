@@ -34,16 +34,16 @@ export function InstagramSetupGuide({ hasConnection }: { hasConnection: boolean 
   return (
     <section
       id="before-you-connect"
-      className="flex scroll-mt-6 flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5"
+      className="flex scroll-mt-6 flex-col gap-4 border border-ds-border bg-ds-surface p-5"
     >
       <div className="flex flex-col gap-1">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           aria-expanded={open}
         >
-          <h2 className="text-lg font-semibold text-ds-text-primary">Before you connect</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">Before you connect</h2>
           <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
         </button>
         <p className="text-sm text-ds-text-secondary">Four quick checks and you&rsquo;re ready.</p>

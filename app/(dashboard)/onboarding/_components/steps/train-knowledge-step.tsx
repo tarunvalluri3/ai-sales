@@ -58,7 +58,7 @@ export function TrainKnowledgeStep({ documents }: { documents: KnowledgeDocument
       <KnowledgeList documents={documents} canEdit onEdit={(id) => setEditingId(id)} />
 
       {editingDocument ? (
-        <div className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <div className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-ds-text-primary">Edit knowledge</h2>
             <button
@@ -110,7 +110,7 @@ export function TrainKnowledgeStep({ documents }: { documents: KnowledgeDocument
             type="button"
             onClick={handleContinue}
             disabled={isPending || !valid}
-            className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : "Continue"}
           </button>

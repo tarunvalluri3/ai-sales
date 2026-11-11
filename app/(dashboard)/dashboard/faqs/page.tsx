@@ -23,7 +23,7 @@ export default async function FaqsPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">FAQs</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">FAQs</h1>
         <p className="text-sm text-ds-text-secondary">
           Questions your AI sales employee has an approved answer for.
         </p>
@@ -36,7 +36,7 @@ export default async function FaqsPage() {
             {pendingFaqs.map((faq) => (
               <li
                 key={faq.id}
-                className="flex items-center justify-between gap-4 rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
+                className="flex items-center justify-between gap-4 border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
               >
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <p className="truncate font-medium text-ds-text-primary">{faq.question}</p>
@@ -68,7 +68,7 @@ export default async function FaqsPage() {
         <FaqsList faqs={faqs} canEdit={canEdit} deleteFaqAction={deleteFaqAction} />
       )}
 
-      <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex w-full max-w-sm flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-medium text-ds-text-primary">Add an FAQ</h2>
         {canEdit ? (
           <FaqForm action={createFaqAction} submitLabel="Add FAQ" pendingLabel="Adding…" />

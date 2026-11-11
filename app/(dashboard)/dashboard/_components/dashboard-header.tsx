@@ -3,6 +3,7 @@
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
 import { NotificationBell } from "./notification-bell";
+import { ThemeToggle } from "../../_components/theme-toggle";
 import { PublishBar, type PublishBarStatus } from "./publish-bar";
 
 /**
@@ -32,9 +33,10 @@ export function DashboardHeader({
   canPublish: boolean;
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-ds-border bg-ds-surface px-4 py-2.5">
+    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-16 border-b border-ds-border bg-ds-surface px-4 py-2 lg:px-6">
       <PublishBar agentName={agentName} status={publishStatus} canPublish={canPublish} />
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         <NotificationBell />
         <OrganizationSwitcher
           hidePersonal

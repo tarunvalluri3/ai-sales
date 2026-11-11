@@ -55,7 +55,7 @@ export default async function WhatsappPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">WhatsApp</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">WhatsApp</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Let prospects message your AI sales employee on WhatsApp, the same way they can on your
           website. Connect a number from{" "}
@@ -95,8 +95,8 @@ export default async function WhatsappPage() {
               configId={embeddedSignup.configId}
               graphVersion={embeddedSignup.graphVersion}
             />
-            <details className="rounded-ds-lg border border-ds-border bg-ds-surface">
-              <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-ds-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent">
+            <details className="border border-ds-border bg-ds-surface">
+              <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-ds-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
                 Already have a system-user token? Connect manually instead
               </summary>
               <div className="border-t border-ds-border p-5">

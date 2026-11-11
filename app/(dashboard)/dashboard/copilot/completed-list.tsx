@@ -35,7 +35,7 @@ export function CompletedList({ items }: { items: CompletedActionItem[] }) {
         const at = item.completedAt ?? item.dismissedAt;
         const by = item.completedBy ?? item.dismissedBy;
         return (
-          <li key={item.id} className="flex flex-col gap-1.5 rounded-ds-sm border border-ds-border bg-ds-surface-soft p-3">
+          <li key={item.id} className="flex flex-col gap-1.5 border border-ds-border bg-ds-surface-soft p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="flex flex-col">
                 <Link href={`/dashboard/customers/${item.customerId}`} className="text-sm font-medium text-ds-text-primary hover:underline">

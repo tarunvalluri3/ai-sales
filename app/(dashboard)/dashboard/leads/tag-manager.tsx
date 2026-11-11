@@ -8,10 +8,10 @@ import { DeleteButton } from "../_components/delete-button";
 import type { LeadTag, TagColor } from "@/lib/supabase/types";
 
 const SELECT_CLASS =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 const INPUT_CLASS =
-  "w-40 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "w-40 border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 function ColorSelect({
   value,
@@ -85,7 +85,7 @@ function NewTagForm() {
       <button
         type="submit"
         disabled={isPending || !name.trim()}
-        className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Adding…" : "Add tag"}
       </button>
@@ -116,7 +116,7 @@ function ExistingTagRow({ tag }: { tag: LeadTag }) {
 
   if (editing) {
     return (
-      <form action={formAction} className="flex flex-wrap items-center gap-2 rounded-ds-sm bg-ds-surface-soft p-2">
+      <form action={formAction} className="flex flex-wrap items-center gap-2 bg-ds-surface-soft p-2">
         <input type="hidden" name="id" value={tag.id} />
         <Badge tone={color} size="sm">
           {name.trim() || "Preview"}
@@ -134,7 +134,7 @@ function ExistingTagRow({ tag }: { tag: LeadTag }) {
         <button
           type="submit"
           disabled={isPending || !name.trim()}
-          className="rounded-ds-sm bg-ds-accent px-2.5 py-1 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isPending ? "Saving…" : "Save"}
         </button>
@@ -146,7 +146,7 @@ function ExistingTagRow({ tag }: { tag: LeadTag }) {
             setColor(tag.color);
           }}
           disabled={isPending}
-          className="rounded-ds-sm px-2.5 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="px-2.5 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Cancel
         </button>
@@ -160,7 +160,7 @@ function ExistingTagRow({ tag }: { tag: LeadTag }) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-ds-sm px-2 py-1.5 hover:bg-ds-surface-soft">
+    <div className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-ds-surface-soft">
       <Badge tone={tag.color} size="sm">
         {tag.name}
       </Badge>
@@ -168,7 +168,7 @@ function ExistingTagRow({ tag }: { tag: LeadTag }) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Rename
         </button>
@@ -203,14 +203,14 @@ export function TagManager({ tags, canEdit }: { tags: LeadTag[]; canEdit: boolea
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="tag-manager-panel"
-        className="w-fit rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="w-fit border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {open ? "Hide tag manager" : "Manage tags"}
       </button>
       {open ? (
         <div
           id="tag-manager-panel"
-          className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4"
+          className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4"
         >
           {tags.length === 0 ? (
             <p className="text-xs text-ds-text-muted">No tags yet -- create the first one below.</p>

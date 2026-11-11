@@ -22,19 +22,19 @@ export default async function ConversationTranscriptPage({ params }: { params: P
       <AdminBreadcrumbs trail={[{ label: "Conversations & Leads", href: "/apache/conversations" }, { label: transcript.businessName }]} />
       <AdminPageHeader title={`Conversation — ${transcript.businessName}`} description="This view was just recorded in the audit log." />
 
-      <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
         {transcript.messages.length === 0 ? (
           <p className="text-sm text-ds-text-muted">No messages in this conversation.</p>
         ) : (
           transcript.messages.map((message) => (
             <div
               key={message.id}
-              className={`flex flex-col gap-1 rounded-ds-sm p-3 text-sm ${
+              className={`flex flex-col gap-1 p-3 text-sm ${
                 message.role === "user" ? "bg-ds-surface-soft" : "bg-ds-surface-elevated"
               }`}
             >
               <div className="flex items-center justify-between text-2xs text-ds-text-muted">
-                <span className="font-semibold uppercase tracking-wide-ds">{message.role.replace("_", " ")}</span>
+                <span className="font-medium uppercase tracking-wide-ds">{message.role.replace("_", " ")}</span>
                 <span>{new Date(message.createdAt).toLocaleString()}</span>
               </div>
               <p className="whitespace-pre-wrap text-ds-text-primary">{message.content}</p>

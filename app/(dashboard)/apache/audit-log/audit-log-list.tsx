@@ -17,7 +17,7 @@ export function AuditLogList({ entries }: { entries: AdminAuditLogEntry[] }) {
   }
 
   if (entries.length === 0) {
-    return <p className="rounded-ds-lg border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">No audit entries match this filter.</p>;
+    return <p className="border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">No audit entries match this filter.</p>;
   }
 
   return (
@@ -25,7 +25,7 @@ export function AuditLogList({ entries }: { entries: AdminAuditLogEntry[] }) {
       {entries.map((entry) => {
         const hasDiff = Boolean(entry.before) || Boolean(entry.after);
         return (
-          <li key={entry.id} className="rounded-ds-lg border border-ds-border bg-ds-surface">
+          <li key={entry.id} className="border border-ds-border bg-ds-surface">
             <button
               type="button"
               onClick={() => hasDiff && toggle(entry.id)}

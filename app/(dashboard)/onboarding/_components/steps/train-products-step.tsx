@@ -56,12 +56,12 @@ export function TrainProductsStep({ products }: { products: Product[] }) {
           onEdit={(id) => setEditingId(id)}
         />
       ) : (
-        <p className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-4 py-8 text-center text-sm text-ds-text-muted">
+        <p className="border border-dashed border-ds-border bg-ds-surface px-4 py-8 text-center text-sm text-ds-text-muted">
           No products or services added yet.
         </p>
       )}
 
-      <section className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex w-full flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         {editingProduct ? (
           <>
             <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ export function TrainProductsStep({ products }: { products: Product[] }) {
             type="button"
             onClick={handleContinue}
             disabled={isPending || !valid}
-            className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : "Continue"}
           </button>

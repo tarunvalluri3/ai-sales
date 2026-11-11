@@ -87,7 +87,7 @@ export function SalesBrief({ header, narrative }: { header: string; narrative: s
   const parsed = parseBriefNarrative(narrative);
 
   return (
-    <div className="flex flex-col gap-3 rounded-ds-sm bg-ds-surface-soft p-4">
+    <div className="flex flex-col gap-3 bg-ds-surface-soft p-4">
       {status || interestedIn ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ds-text-muted">
           {status ? (
@@ -107,14 +107,14 @@ export function SalesBrief({ header, narrative }: { header: string; narrative: s
         <div className="flex flex-col gap-3">
           {parsed.whyThisMatters ? (
             <div className="flex flex-col gap-1">
-              <p className="text-2xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Why this matters</p>
+              <p className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Why this matters</p>
               <p className="text-sm text-ds-text-primary">{parsed.whyThisMatters}</p>
             </div>
           ) : null}
 
           {parsed.whatHappened.length > 0 ? (
             <div className="flex flex-col gap-1">
-              <p className="text-2xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">What happened</p>
+              <p className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">What happened</p>
               <ul className="flex flex-col gap-0.5 text-sm text-ds-text-secondary">
                 {parsed.whatHappened.map((line, index) => (
                   <li key={index} className="flex gap-2">
@@ -130,14 +130,14 @@ export function SalesBrief({ header, narrative }: { header: string; narrative: s
 
           {parsed.risk ? (
             <div className="flex flex-col gap-1">
-              <p className="text-2xs font-semibold tracking-wide-ds text-ds-warning uppercase">Risk</p>
+              <p className="text-2xs font-medium tracking-wide-ds text-ds-warning uppercase">Risk</p>
               <p className="text-sm text-ds-text-secondary">{parsed.risk}</p>
             </div>
           ) : null}
 
           {parsed.recommendedNextStep ? (
-            <div className="flex flex-col gap-1 rounded-ds-sm bg-ds-accent-soft-bg p-3">
-              <p className="text-2xs font-semibold tracking-wide-ds text-ds-accent-muted uppercase">Recommended next step</p>
+            <div className="flex flex-col gap-1 bg-ds-surface-raised p-3">
+              <p className="text-2xs font-medium tracking-wide-ds text-ds-text-primary uppercase">Recommended next step</p>
               <p className="text-sm font-medium text-ds-text-primary">{parsed.recommendedNextStep}</p>
             </div>
           ) : null}

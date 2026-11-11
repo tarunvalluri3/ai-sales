@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { X } from "lucide-react";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -25,16 +25,16 @@ const AUTO_DISMISS_MS = 5000;
 
 const VARIANT_STYLE: Record<ToastVariant, { container: string; icon: ReactNode }> = {
   success: {
-    container: "border-ds-success/40 bg-ds-success-bg text-ds-success",
-    icon: <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />,
+    container: "border-ds-border bg-ds-surface text-ds-text-primary",
+    icon: <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ds-success" aria-hidden="true" />,
   },
   error: {
-    container: "border-ds-danger/40 bg-ds-danger-bg text-ds-danger",
-    icon: <AlertCircle className="size-4 shrink-0" aria-hidden="true" />,
+    container: "border-ds-border bg-ds-surface text-ds-text-primary",
+    icon: <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ds-danger" aria-hidden="true" />,
   },
   info: {
-    container: "border-ds-border bg-ds-surface-elevated text-ds-text-primary",
-    icon: <Info className="size-4 shrink-0 text-ds-text-secondary" aria-hidden="true" />,
+    container: "border-ds-border bg-ds-surface text-ds-text-primary",
+    icon: <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ds-text-muted" aria-hidden="true" />,
   },
 };
 
@@ -83,7 +83,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
-              className={`pointer-events-auto flex w-full max-w-sm items-start gap-2 rounded-ds-lg border px-3 py-2.5 shadow-lg ${VARIANT_STYLE[item.variant].container}`}
+              className={`pointer-events-auto flex w-full max-w-sm items-start gap-2 border px-3 py-2.5 ${VARIANT_STYLE[item.variant].container}`}
             >
               {VARIANT_STYLE[item.variant].icon}
               <div className="flex-1 text-sm">
@@ -94,9 +94,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => dismiss(item.id)}
                 aria-label="Dismiss"
-                className="shrink-0 rounded-ds-sm p-0.5 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+                className="shrink-0 p-0.5 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
               >
-                <X className="size-3.5" aria-hidden="true" />
+                <X className="size-3.5" strokeWidth={2} strokeLinecap="square" aria-hidden="true" />
               </button>
             </motion.div>
           ))}

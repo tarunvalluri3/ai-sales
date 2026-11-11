@@ -24,7 +24,7 @@ function NotificationRow({ notification }: { notification: InternalNotification 
   );
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-ds-sm px-2 py-1.5 hover:bg-ds-surface-soft">
+    <div className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-ds-surface-soft">
       <div className="flex flex-1 flex-col">
         {notification.link ? (
           <Link href={notification.link} className="flex flex-col hover:underline">
@@ -37,7 +37,7 @@ function NotificationRow({ notification }: { notification: InternalNotification 
       {unread ? (
         <form action={formAction}>
           <input type="hidden" name="id" value={notification.id} />
-          <button type="submit" disabled={isPending} className="rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
+          <button type="submit" disabled={isPending} className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
             Mark read
           </button>
           {state.error ? (
@@ -53,8 +53,8 @@ function NotificationRow({ notification }: { notification: InternalNotification 
 
 export function NotificationsPanel({ notifications }: { notifications: InternalNotification[] }) {
   return (
-    <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-      <h2 className="text-sm font-semibold text-ds-text-primary">Notifications</h2>
+    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
+      <h2 className="text-sm font-medium text-ds-text-primary">Notifications</h2>
       {notifications.length === 0 ? (
         <EmptyState title="No notifications" description="A workflow's internal-notification step will show up here." />
       ) : (

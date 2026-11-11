@@ -89,7 +89,7 @@ export function WhatsappConnectionStatus({
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export function WhatsappConnectionStatus({
                 type="submit"
                 disabled={isPending}
                 autoFocus
-                className="rounded-ds-sm bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+                className="bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
               >
                 {isPending ? "Disconnecting…" : "Confirm disconnect"}
               </button>
@@ -131,7 +131,7 @@ export function WhatsappConnectionStatus({
               type="button"
               onClick={() => setConfirming(false)}
               disabled={isPending}
-              className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Cancel
             </button>
@@ -144,7 +144,7 @@ export function WhatsappConnectionStatus({
               onClick={() => setEditing(true)}
               disabled={!canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
-              className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Edit connection
             </button>
@@ -154,7 +154,7 @@ export function WhatsappConnectionStatus({
               onClick={() => setConfirming(true)}
               disabled={!canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
-              className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Disconnect
             </button>
@@ -163,18 +163,18 @@ export function WhatsappConnectionStatus({
       </div>
       {setupFailure ? (
         <div className="flex flex-col gap-2">
-          <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+          <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
             {onboardingFailureMessage(setupFailure)}
           </p>
           {canEdit ? <FinishSetupButton /> : null}
         </div>
       ) : connection.status === "error" && connection.last_error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           {describeConnectionError(connection.last_error)}
         </p>
       ) : null}
       {state.error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           {state.error}
         </p>
       ) : null}

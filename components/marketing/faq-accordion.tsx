@@ -31,7 +31,7 @@ export function FaqAccordion({ items }: { items: FaqItem[] }) {
                 aria-expanded={isOpen}
                 aria-controls={panelId}
                 onClick={() => setOpenIndex(isOpen ? null : index)}
-                className="flex w-full items-center justify-between gap-4 py-4 text-left text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="flex w-full items-center justify-between gap-4 py-4 text-left text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 {item.question}
                 <span

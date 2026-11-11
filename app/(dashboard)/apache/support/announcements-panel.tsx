@@ -33,11 +33,11 @@ export function AnnouncementsPanel({ announcements, tenants }: { announcements: 
       <NewAnnouncementForm tenants={tenants} onCreated={() => router.refresh()} />
 
       {announcements.length === 0 ? (
-        <p className="rounded-ds-lg border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">No announcements yet.</p>
+        <p className="border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">No announcements yet.</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {announcements.map((a) => (
-            <li key={a.id} className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+            <li key={a.id} className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ function NewAnnouncementForm({ tenants, onCreated }: { tenants: Tenant[]; onCrea
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-fit items-center gap-2 rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover"
+        className="flex w-fit items-center gap-2 bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover"
       >
         <Plus className="size-4" aria-hidden="true" /> New announcement
       </button>
@@ -140,20 +140,20 @@ function NewAnnouncementForm({ tenants, onCreated }: { tenants: Tenant[]; onCrea
   const canSubmit = message.trim().length >= 3 && (targetAll || selected.size > 0);
 
   return (
-    <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium text-ds-text-primary">Message</span>
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={2}
-          className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
+          className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
         />
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="font-medium text-ds-text-primary">Severity</span>
-        <select value={severity} onChange={(e) => setSeverity(e.target.value as AnnouncementSeverity)} className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary">
+        <select value={severity} onChange={(e) => setSeverity(e.target.value as AnnouncementSeverity)} className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary">
           <option value="info">Info</option>
           <option value="warning">Warning</option>
           <option value="critical">Critical</option>
@@ -173,7 +173,7 @@ function NewAnnouncementForm({ tenants, onCreated }: { tenants: Tenant[]; onCrea
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tenants to add…"
-              className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
+              className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
             />
             {filtered.length > 0 ? (
               <ul className="flex flex-col gap-1">
@@ -194,14 +194,14 @@ function NewAnnouncementForm({ tenants, onCreated }: { tenants: Tenant[]; onCrea
       {error ? <p className="text-sm text-ds-danger">{error}</p> : null}
 
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={() => setOpen(false)} className="rounded-ds-sm px-3 py-1.5 text-sm font-medium text-ds-text-secondary hover:bg-ds-surface-soft">
+        <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 text-sm font-medium text-ds-text-secondary hover:bg-ds-surface-soft">
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSubmit}
           disabled={isPending || !canSubmit}
-          className="rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
+          className="bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
         >
           {isPending ? "Creating…" : "Create announcement"}
         </button>

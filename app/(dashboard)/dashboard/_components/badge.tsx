@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 export type BadgeTone = "warning" | "success" | "danger" | "muted" | "accent";
 
 const TONE_STYLE: Record<BadgeTone, string> = {
-  warning: "bg-ds-warning-bg text-ds-warning",
-  success: "bg-ds-success-bg text-ds-success",
-  danger: "bg-ds-danger-bg text-ds-danger",
-  muted: "bg-ds-surface-soft text-ds-text-secondary",
-  accent: "bg-ds-accent-soft-bg text-ds-accent-muted",
+  warning: "border-ds-warning/40 bg-ds-warning-bg text-ds-warning",
+  success: "border-ds-success/40 bg-ds-success-bg text-ds-success",
+  danger: "border-ds-danger/40 bg-ds-danger-bg text-ds-danger",
+  muted: "border-ds-border text-ds-text-secondary",
+  accent: "border-ds-accent/40 bg-ds-accent/10 text-ds-accent",
 };
 
 /**
@@ -33,8 +33,9 @@ export function Badge({
   return (
     <span
       title={title}
-      className={`rounded-ds-sm ${sizeClass} text-2xs font-semibold tracking-wide-ds uppercase ${TONE_STYLE[tone]}`}
+      className={`ds-label inline-flex items-center gap-1.5 border ${sizeClass} text-2xs ${TONE_STYLE[tone]}`}
     >
+      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
       {children}
     </span>
   );

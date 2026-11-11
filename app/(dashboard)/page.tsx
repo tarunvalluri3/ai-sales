@@ -197,17 +197,17 @@ export default function HomePage() {
       <div className="relative z-10 flex flex-1 flex-col">
       {/* Hero -- headline, subcopy and CTAs render immediately, no animation
           wrapper and no JS dependency, so they never wait on the client. */}
-      <section className="border-b border-ds-border px-6 py-20 md:py-28">
+      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
           <div className="flex flex-col gap-6">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
-              <span className="size-1.5 rounded-full bg-ds-accent" aria-hidden="true" />
+            <span className="ds-label inline-flex w-fit items-center gap-2 text-xs tracking-[0.32em] text-ds-text-secondary">
+              <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
               AI sales employee
             </span>
-            <h1 className="text-4xl leading-tight font-semibold text-ds-text-primary md:text-5xl">
+            <h1 className="max-w-[900px] text-[32px] leading-[1.12] font-light tracking-[-0.015em] text-ds-text-primary sm:text-[42px] lg:text-[58px]">
               An AI employee that actually knows your business.
             </h1>
-            <p className="max-w-lg text-base text-ds-text-secondary md:text-lg">
+            <p className="max-w-[600px] text-[15px] leading-[1.75] text-ds-text-secondary">
               Waves AI Pilot answers prospects using your own products, services, FAQs, and approved
               knowledge — qualifies who&apos;s worth your time, and hands off to a human the moment one
               is genuinely needed.
@@ -218,13 +218,13 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <MagneticLink
                 href="/sign-up"
-                className="inline-block rounded-ds-sm bg-ds-accent px-5 py-3 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="ds-btn-label inline-flex h-12 items-center bg-ds-primary px-8 text-[13px] text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 Get started
               </MagneticLink>
               <Link
                 href="/sign-in"
-                className="rounded-ds-sm border border-ds-border-strong px-5 py-3 text-sm font-semibold text-ds-text-primary transition-colors hover:border-ds-accent-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="ds-btn-label inline-flex h-12 items-center border border-ds-text-primary px-8 text-[13px] text-ds-text-primary hover:border-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 Sign in
               </Link>
@@ -237,19 +237,19 @@ export default function HomePage() {
       </section>
 
       {/* Channels strip */}
-      <section className="border-b border-ds-border px-6 py-16">
+      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <div className="mx-auto max-w-5xl">
           <Reveal>
-            <h2 className="text-center text-xl font-semibold text-ds-text-primary md:text-2xl">
+            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
               Works where your customers already message you
             </h2>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 gap-px border border-ds-border bg-ds-border sm:grid-cols-3">
             {CHANNELS.map((channel, index) => (
               <Reveal key={channel.label} delay={index * 0.05}>
-                <div className="flex h-full flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-ds-border-strong hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.5)]">
-                  <channel.icon className="size-5 text-ds-accent-muted" aria-hidden="true" />
-                  <span className="text-sm font-semibold text-ds-text-primary">{channel.label}</span>
+                <div className="flex h-full flex-col gap-3 bg-ds-bg p-6 lg:p-8">
+                  <channel.icon className="size-5 text-ds-text-primary" aria-hidden="true" />
+                  <span className="text-sm font-medium text-ds-text-primary">{channel.label}</span>
                   <p className="text-sm text-ds-text-secondary">{channel.detail}</p>
                 </div>
               </Reveal>
@@ -259,10 +259,10 @@ export default function HomePage() {
       </section>
 
       {/* How it works -- each step paired with the fragment that shows it. */}
-      <section className="border-b border-ds-border px-6 py-20">
+      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <div className="mx-auto max-w-5xl">
           <Reveal>
-            <h2 className="text-center text-2xl font-semibold text-ds-text-primary md:text-3xl">
+            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
               How it works
             </h2>
           </Reveal>
@@ -275,11 +275,11 @@ export default function HomePage() {
                   }`}
                 >
                   <div className="flex flex-1 items-start gap-4">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-ds-accent-muted text-sm font-semibold text-ds-accent">
+                    <span className="ds-label flex size-9 shrink-0 items-center justify-center border border-ds-border-strong text-ds-text-secondary">
                       {index + 1}
                     </span>
                     <div className="flex flex-col gap-1">
-                      <p className="text-base font-semibold text-ds-text-primary">{step.label}</p>
+                      <p className="text-base font-medium text-ds-text-primary">{step.label}</p>
                       <p className="text-sm text-ds-text-secondary">{step.detail}</p>
                     </div>
                   </div>
@@ -292,11 +292,11 @@ export default function HomePage() {
       </section>
 
       {/* Dashboard shot -- a real screenshot of the inbox, framed. */}
-      <section className="border-b border-ds-border px-6 py-20">
+      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <div className="mx-auto max-w-5xl">
           <Reveal>
-            <div className="flex flex-col items-center gap-2 text-center">
-              <h2 className="text-2xl font-semibold text-ds-text-primary md:text-3xl">
+            <div className="flex flex-col items-start gap-4 text-left">
+              <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
                 Every conversation, with full context
               </h2>
               <p className="max-w-xl text-sm text-ds-text-secondary">
@@ -328,11 +328,11 @@ export default function HomePage() {
       </section>
 
       {/* Capabilities bento */}
-      <section className="border-b border-ds-border px-6 py-20">
+      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <div className="mx-auto max-w-6xl">
           <Reveal>
-            <div className="flex flex-col items-center gap-2 text-center">
-              <h2 className="text-2xl font-semibold text-ds-text-primary md:text-3xl">
+            <div className="flex flex-col items-start gap-4 text-left">
+              <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
                 What your AI employee actually does
               </h2>
               <p className="max-w-xl text-sm text-ds-text-secondary">
@@ -341,16 +341,16 @@ export default function HomePage() {
               </p>
             </div>
           </Reveal>
-          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 gap-px border border-ds-border bg-ds-border sm:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((capability, index) => (
               <Reveal key={capability.title} delay={(index % 3) * 0.05}>
                 <div
-                  className={`flex h-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-ds-border-strong hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.5)] ${
+                  className={`flex h-full flex-col gap-4 bg-ds-bg p-6 lg:p-8 ${
                     capability.span === "wide" ? "lg:col-span-2" : ""
                   }`}
                 >
                   <div className="flex flex-col gap-2">
-                    <h3 className="text-sm font-semibold text-ds-text-primary">{capability.title}</h3>
+                    <h3 className="text-sm font-medium text-ds-text-primary">{capability.title}</h3>
                     <p className="text-sm text-ds-text-secondary">{capability.detail}</p>
                   </div>
                   <div className="mt-auto">{capability.visual}</div>
@@ -362,19 +362,19 @@ export default function HomePage() {
       </section>
 
       {/* Trust and boundaries */}
-      <section className="border-b border-ds-border px-6 py-20">
+      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <div className="mx-auto max-w-5xl">
           <Reveal>
-            <div className="flex flex-col items-center gap-2 text-center">
-              <h2 className="text-2xl font-semibold text-ds-text-primary md:text-3xl">
+            <div className="flex flex-col items-start gap-4 text-left">
+              <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
                 What your AI employee will never do
               </h2>
             </div>
           </Reveal>
-          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 gap-px border border-ds-border bg-ds-border sm:grid-cols-3">
             {BOUNDARIES.map((boundary, index) => (
               <Reveal key={boundary} delay={index * 0.05}>
-                <div className="flex h-full items-start gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+                <div className="flex h-full items-start gap-3 bg-ds-bg p-6 lg:p-8">
                   <span aria-hidden="true" className="mt-0.5 text-ds-danger">
                     ✕
                   </span>
@@ -384,8 +384,8 @@ export default function HomePage() {
             ))}
           </div>
           <Reveal delay={0.15}>
-            <div className="mt-12 rounded-ds-lg border border-ds-border bg-ds-surface p-6">
-              <p className="mb-6 text-center text-sm font-medium text-ds-text-primary">
+            <div className="mt-12 border border-ds-border bg-ds-surface p-6">
+              <p className="ds-label mb-6 text-ds-text-muted text-ds-text-primary">
                 Tenant isolation, enforced at the database level
               </p>
               <TenantIsolationDiagram />
@@ -395,10 +395,10 @@ export default function HomePage() {
       </section>
 
       {/* FAQ */}
-      <section className="border-b border-ds-border px-6 py-20">
+      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <div className="mx-auto max-w-3xl">
           <Reveal>
-            <h2 className="text-center text-2xl font-semibold text-ds-text-primary md:text-3xl">
+            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
               Frequently asked questions
             </h2>
           </Reveal>
@@ -411,15 +411,15 @@ export default function HomePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="px-6 py-20">
+      <section className="px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
         <Reveal>
-          <div className="mx-auto flex max-w-3xl flex-col items-center gap-6 rounded-ds-lg border border-ds-border-strong bg-ds-surface px-8 py-14 text-center">
-            <h2 className="text-2xl font-semibold text-ds-text-primary md:text-3xl">
+          <div className="mx-auto flex max-w-3xl flex-col items-start gap-6 border border-ds-border bg-ds-surface px-8 py-14 text-left">
+            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
               Your business already has the answers. Give your AI employee access to them.
             </h2>
             <MagneticLink
               href="/sign-up"
-              className="inline-block rounded-ds-sm bg-ds-accent px-6 py-3 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="ds-btn-label inline-flex h-12 items-center bg-ds-primary px-8 text-[13px] text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Get started
             </MagneticLink>

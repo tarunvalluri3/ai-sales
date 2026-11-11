@@ -68,8 +68,8 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <section className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Lead score</h2>
+          <section className="border border-ds-border bg-ds-surface p-4">
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Lead score</h2>
             {latestLead ? (
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
@@ -84,7 +84,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
                 </p>
                 {scoreHistory.length > 0 ? (
                   <div className="flex flex-col gap-1.5 border-t border-ds-border pt-3">
-                    <span className="text-2xs font-semibold tracking-wide-ds text-ds-text-secondary uppercase">
+                    <span className="text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
                       Deterministic score history
                     </span>
                     {scoreHistory.map((entry) => (
@@ -111,8 +111,8 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
             )}
           </section>
 
-          <section className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Conversations ({conversations.length})</h2>
+          <section className="border border-ds-border bg-ds-surface p-4">
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Conversations ({conversations.length})</h2>
             {conversations.length === 0 ? (
               <p className="text-sm text-ds-text-muted">No conversations yet.</p>
             ) : (
@@ -121,7 +121,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
                   <li key={conversation.id}>
                     <Link
                       href={`/dashboard/conversations/${conversation.id}`}
-                      className="flex items-center justify-between gap-2 rounded-ds-sm px-2 py-1.5 text-sm transition-colors hover:bg-ds-surface-soft"
+                      className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm transition-colors hover:bg-ds-surface-soft"
                     >
                       <span className="text-ds-text-primary">{channelLabel(conversation.source)}</span>
                       <span className="flex items-center gap-2 text-xs text-ds-text-muted">
@@ -136,14 +136,14 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
             )}
           </section>
 
-          <section className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Appointments ({appointments.length})</h2>
+          <section className="border border-ds-border bg-ds-surface p-4">
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Appointments ({appointments.length})</h2>
             {appointments.length === 0 ? (
               <p className="text-sm text-ds-text-muted">No appointments yet.</p>
             ) : (
               <ul className="flex flex-col gap-2">
                 {appointments.map((appointment) => (
-                  <li key={appointment.id} className="flex items-center justify-between gap-2 rounded-ds-sm px-2 py-1.5 text-sm">
+                  <li key={appointment.id} className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm">
                     <span className="text-ds-text-primary">{formatDate(appointment.starts_at)}</span>
                     <Badge tone={appointment.status === "confirmed" || appointment.status === "completed" ? "success" : appointment.status === "declined" || appointment.status === "cancelled" || appointment.status === "no_show" || appointment.status === "expired" ? "danger" : "warning"} size="sm">
                       {APPOINTMENT_STATUS_LABEL[appointment.status]}
@@ -156,8 +156,8 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
         </div>
 
         <div className="flex flex-col gap-6">
-          <section className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Tags</h2>
+          <section className="border border-ds-border bg-ds-surface p-4">
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Tags</h2>
             <div className="flex flex-wrap items-center gap-1.5">
               {tags.map((tag) => (
                 <RemovableTagChip
@@ -175,8 +175,8 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
             </div>
           </section>
 
-          <section className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Leads ({leads.length})</h2>
+          <section className="border border-ds-border bg-ds-surface p-4">
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Leads ({leads.length})</h2>
             {leads.length === 0 ? (
               <p className="text-sm text-ds-text-muted">No leads yet.</p>
             ) : (
@@ -185,7 +185,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
                   <li key={lead.id}>
                     <Link
                       href={`/dashboard/conversations/${lead.conversation_id}`}
-                      className="flex flex-col gap-1 rounded-ds-sm px-2 py-1.5 transition-colors hover:bg-ds-surface-soft"
+                      className="flex flex-col gap-1 px-2 py-1.5 transition-colors hover:bg-ds-surface-soft"
                     >
                       <div className="flex items-center gap-2">
                         <Badge tone={QUALIFICATION_TONE[lead.qualification]} size="sm">

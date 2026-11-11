@@ -76,19 +76,19 @@ export function ConfirmActionDialog({
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-action-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ds-bg/80 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ds-scrim p-4"
           onKeyDown={(e) => {
             if (e.key === "Escape") close();
           }}
         >
           <div
             ref={panelRef as React.RefObject<HTMLDivElement>}
-            className="flex w-full max-w-md flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface-elevated p-6 shadow-lg"
+            className="flex w-full max-w-md flex-col gap-4 border border-ds-border bg-ds-surface p-6"
           >
             <div className="flex items-start gap-3">
               <AlertTriangle className={`mt-0.5 size-5 shrink-0 ${dangerous ? "text-ds-danger" : "text-ds-warning"}`} aria-hidden="true" />
               <div className="flex flex-col gap-1">
-                <h2 id="confirm-action-dialog-title" className="text-base font-semibold text-ds-text-primary">
+                <h2 id="confirm-action-dialog-title" className="text-base font-medium text-ds-text-primary">
                   {title}
                 </h2>
                 <p className="text-sm text-ds-text-secondary">{description}</p>
@@ -103,7 +103,7 @@ export function ConfirmActionDialog({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={3}
-                className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                 placeholder="Why are you doing this?"
               />
             </label>
@@ -116,7 +116,7 @@ export function ConfirmActionDialog({
                 <input
                   value={typedConfirm}
                   onChange={(e) => setTypedConfirm(e.target.value)}
-                  className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  className="border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                 />
               </label>
             ) : null}
@@ -127,7 +127,7 @@ export function ConfirmActionDialog({
               <button
                 type="button"
                 onClick={close}
-                className="rounded-ds-sm px-3 py-1.5 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="px-3 py-1.5 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 Cancel
               </button>
@@ -135,9 +135,9 @@ export function ConfirmActionDialog({
                 type="button"
                 onClick={handleSubmit}
                 disabled={isPending || reason.trim().length < 3 || confirmMismatch || !extraValid}
-                className={`rounded-ds-sm px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+                className={`ds-label px-4 py-2 transition-colors disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                   dangerous
-                    ? "bg-ds-danger text-ds-danger-on hover:opacity-90"
+                    ? "border border-ds-danger bg-transparent text-ds-danger hover:bg-ds-danger-bg"
                     : "bg-dashboard-primary text-dashboard-on-primary hover:bg-dashboard-primary-hover"
                 }`}
               >

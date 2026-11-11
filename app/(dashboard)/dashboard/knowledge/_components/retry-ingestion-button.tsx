@@ -32,7 +32,7 @@ export function RetryIngestionButton({
         type="submit"
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="ds-btn-label bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Retrying…" : "Retry"}
       </button>

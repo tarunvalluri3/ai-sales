@@ -1,18 +1,20 @@
 /**
- * Literal hex values mirroring the CSS custom properties in
- * `app/(dashboard)/globals.css`. Recharts renders to raw SVG and cannot
- * reliably resolve `var(--ds-*)` for fill/stroke props, so this is the one
- * place those values are duplicated — keep it in sync with globals.css.
+ * Chart colours as CSS variable references into the design tokens in
+ * `app/(dashboard)/globals.css`, so charts flip with the light/dark theme
+ * and nothing is duplicated. Recharts writes these straight into SVG
+ * `fill`/`stroke` presentation attributes, which resolve `var()`.
+ * Palette rule: ink/paper greys plus at most one red series.
  */
 export const chartColors = {
-  accent: "#d7f24e",
-  accentStrong: "#e8ff5e",
-  accentMuted: "#9aab5c",
-  success: "#9ecb4f",
-  warning: "#d9a94f",
-  danger: "#e0664f",
-  textSecondary: "#a8a190",
-  textMuted: "#948d79",
-  border: "rgba(242, 237, 225, 0.1)",
-  surfaceElevated: "#1e1b13",
+  ink: "var(--ds-text-primary)",
+  accent: "var(--ds-accent)",
+  accentStrong: "var(--ds-accent-strong)",
+  accentMuted: "var(--ds-text-faint)",
+  success: "var(--ds-success)",
+  warning: "var(--ds-warning)",
+  danger: "var(--ds-danger)",
+  textSecondary: "var(--ds-text-secondary)",
+  textMuted: "var(--ds-text-muted)",
+  border: "var(--ds-border)",
+  surfaceElevated: "var(--ds-surface-raised)",
 } as const;

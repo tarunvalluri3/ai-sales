@@ -23,7 +23,7 @@ export default async function ServicesPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Services</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Services</h1>
         <p className="text-sm text-ds-text-secondary">
           What your AI sales employee can tell prospects you offer.
         </p>
@@ -36,7 +36,7 @@ export default async function ServicesPage() {
             {pendingServices.map((service) => (
               <li
                 key={service.id}
-                className="flex items-center justify-between gap-4 rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
+                className="flex items-center justify-between gap-4 border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   {service.image_url ? (
@@ -44,7 +44,7 @@ export default async function ServicesPage() {
                     <img
                       src={service.image_url}
                       alt=""
-                      className="h-12 w-12 shrink-0 rounded-ds-sm object-cover"
+                      className="h-12 w-12 shrink-0 object-cover"
                     />
                   ) : null}
                   <div className="flex min-w-0 flex-col gap-0.5">
@@ -61,7 +61,7 @@ export default async function ServicesPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-4">
                   {service.price ? (
-                    <span className="text-sm font-semibold text-ds-accent">${service.price}</span>
+                    <span className="text-sm font-medium text-ds-accent">${service.price}</span>
                   ) : null}
                   <ReviewActions
                     approveAction={approveServiceAction}
@@ -85,7 +85,7 @@ export default async function ServicesPage() {
         <ServicesList services={services} canEdit={canEdit} deleteServiceAction={deleteServiceAction} />
       )}
 
-      <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex w-full max-w-sm flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-medium text-ds-text-primary">Add a service</h2>
         {canEdit ? (
           <ServiceForm action={createServiceAction} submitLabel="Add service" pendingLabel="Adding…" />

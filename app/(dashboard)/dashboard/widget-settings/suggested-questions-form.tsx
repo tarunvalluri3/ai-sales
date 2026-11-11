@@ -82,15 +82,15 @@ export function SuggestedQuestionsForm({
   const isPending = isGenerating || isSaving;
 
   return (
-    <div className="flex w-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <div className="flex w-full flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           aria-expanded={open}
         >
-          <h2 className="text-lg font-semibold text-ds-text-primary">Prefilled questions</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">Prefilled questions</h2>
           <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
         </button>
         <p className="text-sm text-ds-text-secondary">
@@ -107,7 +107,7 @@ export function SuggestedQuestionsForm({
         onClick={handleGenerate}
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="self-start rounded-ds-sm border border-ds-border px-4 py-2 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="self-start border border-ds-border px-4 py-2 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isGenerating ? "Generating…" : questions.length > 0 ? "Regenerate with AI" : "Generate with AI"}
       </button>
@@ -122,7 +122,7 @@ export function SuggestedQuestionsForm({
                   aria-label="Move up"
                   disabled={isPending || !canEdit || index === 0}
                   onClick={() => moveQuestion(index, -1)}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:h-11 pointer-coarse:w-11"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:h-11 pointer-coarse:w-11"
                 >
                   ▲
                 </button>
@@ -131,7 +131,7 @@ export function SuggestedQuestionsForm({
                   aria-label="Move down"
                   disabled={isPending || !canEdit || index === questions.length - 1}
                   onClick={() => moveQuestion(index, 1)}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:h-11 pointer-coarse:w-11"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:h-11 pointer-coarse:w-11"
                 >
                   ▼
                 </button>
@@ -150,7 +150,7 @@ export function SuggestedQuestionsForm({
                 aria-label="Remove question"
                 disabled={isPending || !canEdit}
                 onClick={() => removeQuestion(index)}
-                className="shrink-0 rounded-ds-sm px-2 py-2 text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-danger disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="shrink-0 px-2 py-2 text-ds-text-muted transition-colors hover:bg-ds-surface-elevated hover:text-ds-danger disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 ✕
               </button>
@@ -198,7 +198,7 @@ export function SuggestedQuestionsForm({
         onClick={handleSave}
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isSaving ? "Saving…" : "Save suggested questions"}
       </button>

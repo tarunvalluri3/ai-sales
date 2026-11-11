@@ -84,7 +84,7 @@ export function HeroConversation() {
       <div
         role="tablist"
         aria-label="Channel"
-        className="mb-3 flex gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-1"
+        className="mb-3 flex gap-1 border border-ds-border bg-ds-surface p-1"
       >
         {CHANNELS.map(({ id, label, icon: Icon }) => {
           const active = id === channel;
@@ -95,7 +95,7 @@ export function HeroConversation() {
               role="tab"
               aria-selected={active}
               onClick={() => handleChannelChange(id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-ds-sm px-2 py-1.5 text-2xs font-medium tracking-wide-ds uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+              className={`flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-2xs font-medium tracking-wide-ds uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                 active
                   ? "bg-ds-surface-elevated text-ds-text-primary"
                   : "text-ds-text-muted hover:text-ds-text-secondary"
@@ -108,13 +108,13 @@ export function HeroConversation() {
         })}
       </div>
 
-      <div className="rounded-ds-lg border border-ds-border-strong bg-ds-surface p-4 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.6)]">
+      <div className="border border-ds-border-strong bg-ds-surface p-4">
         <div className="mb-4 flex items-center gap-2 border-b border-ds-border pb-3">
-          <span className="flex size-7 items-center justify-center rounded-full bg-ds-accent text-xs font-semibold text-ds-accent-on">
+          <span className="flex size-7 items-center justify-center rounded-full bg-ds-primary text-xs font-medium text-ds-primary-on">
             L
           </span>
           <div className="flex flex-col">
-            <span className="text-xs font-semibold text-ds-text-primary">Lumen Dental Studio</span>
+            <span className="text-xs font-medium text-ds-text-primary">Lumen Dental Studio</span>
             <span className="flex items-center gap-1.5 text-2xs text-ds-success">
               <span className="relative flex size-1.5">
                 {!reducedMotion ? (
@@ -147,7 +147,7 @@ export function HeroConversation() {
           ) : null}
 
           {showBooking ? (
-            <div className="flex items-center justify-between gap-2 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2">
+            <div className="flex items-center justify-between gap-2 border border-ds-border bg-ds-surface-elevated px-3 py-2">
               <span className="text-2xs font-medium text-ds-text-primary">Appointment booked</span>
               <span className="font-mono text-2xs text-ds-text-secondary">Thu · 4:30 PM</span>
             </div>
@@ -162,10 +162,10 @@ function ChatBubble({ tone, children }: { tone: "prospect" | "ai"; children: str
   const isProspect = tone === "prospect";
   return (
     <div
-      className={`max-w-[85%] rounded-ds-md px-3 py-2 text-xs text-ds-text-primary ${
+      className={`max-w-[85%] px-3 py-2 text-xs text-ds-text-primary ${
         isProspect
-          ? "self-start rounded-tl-sm bg-ds-surface-elevated"
-          : "self-start rounded-tl-sm bg-ds-accent-soft-bg"
+          ? "self-start bg-ds-surface-elevated"
+          : "self-start bg-ds-surface-raised"
       }`}
     >
       {children}
@@ -175,7 +175,7 @@ function ChatBubble({ tone, children }: { tone: "prospect" | "ai"; children: str
 
 function TypingBubble() {
   return (
-    <div className="flex w-fit items-center gap-1 self-start rounded-ds-md rounded-tl-sm bg-ds-surface-elevated px-3 py-2.5">
+    <div className="flex w-fit items-center gap-1 self-start bg-ds-surface-elevated px-3 py-2.5">
       {[0, 1, 2].map((i) => (
         <span
           key={i}

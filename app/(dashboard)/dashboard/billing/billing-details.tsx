@@ -29,7 +29,7 @@ export type BillingIdentityValues = {
 };
 
 const fieldClass =
-  "rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 export function BillingDetailsFields({
   defaults,
@@ -163,15 +163,15 @@ export function BillingDetailsCard({
     <section
       id="billing-details"
       aria-labelledby="billing-details-heading"
-      className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5"
+      className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5"
     >
       <div className="flex flex-col gap-1">
-        <h2 id="billing-details-heading" className="text-base font-semibold text-ds-text-primary">
+        <h2 id="billing-details-heading" className="text-base font-medium text-ds-text-primary">
           Billing details
         </h2>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           This is who your GST tax invoices are made out to.{" "}
-          <strong className="font-semibold text-ds-text-primary">
+          <strong className="font-medium text-ds-text-primary">
             Changes apply to future invoices only
           </strong>{" "}
           — an invoice we have already issued is a legal record and is never altered.
@@ -187,7 +187,7 @@ export function BillingDetailsCard({
         {state.error ? (
           <p
             role="alert"
-            className="rounded-ds-sm border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary"
+            className="border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary"
           >
             {state.error}
           </p>
@@ -204,7 +204,7 @@ export function BillingDetailsCard({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {pending ? "Saving…" : "Save billing details"}
           </button>

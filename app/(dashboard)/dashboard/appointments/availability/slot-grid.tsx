@@ -8,7 +8,7 @@ function label(entry: SlotGridEntry): string {
   return "";
 }
 
-const TAG_STYLE = "rounded-ds-sm px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase";
+const TAG_STYLE = "px-2 py-0.5 text-2xs font-medium tracking-wide-ds uppercase";
 
 /** One day's slots, open ones plain, booked/blocked ones tagged -- past slots are filtered out before this ever renders (nothing to do with them). A flat divided list, not a card per slot. */
 export function SlotGrid({ entries, canEdit }: { entries: SlotGridEntry[]; canEdit: boolean }) {
@@ -28,7 +28,7 @@ export function SlotGrid({ entries, canEdit }: { entries: SlotGridEntry[]; canEd
             <span className="text-sm text-ds-text-primary">{entry.label}</span>
             {entry.state !== "open" ? (
               <span
-                className={`${TAG_STYLE} ${entry.state === "blocked" ? "bg-ds-danger-bg text-ds-danger" : "bg-ds-accent-soft-bg text-ds-accent-muted"}`}
+                className={`${TAG_STYLE} ${entry.state === "blocked" ? "bg-ds-danger-bg text-ds-danger" : "bg-ds-surface-raised text-ds-text-primary"}`}
               >
                 {label(entry)}
               </span>

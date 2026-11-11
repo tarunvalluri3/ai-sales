@@ -1,11 +1,17 @@
 import type { Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Hanken_Grotesk, Space_Grotesk } from "next/font/google";
 import "./widget.css";
 
-const inter = Inter({
+const hanken = Hanken_Grotesk({
   variable: "--widget-font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["300", "400", "500"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--widget-font-label",
+  subsets: ["latin"],
+  weight: ["500"],
 });
 
 // The widget's own document (loaded via <iframe src="/widget/embed">) had no
@@ -29,7 +35,7 @@ export default function WidgetRootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${hanken.variable} ${spaceGrotesk.variable}`}>
       <body>{children}</body>
     </html>
   );

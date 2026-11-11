@@ -9,7 +9,7 @@ import { advanceOnboarding } from "../../actions";
 import { useOnboardingPreview } from "../preview-context";
 
 const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
 
 const TONES: { key: "friendly" | "professional" | "concise"; label: string; example: string }[] = [
   { key: "friendly", label: "Friendly", example: "Hey there! Happy to help you find the right fit 😊" },
@@ -68,7 +68,7 @@ export function PersonaStep({ business }: { business: Business }) {
 
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-ds-text-primary">Agent name</span>
-        <p className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-secondary">
+        <p className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-secondary">
           {business.name}
         </p>
         <p className="text-xs text-ds-text-muted">
@@ -90,11 +90,11 @@ export function PersonaStep({ business }: { business: Business }) {
                 update({ greeting: next });
               }}
               aria-pressed={tone === t.key}
-              className={`flex flex-col gap-1 rounded-ds-md border p-3 text-left transition-colors ${
-                tone === t.key ? "border-ds-accent bg-ds-accent-soft-bg" : "border-ds-border hover:border-ds-border-strong"
+              className={`flex flex-col gap-1 border p-3 text-left transition-colors ${
+                tone === t.key ? "border-ds-text-primary bg-ds-surface-raised" : "border-ds-border hover:border-ds-border-strong"
               }`}
             >
-              <span className="text-sm font-semibold text-ds-text-primary">{t.label}</span>
+              <span className="text-sm font-medium text-ds-text-primary">{t.label}</span>
               <span className="text-xs text-ds-text-secondary">{t.example}</span>
             </button>
           ))}
@@ -158,7 +158,7 @@ export function PersonaStep({ business }: { business: Business }) {
           <button
             type="submit"
             disabled={isPending || !valid}
-            className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : "Continue"}
           </button>

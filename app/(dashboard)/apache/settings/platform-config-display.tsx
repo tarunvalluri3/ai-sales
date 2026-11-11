@@ -8,27 +8,27 @@ import type { getPlatformSettingsSnapshot } from "@/lib/admin-settings";
 export function PlatformConfigDisplay({ settings }: { settings: ReturnType<typeof getPlatformSettingsSnapshot> }) {
   return (
     <div className="flex flex-col gap-4">
-      <p className="rounded-ds-sm bg-ds-surface-soft px-3 py-2 text-xs text-ds-text-secondary">
+      <p className="bg-ds-surface-soft px-3 py-2 text-xs text-ds-text-secondary">
         These figures are the live source of truth (lib/plans.ts, lib/gemini-pricing.ts) -- changing any of them requires a code change and a new deploy, by deliberate design (see those files&apos; own headers), not an admin-UI edit.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <div className="border border-ds-border bg-ds-surface p-4">
           <p className="text-xs text-ds-text-muted">Trial length</p>
-          <p className="text-lg font-semibold text-ds-text-primary">{settings.trialDays} days</p>
+          <p className="text-lg font-medium text-ds-text-primary">{settings.trialDays} days</p>
         </div>
-        <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <div className="border border-ds-border bg-ds-surface p-4">
           <p className="text-xs text-ds-text-muted">Trial reply quota (TRIAL_REPLY_QUOTA)</p>
-          <p className="text-lg font-semibold text-ds-text-primary">{settings.trialReplyQuota.toLocaleString()}</p>
+          <p className="text-lg font-medium text-ds-text-primary">{settings.trialReplyQuota.toLocaleString()}</p>
           <p className="text-2xs text-ds-text-muted">Last-known plan kept {settings.subscriptionLastKnownMaxHours} h on a read failure</p>
         </div>
-        <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <div className="border border-ds-border bg-ds-surface p-4">
           <p className="text-xs text-ds-text-muted">Past-due grace period</p>
-          <p className="text-lg font-semibold text-ds-text-primary">{settings.pastDueGraceDays} days</p>
+          <p className="text-lg font-medium text-ds-text-primary">{settings.pastDueGraceDays} days</p>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-ds-lg border border-ds-border">
+      <div className="overflow-x-auto border border-ds-border">
         <table className="w-full text-sm">
           <thead className="bg-ds-surface-soft text-left text-xs text-ds-text-muted">
             <tr>
@@ -58,7 +58,7 @@ export function PlatformConfigDisplay({ settings }: { settings: ReturnType<typeo
         </table>
       </div>
 
-      <div className="overflow-x-auto rounded-ds-lg border border-ds-border">
+      <div className="overflow-x-auto border border-ds-border">
         <table className="w-full text-sm">
           <thead className="bg-ds-surface-soft text-left text-xs text-ds-text-muted">
             <tr>

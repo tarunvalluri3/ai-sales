@@ -26,16 +26,16 @@ const BENEFITS = [
  */
 export function ConnectInstagramButton() {
   return (
-    <section className="flex flex-col gap-6 rounded-ds-lg border border-ds-border bg-ds-surface p-6">
+    <section className="flex flex-col gap-6 border border-ds-border bg-ds-surface p-6">
       <div className="flex items-start gap-4">
         <div
           aria-hidden="true"
-          className="flex size-12 shrink-0 items-center justify-center rounded-ds-lg bg-[linear-gradient(135deg,#feda75_0%,#fa7e1e_25%,#d62976_50%,#962fbf_75%,#4f5bd5_100%)] text-white shadow-sm"
+          className="flex size-12 shrink-0 items-center justify-center border border-ds-border bg-ds-surface-raised text-ds-text-primary"
         >
           <Camera className="size-6" aria-hidden="true" />
         </div>
         <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-semibold text-ds-text-primary">Connect your Instagram account</h2>
+          <h2 className="text-sm font-medium text-ds-text-primary">Connect your Instagram account</h2>
           <p className="max-w-md text-sm text-ds-text-secondary">
             Log in with Facebook and choose the Facebook Page linked to your Instagram professional account.
           </p>
@@ -44,7 +44,7 @@ export function ConnectInstagramButton() {
 
       <ul className="grid gap-3 sm:grid-cols-3">
         {BENEFITS.map((benefit) => (
-          <li key={benefit.title} className="flex flex-col gap-1.5 rounded-ds-md bg-ds-surface-soft p-3">
+          <li key={benefit.title} className="flex flex-col gap-1.5 bg-ds-surface-soft p-3">
             <benefit.icon className="size-4 text-ds-accent" aria-hidden="true" />
             <p className="text-xs font-medium text-ds-text-primary">{benefit.title}</p>
             <p className="text-xs text-ds-text-muted">{benefit.description}</p>
@@ -58,7 +58,7 @@ export function ConnectInstagramButton() {
         </p>
         <a
           href={INSTAGRAM_CONNECT_PATH}
-          className="inline-flex w-fit items-center gap-2 rounded-ds-md bg-ds-accent px-4 py-2.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label inline-flex w-fit items-center gap-2 bg-ds-primary px-4 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           <Camera className="size-4" aria-hidden="true" />
           Connect Instagram

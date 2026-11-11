@@ -33,19 +33,19 @@ export function OnboardingPreviewPanel() {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Setup essentials completed"
-          className="h-2 w-full overflow-hidden rounded-full bg-ds-surface-elevated"
+          className="h-2 w-full overflow-hidden bg-ds-surface-raised"
         >
-          <div className="h-full rounded-full bg-ds-accent transition-all" style={{ width: `${percent}%` }} />
+          <div className="h-full bg-ds-primary transition-all" style={{ width: `${percent}%` }} />
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-ds-lg border border-ds-border bg-ds-surface shadow-sm">
+      <div className="flex flex-1 flex-col overflow-hidden border border-ds-border bg-ds-surface">
         <div className="flex items-center justify-between gap-2 border-b border-ds-border bg-ds-surface-elevated px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-full bg-ds-accent text-ds-accent-on">
+            <span className="flex size-7 items-center justify-center rounded-full bg-ds-primary text-ds-primary-on">
               <MessageCircle aria-hidden className="size-3.5" />
             </span>
-            <span className="text-sm font-semibold text-ds-text-primary">
+            <span className="text-sm font-medium text-ds-text-primary">
               {preview.businessName || "Your AI sales employee"}
             </span>
           </div>
@@ -55,30 +55,30 @@ export function OnboardingPreviewPanel() {
         </div>
 
         <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-          <div className="max-w-[85%] rounded-ds-md bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
+          <div className="max-w-[85%] bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
             {greeting}
           </div>
 
           {preview.firstFaqQuestion ? (
             <>
-              <div className="ml-auto max-w-[85%] rounded-ds-md bg-ds-accent-soft-bg px-3 py-2 text-sm text-ds-text-primary">
+              <div className="ml-auto max-w-[85%] bg-ds-surface-raised px-3 py-2 text-sm text-ds-text-primary">
                 {preview.firstFaqQuestion}
               </div>
-              <div className="max-w-[85%] rounded-ds-md bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
+              <div className="max-w-[85%] bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
                 {preview.firstFaqAnswer}
               </div>
             </>
           ) : preview.firstProductName ? (
             <>
-              <div className="ml-auto max-w-[85%] rounded-ds-md bg-ds-accent-soft-bg px-3 py-2 text-sm text-ds-text-primary">
+              <div className="ml-auto max-w-[85%] bg-ds-surface-raised px-3 py-2 text-sm text-ds-text-primary">
                 Do you have {preview.firstProductName}?
               </div>
-              <div className="max-w-[85%] rounded-ds-md bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
+              <div className="max-w-[85%] bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
                 Yes, we do! Want me to tell you more about {preview.firstProductName}?
               </div>
             </>
           ) : (
-            <p className="rounded-ds-md border border-dashed border-ds-border px-3 py-6 text-center text-xs text-ds-text-muted">
+            <p className="border border-dashed border-ds-border px-3 py-6 text-center text-xs text-ds-text-muted">
               Add a product, service or FAQ and a sample conversation will appear here.
             </p>
           )}

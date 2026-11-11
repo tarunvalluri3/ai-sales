@@ -21,10 +21,10 @@ export function KpiTile({
 }) {
   const content = (
     <>
-      <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
+      <span className="ds-label text-ds-text-muted">
         {label}
       </span>
-      <span className="text-3xl font-semibold text-ds-text-primary">
+      <span className="font-label text-3xl font-normal tabular-nums text-ds-text-primary">
         {value}
         {suffix}
       </span>
@@ -34,7 +34,7 @@ export function KpiTile({
 
   if (!href) {
     return (
-      <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
         {content}
       </div>
     );
@@ -43,7 +43,7 @@ export function KpiTile({
   return (
     <Link
       href={href}
-      className="group flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5 transition-colors hover:border-ds-border-strong hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+      className="group flex flex-col gap-3 border border-ds-border bg-ds-surface p-5 transition-colors hover:border-ds-border-strong hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
     >
       {content}
     </Link>

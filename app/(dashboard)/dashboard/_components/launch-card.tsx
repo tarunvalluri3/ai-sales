@@ -16,11 +16,11 @@ export function LaunchCard({ snippet }: { snippet: string | null }) {
   return (
     <section
       aria-labelledby="launch-card-heading"
-      className="flex flex-col gap-4 rounded-ds-lg border border-ds-success/40 bg-ds-success-bg p-5"
+      className="flex flex-col gap-4 border border-ds-success/40 bg-ds-success-bg p-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 id="launch-card-heading" className="text-lg font-semibold text-ds-text-primary">
+          <h2 id="launch-card-heading" className="text-lg font-medium text-ds-text-primary">
             Your AI sales employee is live
           </h2>
           <p className="text-sm text-ds-text-secondary">
@@ -29,7 +29,7 @@ export function LaunchCard({ snippet }: { snippet: string | null }) {
         </div>
         <Link
           href="/dashboard"
-          className="shrink-0 text-xs font-medium text-ds-text-secondary hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="shrink-0 text-xs font-medium text-ds-text-secondary hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Dismiss
         </Link>
@@ -40,7 +40,7 @@ export function LaunchCard({ snippet }: { snippet: string | null }) {
           <li key={step.href}>
             <Link
               href={step.href}
-              className="flex h-full flex-col gap-1 rounded-ds-md border border-ds-border bg-ds-surface p-3 transition-colors hover:border-ds-accent-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="flex h-full flex-col gap-1 border border-ds-border bg-ds-surface p-3 transition-colors hover:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               <span className="text-sm font-medium text-ds-text-primary">
                 {index + 1}. {step.label}
@@ -55,7 +55,7 @@ export function LaunchCard({ snippet }: { snippet: string | null }) {
         <div className="flex flex-col gap-2">
           <p className="text-xs font-medium text-ds-text-primary">Website embed code</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 overflow-x-auto rounded-ds-sm bg-ds-surface px-3 py-2 text-xs text-ds-text-secondary">
+            <code className="flex-1 overflow-x-auto bg-ds-surface px-3 py-2 text-xs text-ds-text-secondary">
               {snippet}
             </code>
             <CopyKeyButton value={snippet} />

@@ -14,14 +14,14 @@ export function DateRangePicker({ current }: { current: number }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex items-center gap-1 rounded-ds-sm border border-ds-border bg-ds-surface-soft p-0.5">
+    <div className="flex items-center gap-1 border border-ds-border bg-ds-surface-soft p-0.5">
       {PRESETS.map((preset) => (
         <button
           key={preset.days}
           type="button"
           onClick={() => router.push(`${pathname}?range=${preset.days}`)}
           aria-current={current === preset.days ? "true" : undefined}
-          className={`rounded-ds-sm px-3 py-1 text-xs font-medium transition-colors ${
+          className={`px-3 py-1 text-xs font-medium transition-colors ${
             current === preset.days
               ? "bg-dashboard-primary text-dashboard-on-primary"
               : "text-ds-text-secondary hover:text-ds-text-primary"

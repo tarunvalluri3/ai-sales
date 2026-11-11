@@ -36,7 +36,7 @@ const NOTICE_TONE: Record<"success" | "danger", string> = {
 };
 
 const SECONDARY_BUTTON =
-  "rounded-ds-md border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 function statusOf(entry: AnswerBankEntryView): { tone: BadgeTone; label: string; hint: string } {
   if (entry.status === "ready" && entry.fresh) {
@@ -74,7 +74,7 @@ export default async function AnswerBankPage({ searchParams }: { searchParams: P
     <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex max-w-2xl flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-ds-text-primary">Instant answers</h1>
+          <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Instant answers</h1>
           <p className="text-sm text-ds-text-secondary">
             Answers your visitors get with no waiting: greetings, your suggested questions, your price and service list,
             and close matches to your FAQs. Anything else goes to your AI as usual. Stored answers are rebuilt whenever
@@ -91,13 +91,13 @@ export default async function AnswerBankPage({ searchParams }: { searchParams: P
       </div>
 
       {notice ? (
-        <p role="status" className={`rounded-ds-lg border px-4 py-3 text-sm ${NOTICE_TONE[notice.tone]}`}>
+        <p role="status" className={`border px-4 py-3 text-sm ${NOTICE_TONE[notice.tone]}`}>
           {notice.text}
         </p>
       ) : null}
 
       {!view.published ? (
-        <p className="rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg px-4 py-3 text-sm text-ds-text-primary">
+        <p className="border border-ds-warning/40 bg-ds-warning-bg px-4 py-3 text-sm text-ds-text-primary">
           Your AI is not published yet. Stored answers are prepared when you publish and only served while it is published.
         </p>
       ) : null}
@@ -116,7 +116,7 @@ export default async function AnswerBankPage({ searchParams }: { searchParams: P
             {view.entries.map((entry) => {
               const status = statusOf(entry);
               return (
-                <li key={entry.id} className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+                <li key={entry.id} className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="min-w-0 flex-1 font-medium text-ds-text-primary">{entry.questionText}</p>
                     <Badge tone="accent" size="sm">
@@ -133,7 +133,7 @@ export default async function AnswerBankPage({ searchParams }: { searchParams: P
                   </div>
                   <p className="text-xs text-ds-text-muted">{status.hint}</p>
                   {entry.answer ? (
-                    <p className="whitespace-pre-line rounded-ds-md bg-ds-surface-soft px-3 py-2 text-sm text-ds-text-primary">
+                    <p className="whitespace-pre-line bg-ds-surface-soft px-3 py-2 text-sm text-ds-text-primary">
                       {entry.answer}
                     </p>
                   ) : null}
@@ -158,11 +158,11 @@ export default async function AnswerBankPage({ searchParams }: { searchParams: P
                             required
                             maxLength={MAX_EDITED_ANSWER_CHARS}
                             rows={5}
-                            className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong"
+                            className="border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-text-primary"
                           />
                           <button
                             type="submit"
-                            className="w-fit rounded-ds-md bg-ds-accent px-3 py-1.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                            className="ds-btn-label w-fit bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                           >
                             Save and go live
                           </button>

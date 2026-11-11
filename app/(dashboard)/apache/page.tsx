@@ -23,7 +23,7 @@ export default async function ApacheOverviewPage() {
       />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Tenants</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Tenants</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <AdminKpiTile label="Total tenants" value={metrics.totalTenants} />
           <AdminKpiTile
@@ -42,7 +42,7 @@ export default async function ApacheOverviewPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Revenue</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Revenue</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <AdminKpiTile label="MRR" value={formatPaiseAsInr2dp(metrics.revenue.mrrPaise)} />
           <AdminKpiTile label="ARR" value={formatPaiseAsInr2dp(metrics.revenue.arrPaise)} />
@@ -57,7 +57,7 @@ export default async function ApacheOverviewPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Today (IST)</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Today (IST)</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <AdminKpiTile
             label="Conversations today"
@@ -92,8 +92,8 @@ export default async function ApacheOverviewPage() {
         </p>
       </section>
 
-      <section className="rounded-ds-lg border border-dashed border-ds-border p-6">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Needs attention, charts, and more</h2>
+      <section className="border border-dashed border-ds-border p-6">
+        <h2 className="text-sm font-medium text-ds-text-primary">Needs attention, charts, and more</h2>
         <p className="mt-1 text-xs text-ds-text-secondary">
           The &quot;Needs attention&quot; list (broken integrations, failed payments, error spikes, tenants over
           usage limits, inactive 14+ days) and the signups/MRR-trend/channel-mix charts ship in Stop 2–3, once the

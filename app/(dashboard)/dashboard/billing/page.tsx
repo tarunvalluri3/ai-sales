@@ -47,7 +47,7 @@ export default async function BillingPage() {
     return (
       <div className="flex flex-col gap-6 p-4 md:p-6">
         <header className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-ds-text-primary">Billing</h1>
+          <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Billing</h1>
           <p className="text-sm text-ds-text-secondary">
             Only an organisation admin can see or change billing.
           </p>
@@ -86,7 +86,7 @@ export default async function BillingPage() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-ds-text-primary">Billing</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Billing</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Your plan, what you have used this period, when you are next charged, and every invoice
           we have issued you.
@@ -99,7 +99,7 @@ export default async function BillingPage() {
       {testMode ? (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+          className="flex items-start gap-3 border border-ds-warning bg-ds-surface p-4"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">
@@ -116,7 +116,7 @@ export default async function BillingPage() {
       {!configured ? (
         <div
           role="status"
-          className="rounded-ds-md border border-ds-border bg-ds-surface p-4 text-sm text-ds-text-secondary"
+          className="border border-ds-border bg-ds-surface p-4 text-sm text-ds-text-secondary"
         >
           Payments are not set up on this deployment yet, so there is nothing to subscribe to here.
           Your plan and usage below are accurate.
@@ -126,7 +126,7 @@ export default async function BillingPage() {
       {!contactEmail ? (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+          className="flex items-start gap-3 border border-ds-warning bg-ds-surface p-4"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">

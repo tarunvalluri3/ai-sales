@@ -10,7 +10,7 @@ import { updateBusinessProfileAction, type ProfileFormState } from "../../../das
 import { useOnboardingPreview } from "../preview-context";
 
 const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
 
 const DESCRIPTION_MIN = 40;
 
@@ -127,9 +127,9 @@ export function BusinessStep({ business }: { business: Business | null }) {
               onClick={() => setBusinessType(type.value)}
               aria-pressed={businessType === type.value}
               disabled={isPending}
-              className={`rounded-ds-sm border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+              className={`border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                 businessType === type.value
-                  ? "border-ds-accent bg-ds-accent-soft-bg text-ds-text-primary"
+                  ? "border-ds-text-primary bg-ds-surface-raised text-ds-text-primary"
                   : "border-ds-border text-ds-text-secondary hover:border-ds-border-strong"
               }`}
             >
@@ -237,7 +237,7 @@ export function BusinessStep({ business }: { business: Business | null }) {
             <button
               type="submit"
               disabled={isPending || !valid}
-              className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {isPending ? "Saving…" : "Continue"}
             </button>
@@ -250,7 +250,7 @@ export function BusinessStep({ business }: { business: Business | null }) {
                 const data = new FormData(formEl);
                 updateFormAction(data);
               }}
-              className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {isPending ? "Saving…" : "Continue"}
             </button>

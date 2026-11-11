@@ -139,7 +139,7 @@ export function LiveConversationPanel({
           canEdit={canEdit}
         />
         {needsAttention ? (
-          <div className="flex items-center gap-3 rounded-ds-lg border border-ds-border bg-ds-warning-bg px-4 py-2.5">
+          <div className="flex items-center gap-3 border border-ds-border bg-ds-warning-bg px-4 py-2.5">
             <span className="text-sm font-medium text-ds-warning">Needs attention</span>
             <DismissAttentionButton conversationId={conversationId} onDismissed={poll} canEdit={canEdit} />
           </div>
@@ -152,7 +152,7 @@ export function LiveConversationPanel({
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-ds-lg border border-ds-border bg-ds-surface p-4 sm:p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto border border-ds-border bg-ds-surface p-4 sm:p-5">
         {messages.length === 0 ? (
           <p className="text-sm text-ds-text-muted">No messages yet.</p>
         ) : (

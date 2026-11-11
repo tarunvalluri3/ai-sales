@@ -39,7 +39,7 @@ export function DayCloseToggle({
             type="submit"
             disabled={isPending || !canEdit}
             title={disabledTitle}
-            className="rounded-ds-sm border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isReopening ? "Reopening…" : "Reopen this day"}
           </button>
@@ -52,7 +52,7 @@ export function DayCloseToggle({
             type="submit"
             disabled={isPending || !canEdit}
             title={disabledTitle}
-            className="rounded-ds-sm border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isClosing ? "Closing…" : "Close this day"}
           </button>

@@ -8,10 +8,10 @@ import { FIELD_LABEL, OPERATOR_LABEL, OPERATORS_FOR_FIELD, EXISTENCE_ONLY_FIELDS
 import type { Segment, SegmentCondition, SegmentConditionField, SegmentMatchType } from "@/lib/supabase/types";
 
 const SELECT_CLASS =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 const INPUT_CLASS =
-  "w-32 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "w-32 border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 function defaultCondition(): SegmentCondition {
   return { field: "score", operator: "gte", value: "80" };
@@ -74,7 +74,7 @@ function ConditionRow({
         onClick={onRemove}
         aria-label="Remove condition"
         title="Remove condition"
-        className="rounded-ds-sm p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         <X className="size-3.5" aria-hidden="true" />
       </button>
@@ -108,7 +108,7 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
   const ruleJson = JSON.stringify({ matchType, conditions });
 
   return (
-    <form action={formAction} className="flex flex-col gap-3 rounded-ds-sm bg-ds-surface-soft p-3">
+    <form action={formAction} className="flex flex-col gap-3 bg-ds-surface-soft p-3">
       {segment ? <input type="hidden" name="id" value={segment.id} /> : null}
       <input type="hidden" name="rule" value={ruleJson} />
       <div className="flex flex-wrap items-center gap-2">
@@ -130,7 +130,7 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
           placeholder="Description (optional)"
           maxLength={300}
           disabled={isPending}
-          className="w-56 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-56 border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
 
@@ -157,7 +157,7 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
       <button
         type="button"
         onClick={() => setConditions((current) => [...current, defaultCondition()])}
-        className="flex w-fit items-center gap-1 rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-accent-soft-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="flex w-fit items-center gap-1 px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         <Plus className="size-3.5" aria-hidden="true" />
         Add condition
@@ -167,7 +167,7 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
         <button
           type="submit"
           disabled={isPending || !name.trim() || conditions.length === 0}
-          className="rounded-ds-sm bg-ds-accent px-2.5 py-1 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isPending ? "Saving…" : segment ? "Save segment" : "Create segment"}
         </button>
@@ -176,7 +176,7 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
             type="button"
             onClick={onDone}
             disabled={isPending}
-            className="rounded-ds-sm px-2.5 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
+            className="px-2.5 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
           >
             Cancel
           </button>
@@ -199,7 +199,7 @@ function ExistingSegmentRow({ segment }: { segment: Segment }) {
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-ds-sm px-2 py-1.5 hover:bg-ds-surface-soft">
+    <div className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-ds-surface-soft">
       <div className="flex flex-col">
         <span className="text-sm font-medium text-ds-text-primary">{segment.name}</span>
         {segment.description ? <span className="text-xs text-ds-text-muted">{segment.description}</span> : null}
@@ -208,7 +208,7 @@ function ExistingSegmentRow({ segment }: { segment: Segment }) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Edit
         </button>
@@ -239,12 +239,12 @@ export function SegmentManager({ segments, canManage }: { segments: Segment[]; c
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="segment-manager-panel"
-        className="w-fit rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="w-fit border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {open ? "Hide segments" : "Manage segments"}
       </button>
       {open ? (
-        <div id="segment-manager-panel" className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <div id="segment-manager-panel" className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
           {segments.length === 0 ? (
             <p className="text-xs text-ds-text-muted">No segments yet -- create the first one below.</p>
           ) : (
@@ -261,7 +261,7 @@ export function SegmentManager({ segments, canManage }: { segments: Segment[]; c
               <button
                 type="button"
                 onClick={() => setCreating(true)}
-                className="flex items-center gap-1 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="flex items-center gap-1 border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 <Plus className="size-3.5" aria-hidden="true" />
                 New segment

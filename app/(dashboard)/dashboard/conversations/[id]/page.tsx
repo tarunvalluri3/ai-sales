@@ -70,7 +70,7 @@ export default async function ConversationDetailPage({
       transcript={
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-ds-bg">
           <div className="flex shrink-0 flex-col gap-1 p-4 pb-0 md:p-6 md:pb-0">
-            <h1 className="text-2xl font-semibold text-ds-text-primary">
+            <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">
               {lead?.contact_name ?? channelLabel(conversation.source)}
             </h1>
             <p className="text-sm text-ds-text-secondary">

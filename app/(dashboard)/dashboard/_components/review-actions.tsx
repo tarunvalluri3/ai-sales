@@ -42,7 +42,7 @@ export function ReviewActions({
           type="submit"
           disabled={disabled}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="px-2 py-1 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isApproving ? "Approving…" : "Approve"}
         </button>
@@ -53,7 +53,7 @@ export function ReviewActions({
           type="submit"
           disabled={disabled}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isRejecting ? "Rejecting…" : "Reject"}
         </button>

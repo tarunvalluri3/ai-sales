@@ -48,7 +48,7 @@ export function InstagramOAuthResult({ username }: { username: string | null }) 
 
   if (connected) {
     return (
-      <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-ds-md bg-ds-success-bg px-4 py-3 text-sm text-ds-success">
+      <div role="status" className="flex flex-wrap items-center justify-between gap-3 bg-ds-success-bg px-4 py-3 text-sm text-ds-success">
         <span>{username ? `Connected as @${username}.` : "Instagram connected."}</span>
         <DismissButton onClick={dismiss} />
       </div>
@@ -57,7 +57,7 @@ export function InstagramOAuthResult({ username }: { username: string | null }) 
 
   const message = ERROR_MESSAGES[error ?? ""] ?? ERROR_MESSAGES.unexpected;
   return (
-    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-ds-md bg-ds-danger-bg px-4 py-3 text-sm text-ds-danger">
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 bg-ds-danger-bg px-4 py-3 text-sm text-ds-danger">
       <span>
         <strong className="font-medium">Couldn&rsquo;t connect Instagram.</strong> {message}
         {error === "no_linked_pages" ? (
@@ -73,7 +73,7 @@ export function InstagramOAuthResult({ username }: { username: string | null }) 
         {NO_RETRY.has(error ?? "") ? null : (
           <a
             href={INSTAGRAM_CONNECT_PATH}
-            className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-medium text-ds-accent-on hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             Try again
           </a>
@@ -89,7 +89,7 @@ function DismissButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-ds-sm px-2 py-1 text-xs font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+      className="px-2 py-1 text-xs font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
     >
       Dismiss
     </button>

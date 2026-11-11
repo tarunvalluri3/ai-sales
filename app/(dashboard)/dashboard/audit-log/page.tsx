@@ -77,7 +77,7 @@ export default async function AuditLogPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Audit Log</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Audit Log</h1>
         <p className="text-sm text-ds-text-secondary">
           A record of sensitive actions taken by your team -- conversation takeovers, knowledge
           and widget key changes, and more. Most recent {entries.length} shown.
@@ -94,7 +94,7 @@ export default async function AuditLogPage() {
           {entries.map((entry) => (
             <li
               key={entry.id}
-              className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4"
+              className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="font-medium text-ds-text-primary">{ACTION_LABEL[entry.action]}</p>
@@ -112,7 +112,7 @@ export default async function AuditLogPage() {
               {entry.target_type === "conversation" ? (
                 <Link
                   href={`/dashboard/conversations/${entry.target_id}`}
-                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                 >
                   View conversation
                 </Link>

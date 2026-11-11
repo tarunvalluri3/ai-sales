@@ -32,7 +32,7 @@ export function ConversationPanes({ transcript, infoPanel }: { transcript: React
         onClick={() => setShowInfo((value) => !value)}
         aria-label={showInfo ? "Back to chat" : "View prospect details"}
         title={showInfo ? "Back to chat" : "View prospect details"}
-        className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center rounded-full bg-ds-surface-elevated text-ds-text-secondary shadow-md transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent md:hidden"
+        className="absolute top-3 right-3 z-10 flex size-8 items-center justify-center bg-ds-surface-elevated text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary md:hidden"
       >
         {showInfo ? <X className="size-4" aria-hidden="true" /> : <PanelRight className="size-4" aria-hidden="true" />}
       </button>

@@ -31,10 +31,10 @@ export function MessageBubble({
   }
 
   const bubbleClass = isUser
-    ? "max-w-[85%] rounded-2xl rounded-br-md bg-widget-user-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-user-bubble-fg"
+    ? "max-w-[85%] bg-widget-user-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-user-bubble-fg"
     : isHumanAgent
-      ? "max-w-[85%] rounded-2xl rounded-bl-md border border-widget-human-bubble-border bg-widget-human-bubble-bg px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-human-bubble-fg"
-      : "max-w-[85%] rounded-2xl rounded-bl-md bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground";
+      ? "max-w-[85%] border border-widget-human-bubble-border bg-widget-human-bubble-bg px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-human-bubble-fg"
+      : "max-w-[85%] bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground";
 
   return (
     <motion.div
@@ -44,7 +44,7 @@ export function MessageBubble({
       className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
     >
       {isHumanAgent ? (
-        <span className="mb-1 flex items-center gap-1 text-xs font-medium text-widget-human-accent">
+        <span className="widget-label mb-1 flex items-center gap-1 text-[10px] text-widget-human-accent">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <circle cx="12" cy="8" r="4" fill="currentColor" />
             <path

@@ -13,7 +13,7 @@ export const LauncherButton = forwardRef<
       aria-label={label}
       title={label}
       onClick={onToggle}
-      className="relative flex h-14 w-14 items-center justify-center rounded-full bg-widget-header-bg text-widget-primary shadow-lg shadow-black/25 transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+      className="relative flex h-14 w-14 items-center justify-center border border-widget-border-strong bg-widget-header-bg text-widget-primary transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
     >
       {isOpen ? (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">

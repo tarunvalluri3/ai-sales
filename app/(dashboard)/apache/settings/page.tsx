@@ -15,18 +15,18 @@ export default async function ApacheSettingsPage() {
       <AdminPageHeader title="Settings" description="Platform admin team, and the current plan/trial/pricing configuration." />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Admin team</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Admin team</h2>
         {admin.role === "owner" ? (
           <AdminTeamPanel team={team} currentUserId={userId} />
         ) : (
-          <p className="rounded-ds-lg border border-dashed border-ds-border p-4 text-sm text-ds-text-secondary">
+          <p className="border border-dashed border-ds-border p-4 text-sm text-ds-text-secondary">
             Only an owner-role admin can view or manage the admin team.
           </p>
         )}
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Plan limits, trial, and pricing</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Plan limits, trial, and pricing</h2>
         <PlatformConfigDisplay settings={settings} />
       </section>
     </div>

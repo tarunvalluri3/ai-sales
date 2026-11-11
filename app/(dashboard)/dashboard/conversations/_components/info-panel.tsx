@@ -65,8 +65,8 @@ export function InfoPanel({
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       {recommendedAction ? (
-        <div className="flex items-center justify-between gap-2 rounded-ds-lg border border-ds-border bg-ds-accent-soft-bg p-3">
-          <span className="text-xs font-semibold tracking-wide-ds text-ds-accent-muted uppercase">Next best action</span>
+        <div className="flex items-center justify-between gap-2 border border-ds-border bg-ds-surface-raised p-3">
+          <span className="text-xs font-medium tracking-wide-ds text-ds-text-primary uppercase">Next best action</span>
           <span className="text-sm font-medium text-ds-text-primary">{recommendedAction}</span>
         </div>
       ) : null}
@@ -87,7 +87,7 @@ export function InfoPanel({
       />
 
       {lead ? (
-        <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-medium text-ds-text-primary">Lead</h3>
             <Badge tone={QUALIFICATION_TONE[lead.qualification]} title="AI-assessed signal -- not verified">
@@ -108,20 +108,20 @@ export function InfoPanel({
           {conversation.customer_id ? (
             <Link
               href={`/dashboard/customers/${conversation.customer_id}`}
-              className="text-xs font-medium text-ds-accent-muted transition-colors hover:text-ds-accent"
+              className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent"
             >
               View customer profile
             </Link>
           ) : null}
         </div>
       ) : (
-        <div className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-4 py-6 text-center text-xs text-ds-text-muted">
+        <div className="border border-dashed border-ds-border bg-ds-surface px-4 py-6 text-center text-xs text-ds-text-muted">
           No lead captured from this conversation yet.
         </div>
       )}
 
       {appointment ? (
-        <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-medium text-ds-text-primary">Appointment</h3>
             <Badge tone={APPOINTMENT_STATUS_TONE[appointment.status]}>{appointment.status.replace("_", "-")}</Badge>
@@ -139,7 +139,7 @@ export function InfoPanel({
           {appointment.notes ? <p className="text-sm text-ds-text-muted">{appointment.notes}</p> : null}
           <Link
             href="/dashboard/appointments"
-            className="text-xs font-medium text-ds-accent-muted transition-colors hover:text-ds-accent"
+            className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent"
           >
             View in Appointments
           </Link>
@@ -147,7 +147,7 @@ export function InfoPanel({
       ) : null}
 
       {guardrailFlags.length > 0 ? (
-        <div className="flex flex-col gap-1.5 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <div className="flex flex-col gap-1.5 border border-ds-border bg-ds-surface p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-medium text-ds-text-primary">Flagged by guardrails</h3>
             <Badge tone="warning">Review</Badge>
@@ -163,7 +163,7 @@ export function InfoPanel({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-1.5 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+      <div className="flex flex-col gap-1.5 border border-ds-border bg-ds-surface p-4">
         <h3 className="text-sm font-medium text-ds-text-primary">Conversation</h3>
         <p className="text-xs text-ds-text-muted">Channel: {channelLabel(conversation.source)}</p>
         <p className="text-xs text-ds-text-muted">Started: {new Date(conversation.created_at).toLocaleString("en-US")}</p>

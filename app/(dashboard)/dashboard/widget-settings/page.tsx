@@ -29,7 +29,7 @@ export default async function WidgetSettingsPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Chat widget</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Chat widget</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Your AI sales employee talks to prospects through a small chat panel embedded on your
           website. Each widget key identifies your business and carries its own list of allowed
@@ -39,7 +39,7 @@ export default async function WidgetSettingsPage() {
       </div>
 
       <section className="flex flex-col gap-6">
-        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">
+        <h2 className="text-xs font-medium uppercase tracking-wide-ds text-ds-text-muted">
           1. Set up your widget
         </h2>
         <WidgetInstallGuide
@@ -63,14 +63,14 @@ export default async function WidgetSettingsPage() {
       </section>
 
       {!published ? (
-        <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
           <p className="text-sm font-medium text-ds-text-primary">Not published yet</p>
           <p className="max-w-xl text-sm text-ds-text-secondary">
             Readiness, testing and publishing now happen in the guided setup wizard, not here.
           </p>
           <Link
             href="/onboarding?step=review"
-            className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             Go to Test &amp; go live
           </Link>
@@ -78,7 +78,7 @@ export default async function WidgetSettingsPage() {
       ) : null}
 
       <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
-        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">2. Customize</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wide-ds text-ds-text-muted">2. Customize</h2>
         <WidgetBrandingForm
           initialAccentColor={business?.widget_accent_color ?? ""}
           initialLogoUrl={business?.widget_logo_url ?? ""}

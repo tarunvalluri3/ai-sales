@@ -20,9 +20,9 @@ export function Qualification() {
         {LEADS.map((lead) => (
           <div
             key={lead.name}
-            className={`flex flex-col gap-1.5 rounded-ds-sm border px-3 py-2.5 ${
+            className={`flex flex-col gap-1.5 border px-3 py-2.5 ${
               lead.tier === "hot"
-                ? "border-ds-accent-muted bg-ds-accent-soft-bg"
+                ? "border-ds-border-strong bg-ds-surface-raised"
                 : "border-ds-border bg-ds-surface-elevated"
             }`}
           >

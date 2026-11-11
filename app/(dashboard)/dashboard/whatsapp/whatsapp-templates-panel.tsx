@@ -42,10 +42,10 @@ export function WhatsappTemplatesPanel({ rows, canEdit }: { rows: TemplatePanelR
   }
 
   return (
-    <section aria-labelledby="wa-templates-heading" className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section aria-labelledby="wa-templates-heading" className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 id="wa-templates-heading" className="text-base font-semibold text-ds-text-primary">
+          <h2 id="wa-templates-heading" className="text-base font-medium text-ds-text-primary">
             Message templates
           </h2>
           <p className="max-w-2xl text-sm text-ds-text-secondary">
@@ -60,7 +60,7 @@ export function WhatsappTemplatesPanel({ rows, canEdit }: { rows: TemplatePanelR
                 type="button"
                 disabled={isPending}
                 onClick={() => run(submitWhatsappTemplatesAction)}
-                className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="ds-btn-label bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 {isPending ? "Working…" : "Submit for approval"}
               </button>
@@ -69,7 +69,7 @@ export function WhatsappTemplatesPanel({ rows, canEdit }: { rows: TemplatePanelR
               type="button"
               disabled={isPending}
               onClick={() => run(refreshWhatsappTemplatesAction)}
-              className="rounded-ds-sm border border-ds-border-strong px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-accent disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="border border-ds-border-strong px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-accent disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Refresh status
             </button>
@@ -109,7 +109,7 @@ export function WhatsappTemplatesPanel({ rows, canEdit }: { rows: TemplatePanelR
         {feedback ? (
           <p
             role={feedback.tone === "error" ? "alert" : undefined}
-            className={`rounded-ds-sm px-3 py-2 text-sm ${feedback.tone === "error" ? "bg-ds-danger-bg text-ds-danger" : "bg-ds-success-bg text-ds-success"}`}
+            className={`px-3 py-2 text-sm ${feedback.tone === "error" ? "bg-ds-danger-bg text-ds-danger" : "bg-ds-success-bg text-ds-success"}`}
           >
             {feedback.text}
           </p>

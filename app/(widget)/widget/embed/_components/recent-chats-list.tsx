@@ -22,7 +22,7 @@ export function RecentChatsList({
         <button
           type="button"
           onClick={onBack}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-widget-foreground transition-colors hover:bg-widget-assistant-bubble focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+          className="flex h-7 w-7 shrink-0 items-center justify-center text-widget-foreground transition-colors hover:bg-widget-assistant-bubble focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
           aria-label={strings.backLabel}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -35,7 +35,7 @@ export function RecentChatsList({
             />
           </svg>
         </button>
-        <span className="text-sm font-semibold text-widget-foreground">{strings.recentChatsTitle}</span>
+        <span className="text-sm font-medium text-widget-foreground">{strings.recentChatsTitle}</span>
       </div>
       <div className="flex-1 overflow-y-auto px-2 py-2">
         {isLoading ? (
@@ -49,7 +49,7 @@ export function RecentChatsList({
                 <button
                   type="button"
                   onClick={() => onSelect(conversation.id)}
-                  className="flex w-full flex-col gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-widget-assistant-bubble"
+                  className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left transition-colors hover:bg-widget-assistant-bubble"
                 >
                   <span className="truncate text-sm text-widget-foreground">
                     {conversation.preview || strings.panelTitle}

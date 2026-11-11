@@ -39,7 +39,7 @@ export default async function DataDeletionStatusPage({
     <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold text-ds-text-primary">Data Deletion Status</h1>
+          <h1 className="text-[32px] leading-[1.12] font-light tracking-[-0.015em] text-ds-text-primary sm:text-[42px]">Data Deletion Status</h1>
           <p className="text-sm text-ds-text-muted">
             Check the progress of a deletion request received from Instagram.
           </p>
@@ -47,7 +47,7 @@ export default async function DataDeletionStatusPage({
 
         <section className="flex flex-col gap-3 border-t border-ds-border pt-6 text-sm leading-relaxed text-ds-text-secondary">
           {result ? (
-            <div className="flex flex-col gap-2 rounded-ds-sm border border-ds-border bg-ds-surface p-4">
+            <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
               <p>
                 Confirmation code: <span className="font-mono text-ds-text-primary">{codeValue}</span>
               </p>

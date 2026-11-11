@@ -16,7 +16,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-4 py-14 text-center">
+    <div className="flex flex-col items-center gap-2 border border-ds-border bg-ds-surface px-4 py-14 text-center">
       <p className="text-sm font-medium text-ds-text-primary">{title}</p>
       {description ? <p className="max-w-sm text-xs text-ds-text-muted">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
@@ -59,7 +59,7 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="flex flex-col items-center gap-2 rounded-ds-lg border border-dashed border-ds-danger/40 bg-ds-danger-bg px-4 py-14 text-center"
+      className="flex flex-col items-center gap-2 border border-ds-danger/40 bg-ds-danger-bg px-4 py-14 text-center"
     >
       <p className="text-sm font-medium text-ds-text-primary">{title}</p>
       <p className="max-w-sm text-xs text-ds-text-muted">{description}</p>
@@ -67,7 +67,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label mt-2 bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Try again
         </button>
@@ -90,7 +90,7 @@ export function PermissionNotice({
   message?: string;
 }) {
   return (
-    <p className="rounded-ds-lg border border-dashed border-ds-border bg-ds-surface px-4 py-3 text-xs text-ds-text-muted">
+    <p className="border border-ds-border bg-ds-surface px-4 py-3 text-xs text-ds-text-muted">
       {message}
     </p>
   );
@@ -98,7 +98,7 @@ export function PermissionNotice({
 
 /** A single skeleton block. Widths/heights are passed via className so callers can compose page-shaped skeletons without a prop explosion. */
 function SkeletonBlock({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`animate-pulse rounded-ds-sm bg-ds-surface-elevated ${className}`} />;
+  return <div aria-hidden="true" className={`bg-ds-surface-raised ${className}`} />;
 }
 
 /**

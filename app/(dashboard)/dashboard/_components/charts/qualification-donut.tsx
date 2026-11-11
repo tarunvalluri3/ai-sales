@@ -20,9 +20,9 @@ const SEGMENT_LABEL: Record<"hot" | "warm" | "cold", string> = {
 function ChartTooltip({ active, payload }: { active?: boolean; payload?: { name: string; value: number }[] }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-ds-sm border border-ds-border-strong bg-ds-surface-elevated px-3 py-1.5 text-xs shadow-lg">
+    <div className="border border-ds-border-strong bg-ds-surface-elevated px-3 py-1.5 text-xs">
       <span className="text-ds-text-secondary">{payload[0].name}: </span>
-      <span className="font-semibold text-ds-text-primary">{payload[0].value}</span>
+      <span className="font-medium text-ds-text-primary">{payload[0].value}</span>
     </div>
   );
 }
@@ -74,7 +74,7 @@ export function QualificationDonut({
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-semibold text-ds-text-primary">{total}</span>
+        <span className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{total}</span>
         <span className="text-2xs text-ds-text-muted">leads</span>
       </div>
     </div>

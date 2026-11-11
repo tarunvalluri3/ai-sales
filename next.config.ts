@@ -85,18 +85,20 @@ const sentryWrappedConfig = withSentryConfig(nextConfig, {
 });
 
 /**
- * Owner decision 2026-11-03: `next dev` against a PRODUCTION Supabase project
- * is refused outright (lib/deployment-env.ts checkDevServerTarget). Next loads
- * .env* before importing this file, so .env.local is already in process.env.
- * The committed refs (supabase/production-project-refs.txt) are included.
- * Emergency override: ALLOW_DEV_AGAINST_PRODUCTION=<exact ref>. Builds and
- * production servers are not affected (development-server phase only).
+ * Owner decision 2026-11-11: `next dev` against a PRODUCTION Supabase project
+ * is no longer refused (it was, from 2026-11-03). It now only prints a loud
+ * warning (lib/deployment-env.ts checkDevServerTarget). Next loads .env*
+ * before importing this file, so .env.local is already in process.env. The
+ * committed refs (supabase/production-project-refs.txt) are included.
  */
 export default function config(phase: string) {
   if (phase === PHASE_DEVELOPMENT_SERVER) {
     const check = checkDevServerTarget(withCommittedProductionRefs(process.env, process.cwd()));
-    if (check.action === "refuse") throw new Error(check.message);
-    if (check.action === "allow_overridden") console.warn(check.message);
+    if (check.action !== "allow") {
+      console.warn(
+        `!!! next dev is running against the PRODUCTION Supabase project ${check.ref}. Every action touches real customer data. !!!`,
+      );
+    }
   }
   return sentryWrappedConfig;
 }

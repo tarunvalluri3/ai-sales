@@ -29,7 +29,7 @@ export default async function ApacheJobsPage() {
       <AdminPageHeader title="Jobs & System Health" description="The real background queues this app already has -- no separate job system." />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">System health</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">System health</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <AdminKpiTile label="Database" value={health.databaseOk ? "OK" : "Unreachable"} />
           <AdminKpiTile
@@ -47,10 +47,10 @@ export default async function ApacheJobsPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Queues</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Queues</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Object.entries(overview).map(([key, counts]) => (
-            <div key={key} className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+            <div key={key} className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
               <span className="text-sm font-medium text-ds-text-primary">{QUEUE_LABELS[key]}</span>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(counts).map(([status, count]) => (
@@ -65,13 +65,13 @@ export default async function ApacheJobsPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Scheduler</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Scheduler</h2>
         {scheduler.length === 0 ? (
-          <p className="rounded-ds-lg border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">
+          <p className="border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">
             No scheduler runs recorded yet. The VPS cron (docs/vps-cron.md) or the daily Vercel cron creates these rows on its first run.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-ds-lg border border-ds-border bg-ds-surface">
+          <div className="overflow-x-auto border border-ds-border bg-ds-surface">
             <table className="w-full text-left text-sm">
               <thead className="text-xs text-ds-text-muted">
                 <tr>
@@ -112,13 +112,13 @@ export default async function ApacheJobsPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Billing cancellations needing attention</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Billing cancellations needing attention</h2>
         {cancellations.length === 0 ? (
-          <p className="rounded-ds-lg border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">
+          <p className="border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">
             Every deleted business&apos;s Razorpay subscription is confirmed cancelled.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-ds-lg border border-ds-border bg-ds-surface">
+          <div className="overflow-x-auto border border-ds-border bg-ds-surface">
             <table className="w-full text-left text-sm">
               <thead className="text-xs text-ds-text-muted">
                 <tr>
@@ -150,7 +150,7 @@ export default async function ApacheJobsPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Recent failures</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Recent failures</h2>
         <FailedJobsTable failures={failures} />
       </section>
     </div>

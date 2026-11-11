@@ -72,7 +72,7 @@ export default async function DashboardOverviewPage({
       {showInstallBanner ? <InstallWidgetBanner hasActiveKey={activeKeys.length > 0} /> : null}
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">{businessName}</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{businessName}</h1>
         <p className="text-sm text-ds-text-secondary">
           {conversationStats.last7Days} conversation{conversationStats.last7Days === 1 ? "" : "s"} in
           the last 7 days · {leadStats.total} lead{leadStats.total === 1 ? "" : "s"} total
@@ -111,7 +111,7 @@ export default async function DashboardOverviewPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Lead qualification</h2>
           <QualificationDonut byQualification={leadStats.byQualification} />
         </section>

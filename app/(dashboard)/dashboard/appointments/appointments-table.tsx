@@ -83,7 +83,7 @@ export function AppointmentsTable({
             {appointment.conversation_id ? (
               <Link
                 href={`/dashboard/conversations/${appointment.conversation_id}`}
-                className="text-xs font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 View conversation
               </Link>

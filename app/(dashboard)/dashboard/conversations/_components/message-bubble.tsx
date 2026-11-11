@@ -15,7 +15,7 @@ export const MESSAGE_ROLE_LABEL: Record<Message["role"], string> = {
 const CAPTION_STYLE: Record<Message["role"], string> = {
   user: "text-ds-text-muted",
   assistant: "text-ds-text-muted",
-  human_agent: "font-semibold text-ds-accent-muted",
+  human_agent: "font-medium text-ds-text-primary",
 };
 
 export function MessageBubble({ message }: { message: Message }) {
@@ -28,10 +28,10 @@ export function MessageBubble({ message }: { message: Message }) {
   const [loading, setLoading] = useState(false);
 
   const bubbleClassName = isUser
-    ? "max-w-[85%] rounded-2xl rounded-br-md bg-ds-surface-soft px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-primary"
+    ? "max-w-[85%] bg-ds-surface-soft px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-primary"
     : isHumanAgent
-      ? "max-w-[85%] rounded-2xl rounded-bl-md bg-ds-accent-soft-bg px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-primary"
-      : "max-w-[85%] rounded-2xl rounded-bl-md bg-ds-surface-elevated px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-secondary";
+      ? "max-w-[85%] border border-ds-text-faint bg-ds-surface px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-primary"
+      : "max-w-[85%] border border-ds-border bg-ds-surface-raised px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-secondary";
 
   async function toggleExpanded() {
     const next = !expanded;
@@ -50,7 +50,7 @@ export function MessageBubble({ message }: { message: Message }) {
   return (
     <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
       <div className={bubbleClassName}>{message.content}</div>
-      <span className={`mt-1 text-2xs ${CAPTION_STYLE[message.role]}`}>
+      <span className={`ds-label mt-1 text-2xs ${CAPTION_STYLE[message.role]}`}>
         {MESSAGE_ROLE_LABEL[message.role]} · {new Date(message.created_at).toLocaleString("en-US")}
       </span>
 
@@ -59,12 +59,12 @@ export function MessageBubble({ message }: { message: Message }) {
           <button
             type="button"
             onClick={toggleExpanded}
-            className="text-2xs font-medium text-ds-accent-muted hover:underline"
+            className="text-2xs font-medium text-ds-text-primary hover:underline"
           >
             {expanded ? "Hide sources" : `Sources (${message.source_chunk_ids.length})`}
           </button>
           {expanded ? (
-            <div className="mt-1.5 flex flex-col gap-1.5 rounded-ds-md border border-ds-border bg-ds-surface-soft p-2.5">
+            <div className="mt-1.5 flex flex-col gap-1.5 border border-ds-border bg-ds-surface-soft p-2.5">
               {loading ? (
                 <p className="text-2xs text-ds-text-muted">Loading…</p>
               ) : citations && citations.length > 0 ? (

@@ -93,7 +93,7 @@ export function Panel({
       initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.96, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-      className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-widget-border-strong bg-widget-surface shadow-2xl shadow-black/20 sm:rounded-2xl"
+      className="flex h-full w-full flex-col overflow-hidden border border-widget-border-strong bg-widget-surface sm:"
     >
       <PanelHeader
         businessName={businessName}

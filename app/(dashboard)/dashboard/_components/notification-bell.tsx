@@ -140,7 +140,7 @@ export function NotificationBell() {
         aria-controls={isOpen ? panelId : undefined}
         aria-label={hasUnread ? `Notifications, ${unreadCount} unread` : "Notifications"}
         onClick={toggleOpen}
-        className="relative flex size-9 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="relative flex size-9 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         <Bell className="size-4" aria-hidden="true" />
         {hasUnread ? (
@@ -148,7 +148,7 @@ export function NotificationBell() {
           // announcing it here would read it twice.
           <span
             aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-ds-warning px-1 text-2xs font-semibold leading-4 text-ds-bg"
+            className="absolute -right-0.5 -top-0.5 min-w-4 bg-ds-warning px-1 text-2xs font-medium leading-4 text-ds-bg"
           >
             {formatAttentionBadge(unreadCount)}
           </span>
@@ -161,7 +161,7 @@ export function NotificationBell() {
           id={panelId}
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-11 z-20 flex max-h-96 w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-ds-md border border-ds-border bg-ds-surface-elevated shadow-lg"
+          className="absolute right-0 top-11 z-20 flex max-h-96 w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden border border-ds-border bg-ds-surface-elevated"
         >
           <div className="flex items-center justify-between border-b border-ds-border px-3 py-2">
             <p className="text-2xs font-medium uppercase tracking-wide-ds text-ds-text-muted">Notifications</p>
@@ -170,7 +170,7 @@ export function NotificationBell() {
                 type="button"
                 onClick={handleMarkAll}
                 disabled={isPending}
-                className="flex items-center gap-1 rounded-ds-sm px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+                className="flex items-center gap-1 px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
               >
                 <Check className="size-3" aria-hidden="true" />
                 Mark all read
@@ -195,7 +195,7 @@ export function NotificationBell() {
                   const isUnread = !notification.read_at;
                   const body = (
                     <div className="flex items-start gap-2">
-                      {isUnread ? <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ds-accent" /> : <span className="mt-1.5 size-1.5 shrink-0" />}
+                      {isUnread ? <span aria-hidden="true" className="mt-1.5 size-1.5 shrink-0 rounded-full bg-ds-primary" /> : <span className="mt-1.5 size-1.5 shrink-0" />}
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <span className="text-2xs font-medium uppercase tracking-wide-ds text-ds-text-muted">
                           {CATEGORY_LABELS[notification.category]}
@@ -214,7 +214,7 @@ export function NotificationBell() {
                         <Link
                           href={notification.link}
                           onClick={() => handleRowClick(notification)}
-                          className="block px-3 py-2.5 transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-accent"
+                          className="block px-3 py-2.5 transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-text-primary"
                         >
                           {body}
                         </Link>
@@ -231,7 +231,7 @@ export function NotificationBell() {
           <Link
             href="/dashboard/notifications"
             onClick={() => setIsOpen(false)}
-            className="border-t border-ds-border px-3 py-2 text-center text-2xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-accent"
+            className="border-t border-ds-border px-3 py-2 text-center text-2xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             Notification settings
           </Link>

@@ -53,7 +53,7 @@ export function MessageList({
       className="flex flex-1 flex-col gap-3 overflow-y-auto bg-widget-surface px-4 py-4"
     >
       {messages.length === 0 ? (
-        <div className="w-fit max-w-[85%] rounded-2xl rounded-bl-md bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground">
+        <div className="w-fit max-w-[85%] bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground">
           {greeting}
         </div>
       ) : null}
@@ -64,7 +64,7 @@ export function MessageList({
               key={question}
               type="button"
               onClick={() => onSend(question, { suggested: true })}
-              className="w-fit max-w-[85%] rounded-full border border-widget-border-strong px-3.5 py-2 text-left text-sm text-widget-foreground transition-colors hover:bg-widget-assistant-bubble"
+              className="w-fit max-w-[85%] border border-widget-border-strong px-3.5 py-2 text-left text-sm text-widget-foreground transition-colors hover:bg-widget-assistant-bubble"
             >
               {question}
             </button>

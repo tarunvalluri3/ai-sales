@@ -33,7 +33,7 @@ export default async function InstagramPage({
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Instagram</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Instagram</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Let prospects message your AI sales employee on Instagram, the same way they can on your website
           and WhatsApp.
@@ -45,7 +45,7 @@ export default async function InstagramPage({
       </Suspense>
 
       {selectionId && canEdit && !choices ? (
-        <p role="alert" className="rounded-ds-md bg-ds-danger-bg px-4 py-3 text-sm text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-4 py-3 text-sm text-ds-danger">
           That account choice expired. Please click &ldquo;Connect Instagram&rdquo; again.
         </p>
       ) : null}

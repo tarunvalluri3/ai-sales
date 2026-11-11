@@ -1,3 +1,3 @@
 /** Shared text/select/number-input styling for this page's forms -- was duplicated verbatim across widget-branding-form.tsx and ai-capabilities-form.tsx. */
 export const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+  "border border-ds-border bg-transparent px-3 py-2 text-[15px] text-ds-text-primary placeholder:text-ds-text-faint transition-colors focus:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-40";

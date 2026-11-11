@@ -39,7 +39,7 @@ export function AdminTeamPanel({ team, currentUserId }: { team: AdminTeamMember[
 
       <ul className="flex flex-col gap-2">
         {team.map((member) => (
-          <li key={member.user_id} className="flex items-center justify-between gap-3 rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm">
+          <li key={member.user_id} className="flex items-center justify-between gap-3 border border-ds-border bg-ds-surface px-3 py-2 text-sm">
             <div className="flex min-w-0 flex-col gap-0.5">
               <span className="flex items-center gap-2 truncate text-ds-text-primary">
                 {member.email ?? member.user_id}
@@ -52,7 +52,7 @@ export function AdminTeamPanel({ team, currentUserId }: { team: AdminTeamMember[
                 value={member.role}
                 disabled={isPending}
                 onChange={(e) => handleRoleChange(member.user_id, e.target.value as PlatformAdminRole)}
-                className="rounded-ds-sm border border-ds-border bg-ds-bg px-2 py-1 text-sm text-ds-text-primary"
+                className="border border-ds-border bg-ds-bg px-2 py-1 text-sm text-ds-text-primary"
               >
                 {ROLE_OPTIONS.map((role) => (
                   <option key={role} value={role}>
@@ -100,7 +100,7 @@ function AddAdminForm({ onAdded }: { onAdded: () => void }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-fit items-center gap-2 rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover"
+        className="flex w-fit items-center gap-2 bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover"
       >
         <Plus className="size-4" aria-hidden="true" /> Add admin
       </button>
@@ -108,7 +108,7 @@ function AddAdminForm({ onAdded }: { onAdded: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="font-medium text-ds-text-primary">Email</span>
@@ -117,13 +117,13 @@ function AddAdminForm({ onAdded }: { onAdded: () => void }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="person@example.com"
-            className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
+            className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
           />
           <span className="text-xs text-ds-text-muted">They must already have a Clerk account (have signed up or signed in at least once).</span>
         </label>
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="font-medium text-ds-text-primary">Role</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary">
+          <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary">
             {ROLE_OPTIONS.map((r) => (
               <option key={r} value={r}>
                 {r}
@@ -134,14 +134,14 @@ function AddAdminForm({ onAdded }: { onAdded: () => void }) {
       </div>
       {error ? <p className="text-sm text-ds-danger">{error}</p> : null}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={() => setOpen(false)} className="rounded-ds-sm px-3 py-1.5 text-sm font-medium text-ds-text-secondary hover:bg-ds-surface-soft">
+        <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 text-sm font-medium text-ds-text-secondary hover:bg-ds-surface-soft">
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSubmit}
           disabled={isPending || email.trim().length === 0}
-          className="rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
+          className="bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
         >
           {isPending ? "Adding…" : "Add admin"}
         </button>

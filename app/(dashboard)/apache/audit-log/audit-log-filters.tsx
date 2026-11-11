@@ -23,7 +23,7 @@ export function AuditLogFilters({
           name="q"
           defaultValue={initial.q ?? ""}
           placeholder="Target ID or tenant ID"
-          className="w-56 rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="w-56 border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         />
       </label>
       <label className="flex flex-col gap-1 text-xs">
@@ -31,7 +31,7 @@ export function AuditLogFilters({
         <select
           name="action"
           defaultValue={initial.action ?? ""}
-          className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           <option value="">All actions</option>
           {actions.map((action) => (
@@ -46,7 +46,7 @@ export function AuditLogFilters({
         <select
           name="targetType"
           defaultValue={initial.targetType ?? ""}
-          className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           <option value="">All target types</option>
           {targetTypes.map((targetType) => (
@@ -58,7 +58,7 @@ export function AuditLogFilters({
       </label>
       <button
         type="submit"
-        className="rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         Filter
       </button>

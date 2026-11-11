@@ -1,68 +1,78 @@
 /**
- * Dark, lime-accented theme for Clerk's prebuilt components (SignIn,
- * SignUp, TaskChooseOrganization, OrganizationSwitcher, UserButton), so
- * they read as part of the same product as the rest of the app rather than
- * a default Clerk-branded widget. Literal hex values, mirroring
- * `app/(dashboard)/globals.css`'s `--ds-*` tokens -- Clerk's `variables`
- * API does not reliably resolve CSS custom properties, so these must be
- * kept in sync by hand. Styling only; no auth behavior changes.
+ * Web Studio theme for Clerk's prebuilt components (SignIn, SignUp,
+ * TaskChooseOrganization, OrganizationSwitcher, UserButton), so they read as
+ * part of the same product. Element classes use the app's CSS variables
+ * (`var(--ds-*)`), so they flip with the light/dark theme. Clerk's
+ * `variables` API cannot reliably resolve CSS custom properties, so the few
+ * literals below are the DARK theme values from
+ * `app/(dashboard)/globals.css` and must be kept in sync by hand; every
+ * element that is visible in both themes is overridden by a class instead.
+ * Styling only; no auth behavior changes.
  *
  * Untyped (no `Appearance` import): `@clerk/types` isn't a resolvable
  * top-level module in this install, and `@clerk/nextjs` doesn't re-export
  * the type. Every consumer passes this straight into a component's own
  * `appearance` prop, which structurally typechecks the object there.
  */
+const INPUT =
+  "!rounded-none !bg-transparent !text-[var(--ds-text-primary)] !border-[var(--ds-border)] focus:!border-[var(--ds-text-primary)] !shadow-none";
+const POPOVER =
+  "!rounded-2xl !bg-[var(--ds-surface)] !border !border-[var(--ds-border)] !shadow-[0_24px_64px_rgba(0,0,0,0.45)]";
+
 export const clerkDarkAppearance = {
   variables: {
-    colorPrimary: "#d7f24e",
-    colorBackground: "#17150f",
-    colorInputBackground: "#1e1b13",
-    colorInputText: "#f2ede1",
-    colorText: "#f2ede1",
-    colorTextSecondary: "#a8a190",
-    colorNeutral: "#f2ede1",
-    colorDanger: "#e0664f",
-    colorSuccess: "#9ecb4f",
-    colorWarning: "#d9a94f",
-    borderRadius: "0.625rem",
-    fontFamily: "var(--font-geist-sans), Arial, Helvetica, sans-serif",
+    colorPrimary: "#dc2626",
+    colorBackground: "#111110",
+    colorInputBackground: "#0c0c0b",
+    colorInputText: "#f5f4f0",
+    colorText: "#f5f4f0",
+    colorTextSecondary: "#a6a49c",
+    colorNeutral: "#f5f4f0",
+    colorDanger: "#dc2626",
+    colorSuccess: "#8fa67e",
+    colorWarning: "#c9a15a",
+    borderRadius: "0",
+    fontFamily: "var(--font-hanken), system-ui, sans-serif",
   },
   elements: {
-    card: "!bg-[#17150f] shadow-none border border-[#f2ede11a]",
-    headerTitle: "!text-[#f2ede1]",
-    headerSubtitle: "!text-[#a8a190]",
+    card: "!rounded-none !bg-[var(--ds-surface)] !shadow-none !border !border-[var(--ds-border)]",
+    headerTitle: "!text-[var(--ds-text-primary)] !font-light",
+    headerSubtitle: "!text-[var(--ds-text-secondary)]",
     footer: "!bg-transparent",
-    footerActionText: "text-[#a8a190]",
-    footerActionLink: "text-[#d7f24e] hover:text-[#e8ff5e]",
-    formFieldLabel: "!text-[#a8a190]",
-    formFieldInput: "!bg-[#1e1b13] !text-[#f2ede1] !border-[#f2ede11a]",
-    formFieldInputShowPasswordButton: "!text-[#a8a190]",
-    formFieldHintText: "!text-[#948d79]",
-    formFieldErrorText: "!text-[#e0664f]",
-    identityPreviewText: "!text-[#f2ede1]",
-    identityPreviewEditButton: "!text-[#d7f24e]",
-    formButtonPrimary: "!bg-[#d7f24e] !text-[#14130c] hover:!bg-[#e8ff5e] !shadow-none normal-case",
-    socialButtonsBlockButton: "!bg-[#1e1b13] !text-[#f2ede1] !border-[#f2ede11a]",
-    socialButtonsBlockButtonText: "!text-[#f2ede1]",
-    dividerLine: "!bg-[#f2ede11a]",
-    dividerText: "!text-[#948d79]",
-    otpCodeFieldInput: "!bg-[#1e1b13] !text-[#f2ede1] !border-[#f2ede11a]",
-    alternativeMethodsBlockButtonText: "!text-[#f2ede1]",
-    navbarButton: "!text-[#f2ede1]",
-    profileSectionTitleText: "!text-[#f2ede1]",
-    profileSectionContent: "!text-[#a8a190]",
+    footerActionText: "!text-[var(--ds-text-secondary)]",
+    footerActionLink: "!text-[var(--ds-text-primary)] hover:!text-[var(--ds-accent)]",
+    formFieldLabel: "!text-[var(--ds-text-faint)] !uppercase !tracking-[0.12em] !text-xs !font-medium",
+    formFieldInput: INPUT,
+    formFieldInputShowPasswordButton: "!text-[var(--ds-text-secondary)]",
+    formFieldHintText: "!text-[var(--ds-text-faint)]",
+    formFieldErrorText: "!text-[var(--ds-danger)]",
+    identityPreviewText: "!text-[var(--ds-text-primary)]",
+    identityPreviewEditButton: "!text-[var(--ds-text-primary)]",
+    formButtonPrimary:
+      "!rounded-none !bg-[var(--ds-primary)] !text-[var(--ds-primary-on)] hover:!bg-[var(--ds-primary-hover)] !shadow-none !uppercase !tracking-[0.18em] !text-[13px] !font-medium !h-12",
+    socialButtonsBlockButton: `${INPUT} !border-[var(--ds-border-strong)]`,
+    socialButtonsBlockButtonText: "!text-[var(--ds-text-primary)]",
+    dividerLine: "!bg-[var(--ds-border)]",
+    dividerText: "!text-[var(--ds-text-faint)]",
+    otpCodeFieldInput: INPUT,
+    alternativeMethodsBlockButtonText: "!text-[var(--ds-text-primary)]",
+    navbarButton: "!text-[var(--ds-text-primary)]",
+    profileSectionTitleText: "!text-[var(--ds-text-primary)]",
+    profileSectionContent: "!text-[var(--ds-text-secondary)]",
+    userButtonPopoverCard: POPOVER,
+    organizationSwitcherPopoverCard: POPOVER,
   },
 };
 
-/** Slim variant for compact UI (OrganizationSwitcher, UserButton) inside the dashboard's own dark shell. */
+/** Slim variant for compact UI (OrganizationSwitcher, UserButton) inside the dashboard's own shell. */
 export const clerkDarkCompactAppearance = {
   variables: clerkDarkAppearance.variables,
   elements: {
     ...clerkDarkAppearance.elements,
     userButtonBox: "flex-row-reverse",
-    userButtonOuterIdentifier: "text-[#f2ede1] text-sm",
-    organizationSwitcherTrigger: "text-[#f2ede1] hover:!bg-[#262218] rounded-md px-2 py-1",
-    organizationPreviewMainIdentifier: "text-[#f2ede1] text-sm",
-    organizationSwitcherTriggerIcon: "text-[#a8a190]",
+    userButtonOuterIdentifier: "!text-[var(--ds-text-primary)] text-sm",
+    organizationSwitcherTrigger: "!text-[var(--ds-text-primary)] hover:!bg-[var(--ds-surface-raised)] !rounded-none px-2 py-1",
+    organizationPreviewMainIdentifier: "!text-[var(--ds-text-primary)] text-sm",
+    organizationSwitcherTriggerIcon: "!text-[var(--ds-text-secondary)]",
   },
 };

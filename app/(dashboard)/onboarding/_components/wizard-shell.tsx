@@ -51,7 +51,7 @@ export function WizardShell({
         </Link>
         <span
           role="status"
-          className="hidden items-center gap-1.5 rounded-ds-sm bg-ds-surface px-2.5 py-1 text-xs text-ds-text-muted sm:flex"
+          className="hidden items-center gap-1.5 bg-ds-surface px-2.5 py-1 text-xs text-ds-text-muted sm:flex"
         >
           <Check aria-hidden className="size-3.5 text-ds-success" />
           All changes saved
@@ -61,7 +61,7 @@ export function WizardShell({
             type="button"
             onClick={() => setPreviewOpen((v) => !v)}
             aria-expanded={previewOpen}
-            className="flex items-center gap-1.5 rounded-ds-sm border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary lg:hidden"
+            className="flex items-center gap-1.5 border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary lg:hidden"
           >
             {previewOpen ? <PanelRightClose className="size-3.5" aria-hidden /> : <PanelRightOpen className="size-3.5" aria-hidden />}
             Preview
@@ -72,9 +72,9 @@ export function WizardShell({
 
       {/* Mobile: a slim progress bar + current stage name replaces the rail. */}
       <div className="flex flex-col gap-1 border-b border-ds-border px-4 py-3 md:hidden">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-ds-surface-elevated">
+        <div className="h-1.5 w-full overflow-hidden bg-ds-surface-raised">
           <div
-            className="h-full rounded-full bg-ds-accent transition-all"
+            className="h-full bg-ds-primary transition-all"
             style={{ width: `${((activeIndex + 1) / WIZARD_STAGES.length) * 100}%` }}
           />
         </div>
@@ -95,11 +95,11 @@ export function WizardShell({
             const content = (
               <>
                 <span
-                  className={`flex size-6 shrink-0 items-center justify-center rounded-full text-2xs font-semibold ${
+                  className={`flex size-6 shrink-0 ds-label items-center justify-center text-2xs ${
                     status === "done"
                       ? "bg-ds-success-bg text-ds-success"
                       : status === "current"
-                        ? "bg-ds-accent text-ds-accent-on"
+                        ? "bg-ds-primary text-ds-primary-on"
                         : "bg-ds-surface-elevated text-ds-text-muted"
                   }`}
                 >
@@ -122,7 +122,7 @@ export function WizardShell({
               <Link
                 key={stage.key}
                 href={stageHref[stage.key]}
-                className="flex items-start gap-3 rounded-ds-sm px-2 py-2.5 transition-colors hover:bg-ds-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="flex items-start gap-3 px-2 py-2.5 transition-colors hover:bg-ds-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 {content}
               </Link>
@@ -130,7 +130,7 @@ export function WizardShell({
               <div
                 key={stage.key}
                 aria-current={stage.key === activeStage ? "step" : undefined}
-                className={`flex items-start gap-3 rounded-ds-sm px-2 py-2.5 ${
+                className={`flex items-start gap-3 px-2 py-2.5 ${
                   stage.key === activeStage ? "bg-ds-surface" : ""
                 }`}
               >
@@ -152,10 +152,10 @@ export function WizardShell({
                 className="flex flex-1 flex-col gap-6"
               >
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide-ds text-ds-accent-muted">
+                  <p className="ds-label text-ds-accent">
                     {eyebrow}
                   </p>
-                  <h1 className="text-2xl font-semibold text-ds-text-primary">{heading}</h1>
+                  <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{heading}</h1>
                   {description ? (
                     <p className="max-w-lg text-sm text-ds-text-secondary">{description}</p>
                   ) : null}
@@ -179,14 +179,14 @@ export function WizardShell({
       </div>
 
       {previewOpen ? (
-        <div className="fixed inset-0 z-40 flex justify-end bg-black/40 lg:hidden" role="dialog" aria-modal="true">
-          <div className="flex h-full w-full max-w-sm flex-col gap-4 bg-ds-bg p-4 shadow-xl">
+        <div className="fixed inset-0 z-40 flex justify-end bg-ds-scrim lg:hidden" role="dialog" aria-modal="true">
+          <div className="flex h-full w-full max-w-sm flex-col gap-4 bg-ds-bg p-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-ds-text-primary">Live preview</p>
+              <p className="text-sm font-medium text-ds-text-primary">Live preview</p>
               <button
                 type="button"
                 onClick={() => setPreviewOpen(false)}
-                className="rounded-ds-sm px-2 py-1 text-sm text-ds-text-secondary hover:text-ds-text-primary"
+                className="px-2 py-1 text-sm text-ds-text-secondary hover:text-ds-text-primary"
               >
                 Close
               </button>
