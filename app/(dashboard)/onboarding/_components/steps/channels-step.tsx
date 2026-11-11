@@ -57,7 +57,7 @@ export function ChannelsStep({
   return (
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Website widget</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Website widget</h2>
         <WidgetInstallGuide widgetKeys={widgetKeys} appOrigin={appOrigin} isPublished={isPublished} />
         <p className="text-xs text-ds-text-muted">You&rsquo;ll get the widget code after publishing.</p>
         <CreateWidgetKeyForm />
@@ -65,7 +65,7 @@ export function ChannelsStep({
       </section>
 
       <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-semibold text-ds-text-primary">WhatsApp Business</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">WhatsApp Business</h2>
         {whatsapp ? (
           <WhatsappConnectionStatus connection={whatsapp} canEdit />
         ) : !whatsappEntitled ? (
@@ -76,7 +76,7 @@ export function ChannelsStep({
       </section>
 
       <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Instagram</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Instagram</h2>
         {instagram ? (
           <InstagramConnectionStatus connection={instagram} canEdit />
         ) : !instagramEntitled ? (
@@ -106,7 +106,7 @@ export function ChannelsStep({
             type="button"
             onClick={handleContinue}
             disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : "Continue"}
           </button>

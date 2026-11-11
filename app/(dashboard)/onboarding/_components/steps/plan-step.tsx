@@ -151,7 +151,7 @@ export function PlanStep({
           aria-labelledby="trial-heading"
           className="flex flex-col gap-3 border border-ds-text-primary bg-ds-surface-elevated p-5"
         >
-          <h2 id="trial-heading" className="text-base font-semibold text-ds-text-primary">
+          <h2 id="trial-heading" className="text-base font-medium text-ds-text-primary">
             Your free trial is on -- no card needed
           </h2>
           <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-ds-text-secondary">
@@ -220,7 +220,7 @@ export function PlanStep({
             type="button"
             onClick={handleContinue}
             disabled={isPending || confirming || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : onTrial ? "Continue with the free trial" : "Continue"}
           </button>

@@ -72,9 +72,9 @@ export function WizardShell({
 
       {/* Mobile: a slim progress bar + current stage name replaces the rail. */}
       <div className="flex flex-col gap-1 border-b border-ds-border px-4 py-3 md:hidden">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-ds-surface-elevated">
+        <div className="h-1.5 w-full overflow-hidden bg-ds-surface-raised">
           <div
-            className="h-full rounded-full bg-ds-primary transition-all"
+            className="h-full bg-ds-primary transition-all"
             style={{ width: `${((activeIndex + 1) / WIZARD_STAGES.length) * 100}%` }}
           />
         </div>
@@ -95,11 +95,11 @@ export function WizardShell({
             const content = (
               <>
                 <span
-                  className={`flex size-6 shrink-0 items-center justify-center rounded-full text-2xs font-semibold ${
+                  className={`flex size-6 shrink-0 ds-label items-center justify-center text-2xs ${
                     status === "done"
                       ? "bg-ds-success-bg text-ds-success"
                       : status === "current"
-                        ? "ds-btn-label bg-ds-primary text-ds-primary-on"
+                        ? "bg-ds-primary text-ds-primary-on"
                         : "bg-ds-surface-elevated text-ds-text-muted"
                   }`}
                 >
@@ -152,10 +152,10 @@ export function WizardShell({
                 className="flex flex-1 flex-col gap-6"
               >
                 <div className="flex flex-col gap-1.5">
-                  <p className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-primary">
+                  <p className="ds-label text-ds-accent">
                     {eyebrow}
                   </p>
-                  <h1 className="text-2xl font-semibold text-ds-text-primary">{heading}</h1>
+                  <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{heading}</h1>
                   {description ? (
                     <p className="max-w-lg text-sm text-ds-text-secondary">{description}</p>
                   ) : null}
@@ -179,10 +179,10 @@ export function WizardShell({
       </div>
 
       {previewOpen ? (
-        <div className="fixed inset-0 z-40 flex justify-end bg-black/40 lg:hidden" role="dialog" aria-modal="true">
-          <div className="flex h-full w-full max-w-sm flex-col gap-4 bg-ds-bg p-4 shadow-xl">
+        <div className="fixed inset-0 z-40 flex justify-end bg-ds-scrim lg:hidden" role="dialog" aria-modal="true">
+          <div className="flex h-full w-full max-w-sm flex-col gap-4 bg-ds-bg p-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-ds-text-primary">Live preview</p>
+              <p className="text-sm font-medium text-ds-text-primary">Live preview</p>
               <button
                 type="button"
                 onClick={() => setPreviewOpen(false)}

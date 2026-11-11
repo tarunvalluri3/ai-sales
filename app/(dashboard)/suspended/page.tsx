@@ -20,7 +20,7 @@ export default async function SuspendedPage() {
   return (
     <div className="flex flex-1 items-center justify-center bg-ds-bg p-6">
       <div className="flex max-w-md flex-col gap-3 border border-ds-border bg-ds-surface p-8 text-center">
-        <h1 className="text-lg font-semibold text-ds-text-primary">This account is suspended</h1>
+        <h1 className="text-lg font-medium text-ds-text-primary">This account is suspended</h1>
         <p className="text-sm text-ds-text-secondary">
           Access to the dashboard and the AI sales employee has been suspended for {business.name}. If you believe
           this is a mistake, contact support.

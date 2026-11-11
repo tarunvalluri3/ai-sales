@@ -36,7 +36,7 @@ export function RecommendedDetails({
   return (
     <section className="flex flex-col gap-5 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-ds-text-primary">Add recommended details</h2>
+        <h2 className="text-lg font-medium text-ds-text-primary">Add recommended details</h2>
         <p className="text-sm text-ds-text-secondary">
           Optional, and you can skip them. They make your agent more accurate, and you can change them later.
         </p>

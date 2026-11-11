@@ -123,7 +123,7 @@ export function TrainProductsStep({ products }: { products: Product[] }) {
             type="button"
             onClick={handleContinue}
             disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : "Continue"}
           </button>

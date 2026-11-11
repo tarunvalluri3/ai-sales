@@ -94,7 +94,7 @@ export function PersonaStep({ business }: { business: Business }) {
                 tone === t.key ? "border-ds-text-primary bg-ds-surface-raised" : "border-ds-border hover:border-ds-border-strong"
               }`}
             >
-              <span className="text-sm font-semibold text-ds-text-primary">{t.label}</span>
+              <span className="text-sm font-medium text-ds-text-primary">{t.label}</span>
               <span className="text-xs text-ds-text-secondary">{t.example}</span>
             </button>
           ))}
@@ -158,7 +158,7 @@ export function PersonaStep({ business }: { business: Business }) {
           <button
             type="submit"
             disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : "Continue"}
           </button>
