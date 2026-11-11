@@ -85,7 +85,7 @@ function NewTagForm() {
       <button
         type="submit"
         disabled={isPending || !name.trim()}
-        className="border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Adding…" : "Add tag"}
       </button>
@@ -134,7 +134,7 @@ function ExistingTagRow({ tag }: { tag: LeadTag }) {
         <button
           type="submit"
           disabled={isPending || !name.trim()}
-          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isPending ? "Saving…" : "Save"}
         </button>
@@ -146,7 +146,7 @@ function ExistingTagRow({ tag }: { tag: LeadTag }) {
             setColor(tag.color);
           }}
           disabled={isPending}
-          className="px-2.5 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="px-2.5 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Cancel
         </button>
@@ -203,7 +203,7 @@ export function TagManager({ tags, canEdit }: { tags: LeadTag[]; canEdit: boolea
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="tag-manager-panel"
-        className="w-fit border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="w-fit border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {open ? "Hide tag manager" : "Manage tags"}
       </button>

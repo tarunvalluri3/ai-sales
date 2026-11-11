@@ -23,7 +23,7 @@ export default async function ProductsPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Products</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Products</h1>
         <p className="text-sm text-ds-text-secondary">
           What your AI sales employee can tell prospects you sell.
         </p>
@@ -61,7 +61,7 @@ export default async function ProductsPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-4">
                   {product.price ? (
-                    <span className="text-sm font-semibold text-ds-accent">${product.price}</span>
+                    <span className="text-sm font-medium text-ds-accent">${product.price}</span>
                   ) : null}
                   <ReviewActions
                     approveAction={approveProductAction}

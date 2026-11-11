@@ -370,7 +370,7 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-ds-text-secondary">
-        <span className="font-semibold text-ds-text-primary">When</span>
+        <span className="font-medium text-ds-text-primary">When</span>
         <select value={triggerType} onChange={(event) => setTriggerType(event.target.value as WorkflowTriggerType)} className={SELECT_CLASS}>
           {WORKFLOW_TRIGGER_TYPES.map((type) => (
             <option key={type} value={type}>
@@ -383,7 +383,7 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
 
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-1.5 text-xs text-ds-text-secondary">
-          <span className="font-semibold text-ds-text-primary">And</span>
+          <span className="font-medium text-ds-text-primary">And</span>
           <select value={matchType} onChange={(event) => setMatchType(event.target.value as SegmentMatchType)} className={SELECT_CLASS}>
             <option value="all">all</option>
             <option value="any">any</option>
@@ -409,7 +409,7 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-semibold text-ds-text-primary">Then, in order:</span>
+        <span className="text-xs font-medium text-ds-text-primary">Then, in order:</span>
         {steps.map((step, index) => (
           <StepRow
             key={index}
@@ -433,12 +433,12 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
         <button
           type="submit"
           disabled={isPending || !name.trim() || steps.length === 0}
-          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Saving…" : workflow ? "Save workflow" : "Create workflow"}
         </button>
         {onDone ? (
-          <button type="button" onClick={onDone} disabled={isPending} className="px-2.5 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
+          <button type="button" onClick={onDone} disabled={isPending} className="px-2.5 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
             Cancel
           </button>
         ) : null}

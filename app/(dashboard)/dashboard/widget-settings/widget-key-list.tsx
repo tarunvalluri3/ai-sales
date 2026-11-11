@@ -44,7 +44,7 @@ function WidgetKeyCard({
           ) : null}
         </div>
         <span
-          className={`px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
+          className={`px-2.5 py-1 text-2xs font-medium tracking-wide-ds uppercase ${
             isRevoked ? "bg-ds-surface-soft text-ds-text-muted" : "bg-ds-success-bg text-ds-success"
           }`}
         >
@@ -88,7 +88,7 @@ function WidgetKeyCard({
               onChange={(event) => setName(event.target.value)}
               disabled={updatePending || !canEdit}
               placeholder="Marketing site"
-              className="border border-ds-border bg-ds-surface-elevated px-3 py-2.5 text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
+              className="border border-ds-border bg-transparent px-3 py-2.5 text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
             />
             <label
               htmlFor={`origins-${widgetKey.id}`}
@@ -105,7 +105,7 @@ function WidgetKeyCard({
               disabled={updatePending || !canEdit}
               placeholder="https://example.com"
               aria-describedby={`origins-hint-${widgetKey.id}`}
-              className="border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
+              className="border border-ds-border bg-transparent px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
             />
             <p id={`origins-hint-${widgetKey.id}`} className="text-xs text-ds-text-muted">
               Just the address itself, one per line, e.g. https://example.com — no page path or trailing slash.

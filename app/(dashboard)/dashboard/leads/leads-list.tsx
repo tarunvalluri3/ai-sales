@@ -162,7 +162,7 @@ export function LeadsList({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Leads</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Leads</h1>
         <p className="text-sm text-ds-text-secondary">{totalLabel}</p>
         <p className="text-xs text-ds-text-muted">
           Qualification is an AI-generated signal, not verified truth — always confirm from the conversation itself.
@@ -231,7 +231,7 @@ export function LeadsList({
                     setTab("all");
                     setActiveTagIds(new Set());
                   }}
-                  className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                  className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                 >
                   View all leads
                 </button>
@@ -296,7 +296,7 @@ function TabButton({
       aria-controls="leads-tabpanel"
       tabIndex={active ? 0 : -1}
       onClick={() => onSelect(id)}
-      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11 ${
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11 ${
         active
           ? "bg-dashboard-primary text-dashboard-on-primary"
           : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
@@ -304,8 +304,8 @@ function TabButton({
     >
       {label}
       <span
-        className={`rounded-full px-1.5 py-0.5 text-2xs font-semibold ${
-          active ? "bg-white/20 text-dashboard-on-primary" : "bg-ds-surface-soft text-ds-text-secondary"
+        className={`px-1.5 py-0.5 text-2xs font-medium ${
+          active ? "bg-ds-ivory/20 text-dashboard-on-primary" : "bg-ds-surface-soft text-ds-text-secondary"
         }`}
       >
         {count}
@@ -520,7 +520,7 @@ function LeadTextBlock({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="inline-flex items-center text-xs font-semibold text-ds-text-primary underline-offset-2 transition-colors hover:text-ds-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11"
+          className="inline-flex items-center text-xs font-medium text-ds-text-primary underline-offset-2 transition-colors hover:text-ds-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11"
         >
           {expanded ? "Show less" : "Show more"}
         </button>

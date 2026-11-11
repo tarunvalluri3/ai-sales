@@ -23,7 +23,7 @@ export default async function ServicesPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Services</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Services</h1>
         <p className="text-sm text-ds-text-secondary">
           What your AI sales employee can tell prospects you offer.
         </p>
@@ -61,7 +61,7 @@ export default async function ServicesPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-4">
                   {service.price ? (
-                    <span className="text-sm font-semibold text-ds-accent">${service.price}</span>
+                    <span className="text-sm font-medium text-ds-accent">${service.price}</span>
                   ) : null}
                   <ReviewActions
                     approveAction={approveServiceAction}

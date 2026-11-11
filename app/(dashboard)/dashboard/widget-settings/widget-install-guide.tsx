@@ -92,7 +92,7 @@ export function WidgetInstallGuide({
           className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           aria-expanded={open}
         >
-          <h2 className="text-lg font-semibold text-ds-text-primary">Install your chat widget</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">Install your chat widget</h2>
           <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
         </button>
         <p className="text-sm text-ds-text-secondary">
@@ -109,7 +109,7 @@ export function WidgetInstallGuide({
             </h3>
             {snippet ? (
               <div className="flex flex-wrap items-center gap-2">
-                <code className="max-w-full overflow-x-auto border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-xs text-ds-text-primary">
+                <code className="max-w-full overflow-x-auto border border-ds-border bg-transparent px-3 py-2.5 font-mono text-xs text-ds-text-primary">
                   {snippet}
                 </code>
                 <CopyKeyButton value={snippet} label="Copy snippet" />

@@ -8,7 +8,7 @@ import { DeleteButton, ROLE_DENIED_TITLE } from "../_components/delete-button";
 const initialState: ExceptionActionState = {};
 
 const inputClasses =
-  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong disabled:opacity-60";
+  "border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-text-primary disabled:opacity-60";
 
 type Mode = "close_all_day" | "close_range" | "open_override";
 

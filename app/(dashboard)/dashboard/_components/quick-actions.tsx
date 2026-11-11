@@ -18,7 +18,7 @@ export function QuickActions() {
           <Link
             key={action.href}
             href={action.href}
-            className="rounded-full border border-ds-border-strong px-3.5 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="border border-ds-border-strong px-3.5 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {action.label}
           </Link>

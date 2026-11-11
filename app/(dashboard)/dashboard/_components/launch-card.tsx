@@ -20,7 +20,7 @@ export function LaunchCard({ snippet }: { snippet: string | null }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 id="launch-card-heading" className="text-lg font-semibold text-ds-text-primary">
+          <h2 id="launch-card-heading" className="text-lg font-medium text-ds-text-primary">
             Your AI sales employee is live
           </h2>
           <p className="text-sm text-ds-text-secondary">

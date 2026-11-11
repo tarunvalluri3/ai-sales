@@ -33,7 +33,7 @@ export function FunnelChart({ stages, dropOffs }: { stages: FunnelStage[]; dropO
 
       {dropOffs.some((d) => d.rate > 0) ? (
         <div className="flex flex-col gap-1 border-t border-ds-border pt-3">
-          <span className="text-2xs font-semibold tracking-wide-ds text-ds-text-secondary uppercase">Drop-off between stages</span>
+          <span className="text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">Drop-off between stages</span>
           {dropOffs.map((dropOff) => (
             <div key={`${dropOff.fromLabel}-${dropOff.toLabel}`} className="flex items-center justify-between text-xs">
               <span className="text-ds-text-secondary">

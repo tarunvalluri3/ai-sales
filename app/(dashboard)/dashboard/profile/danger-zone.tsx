@@ -60,7 +60,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
 
   return (
     <details className="group w-full max-w-lg overflow-hidden border border-ds-border bg-ds-surface">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-5 text-sm font-semibold text-ds-text-primary transition-colors hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary [&::-webkit-details-marker]:hidden">
         Danger zone
         <svg
           width="14"
@@ -83,7 +83,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
       <div className="flex flex-col gap-6 border-t border-ds-border p-5">
         <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface-elevated p-5">
           <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-ds-text-primary">Export your data</h2>
+            <h2 className="text-sm font-medium text-ds-text-primary">Export your data</h2>
             <p className="text-sm text-ds-text-secondary">
               Download everything this business owns — profile, products, services, FAQs, knowledge,
               conversations, messages, leads, and the audit log — as a single JSON file.
@@ -102,7 +102,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
 
         <section className="flex flex-col gap-3 border border-ds-danger/40 bg-ds-surface-elevated p-5">
           <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-semibold text-ds-danger">Delete this business</h2>
+            <h2 className="text-sm font-medium text-ds-danger">Delete this business</h2>
             <p className="text-sm text-ds-text-secondary">
               Permanently deletes this business and everything it owns — products, services, FAQs,
               knowledge, conversations, messages, and leads. This cannot be undone. Your team&apos;s
@@ -112,7 +112,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
           <form action={deleteAction} className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label htmlFor="confirmName" className="text-sm font-medium text-ds-text-secondary">
-                Type <span className="font-semibold text-ds-text-primary">{businessName}</span> to confirm
+                Type <span className="font-medium text-ds-text-primary">{businessName}</span> to confirm
               </label>
               <input
                 id="confirmName"
@@ -122,7 +122,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
                 value={confirmName}
                 onChange={(event) => setConfirmName(event.target.value)}
                 disabled={isDeletePending}
-                className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary transition-colors focus:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger disabled:opacity-60"
+                className="border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary transition-colors focus:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger disabled:opacity-60"
               />
             </div>
             <AnimatePresence mode="wait">
@@ -143,7 +143,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
             <button
               type="submit"
               disabled={isDeletePending || confirmName !== businessName}
-              className="w-fit bg-ds-danger px-4 py-3 text-sm font-semibold text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+              className="w-fit bg-ds-danger px-4 py-3 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
             >
               {isDeletePending ? "Deleting…" : "Permanently delete this business"}
             </button>

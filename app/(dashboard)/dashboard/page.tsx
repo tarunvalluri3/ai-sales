@@ -72,7 +72,7 @@ export default async function DashboardOverviewPage({
       {showInstallBanner ? <InstallWidgetBanner hasActiveKey={activeKeys.length > 0} /> : null}
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">{businessName}</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{businessName}</h1>
         <p className="text-sm text-ds-text-secondary">
           {conversationStats.last7Days} conversation{conversationStats.last7Days === 1 ? "" : "s"} in
           the last 7 days · {leadStats.total} lead{leadStats.total === 1 ? "" : "s"} total

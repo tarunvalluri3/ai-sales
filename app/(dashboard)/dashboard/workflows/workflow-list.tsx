@@ -42,7 +42,7 @@ function EnabledToggle({ workflow, canEdit }: { workflow: Workflow; canEdit: boo
       <button
         type="submit"
         disabled={isPending}
-        className={`px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide-ds transition-colors ${
+        className={`px-2 py-0.5 text-2xs font-medium uppercase tracking-wide-ds transition-colors ${
           workflow.enabled ? "bg-ds-success-bg text-ds-success hover:opacity-80" : "bg-ds-surface-soft text-ds-text-secondary hover:opacity-80"
         }`}
       >
@@ -97,12 +97,12 @@ export function WorkflowList({ workflows, tags, canEdit }: { workflows: Workflow
   return (
     <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Workflows</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Workflows</h2>
         {canEdit && !creating ? (
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="flex items-center gap-1 border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong"
+            className="flex items-center gap-1 border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             New workflow

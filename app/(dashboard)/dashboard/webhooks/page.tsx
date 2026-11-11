@@ -13,7 +13,7 @@ export default async function WebhooksPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Webhooks</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Webhooks</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Get notified the moment your AI sales employee qualifies a new lead. Each endpoint
           receives a signed <code className="font-mono text-ds-text-primary">POST</code> request

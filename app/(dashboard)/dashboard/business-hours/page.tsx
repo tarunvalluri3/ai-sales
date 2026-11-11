@@ -11,7 +11,7 @@ export default async function BusinessHoursPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Business hours</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Business hours</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Set the hours your team is available, and how long an escalated conversation should wait
           before it&rsquo;s re-routed to the next team member. Leave a day off to mark it closed. An

@@ -88,7 +88,7 @@ export function SandboxChatPanel() {
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-ds-text-primary">Test your AI</h2>
+            <h2 className="text-lg font-medium text-ds-text-primary">Test your AI</h2>
             <Badge tone="accent" size="sm" title="This chat reads your draft, including changes you haven't published yet.">
               Testing draft
             </Badge>
@@ -191,7 +191,7 @@ export function SandboxChatPanel() {
           disabled={isPending}
           placeholder="Ask what a prospect might ask…"
           maxLength={2000}
-          className="flex-1 border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60"
+          className="flex-1 border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-text-primary focus:outline-none disabled:opacity-60"
         />
         <button
           type="submit"

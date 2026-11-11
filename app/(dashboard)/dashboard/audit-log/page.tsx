@@ -77,7 +77,7 @@ export default async function AuditLogPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Audit Log</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Audit Log</h1>
         <p className="text-sm text-ds-text-secondary">
           A record of sensitive actions taken by your team -- conversation takeovers, knowledge
           and widget key changes, and more. Most recent {entries.length} shown.

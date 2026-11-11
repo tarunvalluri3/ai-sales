@@ -56,7 +56,7 @@ export function WidgetBrandingForm({
           className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           aria-expanded={open}
         >
-          <h2 className="text-lg font-semibold text-ds-text-primary">Branding &amp; language</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">Branding &amp; language</h2>
           <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
         </button>
         <p className="text-sm text-ds-text-secondary">
@@ -76,7 +76,7 @@ export function WidgetBrandingForm({
                   id="accentColor"
                   name="accentColor"
                   type="text"
-                  placeholder="#d7f24e"
+                  placeholder="#dc2626"
                   pattern="^#[0-9a-fA-F]{6}$"
                   value={accentColor}
                   onChange={(event) => setAccentColor(event.target.value)}
@@ -86,7 +86,7 @@ export function WidgetBrandingForm({
                 <input
                   type="color"
                   aria-label="Pick accent color"
-                  value={accentColor || "#d7f24e"}
+                  value={accentColor || "#dc2626"}
                   onChange={(event) => setAccentColor(event.target.value)}
                   disabled={isPending || !canEdit}
                   className="h-9 w-9 shrink-0 cursor-pointer border border-ds-border bg-transparent disabled:opacity-60"

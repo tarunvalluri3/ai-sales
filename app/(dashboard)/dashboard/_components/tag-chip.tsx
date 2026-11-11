@@ -68,7 +68,7 @@ export function RemovableTagChip({
             disabled={isPending}
             aria-label={`Remove tag ${tag.name}`}
             title={`Remove tag ${tag.name}`}
-            className="rounded-full transition-opacity hover:opacity-70 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="transition-opacity hover:opacity-70 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             <X className="size-2.5" aria-hidden="true" />
           </button>

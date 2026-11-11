@@ -24,7 +24,7 @@ export function ChannelUpgradeNotice({
       {showPlansLink ? (
         <Link
           href="/pricing"
-          className="border border-ds-border-strong px-4 py-2 text-sm font-semibold text-ds-text-primary transition-colors hover:border-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="border border-ds-border-strong px-4 py-2 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           See plans
         </Link>

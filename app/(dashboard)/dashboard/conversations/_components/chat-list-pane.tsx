@@ -176,7 +176,7 @@ export function ChatListPane({
     >
       <div className="flex shrink-0 flex-col gap-2 border-b border-ds-border p-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-ds-text-primary">Conversations</h2>
+          <h2 className="text-sm font-medium text-ds-text-primary">Conversations</h2>
           {isStale ? (
             <p className="flex items-center gap-1 text-2xs text-ds-warning" role="status">
               <RefreshCw className="size-3 animate-spin" aria-hidden="true" />
@@ -244,7 +244,7 @@ export function ChatListPane({
                       active ? "bg-ds-surface-elevated" : ""
                     }`}
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ds-surface-elevated text-xs font-semibold text-ds-accent">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ds-surface-elevated text-xs font-medium text-ds-accent">
                       {initial}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -296,7 +296,7 @@ function FilterPill({ active, onClick, label }: { active: boolean; onClick: () =
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full px-2.5 py-1 text-2xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+      className={`px-2.5 py-1 text-2xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
         active
           ? "bg-dashboard-primary text-dashboard-on-primary"
           : "bg-ds-surface-soft text-ds-text-secondary hover:text-ds-text-primary"

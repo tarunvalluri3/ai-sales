@@ -36,7 +36,7 @@ function NewTaskForm() {
       <button
         type="submit"
         disabled={isPending || !title.trim()}
-        className="border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60"
+        className="border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? "Adding…" : "Add"}
       </button>
@@ -82,7 +82,7 @@ function TaskRow({ task }: { task: SalesTask }) {
 export function TasksPanel({ tasks, canEdit }: { tasks: SalesTask[]; canEdit: boolean }) {
   return (
     <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
-      <h2 className="text-sm font-semibold text-ds-text-primary">Sales tasks</h2>
+      <h2 className="text-sm font-medium text-ds-text-primary">Sales tasks</h2>
       {canEdit ? <NewTaskForm /> : null}
       {tasks.length === 0 ? (
         <EmptyState title="No tasks" description="Manually-created tasks and workflow-created tasks both show up here." />

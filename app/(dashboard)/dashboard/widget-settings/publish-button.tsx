@@ -51,7 +51,7 @@ export function PublishButton({
     <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ds-text-primary">
+          <h2 className="text-lg font-medium text-ds-text-primary">
             {published ? "Published" : "Not published yet"}
           </h2>
           <p className="max-w-xl text-sm text-ds-text-secondary">
@@ -61,7 +61,7 @@ export function PublishButton({
           </p>
         </div>
         <span
-          className={`shrink-0 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide-ds ${
+          className={`shrink-0 px-2.5 py-1 text-2xs font-medium uppercase tracking-wide-ds ${
             published ? "bg-ds-success-bg text-ds-success" : "bg-ds-warning-bg text-ds-warning"
           }`}
         >

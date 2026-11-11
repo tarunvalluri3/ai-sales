@@ -57,7 +57,7 @@ export default async function AppointmentAvailabilityPage({
   return (
     <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
       <div className="flex flex-col gap-3">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Appointments</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Appointments</h1>
         <AppointmentsTabs active="availability" />
       </div>
 

@@ -27,7 +27,7 @@ const STATUS_STYLE: Record<IngestionStatus, string> = {
 export function IngestionStatusPill({ status }: { status: IngestionStatus }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-2xs font-medium transition-colors ${STATUS_STYLE[status]}`}
+      className={`inline-flex shrink-0 items-center px-2 py-0.5 text-2xs font-medium transition-colors ${STATUS_STYLE[status]}`}
     >
       {STATUS_LABEL[status]}
     </span>

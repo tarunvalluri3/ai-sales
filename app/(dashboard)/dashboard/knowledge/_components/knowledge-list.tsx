@@ -166,7 +166,7 @@ export function KnowledgeList({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search title or content…"
               aria-label="Search knowledge documents"
-              className="w-full max-w-xs border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none"
+              className="w-full max-w-xs border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-text-primary focus:outline-none"
             />
             <div
               role="tablist"
@@ -184,7 +184,7 @@ export function KnowledgeList({
                   aria-controls="knowledge-list-panel"
                   tabIndex={statusFilter === f.id ? 0 : -1}
                   onClick={() => setStatusFilter(f.id)}
-                  className={`px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                     statusFilter === f.id
                       ? "bg-dashboard-primary text-dashboard-on-primary"
                       : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
@@ -217,7 +217,7 @@ export function KnowledgeList({
                     <button
                       type="submit"
                       disabled={isBulkPublishing}
-                      className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                      className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                     >
                       {isBulkPublishing ? "Approving…" : "Approve selected"}
                     </button>
@@ -232,7 +232,7 @@ export function KnowledgeList({
                         type="submit"
                         disabled={isBulkDeleting}
                         autoFocus
-                        className="bg-ds-danger px-3 py-1.5 text-xs font-semibold text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+                        className="bg-ds-danger px-3 py-1.5 text-xs font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
                       >
                         {isBulkDeleting ? "Deleting…" : "Confirm delete"}
                       </button>
@@ -240,7 +240,7 @@ export function KnowledgeList({
                         type="button"
                         onClick={() => setBulkDeleteConfirming(false)}
                         disabled={isBulkDeleting}
-                        className="px-3 py-1.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                        className="px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                       >
                         Cancel
                       </button>
@@ -249,7 +249,7 @@ export function KnowledgeList({
                     <button
                       type="button"
                       onClick={() => setBulkDeleteConfirming(true)}
-                      className="px-3 py-1.5 text-xs font-semibold text-ds-danger transition-colors hover:bg-ds-danger-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                      className="px-3 py-1.5 text-xs font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                     >
                       Delete selected
                     </button>

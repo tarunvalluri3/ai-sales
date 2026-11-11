@@ -23,7 +23,7 @@ export default async function EditKnowledgeDocumentPage({
 
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <h1 className="text-2xl font-semibold text-ds-text-primary">Edit knowledge document</h1>
+      <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Edit knowledge document</h1>
       <section className="flex w-full max-w-lg flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         {hasMinRole(orgRole, "org:member") ? (
           <KnowledgeForm

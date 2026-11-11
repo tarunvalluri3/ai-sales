@@ -114,7 +114,7 @@ export function SnoozeMenu({
           ref={panelRef as React.RefObject<HTMLDivElement>}
           role="menu"
           style={{ maxHeight: MENU_MAX_HEIGHT_PX }}
-          className={`absolute right-0 z-20 flex w-52 flex-col gap-1 overflow-y-auto border border-ds-border bg-ds-surface-elevated p-2 shadow-lg ${
+          className={`absolute right-0 z-20 flex w-52 flex-col gap-1 overflow-y-auto border border-ds-border bg-ds-surface-elevated p-2 ${
             placement === "up" ? "bottom-full mb-1" : "top-full mt-1"
           }`}
         >
@@ -155,7 +155,7 @@ export function SnoozeMenu({
               <button
                 type="submit"
                 disabled={isPending}
-                className="ds-btn-label bg-ds-primary px-2 py-1 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
+                className="ds-btn-label bg-ds-primary px-2 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
               >
                 {isPending ? "Snoozing…" : "Set"}
               </button>

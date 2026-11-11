@@ -57,7 +57,7 @@ export function InstagramConnectionStatus({
         <div className="flex items-center gap-3">
           <div
             aria-hidden="true"
-            className="flex size-10 shrink-0 items-center justify-center bg-[linear-gradient(135deg,#feda75_0%,#fa7e1e_25%,#d62976_50%,#962fbf_75%,#4f5bd5_100%)] text-white"
+            className="flex size-10 shrink-0 items-center justify-center border border-ds-border bg-ds-surface-raised text-ds-text-primary"
           >
             <Camera className="size-5" />
           </div>

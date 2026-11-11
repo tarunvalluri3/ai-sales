@@ -21,7 +21,7 @@ export function FinishSetupButton() {
             else setResult({ tone: "error", text: outcome.message ?? "That step still didn't finish." });
           })
         }
-        className="ds-btn-label self-start bg-ds-primary px-3 py-1.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="ds-btn-label self-start bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Finishing setup…" : "Finish setup"}
       </button>

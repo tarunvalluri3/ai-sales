@@ -30,12 +30,12 @@ export function ConnectInstagramButton() {
       <div className="flex items-start gap-4">
         <div
           aria-hidden="true"
-          className="flex size-12 shrink-0 items-center justify-center bg-[linear-gradient(135deg,#feda75_0%,#fa7e1e_25%,#d62976_50%,#962fbf_75%,#4f5bd5_100%)] text-white shadow-sm"
+          className="flex size-12 shrink-0 items-center justify-center border border-ds-border bg-ds-surface-raised text-ds-text-primary"
         >
           <Camera className="size-6" aria-hidden="true" />
         </div>
         <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-semibold text-ds-text-primary">Connect your Instagram account</h2>
+          <h2 className="text-sm font-medium text-ds-text-primary">Connect your Instagram account</h2>
           <p className="max-w-md text-sm text-ds-text-secondary">
             Log in with Facebook and choose the Facebook Page linked to your Instagram professional account.
           </p>

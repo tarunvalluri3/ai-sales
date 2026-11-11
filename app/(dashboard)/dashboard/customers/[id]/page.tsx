@@ -69,7 +69,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
           <section className="border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Lead score</h2>
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Lead score</h2>
             {latestLead ? (
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
@@ -84,7 +84,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
                 </p>
                 {scoreHistory.length > 0 ? (
                   <div className="flex flex-col gap-1.5 border-t border-ds-border pt-3">
-                    <span className="text-2xs font-semibold tracking-wide-ds text-ds-text-secondary uppercase">
+                    <span className="text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
                       Deterministic score history
                     </span>
                     {scoreHistory.map((entry) => (
@@ -112,7 +112,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
           </section>
 
           <section className="border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Conversations ({conversations.length})</h2>
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Conversations ({conversations.length})</h2>
             {conversations.length === 0 ? (
               <p className="text-sm text-ds-text-muted">No conversations yet.</p>
             ) : (
@@ -137,7 +137,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
           </section>
 
           <section className="border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Appointments ({appointments.length})</h2>
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Appointments ({appointments.length})</h2>
             {appointments.length === 0 ? (
               <p className="text-sm text-ds-text-muted">No appointments yet.</p>
             ) : (
@@ -157,7 +157,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
 
         <div className="flex flex-col gap-6">
           <section className="border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Tags</h2>
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Tags</h2>
             <div className="flex flex-wrap items-center gap-1.5">
               {tags.map((tag) => (
                 <RemovableTagChip
@@ -176,7 +176,7 @@ export default async function CustomerProfilePage({ params }: { params: Promise<
           </section>
 
           <section className="border border-ds-border bg-ds-surface p-4">
-            <h2 className="mb-3 text-sm font-semibold text-ds-text-primary">Leads ({leads.length})</h2>
+            <h2 className="mb-3 text-sm font-medium text-ds-text-primary">Leads ({leads.length})</h2>
             {leads.length === 0 ? (
               <p className="text-sm text-ds-text-muted">No leads yet.</p>
             ) : (

@@ -148,7 +148,7 @@ export function NotificationBell() {
           // announcing it here would read it twice.
           <span
             aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-ds-warning px-1 text-2xs font-semibold leading-4 text-ds-bg"
+            className="absolute -right-0.5 -top-0.5 min-w-4 bg-ds-warning px-1 text-2xs font-medium leading-4 text-ds-bg"
           >
             {formatAttentionBadge(unreadCount)}
           </span>
@@ -161,7 +161,7 @@ export function NotificationBell() {
           id={panelId}
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-11 z-20 flex max-h-96 w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden border border-ds-border bg-ds-surface-elevated shadow-lg"
+          className="absolute right-0 top-11 z-20 flex max-h-96 w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden border border-ds-border bg-ds-surface-elevated"
         >
           <div className="flex items-center justify-between border-b border-ds-border px-3 py-2">
             <p className="text-2xs font-medium uppercase tracking-wide-ds text-ds-text-muted">Notifications</p>

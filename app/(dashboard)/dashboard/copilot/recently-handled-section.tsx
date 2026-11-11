@@ -31,7 +31,7 @@ export function RecentlyHandledSection({
 }) {
   return (
     <details className="border border-ds-border bg-ds-surface p-4">
-      <summary className="cursor-pointer text-sm font-semibold text-ds-text-primary">
+      <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">
         Recently handled ({items.length})
       </summary>
       <ul className="mt-3 flex flex-col gap-2">

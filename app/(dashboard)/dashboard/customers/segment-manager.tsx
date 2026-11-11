@@ -167,7 +167,7 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
         <button
           type="submit"
           disabled={isPending || !name.trim() || conditions.length === 0}
-          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isPending ? "Saving…" : segment ? "Save segment" : "Create segment"}
         </button>
@@ -176,7 +176,7 @@ function SegmentForm({ segment, onDone }: { segment?: Segment; onDone?: () => vo
             type="button"
             onClick={onDone}
             disabled={isPending}
-            className="px-2.5 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
+            className="px-2.5 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
           >
             Cancel
           </button>
@@ -239,7 +239,7 @@ export function SegmentManager({ segments, canManage }: { segments: Segment[]; c
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls="segment-manager-panel"
-        className="w-fit border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="w-fit border border-ds-border bg-ds-surface px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {open ? "Hide segments" : "Manage segments"}
       </button>
@@ -261,7 +261,7 @@ export function SegmentManager({ segments, canManage }: { segments: Segment[]; c
               <button
                 type="button"
                 onClick={() => setCreating(true)}
-                className="flex items-center gap-1 border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                className="flex items-center gap-1 border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 <Plus className="size-3.5" aria-hidden="true" />
                 New segment

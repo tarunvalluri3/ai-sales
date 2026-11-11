@@ -19,7 +19,7 @@ export function ChooseInstagramAccount({
   return (
     <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-6">
       <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Choose the Instagram account for this business</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Choose the Instagram account for this business</h2>
         <p className="text-sm text-ds-text-secondary">
           You shared {accounts.length} Instagram accounts with Waves AI Pilot. Pick the one whose DMs your AI sales
           employee should answer.

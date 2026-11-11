@@ -58,7 +58,7 @@ export function ProductsList({
             ) : null}
           </TableCell>
           <TableCell align="right">
-            {product.price ? <span className="font-semibold text-ds-accent">${product.price}</span> : "—"}
+            {product.price ? <span className="font-medium text-ds-accent">${product.price}</span> : "—"}
           </TableCell>
           <TableCell align="right">
             <div className="flex items-center justify-end gap-3">

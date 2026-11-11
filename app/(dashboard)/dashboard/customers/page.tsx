@@ -25,7 +25,7 @@ export default async function CustomersPage({
   return (
     <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold text-ds-text-primary">Customers</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Customers</h1>
         <p className="text-sm text-ds-text-muted">
           Every prospect who&apos;s shared contact info, aggregated across channels, with their lead score, tags, and activity in one place.
         </p>

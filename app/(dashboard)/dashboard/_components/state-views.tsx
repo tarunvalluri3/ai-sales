@@ -67,7 +67,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="ds-btn-label mt-2 bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label mt-2 bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Try again
         </button>

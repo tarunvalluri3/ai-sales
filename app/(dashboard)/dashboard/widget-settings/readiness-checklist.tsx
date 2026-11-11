@@ -129,7 +129,7 @@ export function ReadinessChecklist({
     <div className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-semibold text-ds-text-primary">Readiness checklist</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">Readiness checklist</h2>
           <p className="max-w-xl text-sm text-ds-text-secondary">
             {!report.gateApplies
               ? "Your AI is already live. This list is a health check — nothing here will take it offline."
@@ -144,7 +144,7 @@ export function ReadinessChecklist({
       </div>
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">
+        <h3 className="text-xs font-medium uppercase tracking-wide-ds text-ds-text-muted">
           Required to publish
         </h3>
         <ul className="flex flex-col">
@@ -155,7 +155,7 @@ export function ReadinessChecklist({
       </div>
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">
+        <h3 className="text-xs font-medium uppercase tracking-wide-ds text-ds-text-muted">
           Recommended
         </h3>
         <ul className="flex flex-col">

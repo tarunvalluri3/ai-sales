@@ -47,7 +47,7 @@ export default async function BillingPage() {
     return (
       <div className="flex flex-col gap-6 p-4 md:p-6">
         <header className="flex flex-col gap-1">
-          <h1 className="text-xl font-semibold text-ds-text-primary">Billing</h1>
+          <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Billing</h1>
           <p className="text-sm text-ds-text-secondary">
             Only an organisation admin can see or change billing.
           </p>
@@ -86,7 +86,7 @@ export default async function BillingPage() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-ds-text-primary">Billing</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Billing</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Your plan, what you have used this period, when you are next charged, and every invoice
           we have issued you.

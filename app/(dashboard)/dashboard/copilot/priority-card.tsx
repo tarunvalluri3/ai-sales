@@ -41,7 +41,7 @@ export function PriorityCard({ item, canManage }: { item: TodayActionItem; canMa
     <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-col">
-          <Link href={`/dashboard/customers/${customer.id}`} className="text-base font-semibold text-ds-text-primary hover:underline">
+          <Link href={`/dashboard/customers/${customer.id}`} className="text-base font-medium text-ds-text-primary hover:underline">
             {customer.displayName ?? "Unnamed prospect"}
           </Link>
           <span className="text-xs text-ds-text-muted">
@@ -57,7 +57,7 @@ export function PriorityCard({ item, canManage }: { item: TodayActionItem; canMa
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-sm font-semibold text-ds-text-primary">{title}</p>
+        <p className="text-sm font-medium text-ds-text-primary">{title}</p>
 
         <div className="flex flex-wrap gap-1">
           {reasons.map((reason) => (
@@ -78,7 +78,7 @@ export function PriorityCard({ item, canManage }: { item: TodayActionItem; canMa
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href={`/dashboard/customers/${customer.id}`}
-          className="ds-btn-label w-fit bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label w-fit bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Open conversation
         </Link>

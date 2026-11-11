@@ -11,7 +11,7 @@ const initialState: BusinessHoursState = {};
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const inputClasses =
-  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong disabled:opacity-60";
+  "border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-text-primary disabled:opacity-60";
 
 /**
  * `canEdit` (Phase P2#10, default `true`) disables every input/button

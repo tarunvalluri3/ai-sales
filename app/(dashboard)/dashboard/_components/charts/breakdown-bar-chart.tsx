@@ -5,7 +5,7 @@ import { BarChart3 } from "lucide-react";
 import { chartColors } from "./chart-colors";
 import { InlineEmptyState } from "../state-views";
 
-const DEFAULT_COLORS = [chartColors.accent, chartColors.success, chartColors.warning, chartColors.danger];
+const DEFAULT_COLORS = [chartColors.ink, chartColors.textSecondary, chartColors.textMuted, chartColors.accentMuted];
 
 function ChartTooltip({
   active,
@@ -16,9 +16,9 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="border border-ds-border-strong bg-ds-surface-elevated px-3 py-1.5 text-xs shadow-lg">
+    <div className="border border-ds-border-strong bg-ds-surface-elevated px-3 py-1.5 text-xs">
       <span className="text-ds-text-secondary">{payload[0].name}: </span>
-      <span className="font-semibold text-ds-text-primary">{payload[0].value}</span>
+      <span className="font-medium text-ds-text-primary">{payload[0].value}</span>
     </div>
   );
 }

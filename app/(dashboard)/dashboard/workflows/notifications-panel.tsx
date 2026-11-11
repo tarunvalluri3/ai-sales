@@ -54,7 +54,7 @@ function NotificationRow({ notification }: { notification: InternalNotification 
 export function NotificationsPanel({ notifications }: { notifications: InternalNotification[] }) {
   return (
     <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
-      <h2 className="text-sm font-semibold text-ds-text-primary">Notifications</h2>
+      <h2 className="text-sm font-medium text-ds-text-primary">Notifications</h2>
       {notifications.length === 0 ? (
         <EmptyState title="No notifications" description="A workflow's internal-notification step will show up here." />
       ) : (

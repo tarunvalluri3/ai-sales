@@ -225,7 +225,7 @@ export function BillingPanel({
           ? { subscription_id: session.subscriptionId }
           : { order_id: session.orderId }),
         notes: { plan: session.planKey },
-        theme: { color: "#17150f" },
+        theme: { color: "#111110" },
         // Cards only: one block that lists only the card method, with the
         // default blocks (UPI, netbanking, wallets...) switched off.
         config: {
@@ -351,7 +351,7 @@ export function BillingPanel({
 
       <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold text-ds-text-primary">
+          <h2 className="text-base font-medium text-ds-text-primary">
             {isSubscribed ? "Change your plan" : "Choose a plan"}
           </h2>
           <p className="text-sm text-ds-text-secondary">
@@ -403,14 +403,14 @@ export function BillingPanel({
                   }`}
                 >
                   <span className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-ds-text-primary">{plan.name}</span>
+                    <span className="text-sm font-medium text-ds-text-primary">{plan.name}</span>
                     {current ? (
-                      <span className="bg-ds-surface-elevated px-2 py-0.5 text-2xs font-semibold text-ds-text-secondary">
+                      <span className="bg-ds-surface-elevated px-2 py-0.5 text-2xs font-medium text-ds-text-secondary">
                         Current
                       </span>
                     ) : null}
                   </span>
-                  <span className="text-lg font-semibold text-ds-text-primary">
+                  <span className="text-lg font-medium text-ds-text-primary">
                     {formatInr(pricePaise)}
                     <span className="text-2xs font-normal text-ds-text-muted">
                       {" "}
@@ -475,7 +475,7 @@ export function BillingPanel({
                 (starterWarning !== null && !starterLossAcknowledged) ||
                 (selectedPlan === entitlement.planKey && isSubscribed && interval === entitlement.billingInterval)
               }
-              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {startPending || changePending
                 ? "Opening payment…"
@@ -530,14 +530,14 @@ function CurrentPlanCard({
     <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-ds-text-muted">
+          <p className="text-2xs font-medium uppercase tracking-wide text-ds-text-muted">
             Current plan
           </p>
-          <h2 className="text-lg font-semibold text-ds-text-primary">{entitlement.planName}</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">{entitlement.planName}</h2>
           <p className="text-sm text-ds-text-secondary">{statusLabel}</p>
         </div>
         {!entitlement.serving ? (
-          <span className="border border-ds-danger bg-ds-danger-bg px-3 py-1 text-2xs font-semibold text-ds-text-primary">
+          <span className="border border-ds-danger bg-ds-danger-bg px-3 py-1 text-2xs font-medium text-ds-text-primary">
             AI replies paused
           </span>
         ) : null}
@@ -584,7 +584,7 @@ function CurrentPlanCard({
           <button
             type="submit"
             disabled={updatePaymentMethod.pending || !updatePaymentMethod.ready}
-            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {updatePaymentMethod.pending ? "Opening payment…" : "Update payment method"}
           </button>
@@ -602,10 +602,10 @@ function CurrentPlanCard({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-label="AI replies used this period"
-            className="h-2 w-full overflow-hidden rounded-full bg-ds-surface-elevated"
+            className="h-2 w-full overflow-hidden bg-ds-surface-raised"
           >
             <div
-              className={`h-full rounded-full ${percentUsed >= 100 ? "bg-ds-danger" : "bg-ds-primary"}`}
+              className={`h-full ${percentUsed >= 100 ? "bg-ds-danger" : "bg-ds-primary"}`}
               style={{ width: `${percentUsed}%` }}
             />
           </div>
@@ -691,7 +691,7 @@ function CancelCard({
   return (
     <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold text-ds-text-primary">Cancel your plan</h2>
+        <h2 className="text-base font-medium text-ds-text-primary">Cancel your plan</h2>
         <p className="text-sm text-ds-text-secondary">
           You keep everything until {formatDate(accessUntil)}, the end of the period you have already
           paid for. After that your AI stops replying and prospects are told a person will follow up.
@@ -733,7 +733,7 @@ function CancelCard({
             <button
               type="submit"
               disabled={pending}
-              className="border border-ds-danger bg-ds-danger-bg px-4 py-2 text-sm font-semibold text-ds-text-primary transition-opacity disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="border border-ds-danger bg-ds-danger-bg px-4 py-2 text-sm font-medium text-ds-text-primary transition-opacity disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {pending ? "Cancelling…" : "Confirm cancellation"}
             </button>

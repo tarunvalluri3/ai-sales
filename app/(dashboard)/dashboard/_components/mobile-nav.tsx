@@ -37,7 +37,7 @@ export function MobileNav({ businessName }: { businessName: string }) {
   return (
     <div className="md:hidden">
       <div className="flex items-center justify-between border-b border-ds-border bg-ds-surface px-4 py-3">
-        <p className="truncate text-sm font-semibold text-ds-text-primary">{businessName}</p>
+        <p className="truncate text-sm font-medium text-ds-text-primary">{businessName}</p>
         <button
           ref={triggerRef}
           type="button"
@@ -76,7 +76,7 @@ export function MobileNav({ businessName }: { businessName: string }) {
             aria-label="Close navigation"
             tabIndex={-1}
             onClick={() => setIsOpen(false)}
-            className="fixed inset-0 z-40 bg-black/50"
+            className="fixed inset-0 z-40 bg-ds-scrim"
           />
           <nav
             id={PANEL_ID}
@@ -84,7 +84,7 @@ export function MobileNav({ businessName }: { businessName: string }) {
             aria-label="Dashboard, mobile"
             aria-modal="true"
             role="dialog"
-            className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-1 overflow-y-auto border-r border-ds-border bg-ds-surface p-4 shadow-xl"
+            className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-1 overflow-y-auto border-r border-ds-border bg-ds-surface p-4"
           >
             {NAV_GROUPS.map((group, groupIndex) => (
               <div
@@ -92,7 +92,7 @@ export function MobileNav({ businessName }: { businessName: string }) {
                 className={`flex flex-col gap-1 ${groupIndex === 0 ? "" : "mt-4"}`}
               >
                 {group.label ? (
-                  <p className="mb-1 px-3 text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
+                  <p className="ds-label mb-1 px-3 text-ds-text-faint">
                     {group.label}
                   </p>
                 ) : null}
@@ -105,18 +105,18 @@ export function MobileNav({ businessName }: { businessName: string }) {
                       href={item.href}
                       onClick={() => setIsOpen(false)}
                       aria-current={active ? "page" : undefined}
-                      className={`flex items-center gap-3 px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+                      className={`flex items-center gap-3 border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                         active
-                          ? "bg-dashboard-primary text-dashboard-on-primary"
-                          : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
+                          ? "border-ds-accent bg-ds-surface-raised text-ds-text-primary"
+                          : "border-transparent text-ds-text-secondary hover:bg-ds-surface-raised hover:text-ds-text-primary"
                       }`}
                     >
-                      <item.icon className="size-3.5 shrink-0" aria-hidden="true" />
+                      <item.icon className="size-4 shrink-0" strokeWidth={2} strokeLinecap="square" aria-hidden="true" />
                       <span className="flex-1">{item.label}</span>
                       {showBadge ? (
                         <span
                           aria-label={`${attentionCount} conversation${attentionCount === 1 ? "" : "s"} need attention`}
-                          className="rounded-full bg-ds-warning px-1.5 py-0.5 text-2xs font-semibold text-ds-bg"
+                          className="bg-ds-warning px-1.5 py-0.5 text-2xs font-medium text-ds-bg"
                         >
                           {formatAttentionBadge(attentionCount)}
                         </span>

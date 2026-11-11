@@ -84,7 +84,7 @@ export function PaymentHistory({
   return (
     <section aria-labelledby="payment-history-heading" className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
-        <h2 id="payment-history-heading" className="text-base font-semibold text-ds-text-primary">
+        <h2 id="payment-history-heading" className="text-base font-medium text-ds-text-primary">
           Payment history
         </h2>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
@@ -139,11 +139,11 @@ export function PaymentHistory({
             <caption className="sr-only">Invoices and credit notes, newest first</caption>
             <thead>
               <tr className="border-b border-ds-border text-2xs font-medium uppercase tracking-wide text-ds-text-muted">
-                <th scope="col" className="py-2 pr-4 font-medium">Date</th>
-                <th scope="col" className="py-2 pr-4 font-medium">Document</th>
-                <th scope="col" className="py-2 pr-4 font-medium">Details</th>
-                <th scope="col" className="py-2 pr-4 text-right font-medium">Amount</th>
-                <th scope="col" className="py-2 text-right font-medium">PDF</th>
+                <th scope="col" className="ds-label py-2 pr-4 font-medium">Date</th>
+                <th scope="col" className="ds-label py-2 pr-4 font-medium">Document</th>
+                <th scope="col" className="ds-label py-2 pr-4 font-medium">Details</th>
+                <th scope="col" className="ds-label py-2 pr-4 text-right font-medium">Amount</th>
+                <th scope="col" className="ds-label py-2 text-right font-medium">PDF</th>
               </tr>
             </thead>
             <tbody>
@@ -155,7 +155,7 @@ export function PaymentHistory({
                     <span className="mt-0.5 block text-2xs text-ds-text-muted">
                       {row.kind === "invoice" ? "Tax invoice" : "Credit note"}
                       {row.isTest ? (
-                        <span className="ml-2 border border-ds-warning px-1.5 py-0.5 font-semibold text-ds-text-primary">
+                        <span className="ml-2 border border-ds-warning px-1.5 py-0.5 font-medium text-ds-text-primary">
                           TEST
                         </span>
                       ) : null}

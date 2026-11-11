@@ -48,7 +48,7 @@ export function ServicesList({
             ) : null}
           </TableCell>
           <TableCell align="right">
-            {service.price ? <span className="font-semibold text-ds-accent">${service.price}</span> : "—"}
+            {service.price ? <span className="font-medium text-ds-accent">${service.price}</span> : "—"}
           </TableCell>
           <TableCell align="right">
             <div className="flex items-center justify-end gap-3">

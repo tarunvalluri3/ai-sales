@@ -97,7 +97,7 @@ export function PublishBar({
   if (!status || !status.isLive) {
     return (
       <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate text-sm font-semibold text-ds-text-primary">{agentName}</p>
+        <p className="truncate text-sm font-medium text-ds-text-primary">{agentName}</p>
         {status ? (
           <Badge tone="muted" size="sm">
             Not live
@@ -112,7 +112,7 @@ export function PublishBar({
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
       <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate text-sm font-semibold text-ds-text-primary">{agentName}</p>
+        <p className="truncate text-sm font-medium text-ds-text-primary">{agentName}</p>
         <Badge tone={status.hasUnpublishedChanges ? "warning" : "success"} size="sm">
           {status.hasUnpublishedChanges ? "Live · Unpublished changes" : "Live"}
         </Badge>
@@ -131,7 +131,7 @@ export function PublishBar({
             setSeenState(state);
             setOpen(true);
           }}
-          className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Publish changes ({status.changeCount})
         </button>
@@ -145,7 +145,7 @@ export function PublishBar({
             tabIndex={-1}
             disabled={isPending}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 bg-black/50"
+            className="fixed inset-0 z-40 bg-ds-scrim"
           />
           <div
             id={DIALOG_ID}
@@ -153,10 +153,10 @@ export function PublishBar({
             role="dialog"
             aria-modal="true"
             aria-labelledby={`${DIALOG_ID}-title`}
-            className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto border border-ds-border bg-ds-surface p-5 shadow-xl"
+            className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto border border-ds-border bg-ds-surface p-5"
           >
             <div className="flex flex-col gap-1">
-              <h2 id={`${DIALOG_ID}-title`} className="text-lg font-semibold text-ds-text-primary">
+              <h2 id={`${DIALOG_ID}-title`} className="text-lg font-medium text-ds-text-primary">
                 Publish changes
               </h2>
               <p className="text-sm text-ds-text-secondary">

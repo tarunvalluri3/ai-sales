@@ -45,7 +45,7 @@ export function WhatsappTemplatesPanel({ rows, canEdit }: { rows: TemplatePanelR
     <section aria-labelledby="wa-templates-heading" className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 id="wa-templates-heading" className="text-base font-semibold text-ds-text-primary">
+          <h2 id="wa-templates-heading" className="text-base font-medium text-ds-text-primary">
             Message templates
           </h2>
           <p className="max-w-2xl text-sm text-ds-text-secondary">
@@ -60,7 +60,7 @@ export function WhatsappTemplatesPanel({ rows, canEdit }: { rows: TemplatePanelR
                 type="button"
                 disabled={isPending}
                 onClick={() => run(submitWhatsappTemplatesAction)}
-                className="ds-btn-label bg-ds-primary px-3 py-1.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                className="ds-btn-label bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 {isPending ? "Working…" : "Submit for approval"}
               </button>

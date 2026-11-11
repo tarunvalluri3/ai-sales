@@ -48,7 +48,7 @@ export function ControlToggle({
             type="submit"
             disabled={isPending || !canEdit}
             title={canEdit ? undefined : ROLE_DENIED_TITLE}
-            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Updating…" : control === "human" ? "Hand back to AI" : "Take over this conversation"}
           </button>

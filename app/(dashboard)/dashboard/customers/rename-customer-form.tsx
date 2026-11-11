@@ -26,7 +26,7 @@ export function RenameCustomerForm({
   }
 
   if (!canEdit) {
-    return <h1 className="text-lg font-semibold text-ds-text-primary">{displayName ?? "Unnamed prospect"}</h1>;
+    return <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{displayName ?? "Unnamed prospect"}</h1>;
   }
 
   if (!editing) {
@@ -37,7 +37,7 @@ export function RenameCustomerForm({
         className="group flex items-center gap-1.5 text-left"
         aria-label="Rename customer"
       >
-        <h1 className="text-lg font-semibold text-ds-text-primary">{displayName ?? "Unnamed prospect"}</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{displayName ?? "Unnamed prospect"}</h1>
         <Pencil className="size-3.5 text-ds-text-muted opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
       </button>
     );
@@ -59,7 +59,7 @@ export function RenameCustomerForm({
       <button
         type="submit"
         disabled={isPending || !name.trim()}
-        className="ds-btn-label bg-ds-primary px-2 py-1 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
+        className="ds-btn-label bg-ds-primary px-2 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
       >
         {isPending ? "Saving…" : "Save"}
       </button>
@@ -70,7 +70,7 @@ export function RenameCustomerForm({
           setName(displayName ?? "");
         }}
         disabled={isPending}
-        className="px-2 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
+        className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
       >
         Cancel
       </button>

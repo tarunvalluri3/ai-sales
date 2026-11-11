@@ -6,7 +6,7 @@ import { connectWhatsappAction, type WhatsappActionState } from "./actions";
 const initialState: WhatsappActionState = {};
 
 const inputClasses =
-  "w-full border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60 aria-invalid:border-ds-danger";
+  "w-full border border-ds-border bg-transparent px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60 aria-invalid:border-ds-danger";
 
 const linkClasses = "text-ds-text-secondary underline underline-offset-2 hover:text-ds-text-primary";
 

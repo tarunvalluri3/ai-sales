@@ -74,7 +74,7 @@ export default async function AnswerBankPage({ searchParams }: { searchParams: P
     <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex max-w-2xl flex-col gap-1">
-          <h1 className="text-2xl font-semibold text-ds-text-primary">Instant answers</h1>
+          <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Instant answers</h1>
           <p className="text-sm text-ds-text-secondary">
             Answers your visitors get with no waiting: greetings, your suggested questions, your price and service list,
             and close matches to your FAQs. Anything else goes to your AI as usual. Stored answers are rebuilt whenever
@@ -158,7 +158,7 @@ export default async function AnswerBankPage({ searchParams }: { searchParams: P
                             required
                             maxLength={MAX_EDITED_ANSWER_CHARS}
                             rows={5}
-                            className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong"
+                            className="border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-text-primary"
                           />
                           <button
                             type="submit"

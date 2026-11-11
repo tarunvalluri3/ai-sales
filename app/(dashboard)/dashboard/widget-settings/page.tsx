@@ -29,7 +29,7 @@ export default async function WidgetSettingsPage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Chat widget</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Chat widget</h1>
         <p className="max-w-2xl text-sm text-ds-text-secondary">
           Your AI sales employee talks to prospects through a small chat panel embedded on your
           website. Each widget key identifies your business and carries its own list of allowed
@@ -39,7 +39,7 @@ export default async function WidgetSettingsPage() {
       </div>
 
       <section className="flex flex-col gap-6">
-        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">
+        <h2 className="text-xs font-medium uppercase tracking-wide-ds text-ds-text-muted">
           1. Set up your widget
         </h2>
         <WidgetInstallGuide
@@ -78,7 +78,7 @@ export default async function WidgetSettingsPage() {
       ) : null}
 
       <section className="flex flex-col gap-6 border-t border-ds-border pt-8">
-        <h2 className="text-xs font-semibold uppercase tracking-wide-ds text-ds-text-muted">2. Customize</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wide-ds text-ds-text-muted">2. Customize</h2>
         <WidgetBrandingForm
           initialAccentColor={business?.widget_accent_color ?? ""}
           initialLogoUrl={business?.widget_logo_url ?? ""}

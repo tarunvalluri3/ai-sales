@@ -66,7 +66,7 @@ export function AiSummaryCard({
         <button
           type="submit"
           disabled={isPending}
-          className="mt-1 inline-flex items-center border border-ds-border bg-ds-surface-elevated px-3 py-1.5 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="mt-1 inline-flex items-center border border-ds-border bg-ds-surface-elevated px-3 py-1.5 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {buttonLabel}
         </button>

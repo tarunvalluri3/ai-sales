@@ -41,7 +41,7 @@ function SuggestionChip({
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-full border border-dashed border-ds-border px-2 py-0.5 text-2xs font-medium text-ds-text-secondary transition-colors hover:border-ds-accent hover:text-ds-text-primary disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="border border-dashed border-ds-border px-2 py-0.5 text-2xs font-medium text-ds-text-secondary transition-colors hover:border-ds-accent hover:text-ds-text-primary disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Adding…" : `+ ${name}`}
       </button>
@@ -145,7 +145,7 @@ export function TagsCard({
             <button
               type="submit"
               disabled={isSuggesting}
-              className="inline-flex items-center border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="inline-flex items-center border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {isSuggesting ? "Suggesting…" : "Suggest tags"}
             </button>

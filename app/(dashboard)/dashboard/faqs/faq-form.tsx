@@ -6,7 +6,7 @@ import type { FaqFormState } from "./actions";
 const initialState: FaqFormState = {};
 
 const inputClasses =
-  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+  "border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-text-primary focus:outline-none disabled:opacity-60";
 
 export function FaqForm({
   action,

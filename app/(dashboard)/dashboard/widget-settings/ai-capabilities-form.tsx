@@ -44,7 +44,7 @@ export function AiCapabilitiesForm({
           className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           aria-expanded={open}
         >
-          <h2 className="text-lg font-semibold text-ds-text-primary">AI capabilities</h2>
+          <h2 className="text-lg font-medium text-ds-text-primary">AI capabilities</h2>
           <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
         </button>
         <p className="text-sm text-ds-text-secondary">

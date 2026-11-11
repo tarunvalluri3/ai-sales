@@ -25,7 +25,7 @@ export function CreateWebhookForm() {
           required
           placeholder="https://example.com/webhooks/ai-sales"
           disabled={isPending}
-          className="flex-1 border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
+          className="flex-1 border border-ds-border bg-transparent px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
         />
         <button
           type="submit"

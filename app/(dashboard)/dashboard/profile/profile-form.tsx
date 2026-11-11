@@ -14,7 +14,7 @@ const initialState: ProfileFormState = {};
 // --ds-surface (~3.4-3.6:1, audit finding); --ds-text-secondary already clears
 // AA here (~7:1) and is already used elsewhere on this page for real content.
 const inputClasses =
-  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-secondary transition-colors focus:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60";
+  "border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-secondary transition-colors focus:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60";
 
 const legendClasses = "text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase";
 

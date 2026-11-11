@@ -14,7 +14,7 @@ export function InstallWidgetBanner({ hasActiveKey }: { hasActiveKey: boolean })
       className="flex flex-wrap items-center justify-between gap-3 border border-ds-border bg-ds-surface px-5 py-4"
     >
       <div className="flex flex-col gap-0.5">
-        <h2 id="install-widget-banner-heading" className="text-sm font-semibold text-ds-text-primary">
+        <h2 id="install-widget-banner-heading" className="text-sm font-medium text-ds-text-primary">
           Your widget hasn&rsquo;t answered a visitor yet
         </h2>
         <p className="text-sm text-ds-text-secondary">

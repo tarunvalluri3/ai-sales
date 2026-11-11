@@ -29,7 +29,7 @@ export default async function KnowledgePage() {
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold text-ds-text-primary">Knowledge</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Knowledge</h1>
         <p className="text-sm text-ds-text-secondary">
           This is what your AI sales employee is allowed to know. New documents start as drafts —
           approve one to include it in your agent, then use Publish changes (top of the page) to

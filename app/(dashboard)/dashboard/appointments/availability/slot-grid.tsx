@@ -8,7 +8,7 @@ function label(entry: SlotGridEntry): string {
   return "";
 }
 
-const TAG_STYLE = "px-2 py-0.5 text-2xs font-semibold tracking-wide-ds uppercase";
+const TAG_STYLE = "px-2 py-0.5 text-2xs font-medium tracking-wide-ds uppercase";
 
 /** One day's slots, open ones plain, booked/blocked ones tagged -- past slots are filtered out before this ever renders (nothing to do with them). A flat divided list, not a card per slot. */
 export function SlotGrid({ entries, canEdit }: { entries: SlotGridEntry[]; canEdit: boolean }) {

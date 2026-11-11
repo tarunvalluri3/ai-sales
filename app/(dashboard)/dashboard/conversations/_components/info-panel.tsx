@@ -66,7 +66,7 @@ export function InfoPanel({
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       {recommendedAction ? (
         <div className="flex items-center justify-between gap-2 border border-ds-border bg-ds-surface-raised p-3">
-          <span className="text-xs font-semibold tracking-wide-ds text-ds-text-primary uppercase">Next best action</span>
+          <span className="text-xs font-medium tracking-wide-ds text-ds-text-primary uppercase">Next best action</span>
           <span className="text-sm font-medium text-ds-text-primary">{recommendedAction}</span>
         </div>
       ) : null}

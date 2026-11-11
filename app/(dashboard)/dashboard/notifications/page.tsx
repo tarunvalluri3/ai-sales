@@ -14,7 +14,7 @@ export default async function NotificationsSettingsPage() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-ds-text-primary">Notifications</h1>
+        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Notifications</h1>
         <p className="text-sm text-ds-text-secondary">
           Choose what reaches you immediately, what waits for the daily summary, and what stays in the dashboard only.
         </p>
