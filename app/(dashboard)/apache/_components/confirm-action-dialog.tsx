@@ -88,7 +88,7 @@ export function ConfirmActionDialog({
             <div className="flex items-start gap-3">
               <AlertTriangle className={`mt-0.5 size-5 shrink-0 ${dangerous ? "text-ds-danger" : "text-ds-warning"}`} aria-hidden="true" />
               <div className="flex flex-col gap-1">
-                <h2 id="confirm-action-dialog-title" className="text-base font-semibold text-ds-text-primary">
+                <h2 id="confirm-action-dialog-title" className="text-base font-medium text-ds-text-primary">
                   {title}
                 </h2>
                 <p className="text-sm text-ds-text-secondary">{description}</p>

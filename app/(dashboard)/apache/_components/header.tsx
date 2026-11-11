@@ -2,6 +2,7 @@ import { UserButton } from "@clerk/nextjs";
 import { Search } from "lucide-react";
 import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
 import { resolveAppEnvironment } from "@/lib/deployment-env";
+import { ThemeToggle } from "../../_components/theme-toggle";
 
 /**
  * The /apache top bar: global search (wired to the Tenants page's `q`
@@ -15,8 +16,8 @@ export function AdminHeader() {
   const environment = resolveEnvironmentLabel();
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-ds-border bg-ds-surface px-4 py-2.5">
-      <form action="/apache/tenants" method="get" className="flex min-w-0 max-w-md flex-1 items-center gap-2 border border-ds-border bg-ds-surface-soft px-3 py-1.5">
+    <header className="flex items-center justify-between gap-3 min-h-16 border-b border-ds-border bg-ds-surface px-4 py-2 lg:px-6">
+      <form action="/apache/tenants" method="get" className="flex min-w-0 max-w-md flex-1 items-center gap-2 border border-ds-border bg-transparent px-3 py-2">
         <Search className="size-3.5 shrink-0 text-ds-text-muted" aria-hidden="true" />
         <input
           type="search"
@@ -29,12 +30,13 @@ export function AdminHeader() {
 
       <div className="flex shrink-0 items-center gap-3">
         <span
-          className={`rounded-full px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide-ds ${
-            environment === "Production" ? "bg-ds-warning/20 text-ds-warning" : "bg-ds-surface-soft text-ds-text-muted"
+          className={`ds-label border px-2 py-0.5 text-2xs ${
+            environment === "Production" ? "border-ds-warning/40 bg-ds-warning-bg text-ds-warning" : "border-ds-border text-ds-text-muted"
           }`}
         >
           {environment}
         </span>
+        <ThemeToggle />
         <UserButton appearance={clerkDarkCompactAppearance} />
       </div>
     </header>

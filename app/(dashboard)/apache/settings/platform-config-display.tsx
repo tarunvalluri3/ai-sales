@@ -15,16 +15,16 @@ export function PlatformConfigDisplay({ settings }: { settings: ReturnType<typeo
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="border border-ds-border bg-ds-surface p-4">
           <p className="text-xs text-ds-text-muted">Trial length</p>
-          <p className="text-lg font-semibold text-ds-text-primary">{settings.trialDays} days</p>
+          <p className="text-lg font-medium text-ds-text-primary">{settings.trialDays} days</p>
         </div>
         <div className="border border-ds-border bg-ds-surface p-4">
           <p className="text-xs text-ds-text-muted">Trial reply quota (TRIAL_REPLY_QUOTA)</p>
-          <p className="text-lg font-semibold text-ds-text-primary">{settings.trialReplyQuota.toLocaleString()}</p>
+          <p className="text-lg font-medium text-ds-text-primary">{settings.trialReplyQuota.toLocaleString()}</p>
           <p className="text-2xs text-ds-text-muted">Last-known plan kept {settings.subscriptionLastKnownMaxHours} h on a read failure</p>
         </div>
         <div className="border border-ds-border bg-ds-surface p-4">
           <p className="text-xs text-ds-text-muted">Past-due grace period</p>
-          <p className="text-lg font-semibold text-ds-text-primary">{settings.pastDueGraceDays} days</p>
+          <p className="text-lg font-medium text-ds-text-primary">{settings.pastDueGraceDays} days</p>
         </div>
       </div>
 

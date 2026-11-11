@@ -39,7 +39,7 @@ export function ImpersonationBanner({ businessName, expiresAtIso }: { businessNa
     <div className="flex items-center justify-between gap-3 bg-ds-warning-bg px-4 py-2 text-sm text-ds-warning">
       <span className="flex items-center gap-2">
         <Eye className="size-4 shrink-0" aria-hidden="true" />
-        Viewing <strong className="font-semibold">{businessName}</strong> read-only -- expires in {minutes}:{String(seconds).padStart(2, "0")}
+        Viewing <strong className="font-medium">{businessName}</strong> read-only -- expires in {minutes}:{String(seconds).padStart(2, "0")}
       </span>
       <button
         type="button"

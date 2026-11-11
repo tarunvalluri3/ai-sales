@@ -25,11 +25,11 @@ export default async function ApacheBillingPage() {
       </div>
 
       <div className="border border-ds-border bg-ds-surface p-5">
-        <h2 className="mb-2 text-sm font-semibold text-ds-text-primary">Subscriptions by status</h2>
+        <h2 className="mb-2 text-sm font-medium text-ds-text-primary">Subscriptions by status</h2>
         <div className="flex flex-wrap gap-4 text-sm">
           {Object.entries(rollup.byStatus).map(([status, count]) => (
             <span key={status} className="text-ds-text-secondary">
-              <span className="font-semibold text-ds-text-primary">{count}</span> {status}
+              <span className="font-medium text-ds-text-primary">{count}</span> {status}
             </span>
           ))}
         </div>

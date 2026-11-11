@@ -77,15 +77,15 @@ function UsageTab({ detail }: { detail: TenantDetail }) {
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <div className="border border-ds-border bg-ds-surface p-5">
         <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Conversations (all time)</span>
-        <p className="text-2xl font-semibold text-ds-text-primary">{detail.usage.conversationsTotal}</p>
+        <p className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{detail.usage.conversationsTotal}</p>
       </div>
       <div className="border border-ds-border bg-ds-surface p-5">
         <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Leads (all time)</span>
-        <p className="text-2xl font-semibold text-ds-text-primary">{detail.usage.leadsTotal}</p>
+        <p className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{detail.usage.leadsTotal}</p>
       </div>
       <div className="border border-ds-border bg-ds-surface p-5">
         <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Appointments (all time)</span>
-        <p className="text-2xl font-semibold text-ds-text-primary">{detail.usage.appointmentsTotal}</p>
+        <p className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{detail.usage.appointmentsTotal}</p>
       </div>
       <p className="col-span-full text-xs text-ds-text-muted">
         Gemini token/cost history over time ships in Stop 3, once per-tenant rollups exist (currently only a

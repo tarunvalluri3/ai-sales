@@ -34,7 +34,7 @@ export default async function ConversationTranscriptPage({ params }: { params: P
               }`}
             >
               <div className="flex items-center justify-between text-2xs text-ds-text-muted">
-                <span className="font-semibold uppercase tracking-wide-ds">{message.role.replace("_", " ")}</span>
+                <span className="font-medium uppercase tracking-wide-ds">{message.role.replace("_", " ")}</span>
                 <span>{new Date(message.createdAt).toLocaleString()}</span>
               </div>
               <p className="whitespace-pre-wrap text-ds-text-primary">{message.content}</p>

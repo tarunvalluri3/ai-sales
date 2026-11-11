@@ -26,7 +26,7 @@ export function AdminKpiTile({
   return (
     <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
       <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">{label}</span>
-      <span className="text-3xl font-semibold text-ds-text-primary">
+      <span className="text-3xl font-medium text-ds-text-primary">
         {value}
         {suffix}
       </span>

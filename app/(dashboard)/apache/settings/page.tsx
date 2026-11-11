@@ -15,7 +15,7 @@ export default async function ApacheSettingsPage() {
       <AdminPageHeader title="Settings" description="Platform admin team, and the current plan/trial/pricing configuration." />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Admin team</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Admin team</h2>
         {admin.role === "owner" ? (
           <AdminTeamPanel team={team} currentUserId={userId} />
         ) : (
@@ -26,7 +26,7 @@ export default async function ApacheSettingsPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Plan limits, trial, and pricing</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Plan limits, trial, and pricing</h2>
         <PlatformConfigDisplay settings={settings} />
       </section>
     </div>

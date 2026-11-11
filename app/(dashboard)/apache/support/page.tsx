@@ -14,11 +14,11 @@ export default async function ApacheSupportPage() {
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <AdminPageHeader title="Support Tools" description="Time-boxed, read-only tenant impersonation and platform-wide announcements." />
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Impersonate a tenant</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Impersonate a tenant</h2>
         <ImpersonationPanel tenants={tenantOptions} />
       </section>
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-ds-text-primary">Announcements</h2>
+        <h2 className="text-sm font-medium text-ds-text-primary">Announcements</h2>
         <AnnouncementsPanel announcements={announcements} tenants={tenantOptions} />
       </section>
     </div>

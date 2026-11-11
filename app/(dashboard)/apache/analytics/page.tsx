@@ -40,7 +40,7 @@ export default async function ApacheAnalyticsPage({ searchParams }: { searchPara
       />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">Active tenants</h2>
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Active tenants</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <AdminKpiTile label="DAU" value={activeTenants.dau} hint="Businesses with a real conversation, last 24h" />
           <AdminKpiTile label="WAU" value={activeTenants.wau} hint="Last 7 days" />
@@ -49,7 +49,7 @@ export default async function ApacheAnalyticsPage({ searchParams }: { searchPara
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">
+        <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
           Volume, last {windowDays} days
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -74,8 +74,8 @@ export default async function ApacheAnalyticsPage({ searchParams }: { searchPara
             data={trend}
             series={[
               { key: "conversations", label: "Conversations", color: chartColors.accent },
-              { key: "leads", label: "Leads", color: chartColors.success },
-              { key: "appointments", label: "Appointments", color: chartColors.warning },
+              { key: "leads", label: "Leads", color: chartColors.ink },
+              { key: "appointments", label: "Appointments", color: chartColors.textSecondary },
             ]}
           />
         </div>
@@ -83,7 +83,7 @@ export default async function ApacheAnalyticsPage({ searchParams }: { searchPara
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
-          <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">
+          <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
             Activation funnel (all time)
           </h2>
           <BreakdownBarChart
@@ -98,7 +98,7 @@ export default async function ApacheAnalyticsPage({ searchParams }: { searchPara
         </section>
 
         <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
-          <h2 className="text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">
+          <h2 className="text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
             Channel mix, last {windowDays} days
           </h2>
           <BreakdownBarChart
@@ -112,7 +112,7 @@ export default async function ApacheAnalyticsPage({ searchParams }: { searchPara
       </div>
 
       <section className="border border-ds-border bg-ds-surface p-5">
-        <h2 className="mb-2 text-xs font-semibold tracking-wide-ds text-ds-text-muted uppercase">
+        <h2 className="mb-2 text-xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
           Leads → appointment conversion, last {windowDays} days
         </h2>
         <p className="text-sm text-ds-text-secondary">
