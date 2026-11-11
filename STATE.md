@@ -6,6 +6,27 @@ Last updated: 2026-11-04 (**`production-readiness` merged to `main` (PR #147, CI
 
 ---
 
+## Web Studio design-system re-skin -- 2026-11-11 -- branch `ui/web-studio-design-system`, UI only, NOT merged, NOT visually verified
+
+**What:** the whole app (marketing, auth, onboarding, dashboard, `/apache`, chat widget) now uses the Waves Web Studio design system: Hanken Grotesk + Space Grotesk (Geist removed from the app), ink/paper/Signal Red tokens, sharp corners, hairlines, no gradients, no shadows except floating panels. Dark is the default; a light/dark toggle (`html[data-theme]`, localStorage, inline head script, no next-themes) sits in the marketing header, dashboard topbar and `/apache` topbar. No route, API, data, auth or copy change. The logo (`waves-logo.tsx`, `app/icon.svg`, `public/brand/*`) is untouched.
+
+**Phases (one commit each):** 1 tokens/fonts/theme; 2 primitives (+ `button-classes.ts`, `.ds-btn-label`); 3 marketing; 4 auth + onboarding + `lib/clerk-appearance.ts`; 5 dashboard; 6 `/apache`; 7 widget; 8 cleanup (+ `lib/email-template.ts` restyled, unused tokens removed).
+
+**Checks run (2026-11-11):** `npm run typecheck` clean; `npm run lint` clean; all 36 `test:*` suites 853/853 pass; `npm run build` exit 0 (placeholder secrets, fake Supabase URL, empty Sentry). No Gemini/Meta/Razorpay/Clerk call. **NOT run:** pgTAP (CLI linked to production), any browser/visual check in either theme at 1440/375 (dev server blocked against production), contrast measurement of rendered pages.
+
+**Decisions:** widget accent stays per-business (`widget_accent_color`), only the CSS default is now `#DC2626`; widget is dark by default with a paper palette under `prefers-color-scheme: light`; Clerk + emails restyled, invoice PDFs left on embedded Geist.
+
+**Known issues / waiting on the user:**
+- `public/widget-loader.js` pins `iframe.style.colorScheme = "light"`, which in Chrome probably makes `prefers-color-scheme` inside the iframe report light, so the widget would always show paper. Left untouched (not a styling file). One-line fix if wanted.
+- The logo is hard-coded for dark grounds (ivory nodes, lime hub). On the light theme's white/paper header it will have poor contrast. Not edited. `WavesLogo` has a `tone="light"` variant.
+- Spec greys fall just under WCAG AA: `#78766E` on `#0C0C0B` ~4.3:1 and on paper ~4.1:1; red `#DC2626` text on dark ~3.9:1.
+- Exceptions to the greps: `lib/schemas/business.ts:127` (validation message text mentions `#d7f24e`), `waves-logo.tsx` + `app/icon.svg` (logo), `lib/invoice-pdf*` (Geist PDF), Clerk `variables` hex and Razorpay `theme.color` hex (APIs can't take CSS variables), `global-error.tsx` inline hex.
+- Recharts fills use `var(--ds-*)` strings; confirm they render in a real browser.
+- Screenshots to recapture: `public/marketing/dashboard-conversations.png` (also the OG image).
+- Two small non-styling edits: `DotGridBackground` no longer tracks the pointer (static hairline columns, no client JS); chart series colours changed.
+
+---
+
 ## Launch audit and reply speed -- 2026-11-04 -- merged to `main` via PR #147, migrations APPLIED to production (per the user), code NOT yet deployed
 
 **Migrations (2026-11-04):** the user applied every pending migration to production (`db push --linked`), through `20261124000300_fix_whatsapp_template_name_check`. Applied per the user; not re-verified by this session (`npx supabase migration list --linked` shows it). Next: deploy `main` to the VPS (`docs/launch-runbook.md` section 1, steps 4-6).

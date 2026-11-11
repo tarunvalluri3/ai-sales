@@ -30,12 +30,11 @@ import { getAppUrl } from "@/lib/app-url";
 const MARK_URL_PATH = "/brand/waves-ai-pilot-email-mark.png";
 
 // From the logo system's on-light tone and the app's own --ds-* tokens.
-const INK = "#17150f";
-const MUTED = "#6b6558";
-const LIME = "#d7f24e";
-const PAPER = "#f6f2e8";
+const INK = "#111110";
+const MUTED = "#5c5952";
+const PAPER = "#f5f4f0";
 const CARD = "#ffffff";
-const RULE = "#e3dccb";
+const RULE = "#dcdad2";
 
 export type BrandedEmail = { html: string; text: string };
 
@@ -85,7 +84,7 @@ export function renderBrandedEmail(options: BrandedEmailOptions): BrandedEmail {
     .join("");
 
   const factsHtml = facts.length
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;border:1px solid ${RULE};border-radius:8px;">
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 20px;border:1px solid ${RULE};">
          ${facts
            .map(
              (fact, index) => `<tr>
@@ -101,8 +100,8 @@ export function renderBrandedEmail(options: BrandedEmailOptions): BrandedEmail {
   // block in Outlook instead of breaking, and needs no conditional markup.
   const ctaHtml = cta
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px;">
-         <tr><td style="background:${LIME};border-radius:6px;">
-           <a href="${escapeHtml(cta.url)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:600;color:${INK};text-decoration:none;">${escapeHtml(cta.label)}</a>
+         <tr><td style="background:${INK};">
+           <a href="${escapeHtml(cta.url)}" style="display:inline-block;padding:12px 22px;font-size:14px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;color:${PAPER};text-decoration:none;">${escapeHtml(cta.label)}</a>
          </td></tr>
        </table>`
     : "";
@@ -120,15 +119,15 @@ export function renderBrandedEmail(options: BrandedEmailOptions): BrandedEmail {
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;margin:0 auto;">
         <tr><td style="padding:0 0 20px;">${
           senderName
-            ? `<span style="font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;letter-spacing:-0.015em;color:${INK};">${escapeHtml(senderName)}</span>`
+            ? `<span style="font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;font-weight:500;letter-spacing:-0.015em;color:${INK};">${escapeHtml(senderName)}</span>`
             : `<img src="${escapeHtml(markUrl)}" width="34" height="25" alt="Waves AI Pilot" style="vertical-align:middle;border:0;">
-          <span style="vertical-align:middle;margin-left:9px;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;letter-spacing:-0.015em;">
-            <span style="font-weight:600;color:${INK};">Waves</span><span style="font-weight:400;color:${MUTED};"> AI Pilot</span>
+          <span style="vertical-align:middle;margin-left:9px;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;letter-spacing:-0.015em;">
+            <span style="font-weight:500;color:${INK};">Waves</span><span style="font-weight:400;color:${MUTED};"> AI Pilot</span>
           </span>`
         }
         </td></tr>
-        <tr><td style="background:${CARD};border:1px solid ${RULE};border-radius:12px;padding:28px 28px 24px;font-family:Geist,-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-          <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;font-weight:600;color:${INK};">${escapeHtml(heading)}</h1>
+        <tr><td style="background:${CARD};border:1px solid ${RULE};padding:28px 28px 24px;font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+          <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;font-weight:500;color:${INK};">${escapeHtml(heading)}</h1>
           ${paragraphHtml}
           ${factsHtml}
           ${ctaHtml}

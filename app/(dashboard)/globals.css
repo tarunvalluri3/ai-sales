@@ -5,7 +5,8 @@
  * flips token values under [data-theme="light"] on <html> (set before first
  * paint by the inline script in layout.tsx, persisted in localStorage).
  * Signal Red is identical in both themes: a signal, never a surface.
- * Legacy --ds-* names are kept as aliases until the final cleanup phase.
+ * Some older --ds-* names (surface-elevated/soft, dashboard-primary) remain
+ * as aliases of the current tokens.
  */
 :root {
   color-scheme: dark;
@@ -31,14 +32,9 @@
 
   /* Fixed ink/paper, for surfaces that must not flip with the theme. */
   --ds-ivory: #f5f4f0;
-  --ds-ivory-muted: #e7e5de;
-  --ds-on-ivory: #111110;
 
   --ds-accent: #dc2626;
   --ds-accent-strong: #ef4444;
-  --ds-accent-muted: #b91c1c;
-  --ds-accent-soft-bg: rgba(220, 38, 38, 0.12);
-  --ds-accent-on: #ffffff;
 
   --ds-success: #8fa67e;
   --ds-success-bg: rgba(143, 166, 126, 0.12);
@@ -52,9 +48,6 @@
   --ds-tracking-wide: 0.14em;
 
   /* Sharp corners everywhere; only floating panels are rounded. */
-  --ds-radius-sm: 0;
-  --ds-radius-md: 0;
-  --ds-radius-lg: 0;
   --ds-radius-float: 1rem;
   --ds-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.45);
   --ds-scrim: rgba(0, 0, 0, 0.6);
@@ -112,13 +105,8 @@
   --color-ds-primary-hover: var(--ds-primary-hover);
   --color-ds-primary-on: var(--ds-primary-on);
   --color-ds-ivory: var(--ds-ivory);
-  --color-ds-ivory-muted: var(--ds-ivory-muted);
-  --color-ds-on-ivory: var(--ds-on-ivory);
   --color-ds-accent: var(--ds-accent);
   --color-ds-accent-strong: var(--ds-accent-strong);
-  --color-ds-accent-muted: var(--ds-accent-muted);
-  --color-ds-accent-soft-bg: var(--ds-accent-soft-bg);
-  --color-ds-accent-on: var(--ds-accent-on);
   --color-ds-text-primary: var(--ds-text-primary);
   --color-ds-text-secondary: var(--ds-text-secondary);
   --color-ds-text-muted: var(--ds-text-muted);
@@ -137,10 +125,6 @@
 
   --text-2xs: var(--ds-text-2xs);
   --tracking-wide-ds: var(--ds-tracking-wide);
-
-  --radius-ds-sm: var(--ds-radius-sm);
-  --radius-ds-md: var(--ds-radius-md);
-  --radius-ds-lg: var(--ds-radius-lg);
   --radius-ds-float: var(--ds-radius-float);
   --shadow-float: var(--ds-shadow-float);
 

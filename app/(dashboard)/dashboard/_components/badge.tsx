@@ -7,7 +7,7 @@ const TONE_STYLE: Record<BadgeTone, string> = {
   success: "border-ds-success/40 bg-ds-success-bg text-ds-success",
   danger: "border-ds-danger/40 bg-ds-danger-bg text-ds-danger",
   muted: "border-ds-border text-ds-text-secondary",
-  accent: "border-ds-accent/40 bg-ds-accent-soft-bg text-ds-accent",
+  accent: "border-ds-accent/40 bg-ds-accent/10 text-ds-accent",
 };
 
 /**
