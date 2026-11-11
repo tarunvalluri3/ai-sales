@@ -2,56 +2,73 @@
 
 :root {
   /*
-   * Premium widget palette -- mirrors app/(dashboard)/globals.css's design
-   * tokens (deep warm charcoal + warm ivory + electric lime), hardcoded
-   * here since this route group doesn't share a Tailwind config with the
-   * dashboard. Values are duplicated intentionally, not aliased, to keep
-   * this file self-contained for a standalone cross-origin iframe.
-   *
-   * Layout: charcoal header + launcher (--widget-header-bg #100f0c,
-   * matches --ds-bg), warm ivory panel body (--widget-surface #f3ede0,
-   * matches --ds-ivory) so message text stays highly legible in a small
-   * floating panel, electric lime accent (#d7f24e, matches --ds-accent)
-   * used selectively for the launcher, send action, and focus rings.
+   * Web Studio palette, hardcoded here because this route group does not
+   * share a Tailwind config with the dashboard and the iframe must stay
+   * self-contained. Values are duplicated from app/(dashboard)/globals.css
+   * on purpose. Dark (ink) is the default; a visitor whose preference is
+   * light gets the paper palette via the media query below.
    */
-  --widget-header-bg: #100f0c;
-  --widget-header-fg: #f3ede0;
-  --widget-header-fg-muted: rgba(243, 237, 224, 0.6);
+  --widget-header-bg: #171614;
+  --widget-header-fg: #f5f4f0;
+  --widget-header-fg-muted: #a6a49c;
 
   /*
    * --widget-primary can be overridden per-business (Phase 25a widget
    * branding, app/(widget)/widget/embed/_components/widget-app.tsx sets
    * it as an inline style on its root wrapper from `businesses.widget_accent_color`).
-   * --widget-primary-hover derives from it via color-mix() rather than a
-   * second hardcoded hex, so a custom accent color gets a correct hover
-   * shade automatically instead of silently keeping the default lime's.
+   * Default is Signal Red. --widget-primary-hover derives from it via
+   * color-mix() so a custom accent gets a correct hover shade.
    */
-  --widget-primary: #d7f24e;
+  --widget-primary: #dc2626;
   --widget-primary-hover: color-mix(in srgb, var(--widget-primary) 88%, white);
-  --widget-on-primary: #14130c;
+  --widget-on-primary: #ffffff;
 
-  --widget-surface: #f3ede0;
-  --widget-surface-elevated: #ffffff;
-  --widget-assistant-bubble: #e7ddc8;
-  --widget-user-bubble: #1c1912;
-  --widget-user-bubble-fg: #f3ede0;
+  --widget-surface: #111110;
+  --widget-surface-elevated: #0c0c0b;
+  --widget-assistant-bubble: #171614;
+  --widget-user-bubble: #f5f4f0;
+  --widget-user-bubble-fg: #111110;
 
-  /* Staff (human_agent) reply -- a calm, distinct tint, not an alarm. */
-  --widget-human-bubble-bg: rgba(154, 171, 92, 0.16);
-  --widget-human-bubble-border: rgba(154, 171, 92, 0.4);
-  --widget-human-bubble-fg: #1c1912;
-  --widget-human-accent: #6f7f45;
+  /* Staff (human_agent) reply -- an amber-tinted surface with a stronger border. */
+  --widget-human-bubble-bg: rgba(201, 161, 90, 0.12);
+  --widget-human-bubble-border: rgba(201, 161, 90, 0.4);
+  --widget-human-bubble-fg: #f5f4f0;
+  --widget-human-accent: #c9a15a;
 
-  --widget-foreground: #1c1912;
-  --widget-muted: #746e5f;
-  --widget-border: rgba(28, 25, 18, 0.1);
-  --widget-border-strong: rgba(28, 25, 18, 0.18);
+  --widget-foreground: #f5f4f0;
+  --widget-muted: #a6a49c;
+  --widget-border: #2a2926;
+  --widget-border-strong: #3f3e39;
 
-  /* Tuned darker than the dashboard's dark-bg success/error tokens --
-     these sit on the widget's light ivory surface and need their own
-     contrast ratio. */
-  --widget-success: #5f8a2e;
-  --widget-error: #b23e2b;
+  --widget-success: #8fa67e;
+  --widget-error: #ef4444;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --widget-header-bg: #ffffff;
+    --widget-header-fg: #111110;
+    --widget-header-fg-muted: #5c5952;
+
+    --widget-surface: #f5f4f0;
+    --widget-surface-elevated: #ffffff;
+    --widget-assistant-bubble: #ffffff;
+    --widget-user-bubble: #111110;
+    --widget-user-bubble-fg: #f5f4f0;
+
+    --widget-human-bubble-bg: rgba(138, 106, 42, 0.12);
+    --widget-human-bubble-border: rgba(138, 106, 42, 0.4);
+    --widget-human-bubble-fg: #111110;
+    --widget-human-accent: #8a6a2a;
+
+    --widget-foreground: #111110;
+    --widget-muted: #5c5952;
+    --widget-border: #dcdad2;
+    --widget-border-strong: #bdbbb2;
+
+    --widget-success: #4f6b45;
+    --widget-error: #b91c1c;
+  }
 }
 
 @theme inline {
@@ -81,6 +98,7 @@
   --color-widget-success: var(--widget-success);
   --color-widget-error: var(--widget-error);
   --font-widget-sans: var(--widget-font-sans);
+  --font-widget-label: var(--widget-font-label);
 }
 
 html,
@@ -89,7 +107,7 @@ body {
   margin: 0;
   background: transparent;
   color: var(--widget-foreground);
-  font-family: var(--widget-font-sans), sans-serif;
+  font-family: var(--widget-font-sans), system-ui, sans-serif;
 }
 
 /*
@@ -135,4 +153,12 @@ body {
   .widget-status-dot {
     animation: none;
   }
+}
+
+/* Space Grotesk label style for meta text (staff label, subtitle). */
+.widget-label {
+  font-family: var(--widget-font-label), system-ui, sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
 }

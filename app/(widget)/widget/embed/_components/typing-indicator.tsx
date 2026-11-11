@@ -11,7 +11,7 @@ export function TypingIndicator() {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      className="flex w-fit items-center gap-1 rounded-2xl rounded-bl-md bg-widget-assistant-bubble px-3.5 py-3"
+      className="flex w-fit items-center gap-1 bg-widget-assistant-bubble px-3.5 py-3"
       aria-hidden="true"
     >
       <span className="widget-typing-dot h-1.5 w-1.5 rounded-full bg-widget-muted [animation-delay:0s]" />

@@ -55,7 +55,7 @@ export function PanelHeader({
   }
 
   return (
-    <div className="relative flex items-center justify-between gap-3 border-b border-white/10 bg-widget-header-bg px-4 py-3.5 text-widget-header-fg">
+    <div className="relative flex items-center justify-between gap-3 border-b border-widget-border bg-widget-header-bg px-4 py-3.5 text-widget-header-fg">
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-widget-primary text-widget-on-primary">
           {logoUrl ? (
@@ -75,8 +75,8 @@ export function PanelHeader({
           />
         </span>
         <div className="flex min-w-0 flex-col">
-          <span className="truncate text-[15px] font-semibold">{businessName || strings.panelTitle}</span>
-          <span className="truncate text-[11px] text-widget-header-fg-muted">{strings.panelSubtitle}</span>
+          <span className="truncate text-[15px] font-medium">{businessName || strings.panelTitle}</span>
+          <span className="widget-label truncate text-[10px] text-widget-header-fg-muted">{strings.panelSubtitle}</span>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
@@ -87,7 +87,7 @@ export function PanelHeader({
             aria-haspopup="menu"
             aria-expanded={isMenuOpen}
             onClick={() => setIsMenuOpen((prev) => !prev)}
-            className="flex h-11 w-11 items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+            className="flex h-11 w-11 items-center justify-center transition-colors hover:bg-widget-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="5" cy="12" r="1.75" fill="currentColor" />
@@ -98,7 +98,7 @@ export function PanelHeader({
           {isMenuOpen ? (
             <div
               role="menu"
-              className="absolute right-0 top-[52px] z-10 w-52 overflow-hidden rounded-xl border border-widget-border-strong bg-widget-surface py-1 text-widget-foreground shadow-xl shadow-black/20"
+              className="absolute right-0 top-[52px] z-10 w-52 overflow-hidden rounded-[16px] shadow-[0_24px_64px_rgba(0,0,0,0.45)] border border-widget-border-strong bg-widget-surface py-1 text-widget-foreground shadow-xl shadow-black/20"
             >
               <button
                 type="button"
@@ -131,7 +131,7 @@ export function PanelHeader({
           type="button"
           aria-label={strings.closeChatLabel}
           onClick={onClose}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+          className="flex h-11 w-11 shrink-0 items-center justify-center transition-colors hover:bg-widget-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

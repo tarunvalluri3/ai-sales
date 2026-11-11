@@ -10,7 +10,7 @@ export function EscalationBanner({ text }: { text: string }) {
       initial={prefersReducedMotion ? false : { opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
-      className="mt-1.5 flex max-w-[85%] items-start gap-1.5 rounded-xl border border-widget-human-bubble-border bg-widget-human-bubble-bg px-3 py-2 text-xs leading-relaxed text-widget-human-accent"
+      className="mt-1.5 flex max-w-[85%] items-start gap-1.5 border border-widget-human-bubble-border bg-widget-human-bubble-bg px-3 py-2 text-xs leading-relaxed text-widget-human-accent"
     >
       <svg
         width="13"

@@ -16,11 +16,11 @@ export function ProductRecommendationCards({ items }: { items: WidgetRecommended
       {items.map((item) => (
         <div
           key={item.id}
-          className="flex w-36 flex-col gap-1 rounded-xl border border-widget-border-strong bg-widget-surface p-2"
+          className="flex w-36 flex-col gap-1 border border-widget-border-strong bg-widget-surface p-2"
         >
           {item.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- arbitrary business-supplied catalog image URL
-            <img src={item.imageUrl} alt="" className="h-20 w-full rounded-lg object-cover" />
+            <img src={item.imageUrl} alt="" className="h-20 w-full object-cover" />
           ) : null}
           <span className="text-xs font-medium text-widget-foreground">{item.name}</span>
           {item.priceDisplay ? <span className="text-[11px] text-widget-muted">{item.priceDisplay}</span> : null}
