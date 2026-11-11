@@ -18,7 +18,7 @@ export function TenantIsolationDiagram() {
 function TenantStack({ name }: { name: string }) {
   return (
     <div className="border border-ds-border-strong p-4">
-      <span className="text-xs font-semibold text-ds-text-primary">{name}</span>
+      <span className="text-xs font-medium text-ds-text-primary">{name}</span>
       <div className="mt-3 flex flex-col items-stretch gap-2">
         <div className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-center text-2xs text-ds-text-secondary">
           Knowledge base

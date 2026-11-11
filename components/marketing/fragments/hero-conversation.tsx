@@ -108,13 +108,13 @@ export function HeroConversation() {
         })}
       </div>
 
-      <div className="border border-ds-border-strong bg-ds-surface p-4 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.6)]">
+      <div className="border border-ds-border-strong bg-ds-surface p-4">
         <div className="mb-4 flex items-center gap-2 border-b border-ds-border pb-3">
-          <span className="flex size-7 items-center justify-center rounded-full bg-ds-primary text-xs font-semibold text-ds-primary-on">
+          <span className="flex size-7 items-center justify-center rounded-full bg-ds-primary text-xs font-medium text-ds-primary-on">
             L
           </span>
           <div className="flex flex-col">
-            <span className="text-xs font-semibold text-ds-text-primary">Lumen Dental Studio</span>
+            <span className="text-xs font-medium text-ds-text-primary">Lumen Dental Studio</span>
             <span className="flex items-center gap-1.5 text-2xs text-ds-success">
               <span className="relative flex size-1.5">
                 {!reducedMotion ? (
@@ -164,8 +164,8 @@ function ChatBubble({ tone, children }: { tone: "prospect" | "ai"; children: str
     <div
       className={`max-w-[85%] px-3 py-2 text-xs text-ds-text-primary ${
         isProspect
-          ? "self-start rounded-tl-sm bg-ds-surface-elevated"
-          : "self-start rounded-tl-sm bg-ds-surface-raised"
+          ? "self-start bg-ds-surface-elevated"
+          : "self-start bg-ds-surface-raised"
       }`}
     >
       {children}
@@ -175,7 +175,7 @@ function ChatBubble({ tone, children }: { tone: "prospect" | "ai"; children: str
 
 function TypingBubble() {
   return (
-    <div className="flex w-fit items-center gap-1 self-start rounded-tl-sm bg-ds-surface-elevated px-3 py-2.5">
+    <div className="flex w-fit items-center gap-1 self-start bg-ds-surface-elevated px-3 py-2.5">
       {[0, 1, 2].map((i) => (
         <span
           key={i}

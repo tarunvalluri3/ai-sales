@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
 import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
 import { WavesLogo } from "./waves-logo";
+import { ThemeToggle } from "./theme-toggle";
 
 const MENU_ID = "site-nav-menu";
 
@@ -113,18 +114,18 @@ export function SiteHeader() {
 
   return (
     <header
-      className={`sticky top-0 z-40 border-b bg-ds-bg transition-shadow duration-200 ${
-        scrolled ? "border-ds-border-strong shadow-[0_8px_24px_-16px_rgba(0,0,0,0.5)]" : "border-ds-border"
+      className={`sticky top-0 z-40 border-b bg-ds-surface transition-colors duration-200 ${
+        scrolled ? "border-ds-border-strong" : "border-ds-border"
       }`}
     >
-      <div className="flex items-center gap-7 px-6 py-4">
+      <div className="flex h-16 items-center gap-7 px-6 lg:px-[72px]">
         {/* The nav and the auth pair compete for width here, so the name
             drops out below 480px per the logo system's navbar rule. */}
         <Link href="/" className="flex items-center">
           <WavesLogo collapseNameOnMobile />
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-6 md:flex">
+        <nav aria-label="Main" className="hidden h-full items-center gap-8 md:flex">
           {PUBLIC_NAV.map((item) => {
             const active = pathname === item.href;
             return (
@@ -132,8 +133,8 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`text-sm font-medium transition-colors hover:text-ds-text-primary ${
-                  active ? "text-ds-text-primary" : "text-ds-text-secondary"
+                className={`ds-label flex h-full items-center border-b-2 text-[13px] tracking-[0.2em] transition-colors duration-200 hover:text-ds-text-primary ${
+                  active ? "border-ds-accent text-ds-text-primary" : "border-transparent text-ds-text-secondary"
                 }`}
               >
                 {item.label}
@@ -143,6 +144,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto hidden items-center gap-5 md:flex">
+          <ThemeToggle />
           <AuthActions />
         </div>
 
@@ -155,15 +157,15 @@ export function SiteHeader() {
           aria-expanded={isMenuOpen}
           aria-controls={MENU_ID}
           aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-          className="ml-auto flex size-9 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface hover:text-ds-text-primary md:hidden"
+          className="ml-auto flex size-10 shrink-0 items-center justify-center border border-ds-border text-ds-text-secondary transition-colors hover:text-ds-text-primary md:hidden"
         >
           {isMenuOpen ? (
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="size-5">
-              <path d="M5 5l10 10M15 5 5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M5 5l10 10M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
             </svg>
           ) : (
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="size-5">
-              <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="2" strokeLinecap="square" />
             </svg>
           )}
         </button>
@@ -176,7 +178,7 @@ export function SiteHeader() {
               key={item.href}
               href={item.href}
               aria-current={pathname === item.href ? "page" : undefined}
-              className={`px-2 py-2.5 text-sm font-medium transition-colors hover:bg-ds-surface hover:text-ds-text-primary ${
+              className={`ds-label px-2 py-3 text-[13px] tracking-[0.2em] transition-colors hover:text-ds-text-primary ${
                 pathname === item.href ? "text-ds-text-primary" : "text-ds-text-secondary"
               }`}
             >
@@ -184,6 +186,7 @@ export function SiteHeader() {
             </Link>
           ))}
           <div className="mt-2 flex flex-col gap-2 border-t border-ds-border pt-3 pb-1">
+            <ThemeToggle className="w-fit" />
             <AuthActions stacked />
           </div>
         </div>
@@ -198,10 +201,10 @@ export function SiteHeader() {
  * component means the two can't drift apart as the auth states change.
  */
 function AuthActions({ stacked = false }: { stacked?: boolean }) {
-  const primary = `bg-ds-primary px-4 py-2 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover${
+  const primary = `ds-btn-label inline-flex h-10 items-center justify-center bg-ds-primary px-6 text-xs text-ds-primary-on${
     stacked ? " text-center" : ""
   }`;
-  const quiet = `text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary${
+  const quiet = `ds-label text-[13px] tracking-[0.2em] text-ds-text-secondary transition-colors hover:text-ds-text-primary${
     stacked ? " px-2 py-2.5" : ""
   }`;
 

@@ -47,7 +47,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">{label}</span>
-      <span className="text-lg font-semibold text-ds-text-primary">{value}</span>
+      <span className="text-xl font-medium text-ds-text-primary">{value}</span>
     </div>
   );
 }

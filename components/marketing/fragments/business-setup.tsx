@@ -7,7 +7,7 @@ export function BusinessSetup() {
   return (
     <FragmentCard className="p-4">
       <div className="flex items-center justify-between border-b border-ds-border pb-3">
-        <span className="text-xs font-semibold text-ds-text-primary">Lumen Dental Studio</span>
+        <span className="text-xs font-medium text-ds-text-primary">Lumen Dental Studio</span>
         <MicroChip tone="success">Published</MicroChip>
       </div>
       <div className="flex flex-col gap-3 pt-3">

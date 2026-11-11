@@ -27,7 +27,7 @@ export function HandoffInbox() {
         ))}
       </div>
       <div className="flex flex-1 flex-col gap-2.5 p-3">
-        <div className="max-w-[85%] self-start rounded-tl-sm bg-ds-surface-elevated px-3 py-2 text-xs text-ds-text-primary">
+        <div className="max-w-[85%] self-start bg-ds-surface-elevated px-3 py-2 text-xs text-ds-text-primary">
           Can I speak to a person?
         </div>
         <div className="flex items-center gap-2 py-0.5">
@@ -36,7 +36,7 @@ export function HandoffInbox() {
           <span className="h-px flex-1 bg-ds-border" aria-hidden="true" />
         </div>
         <div className="flex max-w-[85%] flex-col gap-1 self-end">
-          <div className="rounded-tr-sm border border-ds-border-strong bg-ds-surface-elevated px-3 py-2 text-xs text-ds-text-primary">
+          <div className="border border-ds-border-strong bg-ds-surface-elevated px-3 py-2 text-xs text-ds-text-primary">
             Hi, this is Priya — happy to help directly.
           </div>
           <span className="self-end text-2xs text-ds-text-muted">Priya · Staff reply</span>

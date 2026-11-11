@@ -72,14 +72,14 @@ export default function PricingPage() {
     return feature;
   };
   return (
-    <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
+    <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 text-center">
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
+        <div className="flex max-w-2xl flex-col items-start gap-3 text-left">
+          <span className="ds-label inline-flex w-fit items-center gap-2 text-xs tracking-[0.32em] text-ds-text-secondary">
             <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
             Pricing
           </span>
-          <h1 className="text-3xl font-semibold text-ds-text-primary">Pricing</h1>
+          <h1 className="text-[32px] leading-[1.12] font-light tracking-[-0.015em] text-ds-text-primary sm:text-[42px] lg:text-[58px]">Pricing</h1>
           <p className="text-sm leading-relaxed text-ds-text-secondary">
             One AI sales employee, grounded in your own business. Start with a {TRIAL_DAYS}-day free
             trial — no card required, up to {trialReplyQuota.toLocaleString("en-IN")} AI replies, on{" "}
@@ -91,26 +91,24 @@ export default function PricingPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-px border border-ds-border bg-ds-border lg:grid-cols-3">
           {ORDERED_PLANS.map((plan) => (
             <div
               key={plan.key}
-              className={`flex flex-col gap-5 border p-6 ${
-                plan.featured
-                  ? "border-ds-text-primary bg-ds-surface-elevated"
-                  : "border-ds-border bg-ds-surface"
+              className={`flex flex-col gap-5 p-6 lg:p-8 ${
+                plan.featured ? "bg-ds-surface-raised" : "bg-ds-bg"
               }`}
             >
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-lg font-semibold text-ds-text-primary">{plan.name}</h2>
+                  <h2 className="text-xl font-medium text-ds-text-primary">{plan.name}</h2>
                   {plan.featured ? <MicroChip tone="accent">Most popular</MicroChip> : null}
                 </div>
                 <p className="text-sm leading-relaxed text-ds-text-secondary">{plan.tagline}</p>
               </div>
 
               <div className="flex flex-col gap-1">
-                <p className="text-3xl font-semibold text-ds-text-primary">
+                <p className="font-label text-[32px] leading-[1.12] font-normal tabular-nums text-ds-text-primary">
                   {formatPaiseAsInr(plan.monthlyPricePaise)}
                   <span className="text-sm font-normal text-ds-text-muted">
                     {" "}
@@ -143,10 +141,10 @@ export default function PricingPage() {
 
               <Link
                 href="/sign-up"
-                className={`px-5 py-2.5 text-center text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+                className={`ds-btn-label inline-flex h-12 items-center justify-center px-8 text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                   plan.featured
-                    ? "ds-btn-label bg-ds-primary text-ds-primary-on hover:bg-ds-primary-hover"
-                    : "border border-ds-border-strong text-ds-text-primary hover:border-ds-accent"
+                    ? "bg-ds-primary text-ds-primary-on"
+                    : "border border-ds-text-primary text-ds-text-primary hover:border-ds-accent"
                 }`}
               >
                 Start free trial
@@ -264,7 +262,7 @@ export default function PricingPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 border-t border-ds-border pt-6">
-      <h2 className="text-lg font-semibold text-ds-text-primary">{title}</h2>
+      <h2 className="text-xl font-medium text-ds-text-primary">{title}</h2>
       <div className="flex flex-col gap-2 text-sm leading-relaxed text-ds-text-secondary">
         {children}
       </div>

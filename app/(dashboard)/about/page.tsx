@@ -11,14 +11,14 @@ export const metadata = {
  */
 export default function AboutPage() {
   return (
-    <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
+    <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-3">
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
+          <span className="ds-label inline-flex w-fit items-center gap-2 text-xs tracking-[0.32em] text-ds-text-secondary">
             <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
             About
           </span>
-          <h1 className="text-3xl font-semibold text-ds-text-primary">About Us</h1>
+          <h1 className="text-[32px] leading-[1.12] font-light tracking-[-0.015em] text-ds-text-primary sm:text-[42px] lg:text-[58px]">About Us</h1>
           <p className="text-sm text-ds-text-muted">
             Waves AI Pilot is built and operated by Waves Web Studio.
           </p>
@@ -121,7 +121,7 @@ export default function AboutPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 border-t border-ds-border pt-6">
-      <h2 className="text-lg font-semibold text-ds-text-primary">{title}</h2>
+      <h2 className="text-xl font-medium text-ds-text-primary">{title}</h2>
       <div className="flex flex-col gap-2 text-sm leading-relaxed text-ds-text-secondary">
         {children}
       </div>

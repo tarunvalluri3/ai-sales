@@ -35,10 +35,10 @@ export const metadata = {
  */
 export default function PrivacyPolicyPage() {
   return (
-    <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16">
+    <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold text-ds-text-primary">Privacy Policy</h1>
+          <h1 className="text-[32px] leading-[1.12] font-light tracking-[-0.015em] text-ds-text-primary sm:text-[42px] lg:text-[58px]">Privacy Policy</h1>
           <p className="text-sm text-ds-text-muted">Last updated: 2026-11-04</p>
         </div>
 
@@ -463,7 +463,7 @@ export default function PrivacyPolicyPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 border-t border-ds-border pt-6">
-      <h2 className="text-lg font-semibold text-ds-text-primary">{title}</h2>
+      <h2 className="text-xl font-medium text-ds-text-primary">{title}</h2>
       <div className="flex flex-col gap-2 text-sm leading-relaxed text-ds-text-secondary">
         {children}
       </div>
