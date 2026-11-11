@@ -343,9 +343,10 @@ test("next dev: production refused, exact-ref override allowed loudly, staging a
   assert.equal(env.checkDevServerTarget(merged).action, "refuse");
 });
 
-test("next.config.ts runs the check only in the development-server phase, with the committed refs, and throws on refuse", () => {
+test("next.config.ts runs the check only in the development-server phase, with the committed refs, and only warns (never throws)", () => {
   const config = read("next.config.ts");
-  assert.match(config, /if \(phase === PHASE_DEVELOPMENT_SERVER\) \{\s*const check = checkDevServerTarget\(withCommittedProductionRefs\(process\.env, process\.cwd\(\)\)\);\s*if \(check\.action === "refuse"\) throw new Error\(check\.message\);/);
+  assert.match(config, /if \(phase === PHASE_DEVELOPMENT_SERVER\) \{\s*const check = checkDevServerTarget\(withCommittedProductionRefs\(process\.env, process\.cwd\(\)\)\);\s*if \(check\.action !== "allow"\) \{\s*console\.warn\(/);
+  assert.doesNotMatch(config, /throw new Error\(check\.message\)/);
   assert.match(config, /export default function config\(phase: string\) \{/);
   assert.match(config, /return sentryWrappedConfig;/);
 });

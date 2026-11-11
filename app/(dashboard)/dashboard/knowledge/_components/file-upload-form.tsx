@@ -28,7 +28,7 @@ export function FileUploadForm() {
         accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
         required
         disabled={isPending}
-        className="border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary file:mr-3 file:file:border-0 file:bg-ds-surface-raised file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ds-text-primary disabled:opacity-60"
+        className="border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary file:mr-3 file:border-0 file:bg-ds-surface-raised file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ds-text-primary disabled:opacity-60"
       />
       <p className="text-xs text-ds-text-muted">
         If your PDF is a product or service catalog, we&rsquo;ll extract it into structured products and

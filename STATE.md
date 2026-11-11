@@ -189,7 +189,9 @@ Last updated: 2026-11-04 (**`production-readiness` merged to `main` (PR #147, CI
 
 **Item 4 DONE (configurable protected production ref).** New committed `supabase/production-project-refs.txt`. Every script and test guard merges it with the built-in `bykeztxvejpwfcxgsubm` and `PRODUCTION_SUPABASE_PROJECT_REFS` (`lib/production-refs-file.ts`). Before this, an env-only ref didn't protect `npm test` or the unit runners, which never load `.env.local`. The file and the env var only ever ADD refs; the current ref stays built in. To move production: add the new ref to that file and commit it before pointing anything at the new project. `test:env-safety` 29/29.
 
-**Local `next dev` against production is BLOCKED (owner decision).**
+**UPDATE 2026-11-11 (owner decision): the `next dev` block below is REMOVED.** `next.config.ts` now only prints a `!!! next dev is running against the PRODUCTION Supabase project ... !!!` warning instead of throwing; `ALLOW_DEV_AGAINST_PRODUCTION` is no longer needed. `checkDevServerTarget` and its unit tests are unchanged (still return `refuse`, now unused for blocking). Every OTHER guard stays: scripts, tests and `npm test` still refuse production, `env_target_warning`, and the dev Gemini key rule. Landed on `main` 2026-11-11 with the Web Studio re-skin (branch `ui/web-studio-design-system`, PR via CI). `LAUNCH_AUDIT.md` is now tracked. Local checks before merge: lint, typecheck and `test:env-safety` (31/31) pass; `npm test` (pgTAP) not run because the CLI is linked to production.
+
+**(Superseded) Local `next dev` against production is BLOCKED (owner decision).**
 - `next.config.ts` (development-server phase only) throws when `NEXT_PUBLIC_SUPABASE_URL` is a production ref (built-in, committed file or env).
 - Emergency override: `ALLOW_DEV_AGAINST_PRODUCTION=<exact ref>`. A bare `true` or a different ref is refused. Builds and production servers are unaffected.
 - **Your current `.env.local` points at production, so `npm run dev` now refuses until it points at staging.**
