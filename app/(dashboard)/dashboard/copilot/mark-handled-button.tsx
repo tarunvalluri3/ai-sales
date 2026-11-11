@@ -34,7 +34,7 @@ export function MarkAsHandledButton({
         type="submit"
         disabled={isPending || !canManage}
         title={canManage ? undefined : ROLE_DENIED_TITLE}
-        className="w-fit rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-fit border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? "Marking…" : "Mark as handled"}
       </button>

@@ -43,10 +43,10 @@ export function ConversationsLeadsTabs({
             type="search"
             name="q"
             defaultValue={initialQuery}
-            className="w-56 rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none"
+            className="w-56 border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none"
           />
         </label>
-        <button type="submit" className="rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary">
+        <button type="submit" className="bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary">
           Search
         </button>
       </form>
@@ -55,14 +55,14 @@ export function ConversationsLeadsTabs({
         <button
           type="button"
           onClick={() => setTab("conversations")}
-          className={`border-b-2 px-3 py-2 text-sm font-medium ${tab === "conversations" ? "border-ds-accent text-ds-text-primary" : "border-transparent text-ds-text-secondary"}`}
+          className={`border-b-2 px-3 py-2 text-sm font-medium ${tab === "conversations" ? "border-ds-text-primary text-ds-text-primary" : "border-transparent text-ds-text-secondary"}`}
         >
           Conversations ({conversations.length})
         </button>
         <button
           type="button"
           onClick={() => setTab("leads")}
-          className={`border-b-2 px-3 py-2 text-sm font-medium ${tab === "leads" ? "border-ds-accent text-ds-text-primary" : "border-transparent text-ds-text-secondary"}`}
+          className={`border-b-2 px-3 py-2 text-sm font-medium ${tab === "leads" ? "border-ds-text-primary text-ds-text-primary" : "border-transparent text-ds-text-secondary"}`}
         >
           Leads ({leads.length})
         </button>

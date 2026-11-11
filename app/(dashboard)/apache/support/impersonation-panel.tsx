@@ -25,12 +25,12 @@ export function ImpersonationPanel({ tenants }: { tenants: Tenant[] }) {
   }, [tenants, search]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search for a tenant to view as (read-only, 30 minutes max)…"
-        className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
+        className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
       />
       {search.trim().length > 0 && filtered.length === 0 ? (
         <p className="text-sm text-ds-text-muted">No tenant matches &quot;{search}&quot;.</p>
@@ -38,11 +38,11 @@ export function ImpersonationPanel({ tenants }: { tenants: Tenant[] }) {
       {filtered.length > 0 ? (
         <ul className="flex flex-col gap-1">
           {filtered.map((t) => (
-            <li key={t.id} className="flex items-center justify-between gap-3 rounded-ds-sm border border-ds-border px-3 py-2 text-sm">
+            <li key={t.id} className="flex items-center justify-between gap-3 border border-ds-border px-3 py-2 text-sm">
               <span className="truncate text-ds-text-primary">{t.name}</span>
               <ConfirmActionDialog
                 trigger={(open) => (
-                  <button type="button" onClick={open} className="shrink-0 rounded-ds-sm bg-dashboard-primary px-3 py-1 text-xs font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover">
+                  <button type="button" onClick={open} className="shrink-0 bg-dashboard-primary px-3 py-1 text-xs font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover">
                     View as {t.name}
                   </button>
                 )}

@@ -45,7 +45,7 @@ export default async function InstagramPage({
       </Suspense>
 
       {selectionId && canEdit && !choices ? (
-        <p role="alert" className="rounded-ds-md bg-ds-danger-bg px-4 py-3 text-sm text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-4 py-3 text-sm text-ds-danger">
           That account choice expired. Please click &ldquo;Connect Instagram&rdquo; again.
         </p>
       ) : null}

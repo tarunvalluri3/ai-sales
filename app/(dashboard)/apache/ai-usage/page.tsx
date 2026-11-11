@@ -47,7 +47,7 @@ export default async function ApacheAiUsagePage({ searchParams }: { searchParams
       </div>
 
       {flaggedCount > 0 ? (
-        <div className="rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg p-4 text-sm text-ds-warning">
+        <div className="border border-ds-warning/40 bg-ds-warning-bg p-4 text-sm text-ds-warning">
           {flaggedCount} tenant{flaggedCount === 1 ? "" : "s"} cost more than {COST_FLAG_THRESHOLD_PERCENT}% of what they pay this period.
         </div>
       ) : null}

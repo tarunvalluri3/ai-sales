@@ -53,7 +53,7 @@ export function AdminSidebar({ role }: { role: PlatformAdminRole }) {
       }`}
     >
       <div className={`mb-6 flex items-center gap-3 ${collapsed ? "justify-center px-0" : "px-2"}`}>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-ds-sm bg-ds-surface-elevated text-ds-accent">
+        <span className="flex size-8 shrink-0 items-center justify-center bg-ds-surface-elevated text-ds-accent">
           <ShieldCheck className="size-4" aria-hidden="true" />
         </span>
         {collapsed ? null : (
@@ -70,7 +70,7 @@ export function AdminSidebar({ role }: { role: PlatformAdminRole }) {
         aria-pressed={collapsed}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className={`mb-4 flex size-8 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+        className={`mb-4 flex size-8 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
           collapsed ? "self-center" : "self-end"
         }`}
       >
@@ -90,7 +90,7 @@ export function AdminSidebar({ role }: { role: PlatformAdminRole }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 title={collapsed ? item.label : undefined}
-                className={`flex items-center gap-3 rounded-ds-sm px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+                className={`flex items-center gap-3 px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                   collapsed ? "justify-center" : ""
                 } ${
                   active

@@ -15,9 +15,9 @@ export function AppointmentsTabs({ active }: { active: "requests" | "availabilit
           href={tab.href}
           role="tab"
           aria-selected={active === tab.key}
-          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
             active === tab.key
-              ? "border-ds-accent text-ds-text-primary"
+              ? "border-ds-text-primary text-ds-text-primary"
               : "border-transparent text-ds-text-secondary hover:text-ds-text-primary"
           }`}
         >

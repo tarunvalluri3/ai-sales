@@ -45,7 +45,7 @@ export function ImpersonationBanner({ businessName, expiresAtIso }: { businessNa
         type="button"
         onClick={handleExit}
         disabled={isPending}
-        className="shrink-0 rounded-ds-sm border border-ds-warning px-3 py-1 text-xs font-medium transition-colors hover:bg-ds-warning/10 disabled:opacity-40"
+        className="shrink-0 border border-ds-warning px-3 py-1 text-xs font-medium transition-colors hover:bg-ds-warning/10 disabled:opacity-40"
       >
         {isPending ? "Exiting…" : "Exit"}
       </button>

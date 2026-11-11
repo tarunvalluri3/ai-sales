@@ -33,7 +33,7 @@ function WidgetKeyCard({
   const hasNoOrigins = !isRevoked && widgetKey.allowed_origins.length === 0;
 
   return (
-    <div className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <div className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-2">
           <span className="text-sm font-medium text-ds-text-primary">{widgetKey.name || "Unnamed key"}</span>
@@ -44,7 +44,7 @@ function WidgetKeyCard({
           ) : null}
         </div>
         <span
-          className={`rounded-ds-sm px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
+          className={`px-2.5 py-1 text-2xs font-semibold tracking-wide-ds uppercase ${
             isRevoked ? "bg-ds-surface-soft text-ds-text-muted" : "bg-ds-success-bg text-ds-success"
           }`}
         >
@@ -60,7 +60,7 @@ function WidgetKeyCard({
       </p>
 
       {hasNoOrigins ? (
-        <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+        <p role="status" className="bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
           No allowed origins yet — this key will reject every chat request until you add one below.
         </p>
       ) : null}
@@ -88,7 +88,7 @@ function WidgetKeyCard({
               onChange={(event) => setName(event.target.value)}
               disabled={updatePending || !canEdit}
               placeholder="Marketing site"
-              className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+              className="border border-ds-border bg-ds-surface-elevated px-3 py-2.5 text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
             />
             <label
               htmlFor={`origins-${widgetKey.id}`}
@@ -105,18 +105,18 @@ function WidgetKeyCard({
               disabled={updatePending || !canEdit}
               placeholder="https://example.com"
               aria-describedby={`origins-hint-${widgetKey.id}`}
-              className="rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+              className="border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
             />
             <p id={`origins-hint-${widgetKey.id}`} className="text-xs text-ds-text-muted">
               Just the address itself, one per line, e.g. https://example.com — no page path or trailing slash.
             </p>
             {updateState.error ? (
-              <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+              <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
                 {updateState.error}
               </p>
             ) : null}
             {updateState.success ? (
-              <p className="rounded-ds-sm bg-ds-success-bg px-3 py-2 text-xs text-ds-success">Saved.</p>
+              <p className="bg-ds-success-bg px-3 py-2 text-xs text-ds-success">Saved.</p>
             ) : null}
           </form>
           {/* Two sibling <form>s, not nested (HTML forbids a <form> inside a
@@ -128,7 +128,7 @@ function WidgetKeyCard({
               form={`update-origins-${widgetKey.id}`}
               disabled={updatePending || !canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
-              className="self-start rounded-ds-md bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+              className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
             >
               {updatePending ? "Saving…" : "Save"}
             </button>

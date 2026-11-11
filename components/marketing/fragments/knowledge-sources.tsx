@@ -14,7 +14,7 @@ export function KnowledgeSources() {
         {SOURCES.map((source) => (
           <div
             key={source.name}
-            className="flex items-center justify-between rounded-ds-sm bg-ds-surface-elevated px-3 py-2"
+            className="flex items-center justify-between bg-ds-surface-elevated px-3 py-2"
           >
             <div className="flex flex-col">
               <span className="text-xs font-medium text-ds-text-primary">{source.name}</span>

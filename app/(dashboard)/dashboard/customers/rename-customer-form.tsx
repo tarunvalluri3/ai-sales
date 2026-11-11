@@ -54,12 +54,12 @@ export function RenameCustomerForm({
         maxLength={200}
         autoFocus
         disabled={isPending}
-        className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-sm text-ds-text-primary focus:border-ds-accent focus:outline-none disabled:opacity-60"
+        className="border border-ds-border bg-ds-surface-elevated px-2 py-1 text-sm text-ds-text-primary focus:border-ds-accent focus:outline-none disabled:opacity-60"
       />
       <button
         type="submit"
         disabled={isPending || !name.trim()}
-        className="rounded-ds-sm bg-ds-accent px-2 py-1 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60"
+        className="ds-btn-label bg-ds-primary px-2 py-1 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
       >
         {isPending ? "Saving…" : "Save"}
       </button>
@@ -70,7 +70,7 @@ export function RenameCustomerForm({
           setName(displayName ?? "");
         }}
         disabled={isPending}
-        className="rounded-ds-sm px-2 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
+        className="px-2 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
       >
         Cancel
       </button>

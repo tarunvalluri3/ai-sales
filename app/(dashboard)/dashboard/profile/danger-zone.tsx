@@ -59,8 +59,8 @@ export function DangerZone({ businessName }: { businessName: string }) {
   }
 
   return (
-    <details className="group w-full max-w-lg overflow-hidden rounded-ds-lg border border-ds-border bg-ds-surface">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-5 text-sm font-semibold text-ds-text-primary transition-colors hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent [&::-webkit-details-marker]:hidden">
+    <details className="group w-full max-w-lg overflow-hidden border border-ds-border bg-ds-surface">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-5 text-sm font-semibold text-ds-text-primary transition-colors hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary [&::-webkit-details-marker]:hidden">
         Danger zone
         <svg
           width="14"
@@ -81,7 +81,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
       </summary>
 
       <div className="flex flex-col gap-6 border-t border-ds-border p-5">
-        <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface-elevated p-5">
+        <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface-elevated p-5">
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-semibold text-ds-text-primary">Export your data</h2>
             <p className="text-sm text-ds-text-secondary">
@@ -93,14 +93,14 @@ export function DangerZone({ businessName }: { businessName: string }) {
             type="button"
             onClick={handleExport}
             disabled={isExporting}
-            className="w-fit rounded-ds-sm border border-ds-border-strong px-4 py-3 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-accent-muted disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="w-fit border border-ds-border-strong px-4 py-3 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isExporting ? "Preparing export…" : "Download my data"}
           </button>
           {exportError ? <p className="text-sm text-ds-danger">{exportError}</p> : null}
         </section>
 
-        <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-danger/40 bg-ds-surface-elevated p-5">
+        <section className="flex flex-col gap-3 border border-ds-danger/40 bg-ds-surface-elevated p-5">
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-semibold text-ds-danger">Delete this business</h2>
             <p className="text-sm text-ds-text-secondary">
@@ -122,7 +122,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
                 value={confirmName}
                 onChange={(event) => setConfirmName(event.target.value)}
                 disabled={isDeletePending}
-                className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary transition-colors focus:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger disabled:opacity-60"
+                className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary transition-colors focus:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger disabled:opacity-60"
               />
             </div>
             <AnimatePresence mode="wait">
@@ -143,7 +143,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
             <button
               type="submit"
               disabled={isDeletePending || confirmName !== businessName}
-              className="w-fit rounded-ds-sm bg-ds-danger px-4 py-3 text-sm font-semibold text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+              className="w-fit bg-ds-danger px-4 py-3 text-sm font-semibold text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
             >
               {isDeletePending ? "Deleting…" : "Permanently delete this business"}
             </button>

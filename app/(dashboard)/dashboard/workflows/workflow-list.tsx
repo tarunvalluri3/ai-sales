@@ -42,7 +42,7 @@ function EnabledToggle({ workflow, canEdit }: { workflow: Workflow; canEdit: boo
       <button
         type="submit"
         disabled={isPending}
-        className={`rounded-ds-sm px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide-ds transition-colors ${
+        className={`px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide-ds transition-colors ${
           workflow.enabled ? "bg-ds-success-bg text-ds-success hover:opacity-80" : "bg-ds-surface-soft text-ds-text-secondary hover:opacity-80"
         }`}
       >
@@ -65,7 +65,7 @@ function WorkflowRow({ workflow, tags, canEdit }: { workflow: Workflow; tags: Le
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-ds-sm px-2 py-2 hover:bg-ds-surface-soft">
+    <div className="flex items-center justify-between gap-3 px-2 py-2 hover:bg-ds-surface-soft">
       <div className="flex flex-col gap-0.5">
         <span className="text-sm font-medium text-ds-text-primary">{workflow.name}</span>
         <span className="text-xs text-ds-text-muted">
@@ -79,7 +79,7 @@ function WorkflowRow({ workflow, tags, canEdit }: { workflow: Workflow; tags: Le
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary"
+              className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated hover:text-ds-text-primary"
             >
               Edit
             </button>
@@ -95,14 +95,14 @@ export function WorkflowList({ workflows, tags, canEdit }: { workflows: Workflow
   const [creating, setCreating] = useState(false);
 
   return (
-    <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-ds-text-primary">Workflows</h2>
         {canEdit && !creating ? (
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="flex items-center gap-1 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong"
+            className="flex items-center gap-1 border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong"
           >
             <Plus className="size-3.5" aria-hidden="true" />
             New workflow

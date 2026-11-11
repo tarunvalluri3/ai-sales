@@ -24,7 +24,7 @@ export default async function ApacheBillingPage() {
         <AdminKpiTile label="Paying tenants" value={rollup.payingTenantCount} />
       </div>
 
-      <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="border border-ds-border bg-ds-surface p-5">
         <h2 className="mb-2 text-sm font-semibold text-ds-text-primary">Subscriptions by status</h2>
         <div className="flex flex-wrap gap-4 text-sm">
           {Object.entries(rollup.byStatus).map(([status, count]) => (
@@ -35,7 +35,7 @@ export default async function ApacheBillingPage() {
         </div>
       </div>
 
-      <div className="rounded-ds-lg border border-dashed border-ds-border p-4 text-xs text-ds-text-muted">
+      <div className="border border-dashed border-ds-border p-4 text-xs text-ds-text-muted">
         Plan overrides and usage-limit overrides are per-tenant actions on each tenant&apos;s own detail page
         (owner-only). Refunds/credit notes are issued via <code className="font-mono">npm run credit-note</code>{" "}
         (dry-run by default) -- deliberately not wired to a button here; see STATE.md for why. Invoices and credit

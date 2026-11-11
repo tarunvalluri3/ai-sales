@@ -94,7 +94,7 @@ export default async function AuditLogPage() {
           {entries.map((entry) => (
             <li
               key={entry.id}
-              className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4"
+              className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="font-medium text-ds-text-primary">{ACTION_LABEL[entry.action]}</p>
@@ -112,7 +112,7 @@ export default async function AuditLogPage() {
               {entry.target_type === "conversation" ? (
                 <Link
                   href={`/dashboard/conversations/${entry.target_id}`}
-                  className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                 >
                   View conversation
                 </Link>

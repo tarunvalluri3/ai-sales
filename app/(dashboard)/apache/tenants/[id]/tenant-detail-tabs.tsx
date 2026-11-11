@@ -24,7 +24,7 @@ export function TenantDetailTabs({ detail, auditLog }: { detail: TenantDetail; a
             onClick={() => setTab(t)}
             aria-current={tab === t ? "page" : undefined}
             className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              tab === t ? "border-ds-accent text-ds-text-primary" : "border-transparent text-ds-text-secondary hover:text-ds-text-primary"
+              tab === t ? "border-ds-text-primary text-ds-text-primary" : "border-transparent text-ds-text-secondary hover:text-ds-text-primary"
             }`}
           >
             {t}
@@ -54,7 +54,7 @@ function Field({ label, value }: { label: string; value: string }) {
 function ProfileTab({ detail }: { detail: TenantDetail }) {
   const b = detail.business;
   return (
-    <div className="grid grid-cols-1 gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 border border-ds-border bg-ds-surface p-5 sm:grid-cols-2 lg:grid-cols-3">
       <Field label="Business type" value={b.business_type} />
       <Field label="Contact email" value={b.contact_email ?? "—"} />
       <Field label="Contact phone" value={b.contact_phone ?? "—"} />
@@ -75,15 +75,15 @@ function ProfileTab({ detail }: { detail: TenantDetail }) {
 function UsageTab({ detail }: { detail: TenantDetail }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="border border-ds-border bg-ds-surface p-5">
         <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Conversations (all time)</span>
         <p className="text-2xl font-semibold text-ds-text-primary">{detail.usage.conversationsTotal}</p>
       </div>
-      <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="border border-ds-border bg-ds-surface p-5">
         <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Leads (all time)</span>
         <p className="text-2xl font-semibold text-ds-text-primary">{detail.usage.leadsTotal}</p>
       </div>
-      <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="border border-ds-border bg-ds-surface p-5">
         <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">Appointments (all time)</span>
         <p className="text-2xl font-semibold text-ds-text-primary">{detail.usage.appointmentsTotal}</p>
       </div>
@@ -98,14 +98,14 @@ function UsageTab({ detail }: { detail: TenantDetail }) {
 function IntegrationStatus({ label, data }: { label: string; data: TenantDetail["integrations"]["whatsapp"] }) {
   if (!data) {
     return (
-      <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="border border-ds-border bg-ds-surface p-5">
         <span className="text-sm font-medium text-ds-text-primary">{label}</span>
         <p className="text-xs text-ds-text-muted">Not connected.</p>
       </div>
     );
   }
   return (
-    <div className="flex flex-col gap-1 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <div className="flex flex-col gap-1 border border-ds-border bg-ds-surface p-5">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-ds-text-primary">{label}</span>
         <Badge tone={data.status === "connected" ? "success" : data.status === "error" ? "danger" : "muted"}>{data.status}</Badge>
@@ -131,7 +131,7 @@ function BillingTab({ detail }: { detail: TenantDetail }) {
   const sub = detail.subscription;
   if (!sub) {
     return (
-      <div className="rounded-ds-lg border border-ds-border bg-ds-surface p-5 text-sm text-ds-text-secondary">
+      <div className="border border-ds-border bg-ds-surface p-5 text-sm text-ds-text-secondary">
         No subscription row -- this tenant has NO paid access (not serving, no WhatsApp/Instagram). Rows are
         created by the trial trigger or at checkout (lib/entitlement-rules.ts).
       </div>
@@ -139,7 +139,7 @@ function BillingTab({ detail }: { detail: TenantDetail }) {
   }
   const plan = PLANS[sub.planKey];
   return (
-    <div className="grid grid-cols-1 gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 border border-ds-border bg-ds-surface p-5 sm:grid-cols-2 lg:grid-cols-3">
       <Field label="Plan" value={plan.name} />
       <Field label="Status" value={sub.status} />
       <Field label="Monthly price" value={formatPaiseAsInr2dp(plan.monthlyPricePaise)} />
@@ -155,10 +155,10 @@ function BillingTab({ detail }: { detail: TenantDetail }) {
 
 function ActivityTab({ auditLog }: { auditLog: AdminAuditLogEntry[] }) {
   if (auditLog.length === 0) {
-    return <p className="rounded-ds-lg border border-ds-border bg-ds-surface p-5 text-sm text-ds-text-muted">No admin actions recorded for this tenant yet.</p>;
+    return <p className="border border-ds-border bg-ds-surface p-5 text-sm text-ds-text-muted">No admin actions recorded for this tenant yet.</p>;
   }
   return (
-    <div className="flex flex-col divide-y divide-ds-border rounded-ds-lg border border-ds-border bg-ds-surface">
+    <div className="flex flex-col divide-y divide-ds-border border border-ds-border bg-ds-surface">
       {auditLog.map((entry) => (
         <div key={entry.id} className="flex flex-col gap-0.5 p-3 text-sm">
           <div className="flex items-center justify-between">

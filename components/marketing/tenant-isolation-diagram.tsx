@@ -17,14 +17,14 @@ export function TenantIsolationDiagram() {
 
 function TenantStack({ name }: { name: string }) {
   return (
-    <div className="rounded-ds-lg border border-ds-border-strong p-4">
+    <div className="border border-ds-border-strong p-4">
       <span className="text-xs font-semibold text-ds-text-primary">{name}</span>
       <div className="mt-3 flex flex-col items-stretch gap-2">
-        <div className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-center text-2xs text-ds-text-secondary">
+        <div className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-center text-2xs text-ds-text-secondary">
           Knowledge base
         </div>
         <span className="mx-auto h-4 w-px bg-ds-border" aria-hidden="true" />
-        <div className="rounded-ds-sm border border-ds-accent-muted bg-ds-accent-soft-bg px-3 py-2 text-center text-2xs text-ds-text-primary">
+        <div className="border border-ds-border-strong bg-ds-surface-raised px-3 py-2 text-center text-2xs text-ds-text-primary">
           AI sales employee
         </div>
       </div>

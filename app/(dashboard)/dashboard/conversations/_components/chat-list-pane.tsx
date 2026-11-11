@@ -202,7 +202,7 @@ export function ChatListPane({
                 type="checkbox"
                 checked={attentionOnly}
                 onChange={(event) => setAttentionOnly(event.target.checked)}
-                className="h-3.5 w-3.5 rounded-ds-sm border-ds-border text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="h-3.5 w-3.5 border-ds-border text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               />
               Needs attention only{attentionCount > 0 ? ` (${attentionCount})` : ""}
             </label>
@@ -240,7 +240,7 @@ export function ChatListPane({
                   <Link
                     href={`/dashboard/conversations/${conversation.id}`}
                     aria-current={active ? "page" : undefined}
-                    className={`flex items-start gap-2.5 border-b border-ds-border px-3 py-3 transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-accent ${
+                    className={`flex items-start gap-2.5 border-b border-ds-border px-3 py-3 transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-text-primary ${
                       active ? "bg-ds-surface-elevated" : ""
                     }`}
                   >
@@ -296,7 +296,7 @@ function FilterPill({ active, onClick, label }: { active: boolean; onClick: () =
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full px-2.5 py-1 text-2xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+      className={`rounded-full px-2.5 py-1 text-2xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
         active
           ? "bg-dashboard-primary text-dashboard-on-primary"
           : "bg-ds-surface-soft text-ds-text-secondary hover:text-ds-text-primary"

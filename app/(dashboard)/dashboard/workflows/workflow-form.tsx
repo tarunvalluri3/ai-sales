@@ -18,9 +18,9 @@ import type {
 } from "@/lib/supabase/types";
 
 const SELECT_CLASS =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 const INPUT_CLASS =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 const TRIGGER_LABEL: Record<WorkflowTriggerType, string> = {
   lead_created: "Lead created",
@@ -158,7 +158,7 @@ function ConditionRow({ condition, onChange, onRemove }: { condition: SegmentCon
           className={`${INPUT_CLASS} w-28`}
         />
       ) : null}
-      <button type="button" onClick={onRemove} aria-label="Remove condition" className="rounded-ds-sm p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger">
+      <button type="button" onClick={onRemove} aria-label="Remove condition" className="p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger">
         <X className="size-3.5" aria-hidden="true" />
       </button>
     </div>
@@ -218,7 +218,7 @@ function defaultStepOfType(type: (typeof STEP_TYPES)[number], tags: LeadTag[]): 
 
 function StepRow({ step, tags, onChange, onRemove }: { step: WorkflowStep; tags: LeadTag[]; onChange: (next: WorkflowStep) => void; onRemove: () => void }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-ds-sm bg-ds-surface p-2">
+    <div className="flex flex-col gap-1.5 bg-ds-surface p-2">
       <div className="flex items-center gap-1.5">
         <select
           value={step.type}
@@ -270,7 +270,7 @@ function StepRow({ step, tags, onChange, onRemove }: { step: WorkflowStep; tags:
           </select>
         ) : null}
 
-        <button type="button" onClick={onRemove} aria-label="Remove step" className="ml-auto rounded-ds-sm p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger">
+        <button type="button" onClick={onRemove} aria-label="Remove step" className="ml-auto p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger">
           <X className="size-3.5" aria-hidden="true" />
         </button>
       </div>
@@ -347,7 +347,7 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
   const definition = JSON.stringify({ triggerType, triggerConfig, matchType, conditions, steps, enabled });
 
   return (
-    <form action={formAction} className="flex flex-col gap-3 rounded-ds-sm bg-ds-surface-soft p-3">
+    <form action={formAction} className="flex flex-col gap-3 bg-ds-surface-soft p-3">
       {workflow ? <input type="hidden" name="id" value={workflow.id} /> : null}
       <input type="hidden" name="definition" value={definition} />
 
@@ -401,7 +401,7 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
         <button
           type="button"
           onClick={() => setConditions((current) => [...current, { field: "score", operator: "gte", value: "4" }])}
-          className="flex w-fit items-center gap-1 rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-accent-soft-bg"
+          className="flex w-fit items-center gap-1 px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-surface-raised"
         >
           <Plus className="size-3.5" aria-hidden="true" />
           Add condition
@@ -422,7 +422,7 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
         <button
           type="button"
           onClick={() => setSteps((current) => [...current, defaultStepOfType("internal_notification", tags)])}
-          className="flex w-fit items-center gap-1 rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-accent-soft-bg"
+          className="flex w-fit items-center gap-1 px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-surface-raised"
         >
           <Plus className="size-3.5" aria-hidden="true" />
           Add step
@@ -433,12 +433,12 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
         <button
           type="submit"
           disabled={isPending || !name.trim() || steps.length === 0}
-          className="rounded-ds-sm bg-ds-accent px-2.5 py-1 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isPending ? "Saving…" : workflow ? "Save workflow" : "Create workflow"}
         </button>
         {onDone ? (
-          <button type="button" onClick={onDone} disabled={isPending} className="rounded-ds-sm px-2.5 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
+          <button type="button" onClick={onDone} disabled={isPending} className="px-2.5 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
             Cancel
           </button>
         ) : null}

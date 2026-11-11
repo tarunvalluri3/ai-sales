@@ -44,7 +44,7 @@ export function AiSummaryCard({
         : "Regenerate";
 
   return (
-    <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-medium text-ds-text-primary">AI summary</h3>
         {generatedAt ? (
@@ -66,7 +66,7 @@ export function AiSummaryCard({
         <button
           type="submit"
           disabled={isPending}
-          className="mt-1 inline-flex items-center rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-1.5 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="mt-1 inline-flex items-center border border-ds-border bg-ds-surface-elevated px-3 py-1.5 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {buttonLabel}
         </button>

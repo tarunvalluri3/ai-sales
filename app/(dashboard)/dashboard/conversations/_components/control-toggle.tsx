@@ -35,7 +35,7 @@ export function ControlToggle({
   }, [state]);
 
   return (
-    <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={control === "human" ? "warning" : "muted"}>
           {control === "human" ? "Human-controlled" : "AI-handled"}
@@ -48,7 +48,7 @@ export function ControlToggle({
             type="submit"
             disabled={isPending || !canEdit}
             title={canEdit ? undefined : ROLE_DENIED_TITLE}
-            className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Updating…" : control === "human" ? "Hand back to AI" : "Take over this conversation"}
           </button>

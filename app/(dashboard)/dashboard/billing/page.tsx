@@ -99,7 +99,7 @@ export default async function BillingPage() {
       {testMode ? (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+          className="flex items-start gap-3 border border-ds-warning bg-ds-surface p-4"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">
@@ -116,7 +116,7 @@ export default async function BillingPage() {
       {!configured ? (
         <div
           role="status"
-          className="rounded-ds-md border border-ds-border bg-ds-surface p-4 text-sm text-ds-text-secondary"
+          className="border border-ds-border bg-ds-surface p-4 text-sm text-ds-text-secondary"
         >
           Payments are not set up on this deployment yet, so there is nothing to subscribe to here.
           Your plan and usage below are accurate.
@@ -126,7 +126,7 @@ export default async function BillingPage() {
       {!contactEmail ? (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+          className="flex items-start gap-3 border border-ds-warning bg-ds-surface p-4"
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">

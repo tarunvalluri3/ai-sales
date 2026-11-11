@@ -6,7 +6,7 @@ import { connectWhatsappAction, type WhatsappActionState } from "./actions";
 const initialState: WhatsappActionState = {};
 
 const inputClasses =
-  "w-full rounded-ds-md border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60 aria-invalid:border-ds-danger";
+  "w-full border border-ds-border bg-ds-surface-elevated px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60 aria-invalid:border-ds-danger";
 
 const linkClasses = "text-ds-text-secondary underline underline-offset-2 hover:text-ds-text-primary";
 
@@ -99,7 +99,7 @@ export function ConnectWhatsappForm({
   }, [state.success]);
 
   return (
-    <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-sm font-medium text-ds-text-primary">
           {isReconnect ? "Update your WhatsApp connection" : "Connect a WhatsApp number"}
@@ -147,7 +147,7 @@ export function ConnectWhatsappForm({
           <button
             type="submit"
             disabled={isPending}
-            className="shrink-0 self-start rounded-ds-md bg-ds-accent px-4 py-2.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+            className="ds-btn-label shrink-0 self-start bg-ds-primary px-4 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
           >
             {isPending ? "Connecting…" : isReconnect ? "Save" : "Connect"}
           </button>
@@ -156,7 +156,7 @@ export function ConnectWhatsappForm({
               type="button"
               onClick={onCancel}
               disabled={isPending}
-              className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Cancel
             </button>
@@ -164,7 +164,7 @@ export function ConnectWhatsappForm({
         </div>
       </form>
       {state.error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           {state.error}
         </p>
       ) : null}

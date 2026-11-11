@@ -149,7 +149,7 @@ export function PlanStep({
       {onTrial ? (
         <section
           aria-labelledby="trial-heading"
-          className="flex flex-col gap-3 rounded-ds-lg border border-ds-accent bg-ds-surface-elevated p-5"
+          className="flex flex-col gap-3 border border-ds-text-primary bg-ds-surface-elevated p-5"
         >
           <h2 id="trial-heading" className="text-base font-semibold text-ds-text-primary">
             Your free trial is on -- no card needed
@@ -172,15 +172,15 @@ export function PlanStep({
       ) : (
         <p
           role="status"
-          className="rounded-ds-sm border border-ds-border bg-ds-surface px-4 py-3 text-sm text-ds-text-secondary"
+          className="border border-ds-border bg-ds-surface px-4 py-3 text-sm text-ds-text-secondary"
         >
           {notServingMessage(entitlement.notServingReason)}
         </p>
       )}
 
       {onTrial ? (
-        <details className="group rounded-ds-lg border border-ds-border bg-ds-surface">
-          <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent">
+        <details className="group border border-ds-border bg-ds-surface">
+          <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
             <span className="group-open:hidden">Choose a paid plan now (optional)</span>
             <span className="hidden group-open:inline">Hide plans</span>
           </summary>
@@ -220,7 +220,7 @@ export function PlanStep({
             type="button"
             onClick={handleContinue}
             disabled={isPending || confirming || !valid}
-            className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {isPending ? "Saving…" : onTrial ? "Continue with the free trial" : "Continue"}
           </button>

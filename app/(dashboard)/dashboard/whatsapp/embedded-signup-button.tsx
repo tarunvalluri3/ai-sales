@@ -160,7 +160,7 @@ export function EmbeddedSignupButton({ appId, configId, graphVersion }: { appId:
   const busy = phase.kind === "loading_sdk" || phase.kind === "in_popup" || phase.kind === "finishing";
 
   return (
-    <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-semibold text-ds-text-primary">Connect with Facebook</h2>
         <p className="text-sm text-ds-text-secondary">
@@ -173,7 +173,7 @@ export function EmbeddedSignupButton({ appId, configId, graphVersion }: { appId:
           type="button"
           onClick={() => void start()}
           disabled={busy}
-          className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {phase.kind === "loading_sdk"
             ? "Opening…"
@@ -192,17 +192,17 @@ export function EmbeddedSignupButton({ appId, configId, graphVersion }: { appId:
           </p>
         ) : null}
         {phase.kind === "error" ? (
-          <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
+          <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
             {phase.message}
           </p>
         ) : null}
         {phase.kind === "done" ? (
           phase.complete ? (
-            <p className="rounded-ds-sm bg-ds-success-bg px-3 py-2 text-sm text-ds-success">
+            <p className="bg-ds-success-bg px-3 py-2 text-sm text-ds-success">
               WhatsApp is connected. We&rsquo;ve submitted your message templates to Meta for review.
             </p>
           ) : (
-            <p role="alert" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-sm text-ds-warning">
+            <p role="alert" className="bg-ds-warning-bg px-3 py-2 text-sm text-ds-warning">
               Almost there: {phase.message ?? "one setup step didn't finish."} Use &ldquo;Finish setup&rdquo; below.
             </p>
           )

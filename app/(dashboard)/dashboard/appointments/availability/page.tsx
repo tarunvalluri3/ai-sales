@@ -66,7 +66,7 @@ export default async function AppointmentAvailabilityPage({
           {date > today ? (
             <Link
               href={`?date=${prevDate}`}
-              className="text-sm text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="text-sm text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               ← Prev
             </Link>
@@ -74,7 +74,7 @@ export default async function AppointmentAvailabilityPage({
           <span className="text-lg font-medium text-ds-text-primary">{dateLabel}</span>
           <Link
             href={`?date=${nextDate}`}
-            className="text-sm text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="text-sm text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             Next →
           </Link>

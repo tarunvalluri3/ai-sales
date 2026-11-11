@@ -16,9 +16,9 @@ export function BookingCard() {
           return (
             <span
               key={slot}
-              className={`rounded-ds-sm border px-2.5 py-1.5 text-center font-mono text-2xs ${
+              className={`border px-2.5 py-1.5 text-center font-mono text-2xs ${
                 selected
-                  ? "border-ds-accent bg-ds-accent-soft-bg text-ds-text-primary"
+                  ? "border-ds-text-primary bg-ds-surface-raised text-ds-text-primary"
                   : "border-ds-border text-ds-text-muted"
               }`}
             >
@@ -27,7 +27,7 @@ export function BookingCard() {
           );
         })}
       </div>
-      <div className="mt-3 flex items-center justify-between rounded-ds-sm border border-ds-border-strong bg-ds-surface-elevated px-3 py-2">
+      <div className="mt-3 flex items-center justify-between border border-ds-border-strong bg-ds-surface-elevated px-3 py-2">
         <span className="text-2xs font-medium text-ds-text-primary">Appointment booked</span>
         <span className="font-mono text-2xs text-ds-text-secondary">Thu · 4:30 PM</span>
       </div>

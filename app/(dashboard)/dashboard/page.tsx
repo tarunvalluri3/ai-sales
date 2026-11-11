@@ -111,7 +111,7 @@ export default async function DashboardOverviewPage({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Lead qualification</h2>
           <QualificationDonut byQualification={leadStats.byQualification} />
         </section>

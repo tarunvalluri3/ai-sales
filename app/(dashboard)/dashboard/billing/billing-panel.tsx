@@ -331,7 +331,7 @@ export function BillingPanel({
       ) : null}
 
       {confirming ? (
-        <p role="status" className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary">
+        <p role="status" className="border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary">
           Confirming your payment with our server… this usually takes a few seconds.
         </p>
       ) : null}
@@ -349,7 +349,7 @@ export function BillingPanel({
         }}
       />
 
-      <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold text-ds-text-primary">
             {isSubscribed ? "Change your plan" : "Choose a plan"}
@@ -370,9 +370,9 @@ export function BillingPanel({
                 type="button"
                 onClick={() => setInterval(value)}
                 aria-pressed={interval === value}
-                className={`rounded-ds-sm border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+                className={`border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                   interval === value
-                    ? "border-ds-accent bg-ds-accent-soft-bg text-ds-text-primary"
+                    ? "border-ds-text-primary bg-ds-surface-raised text-ds-text-primary"
                     : "border-ds-border text-ds-text-secondary hover:border-ds-border-strong"
                 }`}
               >
@@ -396,16 +396,16 @@ export function BillingPanel({
                     setStarterLossAcknowledged(false);
                   }}
                   aria-pressed={selected}
-                  className={`flex w-full flex-col gap-1 rounded-ds-md border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+                  className={`flex w-full flex-col gap-1 border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                     selected
-                      ? "border-ds-accent bg-ds-accent-soft-bg"
+                      ? "border-ds-text-primary bg-ds-surface-raised"
                       : "border-ds-border bg-ds-bg hover:border-ds-border-strong"
                   }`}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-ds-text-primary">{plan.name}</span>
                     {current ? (
-                      <span className="rounded-ds-sm bg-ds-surface-elevated px-2 py-0.5 text-2xs font-semibold text-ds-text-secondary">
+                      <span className="bg-ds-surface-elevated px-2 py-0.5 text-2xs font-semibold text-ds-text-secondary">
                         Current
                       </span>
                     ) : null}
@@ -445,7 +445,7 @@ export function BillingPanel({
           {starterWarning ? (
             <div
               role="alert"
-              className="flex flex-col gap-3 rounded-ds-md border border-ds-warning bg-ds-surface p-4"
+              className="flex flex-col gap-3 border border-ds-warning bg-ds-surface p-4"
             >
               <p className="flex items-start gap-2 text-sm text-ds-text-primary">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
@@ -475,7 +475,7 @@ export function BillingPanel({
                 (starterWarning !== null && !starterLossAcknowledged) ||
                 (selectedPlan === entitlement.planKey && isSubscribed && interval === entitlement.billingInterval)
               }
-              className="rounded-ds-sm bg-ds-accent px-5 py-2.5 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {startPending || changePending
                 ? "Opening payment…"
@@ -527,7 +527,7 @@ function CurrentPlanCard({
   const canUpdatePaymentMethod = entitlement.status === "past_due" && entitlement.billingInterval === "monthly";
 
   return (
-    <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-col gap-1">
           <p className="text-2xs font-semibold uppercase tracking-wide text-ds-text-muted">
@@ -537,7 +537,7 @@ function CurrentPlanCard({
           <p className="text-sm text-ds-text-secondary">{statusLabel}</p>
         </div>
         {!entitlement.serving ? (
-          <span className="rounded-ds-sm border border-ds-danger bg-ds-danger-bg px-3 py-1 text-2xs font-semibold text-ds-text-primary">
+          <span className="border border-ds-danger bg-ds-danger-bg px-3 py-1 text-2xs font-semibold text-ds-text-primary">
             AI replies paused
           </span>
         ) : null}
@@ -584,7 +584,7 @@ function CurrentPlanCard({
           <button
             type="submit"
             disabled={updatePaymentMethod.pending || !updatePaymentMethod.ready}
-            className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             {updatePaymentMethod.pending ? "Opening payment…" : "Update payment method"}
           </button>
@@ -605,7 +605,7 @@ function CurrentPlanCard({
             className="h-2 w-full overflow-hidden rounded-full bg-ds-surface-elevated"
           >
             <div
-              className={`h-full rounded-full ${percentUsed >= 100 ? "bg-ds-danger" : "bg-ds-accent"}`}
+              className={`h-full rounded-full ${percentUsed >= 100 ? "bg-ds-danger" : "bg-ds-primary"}`}
               style={{ width: `${percentUsed}%` }}
             />
           </div>
@@ -614,14 +614,14 @@ function CurrentPlanCard({
       ) : null}
 
       {entitlement.scheduledPlanKey ? (
-        <p className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
+        <p className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
           Scheduled: moving to the {entitlement.scheduledPlanKey} plan on{" "}
           {formatDate(entitlement.periodEnd)}. Nothing changes before then.
         </p>
       ) : null}
 
       {entitlement.noSubscription ? (
-        <p className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
+        <p className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
           {entitlement.notServingReason === "subscription_unavailable"
             ? "We could not load your plan just now, so AI replies are paused. Please refresh in a minute -- if this continues, contact support."
             : "There is no plan on this account, so your AI is not replying to prospects. Choose a plan below to switch it on."}
@@ -689,7 +689,7 @@ function CancelCard({
   const [open, setOpen] = useState(false);
 
   return (
-    <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-semibold text-ds-text-primary">Cancel your plan</h2>
         <p className="text-sm text-ds-text-secondary">
@@ -703,7 +703,7 @@ function CancelCard({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="self-start rounded-ds-sm border border-ds-border-strong px-4 py-2 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="self-start border border-ds-border-strong px-4 py-2 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Cancel at period end
         </button>
@@ -712,7 +712,7 @@ function CancelCard({
           {error ? (
             <p
               role="alert"
-              className="rounded-ds-sm border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary"
+              className="border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary"
             >
               {error}
             </p>
@@ -726,21 +726,21 @@ function CancelCard({
               name="confirm"
               autoComplete="off"
               required
-              className="max-w-xs rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="max-w-xs border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             />
           </label>
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={pending}
-              className="rounded-ds-sm border border-ds-danger bg-ds-danger-bg px-4 py-2 text-sm font-semibold text-ds-text-primary transition-opacity disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="border border-ds-danger bg-ds-danger-bg px-4 py-2 text-sm font-semibold text-ds-text-primary transition-opacity disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {pending ? "Cancelling…" : "Confirm cancellation"}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-ds-sm px-4 py-2 text-sm font-medium text-ds-text-secondary hover:text-ds-text-primary"
+              className="px-4 py-2 text-sm font-medium text-ds-text-secondary hover:text-ds-text-primary"
             >
               Keep my plan
             </button>

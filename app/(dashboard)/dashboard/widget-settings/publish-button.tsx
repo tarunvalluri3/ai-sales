@@ -48,7 +48,7 @@ export function PublishButton({
   const blockedNow = !published && readinessBlocked;
 
   return (
-    <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-semibold text-ds-text-primary">
@@ -61,7 +61,7 @@ export function PublishButton({
           </p>
         </div>
         <span
-          className={`shrink-0 rounded-ds-sm px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide-ds ${
+          className={`shrink-0 px-2.5 py-1 text-2xs font-semibold uppercase tracking-wide-ds ${
             published ? "bg-ds-success-bg text-ds-success" : "bg-ds-warning-bg text-ds-warning"
           }`}
         >
@@ -70,7 +70,7 @@ export function PublishButton({
       </div>
 
       {!hasActiveKey ? (
-        <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+        <p role="status" className="bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
           You haven&rsquo;t created a widget key yet — publish is safe to click, but nothing will happen until you
           add one.
         </p>
@@ -81,7 +81,7 @@ export function PublishButton({
          falls back to this app's /privacy. Same non-blocking shape as the
          missing-widget-key notice above. */}
       {!hasPrivacyPolicyUrl ? (
-        <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+        <p role="status" className="bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
           You haven&rsquo;t set your own privacy policy URL yet (Customize &rarr; Branding &amp; language,
           below). Until you do, the consent checkbox in your widget links to Waves AI Pilot&rsquo;s privacy
           policy instead of yours. Publishing still works.
@@ -89,14 +89,14 @@ export function PublishButton({
       ) : null}
 
       {blockedNow ? (
-        <p role="status" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+        <p role="status" className="bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
           Finish the {blockingCount} required {blockingCount === 1 ? "item" : "items"} in the readiness
           checklist above before you publish. Your AI needs them to answer prospects accurately.
         </p>
       ) : null}
 
       {confirming ? (
-        <p role="status" className="rounded-ds-sm bg-ds-success-bg px-3 py-2 text-sm font-medium text-ds-success">
+        <p role="status" className="bg-ds-success-bg px-3 py-2 text-sm font-medium text-ds-success">
           Your agent is live. Taking you to your dashboard…
         </p>
       ) : null}
@@ -119,7 +119,7 @@ export function PublishButton({
           type="submit"
           disabled={isPending || !canEdit || blockedNow || confirming}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isPending ? "Publishing…" : confirming ? "Taking you to your dashboard…" : "Publish agent"}
         </button>

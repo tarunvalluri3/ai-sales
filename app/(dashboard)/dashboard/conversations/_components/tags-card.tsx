@@ -41,7 +41,7 @@ function SuggestionChip({
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-full border border-dashed border-ds-border px-2 py-0.5 text-2xs font-medium text-ds-text-secondary transition-colors hover:border-ds-accent hover:text-ds-text-primary disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="rounded-full border border-dashed border-ds-border px-2 py-0.5 text-2xs font-medium text-ds-text-secondary transition-colors hover:border-ds-accent hover:text-ds-text-primary disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Adding…" : `+ ${name}`}
       </button>
@@ -112,7 +112,7 @@ export function TagsCard({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
       <h3 className="text-sm font-medium text-ds-text-primary">Tags</h3>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -145,7 +145,7 @@ export function TagsCard({
             <button
               type="submit"
               disabled={isSuggesting}
-              className="inline-flex items-center rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="inline-flex items-center border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {isSuggesting ? "Suggesting…" : "Suggest tags"}
             </button>

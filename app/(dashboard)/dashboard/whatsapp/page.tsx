@@ -95,8 +95,8 @@ export default async function WhatsappPage() {
               configId={embeddedSignup.configId}
               graphVersion={embeddedSignup.graphVersion}
             />
-            <details className="rounded-ds-lg border border-ds-border bg-ds-surface">
-              <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-ds-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent">
+            <details className="border border-ds-border bg-ds-surface">
+              <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-ds-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
                 Already have a system-user token? Connect manually instead
               </summary>
               <div className="border-t border-ds-border p-5">

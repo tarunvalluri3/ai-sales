@@ -92,7 +92,7 @@ export default async function ApacheOverviewPage() {
         </p>
       </section>
 
-      <section className="rounded-ds-lg border border-dashed border-ds-border p-6">
+      <section className="border border-dashed border-ds-border p-6">
         <h2 className="text-sm font-semibold text-ds-text-primary">Needs attention, charts, and more</h2>
         <p className="mt-1 text-xs text-ds-text-secondary">
           The &quot;Needs attention&quot; list (broken integrations, failed payments, error spikes, tenants over

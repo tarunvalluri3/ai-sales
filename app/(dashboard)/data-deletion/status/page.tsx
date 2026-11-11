@@ -47,7 +47,7 @@ export default async function DataDeletionStatusPage({
 
         <section className="flex flex-col gap-3 border-t border-ds-border pt-6 text-sm leading-relaxed text-ds-text-secondary">
           {result ? (
-            <div className="flex flex-col gap-2 rounded-ds-sm border border-ds-border bg-ds-surface p-4">
+            <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
               <p>
                 Confirmation code: <span className="font-mono text-ds-text-primary">{codeValue}</span>
               </p>

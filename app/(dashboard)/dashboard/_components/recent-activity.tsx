@@ -23,14 +23,14 @@ export function RecentActivity({
   leads: Lead[];
 }) {
   return (
-    <section className="flex flex-col gap-5 rounded-ds-lg border border-ds-border bg-ds-surface p-5 lg:col-span-2">
+    <section className="flex flex-col gap-5 border border-ds-border bg-ds-surface p-5 lg:col-span-2">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-sm font-medium text-ds-text-primary">Recent conversations</h2>
             <Link
               href="/dashboard/conversations"
-              className="text-xs font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               View all
             </Link>
@@ -43,7 +43,7 @@ export function RecentActivity({
                 <li key={conversation.id}>
                   <Link
                     href={`/dashboard/conversations/${conversation.id}`}
-                    className="flex items-center justify-between gap-3 rounded-ds-sm px-2 py-1.5 text-sm transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                    className="flex items-center justify-between gap-3 px-2 py-1.5 text-sm transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                   >
                     <span className="truncate text-ds-text-secondary">
                       {conversation.source ?? "Chat widget"} · {conversation.messageCount} msg
@@ -64,7 +64,7 @@ export function RecentActivity({
             <h2 className="text-sm font-medium text-ds-text-primary">Recent leads</h2>
             <Link
               href="/dashboard/leads"
-              className="text-xs font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               View all
             </Link>
@@ -77,7 +77,7 @@ export function RecentActivity({
                 <li key={lead.id}>
                   <Link
                     href={`/dashboard/conversations/${lead.conversation_id}`}
-                    className="flex items-center justify-between gap-3 rounded-ds-sm px-2 py-1.5 text-sm transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                    className="flex items-center justify-between gap-3 px-2 py-1.5 text-sm transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                   >
                     <span className="truncate text-ds-text-secondary">
                       {lead.contact_name ?? "Unnamed prospect"}

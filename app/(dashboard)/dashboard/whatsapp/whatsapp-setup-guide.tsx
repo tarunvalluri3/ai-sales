@@ -21,12 +21,12 @@ export function WhatsappSetupGuide({ hasConnection }: { hasConnection: boolean }
   const [open, setOpen] = useState(!hasConnection);
 
   return (
-    <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="flex items-center justify-between gap-3 rounded-ds-sm text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           aria-expanded={open}
         >
           <h2 className="text-lg font-semibold text-ds-text-primary">Set up WhatsApp with Meta</h2>

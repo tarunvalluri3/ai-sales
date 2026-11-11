@@ -40,14 +40,14 @@ export function ReplyComposer({
 
   return (
     <form ref={formRef} action={formAction} className="flex flex-col gap-1.5">
-      <div className="flex items-end gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-2">
+      <div className="flex items-end gap-2 border border-ds-border bg-ds-surface p-2">
         <input type="hidden" name="conversationId" value={conversationId} />
         <button
           type="button"
           disabled
           title="File attachments coming soon"
           aria-label="Attach a file (coming soon)"
-          className="flex size-9 shrink-0 cursor-not-allowed items-center justify-center rounded-ds-sm text-ds-text-muted opacity-60"
+          className="flex size-9 shrink-0 cursor-not-allowed items-center justify-center text-ds-text-muted opacity-60"
         >
           <Paperclip className="size-4" aria-hidden="true" />
         </button>
@@ -69,7 +69,7 @@ export function ReplyComposer({
           disabled={isPending || !canEdit}
           title={canEdit ? "Send reply" : ROLE_DENIED_TITLE}
           aria-label="Send reply"
-          className="flex size-9 shrink-0 items-center justify-center rounded-ds-sm bg-ds-accent text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="flex size-9 shrink-0 items-center justify-center bg-ds-primary text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           <SendHorizontal className="size-4" aria-hidden="true" />
         </button>

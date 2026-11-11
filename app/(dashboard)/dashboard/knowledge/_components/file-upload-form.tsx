@@ -28,7 +28,7 @@ export function FileUploadForm() {
         accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
         required
         disabled={isPending}
-        className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary file:mr-3 file:rounded-ds-sm file:border-0 file:bg-ds-accent-soft-bg file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ds-accent-muted disabled:opacity-60"
+        className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary file:mr-3 file:file:border-0 file:bg-ds-surface-raised file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ds-text-primary disabled:opacity-60"
       />
       <p className="text-xs text-ds-text-muted">
         If your PDF is a product or service catalog, we&rsquo;ll extract it into structured products and
@@ -44,7 +44,7 @@ export function FileUploadForm() {
       <button
         type="submit"
         disabled={isPending}
-        className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Uploading…" : "Upload"}
       </button>

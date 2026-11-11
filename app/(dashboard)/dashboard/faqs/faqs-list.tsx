@@ -65,7 +65,7 @@ export function FaqsList({
                 <span className="font-medium text-ds-text-primary">{faq.question}</span>
                 {status ? (
                   <span
-                    className={`shrink-0 rounded-ds-sm px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide-ds ${
+                    className={`shrink-0 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide-ds ${
                       status === "ready"
                         ? "bg-ds-success-bg text-ds-success"
                         : status === "too_short"
@@ -88,14 +88,14 @@ export function FaqsList({
                     <button
                       type="button"
                       onClick={() => onEdit(faq.id)}
-                      className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                      className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                     >
                       Edit
                     </button>
                   ) : (
                     <Link
                       href={`/dashboard/faqs/${faq.id}/edit`}
-                      className="text-sm font-medium text-ds-accent-muted transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                      className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                     >
                       Edit
                     </Link>

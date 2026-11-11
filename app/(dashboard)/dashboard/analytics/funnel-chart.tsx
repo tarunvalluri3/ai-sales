@@ -19,8 +19,8 @@ export function FunnelChart({ stages, dropOffs }: { stages: FunnelStage[]; dropO
           return (
             <div key={stage.key} className="flex items-center gap-3">
               <span className="w-24 shrink-0 text-xs text-ds-text-secondary">{stage.label}</span>
-              <div className="h-6 flex-1 rounded-ds-sm bg-ds-surface-soft">
-                <div className="h-6 rounded-ds-sm bg-ds-accent" style={{ width: `${widthPercent}%` }} />
+              <div className="h-6 flex-1 bg-ds-surface-soft">
+                <div className="h-6 bg-ds-primary" style={{ width: `${widthPercent}%` }} />
               </div>
               <span className="w-24 shrink-0 text-right text-sm font-medium text-ds-text-primary">
                 {stage.count}

@@ -64,8 +64,8 @@ export default async function AppointmentsPage({
             key={filter.value}
             href={filter.value === "all" ? "/dashboard/appointments" : `/dashboard/appointments?status=${filter.value}`}
             aria-current={status === filter.value ? "true" : undefined}
-            className={`rounded-ds-sm px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
-              status === filter.value ? "bg-ds-accent text-ds-accent-on" : "text-ds-text-secondary hover:bg-ds-surface-soft"
+            className={`px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+              status === filter.value ? "ds-btn-label bg-ds-primary text-ds-primary-on" : "text-ds-text-secondary hover:bg-ds-surface-soft"
             }`}
           >
             {filter.label}

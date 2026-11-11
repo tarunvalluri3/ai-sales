@@ -29,7 +29,7 @@ export function RevealButton({ leadId, businessId }: { leadId: string; businessI
           })
         }
         disabled={isPending}
-        className="text-2xs font-medium text-ds-accent-muted hover:text-ds-text-primary disabled:opacity-50"
+        className="text-2xs font-medium text-ds-text-primary hover:text-ds-text-primary disabled:opacity-50"
       >
         {isPending ? "Revealing…" : "Reveal (logged)"}
       </button>

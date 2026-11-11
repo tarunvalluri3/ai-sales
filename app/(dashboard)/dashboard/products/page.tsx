@@ -36,7 +36,7 @@ export default async function ProductsPage() {
             {pendingProducts.map((product) => (
               <li
                 key={product.id}
-                className="flex items-center justify-between gap-4 rounded-ds-lg border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
+                className="flex items-center justify-between gap-4 border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   {product.image_url ? (
@@ -44,7 +44,7 @@ export default async function ProductsPage() {
                     <img
                       src={product.image_url}
                       alt=""
-                      className="h-12 w-12 shrink-0 rounded-ds-sm object-cover"
+                      className="h-12 w-12 shrink-0 object-cover"
                     />
                   ) : null}
                   <div className="flex min-w-0 flex-col gap-0.5">
@@ -85,7 +85,7 @@ export default async function ProductsPage() {
         <ProductsList products={products} canEdit={canEdit} deleteProductAction={deleteProductAction} />
       )}
 
-      <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex w-full max-w-sm flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         <h2 className="text-sm font-medium text-ds-text-primary">Add a product</h2>
         {canEdit ? (
           <ProductForm action={createProductAction} submitLabel="Add product" pendingLabel="Adding…" />

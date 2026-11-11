@@ -71,7 +71,7 @@ export function IntegrationsList({ integrations }: { integrations: IntegrationRo
           type="button"
           onClick={handleNotifySelected}
           disabled={isNotifying || selected.size === 0}
-          className="rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
+          className="bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
         >
           {isNotifying ? "Notifying…" : `Notify selected (${selected.size})`}
         </button>

@@ -124,13 +124,13 @@ export default async function AnalyticsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Leads by qualification</h2>
           <p className="text-2xs text-ds-text-muted">AI-assigned signal, not verified human truth.</p>
           <QualificationDonut byQualification={leadStats.byQualification} />
         </section>
 
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Leads by status</h2>
           <BreakdownBarChart
             items={[
@@ -143,7 +143,7 @@ export default async function AnalyticsPage() {
           />
         </section>
 
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Messages by role</h2>
           <BreakdownBarChart
             items={[
@@ -172,7 +172,7 @@ export default async function AnalyticsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-medium text-ds-text-primary">Sales funnel</h2>
             <p className="text-2xs text-ds-text-muted">
@@ -183,7 +183,7 @@ export default async function AnalyticsPage() {
           <FunnelChart stages={funnelStages} dropOffs={dropOffs} />
         </section>
 
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-medium text-ds-text-primary">Channel performance</h2>
             <p className="text-2xs text-ds-text-muted">Website, WhatsApp, and Instagram, side by side.</p>
@@ -193,7 +193,7 @@ export default async function AnalyticsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-medium text-ds-text-primary">Top unanswered questions</h2>
             <p className="text-2xs text-ds-text-muted">
@@ -210,7 +210,7 @@ export default async function AnalyticsPage() {
                   <span className="text-ds-text-secondary">
                     <span className="text-ds-text-muted">{index + 1}.</span> {item.question}
                   </span>
-                  <span className="shrink-0 rounded-ds-sm bg-ds-surface-soft px-2 py-0.5 text-2xs font-medium text-ds-text-muted">
+                  <span className="shrink-0 bg-ds-surface-soft px-2 py-0.5 text-2xs font-medium text-ds-text-muted">
                     {item.count}×
                   </span>
                 </li>
@@ -219,7 +219,7 @@ export default async function AnalyticsPage() {
           )}
         </section>
 
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <div className="flex flex-col gap-1">
             <h2 className="text-sm font-medium text-ds-text-primary">Top source pages</h2>
             <p className="text-2xs text-ds-text-muted">
@@ -236,7 +236,7 @@ export default async function AnalyticsPage() {
                     <span className="text-ds-text-muted">{index + 1}.</span> {item.sourceUrl}
                     <span className="ml-1 text-2xs text-ds-text-muted">({item.conversations} conversations)</span>
                   </span>
-                  <span className="shrink-0 rounded-ds-sm bg-ds-surface-soft px-2 py-0.5 text-2xs font-medium text-ds-text-muted">
+                  <span className="shrink-0 bg-ds-surface-soft px-2 py-0.5 text-2xs font-medium text-ds-text-muted">
                     {item.leadRate}% lead conversion
                   </span>
                 </li>

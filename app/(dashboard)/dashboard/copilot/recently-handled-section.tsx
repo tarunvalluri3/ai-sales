@@ -30,7 +30,7 @@ export function RecentlyHandledSection({
   canDismiss: boolean;
 }) {
   return (
-    <details className="rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <details className="border border-ds-border bg-ds-surface p-4">
       <summary className="cursor-pointer text-sm font-semibold text-ds-text-primary">
         Recently handled ({items.length})
       </summary>
@@ -38,7 +38,7 @@ export function RecentlyHandledSection({
         {items.map((item) => (
           <li
             key={item.customerId}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-ds-sm border border-ds-border bg-ds-surface-soft p-3"
+            className="flex flex-wrap items-center justify-between gap-3 border border-ds-border bg-ds-surface-soft p-3"
           >
             <div className="flex flex-col gap-1">
               <Link

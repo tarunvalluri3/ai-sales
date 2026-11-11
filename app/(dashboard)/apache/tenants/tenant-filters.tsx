@@ -13,7 +13,7 @@ export function TenantFilters({ initial }: { initial: { q?: string; plan?: strin
           name="q"
           defaultValue={initial.q ?? ""}
           placeholder="Name, email, phone, or ID"
-          className="w-64 rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="w-64 border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         />
       </label>
       <label className="flex flex-col gap-1 text-xs">
@@ -21,7 +21,7 @@ export function TenantFilters({ initial }: { initial: { q?: string; plan?: strin
         <select
           name="plan"
           defaultValue={initial.plan ?? ""}
-          className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           <option value="">All plans</option>
           {PLAN_KEYS.map((key) => (
@@ -36,7 +36,7 @@ export function TenantFilters({ initial }: { initial: { q?: string; plan?: strin
         <select
           name="status"
           defaultValue={initial.status ?? ""}
-          className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="border border-ds-border bg-ds-surface px-3 py-1.5 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           <option value="">All statuses</option>
           <option value="active">Active</option>
@@ -45,7 +45,7 @@ export function TenantFilters({ initial }: { initial: { q?: string; plan?: strin
       </label>
       <button
         type="submit"
-        className="rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         Filter
       </button>

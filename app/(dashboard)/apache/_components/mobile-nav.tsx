@@ -44,7 +44,7 @@ export function AdminMobileNav({ role }: { role: PlatformAdminRole }) {
           aria-controls={PANEL_ID}
           aria-label={isOpen ? "Close navigation" : "Open navigation"}
           onClick={() => setIsOpen((open) => !open)}
-          className="flex size-9 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="flex size-9 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isOpen ? (
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="size-5">
@@ -88,7 +88,7 @@ export function AdminMobileNav({ role }: { role: PlatformAdminRole }) {
                       href={item.href}
                       onClick={() => setIsOpen(false)}
                       aria-current={active ? "page" : undefined}
-                      className={`flex items-center gap-3 rounded-ds-sm px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+                      className={`flex items-center gap-3 px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                         active
                           ? "bg-dashboard-primary text-dashboard-on-primary"
                           : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"

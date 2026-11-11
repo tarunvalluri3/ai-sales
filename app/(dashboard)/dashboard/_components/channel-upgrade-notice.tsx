@@ -19,12 +19,12 @@ export function ChannelUpgradeNotice({
   showPlansLink?: boolean;
 }) {
   return (
-    <div className="flex flex-col items-start gap-3 rounded-ds-lg border border-ds-border bg-ds-surface px-5 py-4">
+    <div className="flex flex-col items-start gap-3 border border-ds-border bg-ds-surface px-5 py-4">
       <p className="text-sm leading-relaxed text-ds-text-secondary">{message}</p>
       {showPlansLink ? (
         <Link
           href="/pricing"
-          className="rounded-ds-sm border border-ds-border-strong px-4 py-2 text-sm font-semibold text-ds-text-primary transition-colors hover:border-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="border border-ds-border-strong px-4 py-2 text-sm font-semibold text-ds-text-primary transition-colors hover:border-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           See plans
         </Link>

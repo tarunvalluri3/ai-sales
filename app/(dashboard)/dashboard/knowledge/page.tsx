@@ -48,7 +48,7 @@ export default async function KnowledgePage() {
           urlForm={<UrlImportForm />}
         />
       ) : (
-        <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <h2 className="text-sm font-medium text-ds-text-primary">Add knowledge</h2>
           <PermissionNotice />
         </section>

@@ -76,7 +76,7 @@ export default function PricingPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
         <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 text-center">
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
-            <span className="size-1.5 rounded-full bg-ds-accent" aria-hidden="true" />
+            <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
             Pricing
           </span>
           <h1 className="text-3xl font-semibold text-ds-text-primary">Pricing</h1>
@@ -95,9 +95,9 @@ export default function PricingPage() {
           {ORDERED_PLANS.map((plan) => (
             <div
               key={plan.key}
-              className={`flex flex-col gap-5 rounded-ds-lg border p-6 ${
+              className={`flex flex-col gap-5 border p-6 ${
                 plan.featured
-                  ? "border-ds-accent bg-ds-surface-elevated"
+                  ? "border-ds-text-primary bg-ds-surface-elevated"
                   : "border-ds-border bg-ds-surface"
               }`}
             >
@@ -143,9 +143,9 @@ export default function PricingPage() {
 
               <Link
                 href="/sign-up"
-                className={`rounded-ds-sm px-5 py-2.5 text-center text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+                className={`px-5 py-2.5 text-center text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                   plan.featured
-                    ? "bg-ds-accent text-ds-accent-on hover:bg-ds-accent-strong"
+                    ? "ds-btn-label bg-ds-primary text-ds-primary-on hover:bg-ds-primary-hover"
                     : "border border-ds-border-strong text-ds-text-primary hover:border-ds-accent"
                 }`}
               >

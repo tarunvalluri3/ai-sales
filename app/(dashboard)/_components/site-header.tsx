@@ -155,7 +155,7 @@ export function SiteHeader() {
           aria-expanded={isMenuOpen}
           aria-controls={MENU_ID}
           aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-          className="ml-auto flex size-9 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface hover:text-ds-text-primary md:hidden"
+          className="ml-auto flex size-9 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface hover:text-ds-text-primary md:hidden"
         >
           {isMenuOpen ? (
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="size-5">
@@ -176,7 +176,7 @@ export function SiteHeader() {
               key={item.href}
               href={item.href}
               aria-current={pathname === item.href ? "page" : undefined}
-              className={`rounded-ds-sm px-2 py-2.5 text-sm font-medium transition-colors hover:bg-ds-surface hover:text-ds-text-primary ${
+              className={`px-2 py-2.5 text-sm font-medium transition-colors hover:bg-ds-surface hover:text-ds-text-primary ${
                 pathname === item.href ? "text-ds-text-primary" : "text-ds-text-secondary"
               }`}
             >
@@ -198,7 +198,7 @@ export function SiteHeader() {
  * component means the two can't drift apart as the auth states change.
  */
 function AuthActions({ stacked = false }: { stacked?: boolean }) {
-  const primary = `rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong${
+  const primary = `bg-ds-primary px-4 py-2 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover${
     stacked ? " text-center" : ""
   }`;
   const quiet = `text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary${

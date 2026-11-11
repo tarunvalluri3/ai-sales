@@ -55,10 +55,10 @@ export function FeatureFlagsPanel({
 
       <div className="flex flex-col gap-3">
         {flags.length === 0 ? (
-          <p className="rounded-ds-lg border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">No feature flags yet.</p>
+          <p className="border border-dashed border-ds-border py-10 text-center text-sm text-ds-text-secondary">No feature flags yet.</p>
         ) : null}
         {flags.map((flag) => (
-          <div key={flag.key} className="rounded-ds-lg border border-ds-border bg-ds-surface">
+          <div key={flag.key} className="border border-ds-border bg-ds-surface">
             <div className="flex items-center justify-between gap-3 p-4">
               <button
                 type="button"
@@ -142,7 +142,7 @@ function NewFlagForm({ onCreated }: { onCreated: () => void }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-fit items-center gap-2 rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover"
+        className="flex w-fit items-center gap-2 bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover"
       >
         <Plus className="size-4" aria-hidden="true" /> New flag
       </button>
@@ -150,7 +150,7 @@ function NewFlagForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5 text-sm">
           <span className="font-medium text-ds-text-primary">Key</span>
@@ -158,7 +158,7 @@ function NewFlagForm({ onCreated }: { onCreated: () => void }) {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             placeholder="widget.new_chat_bubble"
-            className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 font-mono text-sm text-ds-text-primary"
+            className="border border-ds-border bg-ds-bg px-3 py-2 font-mono text-sm text-ds-text-primary"
           />
         </label>
         <label className="flex flex-col gap-1.5 text-sm">
@@ -166,7 +166,7 @@ function NewFlagForm({ onCreated }: { onCreated: () => void }) {
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
+            className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
           />
         </label>
       </div>
@@ -176,14 +176,14 @@ function NewFlagForm({ onCreated }: { onCreated: () => void }) {
       </label>
       {error ? <p className="text-sm text-ds-danger">{error}</p> : null}
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={() => setOpen(false)} className="rounded-ds-sm px-3 py-1.5 text-sm font-medium text-ds-text-secondary hover:bg-ds-surface-soft">
+        <button type="button" onClick={() => setOpen(false)} className="px-3 py-1.5 text-sm font-medium text-ds-text-secondary hover:bg-ds-surface-soft">
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSubmit}
           disabled={isPending || key.trim().length === 0 || description.trim().length < 3}
-          className="rounded-ds-sm bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
+          className="bg-dashboard-primary px-4 py-1.5 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover disabled:opacity-40"
         >
           {isPending ? "Creating…" : "Create flag"}
         </button>
@@ -242,7 +242,7 @@ function TenantOverrides({
       ) : (
         <ul className="flex flex-col gap-2">
           {overrides.map((o) => (
-            <li key={o.business_id} className="flex items-center justify-between gap-3 rounded-ds-sm bg-ds-surface-soft px-3 py-2 text-sm">
+            <li key={o.business_id} className="flex items-center justify-between gap-3 bg-ds-surface-soft px-3 py-2 text-sm">
               <span className="truncate text-ds-text-primary">{tenantsById.get(o.business_id) ?? o.business_id}</span>
               <div className="flex shrink-0 items-center gap-3">
                 <Badge tone={o.enabled ? "success" : "muted"}>{o.enabled ? "Enabled" : "Disabled"}</Badge>
@@ -260,12 +260,12 @@ function TenantOverrides({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search tenant to add an override…"
-          className="rounded-ds-sm border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
+          className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary"
         />
         {filtered.length > 0 ? (
           <ul className="flex flex-col gap-1">
             {filtered.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-3 rounded-ds-sm border border-ds-border px-3 py-1.5 text-sm">
+              <li key={t.id} className="flex items-center justify-between gap-3 border border-ds-border px-3 py-1.5 text-sm">
                 <span className="truncate text-ds-text-primary">{t.name}</span>
                 {overrideByBusinessId.has(t.id) ? (
                   <span className="text-xs text-ds-text-muted">Already overridden</span>

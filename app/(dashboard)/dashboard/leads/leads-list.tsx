@@ -173,7 +173,7 @@ export function LeadsList({
         role="tablist"
         aria-label="Filter leads by status"
         onKeyDown={handleTabListKeyDown}
-        className="flex w-fit flex-wrap items-center gap-1 rounded-ds-lg border border-ds-border bg-ds-surface p-1"
+        className="flex w-fit flex-wrap items-center gap-1 border border-ds-border bg-ds-surface p-1"
       >
         <TabButton id="all" active={tab === "all"} onSelect={setTab} label="All" count={leads.length} />
         {LEAD_STATUSES.map((status) => (
@@ -198,7 +198,7 @@ export function LeadsList({
                 type="button"
                 aria-pressed={active}
                 onClick={() => toggleActiveTag(tag.id)}
-                className={`rounded-ds-sm transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${active ? "" : "opacity-50 hover:opacity-80"}`}
+                className={`transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${active ? "" : "opacity-50 hover:opacity-80"}`}
               >
                 <Badge tone={tag.color} size="sm">
                   {tag.name}
@@ -210,7 +210,7 @@ export function LeadsList({
             <button
               type="button"
               onClick={() => setActiveTagIds(new Set())}
-              className="text-2xs font-medium text-ds-text-muted underline-offset-2 transition-colors hover:text-ds-text-secondary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="text-2xs font-medium text-ds-text-muted underline-offset-2 transition-colors hover:text-ds-text-secondary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Clear tag filter
             </button>
@@ -231,7 +231,7 @@ export function LeadsList({
                     setTab("all");
                     setActiveTagIds(new Set());
                   }}
-                  className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                  className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
                 >
                   View all leads
                 </button>
@@ -296,7 +296,7 @@ function TabButton({
       aria-controls="leads-tabpanel"
       tabIndex={active ? 0 : -1}
       onClick={() => onSelect(id)}
-      className={`flex items-center gap-1.5 rounded-ds-sm px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 ${
+      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11 ${
         active
           ? "bg-dashboard-primary text-dashboard-on-primary"
           : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
@@ -396,7 +396,7 @@ function LeadRow({
           {lead.source ? (
             <span
               title={lead.source}
-              className="min-w-0 max-w-full truncate rounded-ds-sm bg-ds-surface-soft px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary"
+              className="min-w-0 max-w-full truncate bg-ds-surface-soft px-1.5 py-0.5 text-2xs font-medium text-ds-text-secondary"
             >
               {lead.source}
             </span>
@@ -410,7 +410,7 @@ function LeadRow({
             href={`/dashboard/conversations/${lead.conversation_id}`}
             aria-label="View conversation"
             title="View conversation"
-            className="flex size-7 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            className="flex size-7 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
             <ArrowUpRight className="size-4" aria-hidden="true" />
           </Link>
@@ -421,7 +421,7 @@ function LeadRow({
             aria-controls={detailId}
             aria-label={expanded ? "Hide details" : "Show details"}
             title={expanded ? "Hide details" : "Show details"}
-            className="flex size-7 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            className="flex size-7 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
             {expanded ? <ChevronUp className="size-4" aria-hidden="true" /> : <ChevronDown className="size-4" aria-hidden="true" />}
           </button>
@@ -455,7 +455,7 @@ function LeadRow({
               <LeadTextBlock label="Notes" text={lead.notes} textClassName="text-sm text-ds-text-secondary" />
             ) : null}
             {duplicates.length ? (
-              <p className="rounded-ds-sm bg-ds-accent-soft-bg px-2.5 py-1.5 text-xs text-ds-accent-muted">
+              <p className="bg-ds-surface-raised px-2.5 py-1.5 text-xs text-ds-text-primary">
                 Possibly the same prospect as{" "}
                 {duplicates.map((hint, index) => (
                   <span key={hint.leadId}>
@@ -472,7 +472,7 @@ function LeadRow({
               </p>
             ) : null}
             {lead.follow_up_status ? (
-              <div className="flex flex-col items-start gap-1 rounded-ds-sm bg-ds-surface-elevated px-2.5 py-1.5">
+              <div className="flex flex-col items-start gap-1 bg-ds-surface-elevated px-2.5 py-1.5">
                 <p className="text-xs font-medium text-ds-text-secondary">{FOLLOW_UP_LABEL[lead.follow_up_status]}</p>
                 {lead.follow_up_message ? (
                   <LeadTextBlock label="Message" text={lead.follow_up_message} textClassName="text-xs text-ds-text-muted" />
@@ -520,7 +520,7 @@ function LeadTextBlock({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="inline-flex items-center text-xs font-semibold text-ds-accent-muted underline-offset-2 transition-colors hover:text-ds-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11"
+          className="inline-flex items-center text-xs font-semibold text-ds-text-primary underline-offset-2 transition-colors hover:text-ds-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11"
         >
           {expanded ? "Show less" : "Show more"}
         </button>

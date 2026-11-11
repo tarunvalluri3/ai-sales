@@ -7,7 +7,7 @@ import type { AnnouncementSeverity } from "@/lib/supabase/types";
 type Announcement = { id: string; message: string; severity: AnnouncementSeverity };
 
 const SEVERITY_CLASS: Record<AnnouncementSeverity, string> = {
-  info: "bg-ds-accent-soft-bg text-ds-accent-muted",
+  info: "bg-ds-surface-raised text-ds-text-primary",
   warning: "bg-ds-warning-bg text-ds-warning",
   critical: "bg-ds-danger-bg text-ds-danger",
 };

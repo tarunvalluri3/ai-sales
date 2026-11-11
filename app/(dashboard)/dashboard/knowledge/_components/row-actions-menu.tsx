@@ -58,7 +58,7 @@ export function RowActionsMenu({ label, children }: { label: string; children: R
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-ds-sm text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="flex h-8 w-8 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <circle cx="5" cy="12" r="1.75" fill="currentColor" />
@@ -70,7 +70,7 @@ export function RowActionsMenu({ label, children }: { label: string; children: R
         <div
           ref={panelRef as React.RefObject<HTMLDivElement>}
           role="menu"
-          className="absolute right-0 top-9 z-10 w-64 overflow-hidden rounded-ds-md border border-ds-border bg-ds-surface-elevated py-1 shadow-lg"
+          className="absolute right-0 top-9 z-10 w-64 overflow-hidden rounded-ds-float border border-ds-border bg-ds-surface py-1 shadow-float"
         >
           {children}
         </div>

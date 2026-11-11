@@ -31,12 +31,12 @@ function NewTaskForm() {
         placeholder="New task"
         maxLength={200}
         disabled={isPending}
-        className="flex-1 rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:opacity-60"
+        className="flex-1 border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:opacity-60"
       />
       <button
         type="submit"
         disabled={isPending || !title.trim()}
-        className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60"
+        className="border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60"
       >
         {isPending ? "Adding…" : "Add"}
       </button>
@@ -54,7 +54,7 @@ function TaskRow({ task }: { task: SalesTask }) {
   const isOpen = task.status === "open";
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-ds-sm px-2 py-1.5 hover:bg-ds-surface-soft">
+    <div className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-ds-surface-soft">
       <div className="flex flex-col">
         <span className={`text-sm ${isOpen ? "text-ds-text-primary" : "text-ds-text-muted line-through"}`}>{task.title}</span>
         {task.workflow_run_id ? <span className="text-2xs text-ds-text-muted">Created by a workflow</span> : null}
@@ -62,10 +62,10 @@ function TaskRow({ task }: { task: SalesTask }) {
       {isOpen ? (
         <form action={formAction} className="flex items-center gap-1">
           <input type="hidden" name="id" value={task.id} />
-          <button type="submit" name="status" value="done" disabled={isPending} className="rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60">
+          <button type="submit" name="status" value="done" disabled={isPending} className="px-2 py-1 text-xs font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60">
             Done
           </button>
-          <button type="submit" name="status" value="dismissed" disabled={isPending} className="rounded-ds-sm px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
+          <button type="submit" name="status" value="dismissed" disabled={isPending} className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
             Dismiss
           </button>
           {state.error ? (
@@ -81,7 +81,7 @@ function TaskRow({ task }: { task: SalesTask }) {
 
 export function TasksPanel({ tasks, canEdit }: { tasks: SalesTask[]; canEdit: boolean }) {
   return (
-    <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <h2 className="text-sm font-semibold text-ds-text-primary">Sales tasks</h2>
       {canEdit ? <NewTaskForm /> : null}
       {tasks.length === 0 ? (

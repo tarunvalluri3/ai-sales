@@ -17,9 +17,9 @@ import type { TenantDetail } from "@/lib/admin-tenants";
 import type { PlatformAdminRole } from "@/lib/supabase/types";
 
 const BUTTON_CLASS =
-  "rounded-ds-sm border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 const DANGER_BUTTON_CLASS =
-  "rounded-ds-sm border border-ds-danger/40 px-3 py-1.5 text-xs font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent";
+  "border border-ds-danger/40 px-3 py-1.5 text-xs font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 export function TenantActionsBar({ tenant, adminRole }: { tenant: TenantDetail; adminRole: PlatformAdminRole }) {
   const isOwner = adminRole === "owner";
@@ -77,7 +77,7 @@ export function TenantActionsBar({ tenant, adminRole }: { tenant: TenantDetail; 
                 max={90}
                 value={extendDays}
                 onChange={(e) => setExtendDays(Number(e.target.value))}
-                className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               />
             </label>
           }
@@ -100,7 +100,7 @@ export function TenantActionsBar({ tenant, adminRole }: { tenant: TenantDetail; 
               <select
                 value={newPlan}
                 onChange={(e) => setNewPlan(e.target.value as PlanKey)}
-                className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 {PLAN_KEYS.map((key) => (
                   <option key={key} value={key}>
@@ -135,7 +135,7 @@ export function TenantActionsBar({ tenant, adminRole }: { tenant: TenantDetail; 
               min={1}
               value={limitInput}
               onChange={(e) => setLimitInput(e.target.value)}
-              className="rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-primary focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             />
           </label>
         }

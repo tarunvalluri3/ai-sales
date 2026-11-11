@@ -38,7 +38,7 @@ export function PriorityCard({ item, canManage }: { item: TodayActionItem; canMa
   const { customer, reasons, recommendedAction, title } = item;
 
   return (
-    <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-col">
           <Link href={`/dashboard/customers/${customer.id}`} className="text-base font-semibold text-ds-text-primary hover:underline">
@@ -78,7 +78,7 @@ export function PriorityCard({ item, canManage }: { item: TodayActionItem; canMa
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href={`/dashboard/customers/${customer.id}`}
-          className="w-fit rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label w-fit bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Open conversation
         </Link>

@@ -133,7 +133,7 @@ export default function DataDeletionPage() {
         </Section>
 
         <Section title="Contact">
-          <div className="flex flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-4">
+          <div className="flex flex-col gap-1 border border-ds-border bg-ds-surface p-4">
             <p className="font-medium text-ds-text-primary">Tarun Valluri</p>
             <p>Proprietor and Grievance Officer, Waves Web Studio</p>
             <ContactLines />

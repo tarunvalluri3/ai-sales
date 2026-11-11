@@ -26,7 +26,7 @@ function CancelRunButton({ id }: { id: string }) {
   return (
     <form action={formAction}>
       <input type="hidden" name="id" value={id} />
-      <button type="submit" disabled={isPending} className="text-xs font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg rounded-ds-sm px-2 py-1 disabled:opacity-60">
+      <button type="submit" disabled={isPending} className="text-xs font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg px-2 py-1 disabled:opacity-60">
         {isPending ? "Cancelling…" : "Cancel"}
       </button>
       {state.error ? (
@@ -51,7 +51,7 @@ export function RunsList({ runs, workflowNameById }: { runs: WorkflowRun[]; work
   return (
     <div className="flex flex-col gap-1.5">
       {runs.map((run) => (
-        <div key={run.id} className="flex items-center justify-between gap-3 rounded-ds-sm px-2 py-2 hover:bg-ds-surface-soft">
+        <div key={run.id} className="flex items-center justify-between gap-3 px-2 py-2 hover:bg-ds-surface-soft">
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-medium text-ds-text-primary">{workflowNameById[run.workflow_id] ?? "Deleted workflow"}</span>
             <span className="text-xs text-ds-text-muted">

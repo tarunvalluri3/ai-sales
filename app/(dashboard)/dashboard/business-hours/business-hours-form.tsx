@@ -11,7 +11,7 @@ const initialState: BusinessHoursState = {};
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong disabled:opacity-60";
+  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong disabled:opacity-60";
 
 /**
  * `canEdit` (Phase P2#10, default `true`) disables every input/button
@@ -43,7 +43,7 @@ export function BusinessHoursForm({
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-6">
       {!hasSavedHours ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-warning-bg px-3 py-2 text-sm text-ds-warning">
+        <p role="alert" className="bg-ds-warning-bg px-3 py-2 text-sm text-ds-warning">
           You haven&rsquo;t saved your business hours yet. Until you save, appointment booking will show no
           available times to prospects, even though this form displays default hours below.
         </p>
@@ -69,7 +69,7 @@ export function BusinessHoursForm({
         <p className="text-xs text-ds-text-muted">Times below are in this timezone.</p>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
         {DAY_LABELS.map((label, day) => {
           const existing = byDay.get(day);
           const isOpen = openDays[day];
@@ -124,19 +124,19 @@ export function BusinessHoursForm({
       </div>
 
       {state.error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
           {state.error}
         </p>
       ) : null}
       {state.success ? (
-        <p className="rounded-ds-sm bg-ds-success-bg px-3 py-2 text-sm text-ds-success">Saved.</p>
+        <p className="bg-ds-success-bg px-3 py-2 text-sm text-ds-success">Saved.</p>
       ) : null}
 
       <button
         type="submit"
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="self-start rounded-ds-md bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+        className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
       >
         {isPending ? "Saving…" : "Save"}
       </button>

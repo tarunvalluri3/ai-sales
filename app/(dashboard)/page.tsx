@@ -201,7 +201,7 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
           <div className="flex flex-col gap-6">
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
-              <span className="size-1.5 rounded-full bg-ds-accent" aria-hidden="true" />
+              <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
               AI sales employee
             </span>
             <h1 className="text-4xl leading-tight font-semibold text-ds-text-primary md:text-5xl">
@@ -218,13 +218,13 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <MagneticLink
                 href="/sign-up"
-                className="inline-block rounded-ds-sm bg-ds-accent px-5 py-3 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="ds-btn-label inline-block bg-ds-primary px-5 py-3 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 Get started
               </MagneticLink>
               <Link
                 href="/sign-in"
-                className="rounded-ds-sm border border-ds-border-strong px-5 py-3 text-sm font-semibold text-ds-text-primary transition-colors hover:border-ds-accent-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="border border-ds-border-strong px-5 py-3 text-sm font-semibold text-ds-text-primary transition-colors hover:border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 Sign in
               </Link>
@@ -247,8 +247,8 @@ export default function HomePage() {
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {CHANNELS.map((channel, index) => (
               <Reveal key={channel.label} delay={index * 0.05}>
-                <div className="flex h-full flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-ds-border-strong hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.5)]">
-                  <channel.icon className="size-5 text-ds-accent-muted" aria-hidden="true" />
+                <div className="flex h-full flex-col gap-3 border border-ds-border bg-ds-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-ds-border-strong hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.5)]">
+                  <channel.icon className="size-5 text-ds-text-primary" aria-hidden="true" />
                   <span className="text-sm font-semibold text-ds-text-primary">{channel.label}</span>
                   <p className="text-sm text-ds-text-secondary">{channel.detail}</p>
                 </div>
@@ -275,7 +275,7 @@ export default function HomePage() {
                   }`}
                 >
                   <div className="flex flex-1 items-start gap-4">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-ds-accent-muted text-sm font-semibold text-ds-accent">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-ds-border-strong text-sm font-semibold text-ds-accent">
                       {index + 1}
                     </span>
                     <div className="flex flex-col gap-1">
@@ -345,7 +345,7 @@ export default function HomePage() {
             {CAPABILITIES.map((capability, index) => (
               <Reveal key={capability.title} delay={(index % 3) * 0.05}>
                 <div
-                  className={`flex h-full flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-ds-border-strong hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.5)] ${
+                  className={`flex h-full flex-col gap-4 border border-ds-border bg-ds-surface p-5 transition-all duration-300 hover:-translate-y-1 hover:border-ds-border-strong hover:shadow-[0_16px_40px_-20px_rgba(0,0,0,0.5)] ${
                     capability.span === "wide" ? "lg:col-span-2" : ""
                   }`}
                 >
@@ -374,7 +374,7 @@ export default function HomePage() {
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {BOUNDARIES.map((boundary, index) => (
               <Reveal key={boundary} delay={index * 0.05}>
-                <div className="flex h-full items-start gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+                <div className="flex h-full items-start gap-3 border border-ds-border bg-ds-surface p-5">
                   <span aria-hidden="true" className="mt-0.5 text-ds-danger">
                     ✕
                   </span>
@@ -384,7 +384,7 @@ export default function HomePage() {
             ))}
           </div>
           <Reveal delay={0.15}>
-            <div className="mt-12 rounded-ds-lg border border-ds-border bg-ds-surface p-6">
+            <div className="mt-12 border border-ds-border bg-ds-surface p-6">
               <p className="mb-6 text-center text-sm font-medium text-ds-text-primary">
                 Tenant isolation, enforced at the database level
               </p>
@@ -413,13 +413,13 @@ export default function HomePage() {
       {/* Final CTA */}
       <section className="px-6 py-20">
         <Reveal>
-          <div className="mx-auto flex max-w-3xl flex-col items-center gap-6 rounded-ds-lg border border-ds-border-strong bg-ds-surface px-8 py-14 text-center">
+          <div className="mx-auto flex max-w-3xl flex-col items-center gap-6 border border-ds-border-strong bg-ds-surface px-8 py-14 text-center">
             <h2 className="text-2xl font-semibold text-ds-text-primary md:text-3xl">
               Your business already has the answers. Give your AI employee access to them.
             </h2>
             <MagneticLink
               href="/sign-up"
-              className="inline-block rounded-ds-sm bg-ds-accent px-6 py-3 text-sm font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="ds-btn-label inline-block bg-ds-primary px-6 py-3 text-sm font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Get started
             </MagneticLink>

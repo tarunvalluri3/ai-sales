@@ -21,13 +21,13 @@ function SecretReveal({ secret }: { secret: string }) {
 
   return (
     <div className="flex items-center gap-2">
-      <code className="min-w-0 flex-1 truncate rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2 py-1 font-mono text-xs text-ds-text-primary">
+      <code className="min-w-0 flex-1 truncate border border-ds-border bg-ds-surface-elevated px-2 py-1 font-mono text-xs text-ds-text-primary">
         {revealed ? secret : "•".repeat(24)}
       </code>
       <button
         type="button"
         onClick={() => setRevealed((value) => !value)}
-        className="text-xs font-medium text-ds-accent-muted transition-colors hover:text-ds-accent"
+        className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent"
       >
         {revealed ? "Hide" : "Reveal"}
       </button>
@@ -57,7 +57,7 @@ function WebhookEndpointRow({ endpoint, canEdit = true }: { endpoint: WebhookEnd
               type="submit"
               disabled={isPending || !canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
-              className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               {isPending ? "Deleting…" : "Delete"}
             </button>

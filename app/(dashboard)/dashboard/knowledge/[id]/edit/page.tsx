@@ -24,7 +24,7 @@ export default async function EditKnowledgeDocumentPage({
   return (
     <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
       <h1 className="text-2xl font-semibold text-ds-text-primary">Edit knowledge document</h1>
-      <section className="flex w-full max-w-lg flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex w-full max-w-lg flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         {hasMinRole(orgRole, "org:member") ? (
           <KnowledgeForm
             action={updateKnowledgeDocumentAction}
@@ -60,7 +60,7 @@ export default async function EditKnowledgeDocumentPage({
             {chunks.map((chunk) => (
               <li
                 key={chunk.id}
-                className="max-h-40 overflow-y-auto rounded-ds-sm border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary"
+                className="max-h-40 overflow-y-auto border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary"
               >
                 <p className="mb-1 text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
                   Piece {chunk.chunk_index + 1} · {chunk.char_count} characters

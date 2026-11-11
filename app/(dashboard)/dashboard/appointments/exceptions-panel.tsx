@@ -8,7 +8,7 @@ import { DeleteButton, ROLE_DENIED_TITLE } from "../_components/delete-button";
 const initialState: ExceptionActionState = {};
 
 const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong disabled:opacity-60";
+  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-border-strong disabled:opacity-60";
 
 type Mode = "close_all_day" | "close_range" | "open_override";
 
@@ -128,14 +128,14 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
           type="submit"
           disabled={isCreating || !canEdit}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="rounded-ds-md bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isCreating ? "Adding…" : "Add override"}
         </button>
       </form>
 
       {createState.error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
           {createState.error}
         </p>
       ) : null}

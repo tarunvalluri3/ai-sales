@@ -131,7 +131,7 @@ export function PublishBar({
             setSeenState(state);
             setOpen(true);
           }}
-          className="rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           Publish changes ({status.changeCount})
         </button>
@@ -153,7 +153,7 @@ export function PublishBar({
             role="dialog"
             aria-modal="true"
             aria-labelledby={`${DIALOG_ID}-title`}
-            className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-ds-lg border border-ds-border bg-ds-surface p-5 shadow-xl"
+            className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto border border-ds-border bg-ds-surface p-5 shadow-xl"
           >
             <div className="flex flex-col gap-1">
               <h2 id={`${DIALOG_ID}-title`} className="text-lg font-semibold text-ds-text-primary">
@@ -183,7 +183,7 @@ export function PublishBar({
             </ul>
 
             {freshResult?.error ? (
-              <div role="alert" className="flex flex-col gap-1.5 rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+              <div role="alert" className="flex flex-col gap-1.5 bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
                 <p>{freshResult.error}</p>
                 {freshResult.blockingItems && freshResult.blockingItems.length > 0 ? (
                   <ul className="list-disc pl-4">
@@ -201,14 +201,14 @@ export function PublishBar({
                 type="button"
                 disabled={isPending}
                 onClick={() => setOpen(false)}
-                className="rounded-ds-sm px-3 py-2 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="px-3 py-2 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+                className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
               >
                 {isPending ? "Publishing…" : "Publish"}
               </button>

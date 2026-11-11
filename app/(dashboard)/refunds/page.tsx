@@ -140,7 +140,7 @@ export default function RefundsPolicyPage() {
             reference, and what you would like us to do. We acknowledge every request within{" "}
             <strong>48 hours</strong> and resolve it within <strong>one month</strong> of receipt.
           </p>
-          <div className="flex flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-4">
+          <div className="flex flex-col gap-1 border border-ds-border bg-ds-surface p-4">
             <p className="font-medium text-ds-text-primary">Tarun Valluri</p>
             <p>Proprietor and Grievance Officer, Waves Web Studio</p>
             <p>

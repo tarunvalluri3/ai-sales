@@ -16,7 +16,7 @@ export function AdminHeader() {
 
   return (
     <header className="flex items-center justify-between gap-3 border-b border-ds-border bg-ds-surface px-4 py-2.5">
-      <form action="/apache/tenants" method="get" className="flex min-w-0 max-w-md flex-1 items-center gap-2 rounded-ds-sm border border-ds-border bg-ds-surface-soft px-3 py-1.5">
+      <form action="/apache/tenants" method="get" className="flex min-w-0 max-w-md flex-1 items-center gap-2 border border-ds-border bg-ds-surface-soft px-3 py-1.5">
         <Search className="size-3.5 shrink-0 text-ds-text-muted" aria-hidden="true" />
         <input
           type="search"

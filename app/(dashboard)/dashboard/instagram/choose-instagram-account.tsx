@@ -17,7 +17,7 @@ export function ChooseInstagramAccount({
   const [state, formAction, isPending] = useActionState(chooseInstagramAccountAction, initialState);
 
   return (
-    <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-6">
+    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-6">
       <div className="flex flex-col gap-1">
         <h2 className="text-sm font-semibold text-ds-text-primary">Choose the Instagram account for this business</h2>
         <p className="text-sm text-ds-text-secondary">
@@ -33,7 +33,7 @@ export function ChooseInstagramAccount({
           {accounts.map((account, index) => (
             <label
               key={account.id}
-              className="flex cursor-pointer items-center gap-3 rounded-ds-md border border-ds-border px-3 py-2.5 text-sm text-ds-text-primary has-[:checked]:border-ds-accent has-[:checked]:bg-ds-surface-soft"
+              className="flex cursor-pointer items-center gap-3 border border-ds-border px-3 py-2.5 text-sm text-ds-text-primary has-[:checked]:border-ds-accent has-[:checked]:bg-ds-surface-soft"
             >
               <input type="radio" name="accountId" value={account.id} defaultChecked={index === 0} required />
               <Camera className="size-4 text-ds-text-muted" aria-hidden="true" />
@@ -49,14 +49,14 @@ export function ChooseInstagramAccount({
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex w-fit items-center gap-2 rounded-ds-md bg-ds-accent px-4 py-2.5 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label inline-flex w-fit items-center gap-2 bg-ds-primary px-4 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isPending ? "Connecting…" : "Connect this account"}
         </button>
       </form>
 
       {state.error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           {state.error}
         </p>
       ) : null}

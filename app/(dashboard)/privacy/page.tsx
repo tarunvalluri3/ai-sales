@@ -392,7 +392,7 @@ export default function PrivacyPolicyPage() {
             requirements of the Consumer Protection (E-Commerce) Rules, 2020, the following officer
             handles privacy questions, data rights requests, and complaints about this service:
           </p>
-          <div className="flex flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-4">
+          <div className="flex flex-col gap-1 border border-ds-border bg-ds-surface p-4">
             <p className="font-medium text-ds-text-primary">Tarun Valluri</p>
             <p>Proprietor and Grievance Officer, Waves Web Studio</p>
             <ContactLines />

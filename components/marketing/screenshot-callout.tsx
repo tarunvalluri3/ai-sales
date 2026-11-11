@@ -17,7 +17,7 @@ export function ScreenshotCallout({
       className="absolute flex items-center gap-2"
       style={{ left: `${left}%`, top: `${top}%`, flexDirection: align === "left" ? "row-reverse" : "row" }}
     >
-      <span className="size-2 shrink-0 rounded-full border-2 border-ds-accent bg-ds-bg" aria-hidden="true" />
+      <span className="size-2 shrink-0 rounded-full border-2 border-ds-text-primary bg-ds-bg" aria-hidden="true" />
       <MicroChip tone="accent" className="bg-ds-bg/90 backdrop-blur-sm">
         {label}
       </MicroChip>

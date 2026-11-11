@@ -19,7 +19,7 @@ export default async function ApacheSettingsPage() {
         {admin.role === "owner" ? (
           <AdminTeamPanel team={team} currentUserId={userId} />
         ) : (
-          <p className="rounded-ds-lg border border-dashed border-ds-border p-4 text-sm text-ds-text-secondary">
+          <p className="border border-dashed border-ds-border p-4 text-sm text-ds-text-secondary">
             Only an owner-role admin can view or manage the admin team.
           </p>
         )}

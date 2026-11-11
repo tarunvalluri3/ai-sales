@@ -63,14 +63,14 @@ export default async function WidgetSettingsPage() {
       </section>
 
       {!published ? (
-        <section className="flex flex-col gap-3 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+        <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
           <p className="text-sm font-medium text-ds-text-primary">Not published yet</p>
           <p className="max-w-xl text-sm text-ds-text-secondary">
             Readiness, testing and publishing now happen in the guided setup wizard, not here.
           </p>
           <Link
             href="/onboarding?step=review"
-            className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+            className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
             Go to Test &amp; go live
           </Link>

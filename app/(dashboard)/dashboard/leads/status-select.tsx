@@ -94,7 +94,7 @@ export function StatusSelect({
               onClick={() => {
                 lastChangeRef.current = { from: displayedStatus, to: "lost" };
               }}
-              className="inline-flex items-center rounded-ds-sm bg-ds-danger px-2 py-1 text-xs font-semibold text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger pointer-coarse:min-h-11 pointer-coarse:px-3.5"
+              className="inline-flex items-center bg-ds-danger px-2 py-1 text-xs font-semibold text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger pointer-coarse:min-h-11 pointer-coarse:px-3.5"
             >
               {isPending ? "Saving…" : "Confirm lost"}
             </button>
@@ -103,7 +103,7 @@ export function StatusSelect({
             type="button"
             onClick={() => setConfirmingLost(false)}
             disabled={isPending}
-            className="inline-flex items-center rounded-ds-sm px-2 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:px-3.5"
+            className="inline-flex items-center px-2 py-1 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11 pointer-coarse:px-3.5"
           >
             Cancel
           </button>
@@ -128,7 +128,7 @@ export function StatusSelect({
           disabled={isPending || !canEdit}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
           onChange={handleChange}
-          className="rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-2.5 py-1.5 text-sm text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11 pointer-coarse:py-3"
+          className="border border-ds-border bg-ds-surface-elevated px-2.5 py-1.5 text-sm text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11 pointer-coarse:py-3"
         >
           {LEAD_STATUSES.map((value) => (
             <option key={value} value={value} className="bg-ds-surface-elevated text-ds-text-primary">
@@ -154,7 +154,7 @@ export function StatusSelect({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center font-semibold text-ds-accent-muted underline-offset-2 transition-colors hover:text-ds-accent hover:underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent pointer-coarse:min-h-11"
+              className="inline-flex items-center font-semibold text-ds-text-primary underline-offset-2 transition-colors hover:text-ds-accent hover:underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary pointer-coarse:min-h-11"
             >
               Undo
             </button>

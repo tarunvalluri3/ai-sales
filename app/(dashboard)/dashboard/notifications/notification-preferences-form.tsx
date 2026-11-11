@@ -58,7 +58,7 @@ export function NotificationPreferencesForm({
   return (
     <form action={formAction} className="flex flex-col gap-4">
       {state.error ? (
-        <p role="alert" className="rounded-ds-sm border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary">
+        <p role="alert" className="border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary">
           {state.error}
         </p>
       ) : null}
@@ -67,7 +67,7 @@ export function NotificationPreferencesForm({
         {preferences.map((preference) => (
           <li
             key={preference.category}
-            className="flex flex-col gap-3 rounded-ds-md border border-ds-border bg-ds-surface p-4 md:flex-row md:items-start md:justify-between md:gap-6"
+            className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4 md:flex-row md:items-start md:justify-between md:gap-6"
           >
             <div className="flex min-w-0 flex-col gap-1">
               <p className="text-sm font-medium text-ds-text-primary">{CATEGORY_COPY[preference.category]?.title ?? preference.category}</p>
@@ -78,7 +78,7 @@ export function NotificationPreferencesForm({
                   name={`in_app_${preference.category}`}
                   defaultChecked={preference.inAppEnabled}
                   disabled={!canEdit}
-                  className="size-4 rounded-ds-sm border-ds-border accent-ds-accent"
+                  className="size-4 border-ds-border accent-ds-accent"
                 />
                 Show in the dashboard
               </label>
@@ -118,7 +118,7 @@ export function NotificationPreferencesForm({
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-ds-sm bg-dashboard-primary px-4 py-2 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent disabled:opacity-60"
+            className="bg-dashboard-primary px-4 py-2 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
           >
             {isPending ? "Saving…" : "Save notification settings"}
           </button>

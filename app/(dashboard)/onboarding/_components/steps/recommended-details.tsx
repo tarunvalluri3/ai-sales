@@ -6,7 +6,7 @@ import { BusinessHoursForm } from "../../../dashboard/business-hours/business-ho
 import type { BusinessHours } from "@/lib/supabase/types";
 
 const inputClasses =
-  "rounded-ds-sm border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
 
 const initialState: OptionalDetailsState = {};
 
@@ -34,7 +34,7 @@ export function RecommendedDetails({
   const fieldErrors = state.fieldErrors ?? {};
 
   return (
-    <section className="flex flex-col gap-5 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-5 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold text-ds-text-primary">Add recommended details</h2>
         <p className="text-sm text-ds-text-secondary">
@@ -113,7 +113,7 @@ export function RecommendedDetails({
         <button
           type="submit"
           disabled={isPending}
-          className="self-start rounded-ds-sm bg-ds-accent px-4 py-2 text-sm font-medium text-ds-accent-on transition-colors hover:bg-ds-accent-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+          className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
         >
           {isPending ? "Saving…" : "Save details"}
         </button>

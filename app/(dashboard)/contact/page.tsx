@@ -25,7 +25,7 @@ export default function ContactPage() {
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <div className="flex flex-col gap-3">
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-ds-border-strong px-3 py-1 text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">
-            <span className="size-1.5 rounded-full bg-ds-accent" aria-hidden="true" />
+            <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
             Contact
           </span>
           <h1 className="text-3xl font-semibold text-ds-text-primary">Contact Us</h1>
@@ -112,7 +112,7 @@ export default function ContactPage() {
             officer for any complaint about the service, a billing dispute, or a request concerning
             your personal data.
           </p>
-          <div className="flex flex-col gap-1 rounded-ds-sm border border-ds-border bg-ds-surface p-4 text-sm">
+          <div className="flex flex-col gap-1 border border-ds-border bg-ds-surface p-4 text-sm">
             <p className="font-medium text-ds-text-primary">Tarun Valluri</p>
             <p>Proprietor and Grievance Officer, Waves Web Studio</p>
             <ContactLines />

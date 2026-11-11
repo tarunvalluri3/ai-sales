@@ -52,7 +52,7 @@ export function AddKnowledgeTabs({
   const panels: Record<AddKnowledgeMethod, ReactNode> = { manual: manualForm, file: fileForm, url: urlForm };
 
   return (
-    <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-col gap-1">
         <h2 className="text-sm font-medium text-ds-text-primary">Add knowledge</h2>
         <p className="text-xs text-ds-text-secondary">Choose how you want to add this document.</p>
@@ -62,7 +62,7 @@ export function AddKnowledgeTabs({
         role="tablist"
         aria-label="Add knowledge method"
         onKeyDown={handleTabListKeyDown}
-        className="inline-flex w-fit items-center gap-1 rounded-ds-lg border border-ds-border bg-ds-surface-elevated p-1"
+        className="inline-flex w-fit items-center gap-4 border-b border-ds-border"
       >
         {TABS.map((t) => (
           <button
@@ -74,10 +74,10 @@ export function AddKnowledgeTabs({
             aria-controls={`add-knowledge-panel-${t.id}`}
             tabIndex={method === t.id ? 0 : -1}
             onClick={() => setMethod(t.id)}
-            className={`rounded-ds-sm px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${
+            className={`ds-label -mb-px border-b-2 px-1 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
               method === t.id
-                ? "bg-dashboard-primary text-dashboard-on-primary"
-                : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
+                ? "border-ds-accent text-ds-text-primary"
+                : "border-transparent text-ds-text-muted hover:text-ds-text-primary"
             }`}
           >
             {t.label}

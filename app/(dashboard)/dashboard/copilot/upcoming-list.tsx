@@ -32,7 +32,7 @@ export function UpcomingList({ items, canManage, timezone }: { items: UpcomingAc
   return (
     <ul className="flex flex-col gap-3">
       {items.map((item) => (
-        <li key={item.id} className="flex flex-col gap-2 rounded-ds-lg border border-ds-border bg-ds-surface p-4">
+        <li key={item.id} className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="flex flex-col">
               <Link href={`/dashboard/customers/${item.customerId}`} className="text-sm font-semibold text-ds-text-primary hover:underline">
@@ -54,7 +54,7 @@ export function UpcomingList({ items, canManage, timezone }: { items: UpcomingAc
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href={`/dashboard/customers/${item.customerId}`}
-              className="w-fit rounded-ds-sm bg-ds-accent px-3 py-1.5 text-xs font-semibold text-ds-accent-on transition-colors hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="ds-btn-label w-fit bg-ds-primary px-3 py-1.5 text-xs font-semibold text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Open conversation
             </Link>

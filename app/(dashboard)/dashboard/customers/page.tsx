@@ -37,9 +37,9 @@ export default async function CustomersPage({
         <div className="flex flex-wrap items-center gap-1.5">
           <Link
             href="/dashboard/customers"
-            className={`rounded-ds-sm px-2.5 py-1 text-xs font-medium transition-colors ${
+            className={`px-2.5 py-1 text-xs font-medium transition-colors ${
               !activeSegment
-                ? "bg-ds-accent text-ds-accent-on"
+                ? "ds-btn-label bg-ds-primary text-ds-primary-on"
                 : "bg-ds-surface-soft text-ds-text-secondary hover:text-ds-text-primary"
             }`}
           >
@@ -49,9 +49,9 @@ export default async function CustomersPage({
             <Link
               key={segment.id}
               href={`/dashboard/customers?segment=${segment.id}`}
-              className={`rounded-ds-sm px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium transition-colors ${
                 activeSegment?.id === segment.id
-                  ? "bg-ds-accent text-ds-accent-on"
+                  ? "ds-btn-label bg-ds-primary text-ds-primary-on"
                   : "bg-ds-surface-soft text-ds-text-secondary hover:text-ds-text-primary"
               }`}
               title={segment.description ?? undefined}

@@ -52,12 +52,12 @@ export function InstagramConnectionStatus({
   const broken = connection.status === "disconnected" || connection.status === "error";
 
   return (
-    <section className="flex flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
             aria-hidden="true"
-            className="flex size-10 shrink-0 items-center justify-center rounded-ds-md bg-[linear-gradient(135deg,#feda75_0%,#fa7e1e_25%,#d62976_50%,#962fbf_75%,#4f5bd5_100%)] text-white"
+            className="flex size-10 shrink-0 items-center justify-center bg-[linear-gradient(135deg,#feda75_0%,#fa7e1e_25%,#d62976_50%,#962fbf_75%,#4f5bd5_100%)] text-white"
           >
             <Camera className="size-5" />
           </div>
@@ -91,7 +91,7 @@ export function InstagramConnectionStatus({
                 type="submit"
                 disabled={isPending}
                 autoFocus
-                className="rounded-ds-sm bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+                className="bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
               >
                 {isPending ? "Disconnecting…" : "Confirm disconnect"}
               </button>
@@ -100,7 +100,7 @@ export function InstagramConnectionStatus({
               type="button"
               onClick={() => setConfirming(false)}
               disabled={isPending}
-              className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Cancel
             </button>
@@ -111,7 +111,7 @@ export function InstagramConnectionStatus({
               href={INSTAGRAM_CONNECT_PATH}
               aria-disabled={!canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
-              className={`rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent ${!canEdit ? "pointer-events-none opacity-60" : ""}`}
+              className={`px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${!canEdit ? "pointer-events-none opacity-60" : ""}`}
             >
               Reconnect
             </a>
@@ -120,7 +120,7 @@ export function InstagramConnectionStatus({
               onClick={() => setConfirming(true)}
               disabled={!canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
-              className="rounded-ds-sm px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Disconnect
             </button>
@@ -128,7 +128,7 @@ export function InstagramConnectionStatus({
         )}
       </div>
       {connection.status === "connected" ? (
-        <div className="flex items-start gap-2 rounded-ds-sm bg-ds-surface-soft px-3 py-2 text-xs text-ds-text-secondary">
+        <div className="flex items-start gap-2 bg-ds-surface-soft px-3 py-2 text-xs text-ds-text-secondary">
           <CheckSquare aria-hidden="true" className="mt-px size-3.5 shrink-0 text-ds-text-muted" />
           <p>
             <span className="font-medium text-ds-text-primary">Not getting DMs? Check message access.</span>{" "}
@@ -137,12 +137,12 @@ export function InstagramConnectionStatus({
         </div>
       ) : null}
       {broken ? (
-        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           <span>{describeBrokenConnection(connection)}</span>
           {canEdit ? (
             <a
               href={INSTAGRAM_CONNECT_PATH}
-              className="rounded-ds-sm bg-ds-accent px-3 py-1.5 font-medium text-ds-accent-on hover:bg-ds-accent-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-accent"
+              className="ds-btn-label bg-ds-primary px-3 py-1.5 font-medium text-ds-primary-on hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
             >
               Reconnect Instagram
             </a>
@@ -150,7 +150,7 @@ export function InstagramConnectionStatus({
         </div>
       ) : null}
       {state.error ? (
-        <p role="alert" className="rounded-ds-sm bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           {state.error}
         </p>
       ) : null}

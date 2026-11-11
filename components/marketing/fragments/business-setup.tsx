@@ -21,7 +21,7 @@ export function BusinessSetup() {
             {CATALOG.map((item) => (
               <li
                 key={item}
-                className="rounded-ds-sm bg-ds-surface-elevated px-2.5 py-1.5 text-xs text-ds-text-secondary"
+                className="bg-ds-surface-elevated px-2.5 py-1.5 text-xs text-ds-text-secondary"
               >
                 {item}
               </li>

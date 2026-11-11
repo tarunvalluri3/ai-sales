@@ -22,7 +22,7 @@ export default async function EditFaqPage({
   return (
     <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
       <h1 className="text-2xl font-semibold text-ds-text-primary">Edit FAQ</h1>
-      <section className="flex w-full max-w-sm flex-col gap-4 rounded-ds-lg border border-ds-border bg-ds-surface p-5">
+      <section className="flex w-full max-w-sm flex-col gap-4 border border-ds-border bg-ds-surface p-5">
         {hasMinRole(orgRole, "org:member") ? (
           <FaqForm
             action={updateFaqAction}

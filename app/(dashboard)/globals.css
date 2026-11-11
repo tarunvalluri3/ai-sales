@@ -232,3 +232,53 @@ html {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Primary button typography and motion (Web Studio): Space Grotesk label,
+ * uppercase, wide tracking; hover scales up slightly and a small Signal Red
+ * "node" dot appears; active scales down. Applied (via className) to every
+ * paper/ink-filled button. Disabled buttons get no hover effects.
+ */
+.ds-btn-label {
+  position: relative;
+  font-family: var(--font-space), system-ui, sans-serif;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  transition:
+    transform 200ms ease,
+    background-color 200ms ease,
+    color 200ms ease,
+    border-color 200ms ease;
+}
+
+.ds-btn-label::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--ds-accent);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+
+.ds-btn-label:hover:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(1.02);
+}
+
+.ds-btn-label:hover:not(:disabled):not([aria-disabled="true"])::after {
+  opacity: 1;
+}
+
+.ds-btn-label:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: scale(0.98);
+}
+
+.ds-btn-label:disabled,
+.ds-btn-label[aria-disabled="true"] {
+  opacity: 0.4;
+}
