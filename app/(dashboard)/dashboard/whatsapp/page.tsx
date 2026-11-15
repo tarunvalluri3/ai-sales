@@ -12,6 +12,15 @@ import { WhatsappConnectionStatus } from "./whatsapp-connection-status";
 import { WhatsappSetupGuide } from "./whatsapp-setup-guide";
 import { PermissionNotice } from "../_components/state-views";
 import { ChannelUpgradeNotice } from "../_components/channel-upgrade-notice";
+import Link from "next/link";
+import { ArrowUpRight, Box, Headset, MessageCircleMore, Users } from "lucide-react";
+import { PageHeader, btnOutline, linkAccent } from "../_components/ui";
+
+const CHANNEL_POINTS = [
+  { icon: Box, label: "Answers product questions" },
+  { icon: Users, label: "Captures leads" },
+  { icon: Headset, label: "Hands over to your team" },
+];
 
 const TEMPLATE_PURPOSE: Record<WhatsappTemplateKind, string> = {
   appointment_confirmed: "Appointment confirmed",
@@ -52,26 +61,50 @@ export default async function WhatsappPage() {
     };
   });
 
-  return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">WhatsApp</h1>
-        <p className="max-w-2xl text-sm text-ds-text-secondary">
-          Let prospects message your AI sales employee on WhatsApp, the same way they can on your
-          website. Connect a number from{" "}
-          <a
-            href={WHATSAPP_MANAGER_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="font-medium text-ds-accent underline underline-offset-2"
-          >
-            WhatsApp Manager
-          </a>{" "}
-          below.
-        </p>
+  const connectionArea = connection ? (
+    <WhatsappConnectionStatus connection={connection} canEdit={canEdit} />
+  ) : !entitled ? (
+    <ChannelUpgradeNotice message={channelNotEntitledMessage("whatsapp", entitlement)} />
+  ) : canEdit ? (
+    embeddedSignup ? (
+      <div className="flex flex-col gap-4">
+        <EmbeddedSignupButton
+          appId={embeddedSignup.appId}
+          configId={embeddedSignup.configId}
+          graphVersion={embeddedSignup.graphVersion}
+        />
+        <details className="dx-card group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary [&::-webkit-details-marker]:hidden">
+            Already have a system-user token? Connect manually instead
+            <span aria-hidden="true" className="text-ds-text-secondary transition-transform group-open:rotate-180">
+              ▾
+            </span>
+          </summary>
+          <div className="border-t border-ds-border p-5">
+            <ConnectWhatsappForm />
+          </div>
+        </details>
       </div>
+    ) : (
+      <ConnectWhatsappForm />
+    )
+  ) : (
+    <PermissionNotice />
+  );
 
-      {canEdit && entitled ? <WhatsappSetupGuide hasConnection={connection != null} /> : null}
+  return (
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeader
+        icon={MessageCircleMore}
+        title="WhatsApp"
+        description="Your AI sales employee, on your business WhatsApp number."
+        actions={
+          <a href={WHATSAPP_MANAGER_URL} target="_blank" rel="noreferrer" className={btnOutline}>
+            WhatsApp Manager
+            <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
+          </a>
+        }
+      />
 
       {/* An already-connected number without WhatsApp access (Starter, or a
           lapsed trial/plan) stays visible and can be disconnected, but the
@@ -83,35 +116,42 @@ export default async function WhatsappPage() {
         />
       ) : null}
 
-      {connection ? (
-        <WhatsappConnectionStatus connection={connection} canEdit={canEdit} />
-      ) : !entitled ? (
-        <ChannelUpgradeNotice message={channelNotEntitledMessage("whatsapp", entitlement)} />
-      ) : canEdit ? (
-        embeddedSignup ? (
-          <div className="flex flex-col gap-4">
-            <EmbeddedSignupButton
-              appId={embeddedSignup.appId}
-              configId={embeddedSignup.configId}
-              graphVersion={embeddedSignup.graphVersion}
-            />
-            <details className="border border-ds-border bg-ds-surface">
-              <summary className="cursor-pointer px-5 py-3 text-sm font-medium text-ds-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
-                Already have a system-user token? Connect manually instead
-              </summary>
-              <div className="border-t border-ds-border p-5">
-                <ConnectWhatsappForm />
-              </div>
-            </details>
+      {/* Until a number is connected the setup guide leads; afterwards it
+          recedes to the bottom of the page. */}
+      {!connection && canEdit && entitled ? <WhatsappSetupGuide hasConnection={false} /> : null}
+
+      <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">{connectionArea}</div>
+
+        <aside className="flex flex-col gap-3 rounded-3xl bg-ds-surface-soft dx-card-pad">
+          <h2 className="flex items-center gap-3 text-lg leading-tight font-medium text-ds-text-primary">
+            <MessageCircleMore className="size-6 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            One AI, across your channels
+          </h2>
+          <p className="text-sm text-ds-text-secondary">
+            Your approved products, services and FAQs power replies here too.
+          </p>
+          <ul className="flex flex-col gap-2.5 py-1">
+            {CHANNEL_POINTS.map((point) => (
+              <li key={point.label} className="flex items-center gap-4 text-sm font-medium text-ds-text-primary">
+                <point.icon className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                {point.label}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-auto flex flex-col gap-1.5 border-t border-ds-primary/15 pt-3">
+            <p className="text-sm text-ds-text-secondary">Manage conversations from your shared inbox.</p>
+            <Link href="/dashboard/conversations" className={`${linkAccent} self-start text-base`}>
+              Open conversations
+              <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
+            </Link>
           </div>
-        ) : (
-          <ConnectWhatsappForm />
-        )
-      ) : (
-        <PermissionNotice />
-      )}
+        </aside>
+      </div>
 
       {connection && entitled ? <WhatsappTemplatesPanel rows={templateRows} canEdit={canEdit} /> : null}
+
+      {connection && canEdit && entitled ? <WhatsappSetupGuide hasConnection /> : null}
     </div>
   );
 }

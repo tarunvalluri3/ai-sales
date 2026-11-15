@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { getProduct } from "@/lib/products";
 import { ProductForm } from "../../product-form";
 import { updateProductAction } from "../../actions";
 import { PermissionNotice } from "../../../_components/state-views";
+import { Card, PageHeader } from "../../../_components/ui";
 
 export default async function EditProductPage({
   params,
@@ -20,9 +23,16 @@ export default async function EditProductPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
-      <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Edit product</h1>
-      <section className="flex w-full max-w-sm flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+    <div className="flex flex-1 flex-col gap-6">
+      <Link
+        href="/dashboard/products"
+        className="inline-flex w-fit items-center gap-2 rounded-md text-base text-ds-text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
+      >
+        <ArrowLeft strokeWidth={1.75} className="size-4" aria-hidden="true" />
+        Products
+      </Link>
+      <PageHeader title="Edit product" description={product.name} />
+      <Card className="flex w-full max-w-xl flex-col gap-4">
         {hasMinRole(orgRole, "org:member") ? (
           <ProductForm
             action={updateProductAction}
@@ -39,7 +49,7 @@ export default async function EditProductPage({
         ) : (
           <PermissionNotice />
         )}
-      </section>
+      </Card>
     </div>
   );
 }

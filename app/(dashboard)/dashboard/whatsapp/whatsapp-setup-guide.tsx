@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown, ClipboardList } from "lucide-react";
 import {
   BUSINESS_MANAGER_URL,
   DEVELOPER_APPS_URL,
@@ -8,10 +9,10 @@ import {
   WHATSAPP_MANAGER_URL,
 } from "./connect-whatsapp-form";
 
-const linkClasses = "font-medium text-ds-accent underline underline-offset-2";
+const linkClasses = "font-medium text-ds-primary underline underline-offset-4";
 
 function StepDone() {
-  return <span className="text-xs font-medium text-ds-success">✓ Done</span>;
+  return <span className="dx-pill bg-ds-success-bg px-2.5 py-0.5 text-xs font-medium text-ds-success">Done</span>;
 }
 
 export function WhatsappSetupGuide({ hasConnection }: { hasConnection: boolean }) {
@@ -21,24 +22,20 @@ export function WhatsappSetupGuide({ hasConnection }: { hasConnection: boolean }
   const [open, setOpen] = useState(!hasConnection);
 
   return (
-    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-col gap-1">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="flex items-center justify-between gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          aria-expanded={open}
-        >
-          <h2 className="text-lg font-medium text-ds-text-primary">Set up WhatsApp with Meta</h2>
-          <span className="shrink-0 text-sm text-ds-text-muted">{open ? "Hide" : "Show"}</span>
-        </button>
-        <p className="text-sm text-ds-text-secondary">
-          A step-by-step guide to creating everything the form below needs, directly from Meta.
-          Takes about 10 minutes the first time.
-        </p>
-      </div>
+    <section className="dx-card flex flex-col px-5 py-4">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
+        aria-expanded={open}
+      >
+        <ClipboardList className="size-5 shrink-0 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
+        <h2 className="dx-title text-lg">Set up WhatsApp with Meta</h2>
+        <span className="text-sm text-ds-text-secondary">~10 min · Business account, app and number setup</span>
+        <ChevronDown strokeWidth={1.75} className={`ml-auto size-5 shrink-0 text-ds-text-primary transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
 
-      <div className={open ? "flex flex-col gap-6" : "hidden"}>
+      <div className={open ? "mt-4 flex flex-col gap-5 border-t border-ds-border pt-4" : "hidden"}>
         <div className="flex flex-col gap-1">
           <h3 className="text-sm font-medium text-ds-text-primary">Have a Meta Business account?</h3>
           <p className="text-sm text-ds-text-secondary">

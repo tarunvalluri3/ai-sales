@@ -9,10 +9,12 @@ import { MessagesSquare } from "lucide-react";
  */
 export default function ConversationsIndexPage() {
   return (
-    <div className="hidden h-full flex-1 flex-col items-center justify-center gap-2 bg-ds-bg p-6 text-center md:flex">
-      <MessagesSquare className="size-8 text-ds-text-muted" aria-hidden="true" />
+    <div className="hidden h-full flex-1 flex-col items-center justify-center gap-2 bg-ds-surface p-6 text-center md:flex">
+      <span className="mb-1 flex size-10 items-center justify-center rounded-full bg-ds-surface-soft text-ds-text-primary">
+        <MessagesSquare className="size-5" strokeWidth={1.75} aria-hidden="true" />
+      </span>
       <p className="text-sm font-medium text-ds-text-primary">Select a conversation</p>
-      <p className="max-w-sm text-xs text-ds-text-muted">
+      <p className="max-w-sm text-xs text-ds-text-secondary">
         Pick a conversation from the list to see the transcript and prospect details.
       </p>
     </div>

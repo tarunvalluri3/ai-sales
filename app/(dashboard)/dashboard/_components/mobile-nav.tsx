@@ -1,18 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { NAV_GROUPS, isNavItemActive, formatAttentionBadge } from "./nav-items";
-import { useAttentionCount } from "./attention-provider";
+import { Menu, X } from "lucide-react";
+import { NavList, SidebarBrand } from "./sidebar";
 import { useFocusTrap } from "./use-focus-trap";
 
 const PANEL_ID = "dashboard-mobile-nav";
 
+/**
+ * Below `md` the sidebar is replaced by this menu button (rendered at the
+ * start of the dashboard header) and a slide-over drawer holding the same
+ * `NavList` the desktop sidebar renders.
+ */
 export function MobileNav({ businessName }: { businessName: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const pathname = usePathname();
-  const attentionCount = useAttentionCount();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
   const panelRef = useFocusTrap(isOpen);
@@ -36,38 +37,17 @@ export function MobileNav({ businessName }: { businessName: string }) {
 
   return (
     <div className="md:hidden">
-      <div className="flex items-center justify-between border-b border-ds-border bg-ds-surface px-4 py-3">
-        <p className="truncate text-sm font-medium text-ds-text-primary">{businessName}</p>
-        <button
-          ref={triggerRef}
-          type="button"
-          aria-expanded={isOpen}
-          aria-controls={PANEL_ID}
-          aria-label={isOpen ? "Close navigation" : "Open navigation"}
-          onClick={() => setIsOpen((open) => !open)}
-          className="flex size-9 shrink-0 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-        >
-          {isOpen ? (
-            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="size-5">
-              <path
-                d="M5 5l10 10M15 5 5 15"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          ) : (
-            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="size-5">
-              <path
-                d="M3 5h14M3 10h14M3 15h14"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          )}
-        </button>
-      </div>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={PANEL_ID}
+        aria-label={isOpen ? "Close navigation" : "Open navigation"}
+        onClick={() => setIsOpen((open) => !open)}
+        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-ds-border bg-ds-surface text-ds-text-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
+      >
+        {isOpen ? <X strokeWidth={1.75} className="size-5" aria-hidden="true" /> : <Menu strokeWidth={1.75} className="size-5" aria-hidden="true" />}
+      </button>
 
       {isOpen ? (
         <>
@@ -76,7 +56,7 @@ export function MobileNav({ businessName }: { businessName: string }) {
             aria-label="Close navigation"
             tabIndex={-1}
             onClick={() => setIsOpen(false)}
-            className="fixed inset-0 z-40 bg-ds-scrim"
+            className="fixed inset-0 z-40 rounded-none bg-ds-scrim"
           />
           <nav
             id={PANEL_ID}
@@ -84,48 +64,12 @@ export function MobileNav({ businessName }: { businessName: string }) {
             aria-label="Dashboard, mobile"
             aria-modal="true"
             role="dialog"
-            className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col gap-1 overflow-y-auto border-r border-ds-border bg-ds-surface p-4"
+            className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-4 overflow-y-auto border-r border-ds-border bg-ds-surface px-3 py-6"
           >
-            {NAV_GROUPS.map((group, groupIndex) => (
-              <div
-                key={group.label ?? `group-${groupIndex}`}
-                className={`flex flex-col gap-1 ${groupIndex === 0 ? "" : "mt-4"}`}
-              >
-                {group.label ? (
-                  <p className="ds-label mb-1 px-3 text-ds-text-faint">
-                    {group.label}
-                  </p>
-                ) : null}
-                {group.items.map((item) => {
-                  const active = isNavItemActive(pathname, item.href);
-                  const showBadge = item.href === "/dashboard/conversations" && attentionCount > 0;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setIsOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex items-center gap-3 border-l-2 px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
-                        active
-                          ? "border-ds-accent bg-ds-surface-raised text-ds-text-primary"
-                          : "border-transparent text-ds-text-secondary hover:bg-ds-surface-raised hover:text-ds-text-primary"
-                      }`}
-                    >
-                      <item.icon className="size-4 shrink-0" strokeWidth={2} strokeLinecap="square" aria-hidden="true" />
-                      <span className="flex-1">{item.label}</span>
-                      {showBadge ? (
-                        <span
-                          aria-label={`${attentionCount} conversation${attentionCount === 1 ? "" : "s"} need attention`}
-                          className="bg-ds-warning px-1.5 py-0.5 text-2xs font-medium text-ds-bg"
-                        >
-                          {formatAttentionBadge(attentionCount)}
-                        </span>
-                      ) : null}
-                    </Link>
-                  );
-                })}
-              </div>
-            ))}
+            <SidebarBrand businessName={businessName} />
+            <div className="flex flex-col">
+              <NavList onNavigate={() => setIsOpen(false)} />
+            </div>
           </nav>
         </>
       ) : null}

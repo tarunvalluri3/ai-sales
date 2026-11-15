@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { btnPrimary } from "./ui";
 
 /**
  * Shared empty-state card (Phase 25c) -- replaces the two near-duplicate
@@ -16,9 +17,9 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 border border-ds-border bg-ds-surface px-4 py-14 text-center">
+    <div className="dx-card flex flex-col items-center gap-3 px-4 py-14 text-center">
       <p className="text-sm font-medium text-ds-text-primary">{title}</p>
-      {description ? <p className="max-w-sm text-xs text-ds-text-muted">{description}</p> : null}
+      {description ? <p className="max-w-sm text-xs text-ds-text-secondary">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );
@@ -31,10 +32,16 @@ export function EmptyState({
  * up visually nested inside another card. No border here, just a muted
  * icon + label, sized to sit naturally in a compact slot.
  */
-export function InlineEmptyState({ icon: Icon, label }: { icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>; label: string }) {
+export function InlineEmptyState({
+  icon: Icon,
+  label,
+}: {
+  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean; strokeWidth?: number }>;
+  label: string;
+}) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
-      <Icon className="size-5 text-ds-text-muted" aria-hidden={true} />
+      <Icon className="size-5 text-ds-text-muted" strokeWidth={1.75} aria-hidden={true} />
       <p className="text-sm text-ds-text-muted">{label}</p>
     </div>
   );
@@ -59,15 +66,15 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="flex flex-col items-center gap-2 border border-ds-danger/40 bg-ds-danger-bg px-4 py-14 text-center"
+      className="flex flex-col items-center gap-3 rounded-3xl border border-ds-danger/30 bg-ds-danger-bg px-4 py-14 text-center"
     >
       <p className="text-sm font-medium text-ds-text-primary">{title}</p>
-      <p className="max-w-sm text-xs text-ds-text-muted">{description}</p>
+      <p className="max-w-sm text-xs text-ds-text-secondary">{description}</p>
       {onRetry ? (
         <button
           type="button"
           onClick={onRetry}
-          className="ds-btn-label mt-2 bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className={`${btnPrimary} mt-2`}
         >
           Try again
         </button>
@@ -90,7 +97,7 @@ export function PermissionNotice({
   message?: string;
 }) {
   return (
-    <p className="border border-ds-border bg-ds-surface px-4 py-3 text-xs text-ds-text-muted">
+    <p className="rounded-2xl bg-ds-surface-soft px-4 py-3 text-sm leading-relaxed text-ds-text-secondary">
       {message}
     </p>
   );
@@ -98,28 +105,37 @@ export function PermissionNotice({
 
 /** A single skeleton block. Widths/heights are passed via className so callers can compose page-shaped skeletons without a prop explosion. */
 function SkeletonBlock({ className = "" }: { className?: string }) {
-  return <div aria-hidden="true" className={`bg-ds-surface-raised ${className}`} />;
+  return <div aria-hidden="true" className={`rounded-xl bg-ds-surface-soft ${className}`} />;
 }
 
 /**
  * Generic page-loading skeleton (Phase 25c) -- used by
- * app/(dashboard)/dashboard/loading.tsx, which Next.js wraps around
- * every nested dashboard page during navigation. Deliberately generic
- * (a heading bar + a few row-shaped blocks) rather than page-specific,
- * since one loading.tsx here covers all of them.
+ * app/(dashboard)/dashboard/loading.tsx, which Next.js wraps around every
+ * nested dashboard page during navigation. Shaped like the common page:
+ * title block, then the "work + aside" split most sections use, so the
+ * swap to real content does not jump.
  */
 export function DashboardLoadingSkeleton() {
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6" aria-busy="true" aria-live="polite">
+    <div className="flex flex-1 flex-col gap-8" aria-busy="true" aria-live="polite">
       <span className="sr-only">Loading…</span>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 pb-1">
         <SkeletonBlock className="h-7 w-48" />
         <SkeletonBlock className="h-4 w-80 max-w-full" />
       </div>
-      <div className="flex flex-col gap-3">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <SkeletonBlock key={index} className="h-20 w-full" />
-        ))}
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="dx-card dx-card-pad flex flex-col gap-4">
+          <SkeletonBlock className="h-5 w-40" />
+          {Array.from({ length: 5 }).map((_, index) => (
+            <SkeletonBlock key={index} className="h-10 w-full" />
+          ))}
+        </div>
+        <div className="dx-card dx-card-pad hidden flex-col gap-4 xl:flex">
+          <SkeletonBlock className="h-5 w-32" />
+          <SkeletonBlock className="h-10 w-full" />
+          <SkeletonBlock className="h-10 w-full" />
+          <SkeletonBlock className="h-24 w-full" />
+        </div>
       </div>
     </div>
   );

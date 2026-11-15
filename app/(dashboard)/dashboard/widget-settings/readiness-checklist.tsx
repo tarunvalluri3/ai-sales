@@ -14,15 +14,15 @@ const initialDismissalState: ReadinessDismissalActionState = {};
 
 function StatusIcon({ item }: { item: ReadinessItem }) {
   if (item.status === "met") {
-    return <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-success" />;
+    return <CheckCircle2 strokeWidth={1.75} aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-success" />;
   }
   if (item.status === "not_applicable") {
-    return <MinusCircle aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-text-muted" />;
+    return <MinusCircle strokeWidth={1.75} aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-text-muted" />;
   }
   if (item.tier === "required") {
-    return <AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-warning" />;
+    return <AlertCircle strokeWidth={1.75} aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-warning" />;
   }
-  return <Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-text-muted" />;
+  return <Circle strokeWidth={1.75} aria-hidden className="mt-0.5 size-4 shrink-0 text-ds-text-muted" />;
 }
 
 function statusLabel(item: ReadinessItem): string {

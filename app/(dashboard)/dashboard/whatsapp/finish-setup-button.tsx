@@ -21,7 +21,7 @@ export function FinishSetupButton() {
             else setResult({ tone: "error", text: outcome.message ?? "That step still didn't finish." });
           })
         }
-        className="ds-btn-label self-start bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="ds-btn-label inline-flex h-9 items-center self-start rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
         {isPending ? "Finishing setup…" : "Finish setup"}
       </button>
@@ -29,7 +29,7 @@ export function FinishSetupButton() {
         {result ? (
           <p
             role={result.tone === "error" ? "alert" : undefined}
-            className={`px-3 py-2 text-xs ${result.tone === "error" ? "bg-ds-danger-bg text-ds-danger" : "bg-ds-success-bg text-ds-success"}`}
+            className={`rounded-xl px-3 py-2 text-xs ${result.tone === "error" ? "bg-ds-danger-bg text-ds-danger" : "bg-ds-success-bg text-ds-success"}`}
           >
             {result.text}
           </p>

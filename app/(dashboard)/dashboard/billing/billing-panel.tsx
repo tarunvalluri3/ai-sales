@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { AlertTriangle } from "lucide-react";
@@ -123,6 +123,7 @@ export function BillingPanel({
   onConfirmingChange,
   metaChannelNames,
   connectedChannels,
+  aside,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -137,6 +138,8 @@ export function BillingPanel({
   metaChannelNames: string | null;
   /** WhatsApp / Instagram connected right now, for the "you'd lose it on Starter" warning. */
   connectedChannels: ConnectedMetaChannels;
+  /** Optional card rendered beside the current-plan card (the Billing page's "Invoice details" summary). */
+  aside?: ReactNode;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -310,7 +313,7 @@ export function BillingPanel({
       : null;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="@container flex flex-col gap-4">
       {/* Razorpay's Checkout script, loaded only on this page rather than
           across the whole dashboard: it is a third-party script that most
           visits never need. `onReady` rather than `onLoad` because it also
@@ -331,52 +334,60 @@ export function BillingPanel({
       ) : null}
 
       {confirming ? (
-        <p role="status" className="border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary">
+        <p role="status" className="rounded-2xl bg-ds-success-bg px-4 py-3 text-sm text-ds-success">
           Confirming your payment with our server… this usually takes a few seconds.
         </p>
       ) : null}
 
-      <CurrentPlanCard
-        entitlement={entitlement}
-        usage={usage}
-        percentUsed={percentUsed}
-        nextChargePaise={nextChargePaise}
-        gstRatePercent={gstRatePercent}
-        updatePaymentMethod={{
-          action: paymentMethodFormAction,
-          pending: paymentMethodPending || confirming || checkoutOpen,
-          ready: configured && scriptReady,
-        }}
-      />
+      <div className={aside ? "grid grid-cols-1 items-stretch gap-4 @5xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]" : undefined}>
+        <CurrentPlanCard
+          entitlement={entitlement}
+          usage={usage}
+          percentUsed={percentUsed}
+          nextChargePaise={nextChargePaise}
+          gstRatePercent={gstRatePercent}
+          updatePaymentMethod={{
+            action: paymentMethodFormAction,
+            pending: paymentMethodPending || confirming || checkoutOpen,
+            ready: configured && scriptReady,
+          }}
+        />
+        {aside}
+      </div>
 
-      <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+      <section className="dx-card flex flex-col gap-4 dx-card-pad">
         <div className="flex flex-col gap-1">
-          <h2 className="text-base font-medium text-ds-text-primary">
-            {isSubscribed ? "Change your plan" : "Choose a plan"}
-          </h2>
-          <p className="text-sm text-ds-text-secondary">
+          <h2 className="dx-title">{isSubscribed ? "Choose your plan" : "Choose a plan"}</h2>
+          <p className="dx-subtitle">
             Upgrades take effect straight away and you pay only the difference for the rest of your
             period. Downgrades take effect at your next renewal, so you keep what you have paid for.
           </p>
           {trialNote ? <p className="text-sm font-medium text-ds-text-primary">{trialNote}</p> : null}
         </div>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium text-ds-text-primary">Billing period</legend>
-          <div className="flex gap-2">
+        <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+          <legend className="sr-only">Billing period</legend>
+          <div className="inline-flex w-fit gap-1 rounded-full border border-ds-border-strong bg-ds-surface p-1">
             {(["monthly", "annual"] as const).map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setInterval(value)}
                 aria-pressed={interval === value}
-                className={`border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
-                  interval === value
-                    ? "border-ds-text-primary bg-ds-surface-raised text-ds-text-primary"
-                    : "border-ds-border text-ds-text-secondary hover:border-ds-border-strong"
+                className={`dx-pill inline-flex h-10 items-center gap-2 px-6 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary ${
+                  interval === value ? "bg-ds-primary text-ds-primary-on" : "text-ds-text-primary hover:bg-ds-surface-soft"
                 }`}
               >
-                {value === "monthly" ? "Monthly" : "Yearly — two months free"}
+                {value === "monthly" ? "Monthly" : "Yearly"}
+                {value === "annual" ? (
+                  <span
+                    className={`dx-pill px-2.5 py-0.5 text-xs font-medium ${
+                      interval === value ? "bg-ds-primary-on/20 text-ds-primary-on" : "bg-ds-primary/10 text-ds-primary"
+                    }`}
+                  >
+                    Two months free
+                  </span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -396,34 +407,39 @@ export function BillingPanel({
                     setStarterLossAcknowledged(false);
                   }}
                   aria-pressed={selected}
-                  className={`flex w-full flex-col gap-1 border p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
-                    selected
-                      ? "border-ds-text-primary bg-ds-surface-raised"
-                      : "border-ds-border bg-ds-bg hover:border-ds-border-strong"
+                  className={`flex h-full w-full flex-col gap-1.5 rounded-2xl border-2 p-5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary ${
+                    selected ? "border-ds-lime bg-ds-lime-soft" : "border-ds-border bg-ds-surface hover:border-ds-border-strong"
                   }`}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-ds-text-primary">{plan.name}</span>
                     {current ? (
-                      <span className="bg-ds-surface-elevated px-2 py-0.5 text-2xs font-medium text-ds-text-secondary">
-                        Current
-                      </span>
+                      <span className="dx-pill bg-ds-primary/10 px-3 py-0.5 text-sm font-medium text-ds-primary">Current</span>
                     ) : null}
                   </span>
-                  <span className="text-lg font-medium text-ds-text-primary">
+                  <span className="text-base font-medium text-ds-text-primary">
                     {formatInr(pricePaise)}
-                    <span className="text-2xs font-normal text-ds-text-muted">
+                    <span className="text-sm font-normal text-ds-text-secondary">
                       {" "}
                       / {interval === "annual" ? "year" : "month"}, incl. GST
                     </span>
                   </span>
-                  <GstBreakdown grossPaise={pricePaise} gstRatePercent={gstRatePercent} />
-                  <span className="text-2xs text-ds-text-secondary">
+                  <span className="text-sm text-ds-text-primary">
                     {plan.monthlyReplyQuota.toLocaleString("en-IN")} AI replies / month ·{" "}
                     {plan.seatsLabel}
                   </span>
-                  <span className="text-2xs font-medium text-ds-text-secondary">
-                    {planChannelsLabel(plan.key, metaChannelNames)}
+                  <span className="text-sm text-ds-text-secondary">{planChannelsLabel(plan.key, metaChannelNames)}</span>
+                  <GstBreakdown
+                    grossPaise={pricePaise}
+                    gstRatePercent={gstRatePercent}
+                    className="mt-auto border-t border-ds-border pt-2 text-sm text-ds-text-primary"
+                  />
+                  <span
+                    className={`dx-pill mt-1 inline-flex h-9 items-center justify-center px-4 text-sm font-medium ${
+                      selected ? "bg-ds-primary text-ds-primary-on" : "border border-ds-primary text-ds-primary"
+                    }`}
+                  >
+                    {selected ? "Selected" : `Select ${plan.name}`}
                   </span>
                 </button>
               </li>
@@ -443,15 +459,12 @@ export function BillingPanel({
           />
 
           {starterWarning ? (
-            <div
-              role="alert"
-              className="flex flex-col gap-3 border border-ds-warning bg-ds-surface p-4"
-            >
+            <div role="alert" className="flex flex-col gap-3 rounded-2xl bg-ds-warning-bg p-4">
               <p className="flex items-start gap-2 text-sm text-ds-text-primary">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+                <AlertTriangle strokeWidth={1.75} className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
                 <span>{starterWarning}</span>
               </p>
-              <label className="flex items-start gap-2 text-sm text-ds-text-secondary">
+              <label className="flex items-start gap-2 text-sm text-ds-text-primary">
                 <input
                   type="checkbox"
                   checked={starterLossAcknowledged}
@@ -475,7 +488,7 @@ export function BillingPanel({
                 (starterWarning !== null && !starterLossAcknowledged) ||
                 (selectedPlan === entitlement.planKey && isSubscribed && interval === entitlement.billingInterval)
               }
-              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="ds-btn-label inline-flex h-9 items-center justify-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary min-w-56"
             >
               {startPending || changePending
                 ? "Opening payment…"
@@ -484,9 +497,9 @@ export function BillingPanel({
                   : "Continue to payment"}
             </button>
             {configured && !scriptReady ? (
-              <span className="text-2xs text-ds-text-muted">Loading the payment window…</span>
+              <span className="text-sm text-ds-text-secondary">Loading the payment window…</span>
             ) : null}
-            <span className="text-2xs text-ds-text-muted">
+            <span className="text-sm text-ds-text-secondary">
               Cards only. {entitlement.isTrial ? "You are not charged until your trial ends." : ""}
             </span>
           </div>
@@ -526,47 +539,76 @@ function CurrentPlanCard({
   // card cannot be swapped self-serve yet (see updatePaymentMethodAction).
   const canUpdatePaymentMethod = entitlement.status === "past_due" && entitlement.billingInterval === "monthly";
 
+  const isHealthy = entitlement.serving && entitlement.status !== "past_due";
+
   return (
-    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="dx-card flex h-full flex-col gap-4 dx-card-pad">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="flex flex-col gap-1">
-          <p className="text-2xs font-medium uppercase tracking-wide text-ds-text-muted">
-            Current plan
-          </p>
-          <h2 className="text-lg font-medium text-ds-text-primary">{entitlement.planName}</h2>
-          <p className="text-sm text-ds-text-secondary">{statusLabel}</p>
+          <p className="text-sm text-ds-text-primary">Current plan</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-lg leading-none font-medium text-ds-text-primary">{entitlement.planName}</h2>
+            <span
+              className={`dx-pill px-3 py-1 text-sm font-medium ${
+                !entitlement.serving
+                  ? "bg-ds-danger-bg text-ds-danger"
+                  : isHealthy
+                    ? "bg-ds-primary text-ds-primary-on"
+                    : "bg-ds-warning-bg text-ds-warning"
+              }`}
+            >
+              {!entitlement.serving ? "AI replies paused" : entitlement.isTrial ? "Trial" : isHealthy ? "Active" : "Payment due"}
+            </span>
+          </div>
         </div>
-        {!entitlement.serving ? (
-          <span className="border border-ds-danger bg-ds-danger-bg px-3 py-1 text-2xs font-medium text-ds-text-primary">
-            AI replies paused
+        <div className="flex flex-col gap-0.5 sm:border-l sm:border-ds-border sm:pl-6">
+          <p className="text-lg leading-tight font-medium text-ds-text-primary">
+            {nextChargePaise !== null ? formatInr(nextChargePaise) : "Nothing due"}
+            {nextChargePaise !== null ? (
+              <span className="text-base font-medium"> / {entitlement.billingInterval === "annual" ? "year" : "month"}</span>
+            ) : null}
+          </p>
+          {nextChargePaise !== null ? (
+            <GstBreakdown grossPaise={nextChargePaise} gstRatePercent={gstRatePercent} className="text-sm" />
+          ) : null}
+        </div>
+      </div>
+
+      <p className="text-sm text-ds-text-secondary">{statusLabel}</p>
+
+      <div className="flex flex-col gap-2">
+        <p className="flex items-center justify-between gap-3 text-sm text-ds-text-primary">
+          <span>
+            {usage.degraded ? (
+              "Reply usage is unavailable right now"
+            ) : (
+              <>
+                <span className="font-medium">{usage.repliesUsed.toLocaleString("en-IN")}</span> /{" "}
+                {usage.replyQuota.toLocaleString("en-IN")} AI replies used
+              </>
+            )}
           </span>
+          {!usage.degraded && usage.replyQuota > 0 ? <span className="font-medium">{percentUsed}%</span> : null}
+        </p>
+        {!usage.degraded && usage.replyQuota > 0 ? (
+          <div
+            role="progressbar"
+            aria-valuenow={percentUsed}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="AI replies used this period"
+            className="dx-track h-3"
+          >
+            <span className={percentUsed >= 100 ? "bg-ds-danger" : ""} style={{ width: `${percentUsed}%` }} />
+          </div>
         ) : null}
       </div>
 
-      <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Fact
-          label="Replies this period"
-          value={
-            usage.degraded
-              ? "Unavailable right now"
-              : `${usage.repliesUsed.toLocaleString("en-IN")} of ${usage.replyQuota.toLocaleString("en-IN")}`
-          }
-        />
+      <dl className="mt-auto flex flex-wrap items-center gap-x-8 gap-y-3">
         <Fact
           label={entitlement.isTrial ? "Trial ends" : entitlement.cancelAtPeriodEnd ? "Access until" : "Next renewal"}
           value={formatDate(entitlement.trialEndsAt ?? entitlement.periodEnd)}
         />
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-2xs font-medium uppercase tracking-wide text-ds-text-muted">Amount</dt>
-          <dd className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium text-ds-text-primary">
-              {nextChargePaise !== null ? formatInr(nextChargePaise) : "Nothing due"}
-            </span>
-            {nextChargePaise !== null ? (
-              <GstBreakdown grossPaise={nextChargePaise} gstRatePercent={gstRatePercent} />
-            ) : null}
-          </dd>
-        </div>
         <Fact
           label="Payment method"
           value={
@@ -577,51 +619,29 @@ function CurrentPlanCard({
                 : "Card, charged automatically"
           }
         />
+        {canUpdatePaymentMethod ? (
+          <form action={updatePaymentMethod.action} className="flex flex-col gap-1">
+            <button
+              type="submit"
+              disabled={updatePaymentMethod.pending || !updatePaymentMethod.ready}
+              className="ds-btn-label inline-flex h-10 items-center justify-center rounded-xl border border-ds-primary bg-ds-surface px-4 text-sm text-ds-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
+            >
+              {updatePaymentMethod.pending ? "Opening payment…" : "Update payment method"}
+            </button>
+            <span className="text-xs text-ds-text-secondary">Authorise a card again and we retry the payment straight away.</span>
+          </form>
+        ) : null}
       </dl>
 
-      {canUpdatePaymentMethod ? (
-        <form action={updatePaymentMethod.action} className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={updatePaymentMethod.pending || !updatePaymentMethod.ready}
-            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            {updatePaymentMethod.pending ? "Opening payment…" : "Update payment method"}
-          </button>
-          <span className="text-2xs text-ds-text-muted">
-            Authorise a card again and we retry the payment straight away.
-          </span>
-        </form>
-      ) : null}
-
-      {!usage.degraded && usage.replyQuota > 0 ? (
-        <div className="flex flex-col gap-1">
-          <div
-            role="progressbar"
-            aria-valuenow={percentUsed}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="AI replies used this period"
-            className="h-2 w-full overflow-hidden bg-ds-surface-raised"
-          >
-            <div
-              className={`h-full ${percentUsed >= 100 ? "bg-ds-danger" : "bg-ds-primary"}`}
-              style={{ width: `${percentUsed}%` }}
-            />
-          </div>
-          <p className="text-2xs text-ds-text-muted">{percentUsed}% of this period&apos;s AI replies used</p>
-        </div>
-      ) : null}
-
       {entitlement.scheduledPlanKey ? (
-        <p className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
+        <p className="rounded-xl bg-ds-surface-soft px-4 py-2.5 text-sm text-ds-text-primary">
           Scheduled: moving to the {entitlement.scheduledPlanKey} plan on{" "}
           {formatDate(entitlement.periodEnd)}. Nothing changes before then.
         </p>
       ) : null}
 
       {entitlement.noSubscription ? (
-        <p className="border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-secondary">
+        <p className="rounded-xl bg-ds-surface-soft px-4 py-2.5 text-sm text-ds-text-primary">
           {entitlement.notServingReason === "subscription_unavailable"
             ? "We could not load your plan just now, so AI replies are paused. Please refresh in a minute -- if this continues, contact support."
             : "There is no plan on this account, so your AI is not replying to prospects. Choose a plan below to switch it on."}
@@ -663,8 +683,8 @@ function describeStatus(entitlement: EntitlementSummary): string {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-2xs font-medium uppercase tracking-wide text-ds-text-muted">{label}</dt>
+    <div className="flex flex-col">
+      <dt className="text-sm text-ds-text-secondary">{label}</dt>
       <dd className="text-sm font-medium text-ds-text-primary">{value}</dd>
     </div>
   );
@@ -689,10 +709,10 @@ function CancelCard({
   const [open, setOpen] = useState(false);
 
   return (
-    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
+    <section className="dx-card flex flex-col gap-3 dx-card-pad">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium text-ds-text-primary">Cancel your plan</h2>
-        <p className="text-sm text-ds-text-secondary">
+        <h2 className="dx-title text-base">Cancel your plan</h2>
+        <p className="dx-subtitle">
           You keep everything until {formatDate(accessUntil)}, the end of the period you have already
           paid for. After that your AI stops replying and prospects are told a person will follow up.
           Your data stays where it is. Fees already paid are not refundable.
@@ -703,17 +723,14 @@ function CancelCard({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="self-start border border-ds-border-strong px-4 py-2 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label inline-flex h-10 items-center self-start rounded-xl border border-ds-border-strong bg-ds-surface px-4 text-sm text-ds-text-primary transition-colors hover:border-ds-danger hover:text-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           Cancel at period end
         </button>
       ) : (
         <form action={action} className="flex flex-col gap-3">
           {error ? (
-            <p
-              role="alert"
-              className="border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary"
-            >
+            <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
               {error}
             </p>
           ) : null}
@@ -726,21 +743,21 @@ function CancelCard({
               name="confirm"
               autoComplete="off"
               required
-              className="max-w-xs border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="h-10 max-w-xs rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 text-sm text-ds-text-primary"
             />
           </label>
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={pending}
-              className="border border-ds-danger bg-ds-danger-bg px-4 py-2 text-sm font-medium text-ds-text-primary transition-opacity disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="ds-btn-label inline-flex h-10 items-center rounded-xl bg-ds-danger px-4 text-sm text-ds-danger-on transition-opacity disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
             >
               {pending ? "Cancelling…" : "Confirm cancellation"}
             </button>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-ds-text-secondary hover:text-ds-text-primary"
+              className="inline-flex h-10 items-center rounded-xl px-4 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary"
             >
               Keep my plan
             </button>

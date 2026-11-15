@@ -24,7 +24,7 @@ export default function DashboardError({
   }, [error]);
 
   return (
-    <div className="flex flex-1 flex-col bg-ds-bg p-6">
+    <div className="flex flex-1 flex-col">
       <ErrorState onRetry={retry} />
     </div>
   );

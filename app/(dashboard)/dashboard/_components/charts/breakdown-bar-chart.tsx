@@ -16,7 +16,7 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="border border-ds-border-strong bg-ds-surface-elevated px-3 py-1.5 text-xs">
+    <div className="rounded-xl border border-ds-border bg-ds-surface-elevated px-3 py-1.5 text-xs shadow-float">
       <span className="text-ds-text-secondary">{payload[0].name}: </span>
       <span className="font-medium text-ds-text-primary">{payload[0].value}</span>
     </div>

@@ -160,9 +160,9 @@ export function EmbeddedSignupButton({ appId, configId, graphVersion }: { appId:
   const busy = phase.kind === "loading_sdk" || phase.kind === "in_popup" || phase.kind === "finishing";
 
   return (
-    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
+    <section className="dx-card flex flex-col gap-3 dx-card-pad">
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium text-ds-text-primary">Connect with Facebook</h2>
+        <h2 className="dx-title text-base">Connect with Facebook</h2>
         <p className="text-sm text-ds-text-secondary">
           Log in with Facebook, choose or create your WhatsApp Business account, and add the phone number you want
           prospects to message. We set up the rest. Use a number that isn&rsquo;t already on the WhatsApp app.
@@ -173,7 +173,7 @@ export function EmbeddedSignupButton({ appId, configId, graphVersion }: { appId:
           type="button"
           onClick={() => void start()}
           disabled={busy}
-          className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label inline-flex h-9 items-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           {phase.kind === "loading_sdk"
             ? "Opening…"
@@ -192,17 +192,17 @@ export function EmbeddedSignupButton({ appId, configId, graphVersion }: { appId:
           </p>
         ) : null}
         {phase.kind === "error" ? (
-          <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
+          <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
             {phase.message}
           </p>
         ) : null}
         {phase.kind === "done" ? (
           phase.complete ? (
-            <p className="bg-ds-success-bg px-3 py-2 text-sm text-ds-success">
+            <p className="rounded-xl bg-ds-success-bg px-3 py-2 text-sm text-ds-success">
               WhatsApp is connected. We&rsquo;ve submitted your message templates to Meta for review.
             </p>
           ) : (
-            <p role="alert" className="bg-ds-warning-bg px-3 py-2 text-sm text-ds-warning">
+            <p role="alert" className="rounded-xl bg-ds-warning-bg px-3 py-2 text-sm text-ds-warning">
               Almost there: {phase.message ?? "one setup step didn't finish."} Use &ldquo;Finish setup&rdquo; below.
             </p>
           )

@@ -2,10 +2,10 @@
 
 import { useActionState, useMemo, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
+import { FileText, Search } from "lucide-react";
 import type { KnowledgeDocument } from "@/lib/supabase/types";
 import { DeleteButton } from "../../_components/delete-button";
 import { EmptyState } from "../../_components/state-views";
-import { Badge } from "../../_components/badge";
 import { DataTable, TableCell, TableRow, type DataTableColumn } from "../../_components/data-table";
 import { IngestionStatusPill, IngestionErrorMessage } from "./ingestion-status-pill";
 import { RetryIngestionButton } from "./retry-ingestion-button";
@@ -138,16 +138,16 @@ export function KnowledgeList({
 
   const columns = useMemo<DataTableColumn[]>(() => {
     const base: DataTableColumn[] = [
-      { key: "document", label: "Document", width: "2.4fr" },
-      { key: "source", label: "Source", width: "100px" },
-      { key: "actions", label: "Actions", width: "170px", align: "right" },
+      { key: "document", label: "Document", width: "minmax(16rem,2.4fr)" },
+      { key: "source", label: "Source", width: "6.5rem" },
+      { key: "actions", label: "Actions", width: "11rem" },
     ];
-    return canEdit ? [{ key: "select", label: "", width: "36px" }, ...base] : base;
+    return canEdit ? [{ key: "select", label: "", width: "3.25rem" }, ...base] : base;
   }, [canEdit]);
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-ds-text-secondary">
+      <p className="text-sm text-ds-text-primary">
         {liveCount} live and answering prospects · {documents.length - liveCount} not live
         {attentionCount > 0 ? ` · ${attentionCount} need${attentionCount === 1 ? "s" : ""} attention` : ""}
       </p>
@@ -159,21 +159,19 @@ export function KnowledgeList({
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search title or content…"
-              aria-label="Search knowledge documents"
-              className="w-full max-w-xs border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-text-primary focus:outline-none"
-            />
-            <div
-              role="tablist"
-              aria-label="Filter by status"
-              onKeyDown={handleFilterKeyDown}
-              className="inline-flex flex-wrap items-center gap-1 border border-ds-border bg-ds-surface p-1"
-            >
+          <div className="flex flex-col gap-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search title or content…"
+                aria-label="Search knowledge documents"
+                className="h-10 w-full rounded-xl border border-ds-border-strong bg-ds-surface pr-4 pl-12 text-sm text-ds-text-primary placeholder:text-ds-text-faint"
+              />
+            </div>
+            <div role="tablist" aria-label="Filter by status" onKeyDown={handleFilterKeyDown} className="dx-tabs">
               {STATUS_FILTERS.map((f) => (
                 <button
                   key={f.id}
@@ -184,32 +182,35 @@ export function KnowledgeList({
                   aria-controls="knowledge-list-panel"
                   tabIndex={statusFilter === f.id ? 0 : -1}
                   onClick={() => setStatusFilter(f.id)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
-                    statusFilter === f.id
-                      ? "bg-dashboard-primary text-dashboard-on-primary"
-                      : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
-                  }`}
+                  className="dx-tab px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
                 >
                   {f.label}
+                  <span className="tabular-nums">
+                    {f.id === "all"
+                      ? documents.length
+                      : f.id === "failed"
+                        ? attentionCount
+                        : documents.filter((d) => d.status === f.id).length}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
           {canEdit && filtered.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 border border-ds-border bg-ds-surface-soft px-3 py-2">
-              <label className="flex items-center gap-2 text-xs font-medium text-ds-text-secondary">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+              <label className="flex items-center gap-3 text-sm text-ds-text-primary">
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
                   onChange={toggleSelectAllVisible}
-                  className="h-4 w-4 border-ds-border accent-ds-accent"
+                  className="size-5 rounded accent-ds-accent"
                 />
                 Select all ({filtered.length})
               </label>
               {selectedCount > 0 ? (
                 <>
-                  <span className="text-xs text-ds-text-muted">{selectedCount} selected</span>
+                  <span className="dx-pill bg-ds-primary/10 px-3 py-1 text-xs font-medium text-ds-primary">{selectedCount} selected</span>
                   <form action={bulkPublishFormAction} className="flex items-center gap-2">
                     {[...selectedIds].map((id) => (
                       <input key={id} type="hidden" name="ids" value={id} />
@@ -217,7 +218,7 @@ export function KnowledgeList({
                     <button
                       type="submit"
                       disabled={isBulkPublishing}
-                      className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                      className="ds-btn-label inline-flex h-9 items-center rounded-xl border border-ds-primary bg-ds-surface px-4 text-sm text-ds-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
                     >
                       {isBulkPublishing ? "Approving…" : "Approve selected"}
                     </button>
@@ -232,7 +233,7 @@ export function KnowledgeList({
                         type="submit"
                         disabled={isBulkDeleting}
                         autoFocus
-                        className="bg-ds-danger px-3 py-1.5 text-xs font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+                        className="inline-flex h-9 items-center rounded-xl bg-ds-danger px-3 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
                       >
                         {isBulkDeleting ? "Deleting…" : "Confirm delete"}
                       </button>
@@ -240,7 +241,7 @@ export function KnowledgeList({
                         type="button"
                         onClick={() => setBulkDeleteConfirming(false)}
                         disabled={isBulkDeleting}
-                        className="px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                        className="inline-flex h-9 items-center rounded-xl px-3 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
                       >
                         Cancel
                       </button>
@@ -249,7 +250,7 @@ export function KnowledgeList({
                     <button
                       type="button"
                       onClick={() => setBulkDeleteConfirming(true)}
-                      className="px-3 py-1.5 text-xs font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                      className="inline-flex h-9 items-center rounded-xl px-3 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
                     >
                       Delete selected
                     </button>
@@ -257,7 +258,7 @@ export function KnowledgeList({
                   <button
                     type="button"
                     onClick={() => setSelectedIds(new Set())}
-                    className="text-xs font-medium text-ds-text-muted transition-colors hover:text-ds-text-secondary"
+                    className="inline-flex h-9 items-center rounded-xl px-3 text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
                   >
                     Clear selection
                   </button>
@@ -349,40 +350,45 @@ function KnowledgeRow({
             checked={selected}
             onChange={onToggleSelected}
             aria-label={`Select ${document.title}`}
-            className="h-4 w-4 shrink-0 border-ds-border accent-ds-accent"
+            className="size-5 shrink-0 rounded accent-ds-accent"
           />
         </TableCell>
       ) : null}
-      <TableCell direction="col" className="gap-1">
-        <div className="flex items-center gap-2">
+      <TableCell className={`min-w-0 items-start gap-3.5 ${selected ? "bg-ds-lime-soft/60" : ""}`}>
+        <FileText className="mt-0.5 size-5 shrink-0 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="truncate text-sm font-medium text-ds-text-primary">{document.title}</span>
           {isLive ? (
             <span
               title="Approved and processed: goes live with your next Publish changes"
-              aria-label="Approved and processed: goes live with your next Publish changes"
-              className="h-2 w-2 shrink-0 rounded-full bg-ds-success"
-            />
+              className="flex items-center gap-1.5 text-sm font-medium text-ds-success"
+            >
+              <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ds-success-bright" />
+              Live
+            </span>
           ) : null}
-          <span className="truncate font-medium text-ds-text-primary">{document.title}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <IngestionStatusPill status={document.ingestion_status} />
-          <Badge tone={isPublished ? "success" : "muted"} size="sm">
-            {isPublished ? "approved" : "draft"}
-          </Badge>
+          <span className={`dx-pill px-2.5 py-0.5 text-xs font-medium ${isPublished ? "bg-ds-warning-bg text-ds-warning" : "bg-ds-surface-soft text-ds-text-secondary"}`}>
+            {isPublished ? "Approved" : "Draft"}
+          </span>
         </div>
         <span className="line-clamp-2 text-sm text-ds-text-secondary">{document.content}</span>
         {isFailed ? <IngestionErrorMessage lastError={document.ingestion_last_error} /> : null}
         {document.source_type === "url" && document.source_url ? (
-          <span className="truncate text-xs text-ds-text-muted">
+          <span className="truncate text-sm text-ds-text-secondary">
             {document.source_url}
             {document.refresh_interval_hours ? ` · Auto-refreshes every ${document.refresh_interval_hours}h` : ""}
           </span>
         ) : null}
+        </div>
       </TableCell>
       <TableCell>
-        <span className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
-          {SOURCE_LABEL[document.source_type] ?? document.source_type}
-        </span>
+        <span className="text-sm text-ds-text-primary">{SOURCE_LABEL[document.source_type] ?? document.source_type}</span>
       </TableCell>
-      <TableCell align="right">
+      <TableCell>
         <div className="flex shrink-0 items-center gap-2">
         {primaryIsRetry ? (
           <RetryIngestionButton action={retryIngestionAction} id={document.id} canEdit={canEdit} />
@@ -400,14 +406,14 @@ function KnowledgeRow({
             <button
               type="button"
               onClick={() => onEdit(document.id)}
-              className="ds-btn-label bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="ds-btn-label inline-flex h-9 items-center rounded-xl border border-ds-primary bg-ds-surface px-4 text-sm text-ds-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
             >
               Edit
             </button>
           ) : (
             <Link
               href={`/dashboard/knowledge/${document.id}/edit`}
-              className="ds-btn-label bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="ds-btn-label inline-flex h-9 items-center rounded-xl border border-ds-primary bg-ds-surface px-4 text-sm text-ds-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
             >
               Edit
             </Link>
@@ -420,7 +426,7 @@ function KnowledgeRow({
                 type="button"
                 role="menuitem"
                 onClick={() => onEdit(document.id)}
-                className="block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
+                className="block w-full rounded-none px-4 py-2.5 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
               >
                 Edit
               </button>
@@ -428,7 +434,7 @@ function KnowledgeRow({
               <Link
                 href={`/dashboard/knowledge/${document.id}/edit`}
                 role="menuitem"
-                className="block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
+                className="block w-full rounded-none px-4 py-2.5 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
               >
                 Edit
               </Link>

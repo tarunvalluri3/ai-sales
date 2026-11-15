@@ -3,24 +3,24 @@ import {
   BarChart3,
   Bell,
   BookOpen,
-  Building2,
-  CalendarCheck,
+  CalendarDays,
   Camera,
   CircleHelp,
-  CreditCard,
   Clock,
-  Contact,
-  LayoutDashboard,
+  CreditCard,
+  House,
+  Layers,
   MessageCircle,
-  MessageSquareText,
-  MessagesSquare,
-  Package,
+  MessageCircleMore,
+  Monitor,
   ScrollText,
   Sparkles,
+  Store,
+  Tag,
+  UserRound,
   Users,
   Webhook,
   Workflow,
-  Wrench,
   Zap,
 } from "lucide-react";
 
@@ -33,6 +33,10 @@ export type NavItem = {
 export type NavGroup = {
   /** Omitted for the top-level, ungrouped items (just "Overview" today). */
   label?: string;
+  /** Renders the group heading as a disclosure button (Knowledge Base, Settings). */
+  collapsible?: boolean;
+  /** Collapsible groups only: closed until opened, or until a page inside it is active. */
+  defaultCollapsed?: boolean;
   items: NavItem[];
 };
 
@@ -43,22 +47,22 @@ export type NavGroup = {
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
-    items: [{ label: "Overview", href: "/dashboard", icon: LayoutDashboard }],
+    items: [{ label: "Overview", href: "/dashboard", icon: House }],
   },
   {
     label: "Engage",
     items: [
-      { label: "Conversations", href: "/dashboard/conversations", icon: MessagesSquare },
+      { label: "Conversations", href: "/dashboard/conversations", icon: MessageCircle },
       { label: "Leads", href: "/dashboard/leads", icon: Users },
-      { label: "Appointments", href: "/dashboard/appointments", icon: CalendarCheck },
-      { label: "Customers", href: "/dashboard/customers", icon: Contact },
+      { label: "Appointments", href: "/dashboard/appointments", icon: CalendarDays },
+      { label: "Customers", href: "/dashboard/customers", icon: UserRound },
     ],
   },
   {
     label: "Channels",
     items: [
-      { label: "Widget Settings", href: "/dashboard/widget-settings", icon: MessageSquareText },
-      { label: "WhatsApp", href: "/dashboard/whatsapp", icon: MessageCircle },
+      { label: "Widget Settings", href: "/dashboard/widget-settings", icon: Monitor },
+      { label: "WhatsApp", href: "/dashboard/whatsapp", icon: MessageCircleMore },
       { label: "Instagram", href: "/dashboard/instagram", icon: Camera },
     ],
   },
@@ -68,9 +72,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Knowledge Base",
+    collapsible: true,
     items: [
-      { label: "Products", href: "/dashboard/products", icon: Package },
-      { label: "Services", href: "/dashboard/services", icon: Wrench },
+      { label: "Products", href: "/dashboard/products", icon: Layers },
+      { label: "Services", href: "/dashboard/services", icon: Tag },
       { label: "FAQs", href: "/dashboard/faqs", icon: CircleHelp },
       { label: "Knowledge", href: "/dashboard/knowledge", icon: BookOpen },
       { label: "Instant Answers", href: "/dashboard/answer-bank", icon: Zap },
@@ -85,8 +90,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: "Settings",
+    collapsible: true,
+    defaultCollapsed: true,
     items: [
-      { label: "Business Profile", href: "/dashboard/profile", icon: Building2 },
+      { label: "Business Profile", href: "/dashboard/profile", icon: Store },
       { label: "Business Hours", href: "/dashboard/business-hours", icon: Clock },
       // Phase 17b. Visible to everyone, like every other item here: the
       // page itself explains that billing is admin-only, and a nav entry

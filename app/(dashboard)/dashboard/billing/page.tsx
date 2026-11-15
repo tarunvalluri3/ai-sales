@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Building2, CircleCheck, CreditCard, MapPin } from "lucide-react";
+import { stateNameForCode } from "@/lib/india-states";
+import { PageHeader, btnOutline, linkAccent } from "../_components/ui";
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -45,13 +47,8 @@ export default async function BillingPage() {
 
   if (!hasMinRole(orgRole, "org:admin")) {
     return (
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Billing</h1>
-          <p className="text-sm text-ds-text-secondary">
-            Only an organisation admin can see or change billing.
-          </p>
-        </header>
+      <div className="flex flex-1 flex-col gap-8">
+        <PageHeader icon={CreditCard} title="Billing" description="Only an organisation admin can see or change billing." />
         <PermissionNotice />
       </div>
     );
@@ -83,28 +80,54 @@ export default async function BillingPage() {
   );
   const plan = PLANS[entitlement.planKey];
 
+  const billingStateName = stateNameForCode(identity?.stateCode ?? null);
+  const hasBillingDetails = Boolean(identity?.name && identity?.address && identity?.stateCode);
+
+  const invoiceDetails = (
+    <section aria-labelledby="invoice-details-heading" className="dx-card flex h-full flex-col gap-3 dx-card-pad">
+      <h2 id="invoice-details-heading" className="dx-title">
+        Invoice details
+      </h2>
+      <ul className="flex flex-col gap-2.5 text-sm text-ds-text-primary">
+        <li className="flex items-center gap-4 text-base font-medium">
+          <Building2 className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          <span className="min-w-0 break-words">{identityDefaults.name}</span>
+        </li>
+        {billingStateName ? (
+          <li className="flex items-center gap-4">
+            <MapPin className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            {billingStateName}
+          </li>
+        ) : null}
+        <li className="flex items-center gap-4">
+          {hasBillingDetails ? (
+            <CircleCheck className="size-5 shrink-0 text-ds-success-bright" strokeWidth={1.75} aria-hidden="true" />
+          ) : (
+            <AlertTriangle className="size-5 shrink-0 text-ds-warning" strokeWidth={1.75} aria-hidden="true" />
+          )}
+          {hasBillingDetails ? "Billing details on file" : "Billing details not added yet"}
+        </li>
+      </ul>
+      <a href="#billing-details" className={`${btnOutline} mt-auto w-full text-base`}>
+        {hasBillingDetails ? "Edit billing details" : "Add billing details"}
+      </a>
+      <p className="text-center text-sm text-ds-text-secondary">Changes apply to future invoices.</p>
+    </section>
+  );
+
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Billing</h1>
-        <p className="max-w-2xl text-sm text-ds-text-secondary">
-          Your plan, what you have used this period, when you are next charged, and every invoice
-          we have issued you.
-        </p>
-      </header>
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeader icon={CreditCard} title="Billing" description="Your plan, usage and payments in one place." />
 
       {/* Stated to the customer while it is true: a payment form that
           cannot take a real payment must say so, or it is misleading. Keyed
           on the configured keys, so it goes away on its own with live keys. */}
       {testMode ? (
-        <div
-          role="status"
-          className="flex items-start gap-3 border border-ds-warning bg-ds-surface p-4"
-        >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+        <div role="status" className="flex items-start gap-4 rounded-2xl bg-ds-warning-bg px-5 py-4">
+          <AlertTriangle strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-ds-text-primary">Payments are in test mode</p>
-            <p className="text-sm text-ds-text-secondary">
+            <p className="text-sm text-ds-text-primary">
               Nothing on this page charges a real card yet. Invoices issued for test payments are
               marked TEST: they are not tax documents and use a separate number series. We turn real
               payments on only after invoicing has been checked end to end.
@@ -114,28 +137,22 @@ export default async function BillingPage() {
       ) : null}
 
       {!configured ? (
-        <div
-          role="status"
-          className="border border-ds-border bg-ds-surface p-4 text-sm text-ds-text-secondary"
-        >
+        <div role="status" className="rounded-2xl bg-ds-surface-soft px-5 py-4 text-sm text-ds-text-primary">
           Payments are not set up on this deployment yet, so there is nothing to subscribe to here.
           Your plan and usage below are accurate.
         </div>
       ) : null}
 
       {!contactEmail ? (
-        <div
-          role="status"
-          className="flex items-start gap-3 border border-ds-warning bg-ds-surface p-4"
-        >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+        <div role="status" className="flex items-start gap-4 rounded-2xl bg-ds-warning-bg px-5 py-4">
+          <AlertTriangle strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-ds-text-primary">No billing email set</p>
-            <p className="text-sm text-ds-text-secondary">
+            <p className="text-sm text-ds-text-primary">
               Payment receipts, renewal reminders and your GST invoices all go to your business contact
               email, and there is not one on this account.
             </p>
-            <Link href="/dashboard/profile" className="text-sm font-medium text-ds-accent hover:underline">
+            <Link href="/dashboard/profile" className={`${linkAccent} w-fit underline`}>
               Add a contact email
             </Link>
           </div>
@@ -143,6 +160,7 @@ export default async function BillingPage() {
       ) : null}
 
       <BillingPanel
+        aside={invoiceDetails}
         configured={configured}
         metaChannelNames={launchedMetaChannelNames(channelLaunchSwitchesFromEnv())}
         connectedChannels={connectedChannels}
@@ -196,16 +214,16 @@ export default async function BillingPage() {
         hasHeldInvoice={hasHeldInvoice}
       />
 
-      <p className="max-w-2xl text-sm text-ds-text-muted">
+      <p className="max-w-3xl px-1 text-sm leading-relaxed text-ds-text-secondary">
         Your {plan.name} plan includes{" "}
         {plan.monthlyReplyQuota.toLocaleString("en-IN")} AI replies a period at{" "}
         {formatPaiseAsInr(plan.monthlyPricePaise)} / month, inclusive of {GST_RATE_PERCENT}% GST. The
         full comparison is on the{" "}
-        <Link href="/pricing" className="font-medium text-ds-accent hover:underline">
+        <Link href="/pricing" className="font-medium text-ds-primary underline underline-offset-4">
           pricing page
         </Link>
         , and the cancellation terms are in our{" "}
-        <Link href="/refunds" className="font-medium text-ds-accent hover:underline">
+        <Link href="/refunds" className="font-medium text-ds-primary underline underline-offset-4">
           Cancellation and Refunds Policy
         </Link>
         .

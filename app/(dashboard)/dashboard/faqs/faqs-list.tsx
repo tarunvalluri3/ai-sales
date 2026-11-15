@@ -2,16 +2,20 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } from "../_components/data-table";
 import { DeleteButton } from "../_components/delete-button";
 import type { deleteFaqAction as DeleteFaqAction } from "./actions";
 import type { Faq } from "@/lib/supabase/types";
 
 const COLUMNS: DataTableColumn[] = [
-  { key: "question", label: "Question", width: "2fr", sortable: true },
-  { key: "answer", label: "Answer", width: "2fr" },
-  { key: "actions", label: "Actions", width: "160px", align: "right" },
+  { key: "question", label: "Question", width: "minmax(12rem,1.4fr)", sortable: true },
+  { key: "answer", label: "Answer", width: "minmax(12rem,1.6fr)" },
+  { key: "actions", label: "Actions", width: "7rem" },
 ];
+
+const EDIT_CLASS =
+  "inline-flex size-9 items-center justify-center rounded-xl text-ds-text-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary";
 
 /** Client half of the FAQs list -- same DataTable retrofit as ProductsList/ServicesList (codebase gap sweep, Phase E). */
 export type FaqReadinessStatus = "ready" | "processing" | "too_short";
@@ -60,49 +64,38 @@ export function FaqsList({
         const status = readinessByFaqId?.[faq.id];
         return (
           <TableRow>
-            <TableCell direction="col" className="gap-0.5">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-ds-text-primary">{faq.question}</span>
-                {status ? (
-                  <span
-                    className={`shrink-0 px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide-ds ${
-                      status === "ready"
-                        ? "bg-ds-success-bg text-ds-success"
-                        : status === "too_short"
-                          ? "bg-ds-warning-bg text-ds-warning"
-                          : "bg-ds-surface-elevated text-ds-text-muted"
-                    }`}
-                  >
-                    {status === "ready" ? "Ready" : status === "too_short" ? "Needs more detail" : "Processing"}
-                  </span>
-                ) : null}
-              </div>
+            <TableCell direction="col" className="gap-1.5">
+              <span className="text-sm leading-snug font-medium text-ds-text-primary">{faq.question}</span>
+              {status ? (
+                <span
+                  className={`dx-pill shrink-0 px-2.5 py-0.5 text-xs font-medium ${
+                    status === "ready"
+                      ? "bg-ds-lime-soft text-ds-primary"
+                      : status === "too_short"
+                        ? "bg-ds-warning-bg text-ds-warning"
+                        : "bg-ds-surface-soft text-ds-text-secondary"
+                  }`}
+                >
+                  {status === "ready" ? "Ready" : status === "too_short" ? "Needs more detail" : "Processing"}
+                </span>
+              ) : null}
             </TableCell>
             <TableCell>
-              <span className="line-clamp-2 text-sm text-ds-text-secondary">{faq.answer}</span>
+              <span className="line-clamp-3 text-sm leading-relaxed text-ds-text-primary">{faq.answer}</span>
             </TableCell>
-            <TableCell align="right">
-              <div className="flex items-center justify-end gap-3">
-                {canEdit ? (
-                  onEdit ? (
-                    <button
-                      type="button"
-                      onClick={() => onEdit(faq.id)}
-                      className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-                    >
-                      Edit
-                    </button>
-                  ) : (
-                    <Link
-                      href={`/dashboard/faqs/${faq.id}/edit`}
-                      className="text-sm font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-                    >
-                      Edit
-                    </Link>
-                  )
-                ) : null}
-                <DeleteButton action={deleteFaqAction} id={faq.id} canEdit={canEdit} />
-              </div>
+            <TableCell className="gap-1">
+              {canEdit ? (
+                onEdit ? (
+                  <button type="button" onClick={() => onEdit(faq.id)} aria-label="Edit FAQ" title="Edit" className={EDIT_CLASS}>
+                    <Pencil className="size-5" strokeWidth={1.75} aria-hidden="true" />
+                  </button>
+                ) : (
+                  <Link href={`/dashboard/faqs/${faq.id}/edit`} aria-label="Edit FAQ" title="Edit" className={EDIT_CLASS}>
+                    <Pencil className="size-5" strokeWidth={1.75} aria-hidden="true" />
+                  </Link>
+                )
+              ) : null}
+              <DeleteButton action={deleteFaqAction} id={faq.id} canEdit={canEdit} variant="icon" label="Delete FAQ" />
             </TableCell>
           </TableRow>
         );

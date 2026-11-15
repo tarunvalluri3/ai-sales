@@ -13,22 +13,13 @@ import { ChatListPane } from "./_components/chat-list-pane";
  * navigating between conversations -- Next.js only re-renders `page.tsx`
  * on a sibling-route navigation within the same layout segment.
  *
- * Neither this row nor `<main>` above it (`app/(dashboard)/dashboard/layout.tsx`,
- * untouched) needs a bounded/`overflow-hidden` height. `ChatListPane`
- * pins itself to the viewport via `sticky top-0 h-screen self-start` --
- * the exact same technique `Sidebar` already uses one level up in the
- * tree -- at every breakpoint (its own `hidden`/`flex` visibility toggle
- * is what keeps it off-screen on mobile at the `[id]` route, not a
- * height of 0). The `{children}` wrapper only needs that same treatment
- * from `md:` up, where it sits *beside* `ChatListPane`; on mobile the two
- * routes never render side by side (`page.tsx`'s own content is `hidden`
- * there, `ConversationPanes` pins itself the same way `ChatListPane`
- * does), so forcing this wrapper to `h-screen` unconditionally would
- * stack an empty extra viewport-height block beneath the chat list.
- * That's what makes the chat list and the transcript/info-panel column
- * feel like a fixed 3-pane app shell without touching the shared
- * dashboard layout, without any `calc()` arbitrary Tailwind value, and
- * without any JS scroll lock.
+ * The workspace as a whole pins itself to the viewport (`sticky top-0
+ * h-screen`, the same technique `Sidebar` uses one level up), so `<main>`
+ * above it needs no bounded height: the panes (chat list, transcript,
+ * prospect context) sit edge to edge, full width, each scrolling internally,
+ * like the deployed inbox. The list pane carries the page's h1. Below `md:` only one card shows at
+ * a time: `ChatListPane` hides itself on the `[id]` route and the index
+ * page renders nothing visible, so the two never sit side by side there.
  */
 export default async function ConversationsLayout({ children }: LayoutProps<"/dashboard/conversations">) {
   const { businessId } = await requireLiveBusinessContext();
@@ -43,15 +34,13 @@ export default async function ConversationsLayout({ children }: LayoutProps<"/da
   ]);
 
   return (
-    <div className="flex flex-1 flex-col bg-ds-bg md:flex-row">
+    <div className="dashboard-conversation-workspace sticky top-0 flex h-screen w-full overflow-hidden border-t border-ds-border">
       <ChatListPane
         initialConversations={conversations}
         initialLeads={leads.map((lead) => ({ conversationId: lead.conversation_id, contactName: lead.contact_name }))}
         initialLastMessages={lastMessages}
       />
-      <div className="flex min-w-0 flex-1 flex-col md:sticky md:top-0 md:h-screen md:self-start md:overflow-hidden">
-        {children}
-      </div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );
 }

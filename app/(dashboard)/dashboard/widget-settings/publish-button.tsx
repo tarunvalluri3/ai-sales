@@ -51,7 +51,7 @@ export function PublishButton({
     <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h2 className="text-lg font-medium text-ds-text-primary">
+          <h2 className="text-base font-medium text-ds-text-primary">
             {published ? "Published" : "Not published yet"}
           </h2>
           <p className="max-w-xl text-sm text-ds-text-secondary">
@@ -96,7 +96,7 @@ export function PublishButton({
       ) : null}
 
       {confirming ? (
-        <p role="status" className="bg-ds-success-bg px-3 py-2 text-sm font-medium text-ds-success">
+        <p role="status" className="bg-ds-success-bg px-3 py-2 text-xs font-medium text-ds-success">
           Your agent is live. Taking you to your dashboard…
         </p>
       ) : null}

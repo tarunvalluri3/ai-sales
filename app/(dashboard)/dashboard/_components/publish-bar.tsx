@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { publishBusinessAction, type PublishBusinessState } from "../widget-settings/actions";
 import type { AgentChange } from "@/lib/agent-snapshot";
-import { Badge } from "./badge";
+import { CloudUpload, Headset } from "lucide-react";
+import { Pill, btnPrimary, btnText } from "./ui";
 import { ROLE_DENIED_TITLE } from "./delete-button";
 import { useFocusTrap } from "./use-focus-trap";
 import { useToast } from "./toast";
@@ -28,6 +29,22 @@ const AREA_HEADING: Record<AgentChange["area"], string> = {
 };
 
 const initialState: PublishBusinessState = {};
+
+/** The white "Sales agent / <name>" pill at the start of the top bar. */
+function AgentPill({ agentName }: { agentName: string }) {
+  return (
+    <p className="flex h-10 min-w-0 items-center gap-2.5 rounded-full border border-ds-border bg-ds-surface px-4 text-sm text-ds-text-primary">
+      <Headset className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+      <span className="hidden text-ds-text-secondary sm:inline">Sales agent</span>
+      <span aria-hidden="true" className="hidden text-ds-text-faint sm:inline">
+        /
+      </span>
+      <span className="truncate font-medium" title={agentName}>
+        {agentName}
+      </span>
+    </p>
+  );
+}
 const DIALOG_ID = "publish-changes-dialog";
 
 function groupByArea(changes: AgentChange[]): { area: AgentChange["area"]; items: AgentChange[] }[] {
@@ -96,12 +113,12 @@ export function PublishBar({
 
   if (!status || !status.isLive) {
     return (
-      <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate text-sm font-medium text-ds-text-primary">{agentName}</p>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+        <AgentPill agentName={agentName} />
         {status ? (
-          <Badge tone="muted" size="sm">
+          <Pill tone="gray" dot className="h-10 px-4">
             Not live
-          </Badge>
+          </Pill>
         ) : null}
       </div>
     );
@@ -110,12 +127,13 @@ export function PublishBar({
   const groups = groupByArea(status.changes);
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate text-sm font-medium text-ds-text-primary">{agentName}</p>
-        <Badge tone={status.hasUnpublishedChanges ? "warning" : "success"} size="sm">
-          {status.hasUnpublishedChanges ? "Live · Unpublished changes" : "Live"}
-        </Badge>
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+        <AgentPill agentName={agentName} />
+        <Pill tone="lime" dot className="h-10 px-4">
+          <span className="font-medium">Live</span>
+          {status.hasUnpublishedChanges ? <span className="font-normal">· Unpublished changes</span> : null}
+        </Pill>
       </div>
 
       {status.hasUnpublishedChanges ? (
@@ -131,8 +149,9 @@ export function PublishBar({
             setSeenState(state);
             setOpen(true);
           }}
-          className="ds-btn-label bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className={btnPrimary}
         >
+          <CloudUpload className="size-5" strokeWidth={1.75} aria-hidden="true" />
           Publish changes ({status.changeCount})
         </button>
       ) : null}
@@ -145,7 +164,7 @@ export function PublishBar({
             tabIndex={-1}
             disabled={isPending}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 bg-ds-scrim"
+            className="fixed inset-0 z-40 rounded-none bg-ds-scrim"
           />
           <div
             id={DIALOG_ID}
@@ -153,10 +172,10 @@ export function PublishBar({
             role="dialog"
             aria-modal="true"
             aria-labelledby={`${DIALOG_ID}-title`}
-            className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto border border-ds-border bg-ds-surface p-5"
+            className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-3xl border border-ds-border bg-ds-surface p-6"
           >
             <div className="flex flex-col gap-1">
-              <h2 id={`${DIALOG_ID}-title`} className="text-lg font-medium text-ds-text-primary">
+              <h2 id={`${DIALOG_ID}-title`} className="dx-title text-lg">
                 Publish changes
               </h2>
               <p className="text-sm text-ds-text-secondary">
@@ -168,7 +187,7 @@ export function PublishBar({
             <ul className="flex flex-col gap-3">
               {groups.map((group) => (
                 <li key={group.area} className="flex flex-col gap-1">
-                  <p className="text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
+                  <p className="text-xs font-medium text-ds-text-muted">
                     {AREA_HEADING[group.area]}
                   </p>
                   <ul className="flex flex-col gap-0.5">
@@ -183,7 +202,7 @@ export function PublishBar({
             </ul>
 
             {freshResult?.error ? (
-              <div role="alert" className="flex flex-col gap-1.5 bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+              <div role="alert" className="flex flex-col gap-1.5 rounded-xl bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
                 <p>{freshResult.error}</p>
                 {freshResult.blockingItems && freshResult.blockingItems.length > 0 ? (
                   <ul className="list-disc pl-4">
@@ -201,14 +220,14 @@ export function PublishBar({
                 type="button"
                 disabled={isPending}
                 onClick={() => setOpen(false)}
-                className="px-3 py-2 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                className={btnText}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                className={btnPrimary}
               >
                 {isPending ? "Publishing…" : "Publish"}
               </button>

@@ -11,7 +11,7 @@ export function InstallWidgetBanner({ hasActiveKey }: { hasActiveKey: boolean })
   return (
     <section
       aria-labelledby="install-widget-banner-heading"
-      className="flex flex-wrap items-center justify-between gap-3 border border-ds-border bg-ds-surface px-5 py-4"
+      className="dx-card flex flex-wrap items-center justify-between gap-3 px-5 py-4"
     >
       <div className="flex flex-col gap-0.5">
         <h2 id="install-widget-banner-heading" className="text-sm font-medium text-ds-text-primary">
@@ -25,7 +25,7 @@ export function InstallWidgetBanner({ hasActiveKey }: { hasActiveKey: boolean })
       </div>
       <Link
         href="/dashboard/widget-settings"
-        className="ds-btn-label shrink-0 bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="ds-btn-label inline-flex h-9 shrink-0 items-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
         Install your widget
       </Link>

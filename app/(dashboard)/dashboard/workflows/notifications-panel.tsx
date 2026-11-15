@@ -3,7 +3,8 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { markNotificationReadAction, type ActionState } from "./actions";
-import { EmptyState } from "../_components/state-views";
+import { Bell, MessageCircle } from "lucide-react";
+import { Card } from "../_components/ui";
 import type { InternalNotification } from "@/lib/supabase/types";
 
 const initialState: ActionState = {};
@@ -18,16 +19,17 @@ function NotificationRow({ notification }: { notification: InternalNotification 
 
   const content = (
     <>
-      <span className={`text-sm ${unread ? "font-medium text-ds-text-primary" : "text-ds-text-muted"}`}>{notification.message}</span>
-      <span className="text-2xs text-ds-text-muted">{formatDate(notification.created_at)}</span>
+      <span className={`text-sm leading-snug ${unread ? "font-medium text-ds-text-primary" : "text-ds-text-muted"}`}>{notification.message}</span>
+      <span className="text-sm text-ds-text-secondary">{formatDate(notification.created_at)}</span>
     </>
   );
 
   return (
-    <div className="flex items-center justify-between gap-2 px-2 py-1.5 hover:bg-ds-surface-soft">
-      <div className="flex flex-1 flex-col">
+    <div className="flex items-start gap-3 py-2.5">
+      <MessageCircle className="mt-0.5 size-5 shrink-0 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
+      <div className="flex min-w-0 flex-1 flex-col">
         {notification.link ? (
-          <Link href={notification.link} className="flex flex-col hover:underline">
+          <Link href={notification.link} className="flex flex-col rounded-md hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary">
             {content}
           </Link>
         ) : (
@@ -37,7 +39,7 @@ function NotificationRow({ notification }: { notification: InternalNotification 
       {unread ? (
         <form action={formAction}>
           <input type="hidden" name="id" value={notification.id} />
-          <button type="submit" disabled={isPending} className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
+          <button type="submit" disabled={isPending} className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-ds-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60">
             Mark read
           </button>
           {state.error ? (
@@ -53,17 +55,22 @@ function NotificationRow({ notification }: { notification: InternalNotification 
 
 export function NotificationsPanel({ notifications }: { notifications: InternalNotification[] }) {
   return (
-    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
-      <h2 className="text-sm font-medium text-ds-text-primary">Notifications</h2>
+    <Card className="flex flex-col gap-3 p-5">
+      <h2 className="dx-title flex items-center gap-3">
+        <Bell className="size-5" strokeWidth={1.75} aria-hidden="true" />
+        Notifications
+      </h2>
       {notifications.length === 0 ? (
-        <EmptyState title="No notifications" description="A workflow's internal-notification step will show up here." />
+        <p className="rounded-2xl bg-ds-surface-soft px-4 py-6 text-center text-sm text-ds-text-secondary">
+          No notifications. A workflow&rsquo;s in-app notification step will show up here.
+        </p>
       ) : (
-        <div className="flex flex-col gap-1">
+        <div className="dx-rows flex flex-col">
           {notifications.map((notification) => (
             <NotificationRow key={notification.id} notification={notification} />
           ))}
         </div>
       )}
-    </section>
+    </Card>
   );
 }

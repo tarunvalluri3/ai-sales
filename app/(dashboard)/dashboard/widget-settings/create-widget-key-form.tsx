@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { Plus } from "lucide-react";
 import { createWidgetKeyAction, type WidgetKeyActionState } from "./actions";
+import { btnOutline, helpClass, inputClass, labelClass, textareaClass } from "../_components/ui";
 
 const initialState: WidgetKeyActionState = {};
 
@@ -16,55 +18,55 @@ export function CreateWidgetKeyForm() {
   }, [state.success]);
 
   return (
-    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-medium text-ds-text-primary">Create a new widget key</h2>
-        <p className="text-xs text-ds-text-secondary">
-          Useful for rotating an existing key, or adding a key scoped to a new site. Leave origins
-          blank to create the key first and configure origins after.
-        </p>
+    <section className="flex flex-col gap-3 rounded-2xl border border-ds-border p-5">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="text-sm font-medium text-ds-text-primary">Create a new widget key</h3>
+        <p className="dx-subtitle">Use a separate key for another website, or to rotate an existing key.</p>
       </div>
       <form ref={formRef} action={formAction} className="flex flex-col gap-3">
-        <label htmlFor="new-key-name" className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds">
-          Nickname (optional, e.g. &ldquo;Marketing site&rdquo;)
-        </label>
-        <input
-          id="new-key-name"
-          name="name"
-          type="text"
-          maxLength={100}
-          placeholder="Marketing site"
-          disabled={isPending}
-          className="border border-ds-border bg-transparent px-3 py-2.5 text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
-        />
-        <label htmlFor="new-key-origins" className="text-xs font-medium text-ds-text-muted uppercase tracking-wide-ds">
-          Allowed origins for this new key (optional — add later)
-        </label>
-        <textarea
-          id="new-key-origins"
-          name="origins"
-          rows={2}
-          placeholder="https://example.com"
-          disabled={isPending}
-          aria-describedby="new-key-origins-hint"
-          className="border border-ds-border bg-transparent px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
-        />
-        <p id="new-key-origins-hint" className="text-xs text-ds-text-muted">
-          Just the address itself, one per line, e.g. https://example.com — no page path or trailing slash.
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="new-key-name" className={labelClass}>
+            Nickname <span className="font-normal text-ds-text-secondary">(optional)</span>
+          </label>
+          <input
+            id="new-key-name"
+            name="name"
+            type="text"
+            maxLength={100}
+            placeholder="e.g. Landing page"
+            disabled={isPending}
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="new-key-origins" className={labelClass}>
+            Allowed origins <span className="font-normal text-ds-text-secondary">(optional, add later)</span>
+          </label>
+          <textarea
+            id="new-key-origins"
+            name="origins"
+            rows={2}
+            placeholder="https://example.com"
+            disabled={isPending}
+            aria-describedby="new-key-origins-hint"
+            className={`${textareaClass} font-mono`}
+          />
+          <p id="new-key-origins-hint" className={helpClass}>
+            Only these exact website addresses can use this key. One per line, no page path or trailing slash.
+          </p>
+        </div>
         {state.error ? (
-          <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+          <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
             {state.error}
           </p>
         ) : null}
         {state.success ? (
-          <p className="bg-ds-success-bg px-3 py-2 text-xs text-ds-success">Key created.</p>
+          <p role="status" className="rounded-xl bg-ds-success-bg px-3 py-2 text-sm text-ds-success">
+            Key created.
+          </p>
         ) : null}
-        <button
-          type="submit"
-          disabled={isPending}
-          className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
-        >
+        <button type="submit" disabled={isPending} className={`${btnOutline} w-full`}>
+          <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />
           {isPending ? "Creating…" : "Create key"}
         </button>
       </form>

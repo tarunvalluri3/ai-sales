@@ -3,7 +3,8 @@ import { SnoozeMenu } from "./snooze-menu";
 import { MarkAsHandledButton } from "./mark-handled-button";
 import { PRIORITY_REASON_KEY_LABELS } from "@/lib/copilot-lifecycle";
 import type { UpcomingActionItem } from "@/lib/copilot-actions";
-import { Badge } from "../_components/badge";
+import { Clock, MessageCircle } from "lucide-react";
+import { Pill, btnOutlineSm } from "../_components/ui";
 import { EmptyState } from "../_components/state-views";
 
 function formatSnoozedUntil(iso: string, timezone: string): string {
@@ -32,30 +33,37 @@ export function UpcomingList({ items, canManage, timezone }: { items: UpcomingAc
   return (
     <ul className="flex flex-col gap-3">
       {items.map((item) => (
-        <li key={item.id} className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
+        <li key={item.id} className="dx-card flex flex-col gap-3 p-5">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="flex flex-col">
-              <Link href={`/dashboard/customers/${item.customerId}`} className="text-sm font-medium text-ds-text-primary hover:underline">
+              <Link
+                href={`/dashboard/customers/${item.customerId}`}
+                className="w-fit rounded-md text-sm font-medium text-ds-primary underline underline-offset-4"
+              >
                 {item.customerName ?? "Unnamed prospect"}
               </Link>
-              <span className="text-sm text-ds-text-secondary">{item.title}</span>
+              <span className="text-sm font-medium text-ds-text-primary">{item.title}</span>
             </div>
-            <span className="text-xs font-medium text-ds-text-muted">{formatSnoozedUntil(item.snoozedUntil, timezone)}</span>
+            <span className="flex items-center gap-2 text-sm font-medium text-ds-text-primary">
+              <Clock className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              {formatSnoozedUntil(item.snoozedUntil, timezone)}
+            </span>
           </div>
 
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-2">
             {item.reasonKeys.map((key) => (
-              <Badge key={key} tone="muted" size="sm">
+              <Pill key={key} tone="gray" size="sm">
                 {PRIORITY_REASON_KEY_LABELS[key]}
-              </Badge>
+              </Pill>
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href={`/dashboard/customers/${item.customerId}`}
-              className="ds-btn-label w-fit bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className={`${btnOutlineSm} h-10`}
             >
+              <MessageCircle className="size-5" strokeWidth={1.75} aria-hidden="true" />
               Open conversation
             </Link>
             <MarkAsHandledButton customerId={item.customerId} reasonKeys={item.reasonKeys} canManage={canManage} />

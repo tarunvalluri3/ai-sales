@@ -77,8 +77,8 @@ export function DataTable<T>({
   const gridTemplateColumns = columns.map((column) => column.width ?? "1fr").join(" ");
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto border border-ds-border">
+    <div className="flex flex-col gap-3">
+      <div className="dx-table-frame overflow-x-auto">
         {/* No min-w-max here: it forces min-width:max-content, which
             defeats the fr-based column sizing above and forces horizontal
             scroll even on a viewport wide enough for the grid to shrink to
@@ -98,23 +98,23 @@ export function DataTable<T>({
                   key={column.key}
                   role="columnheader"
                   aria-sort={ariaSort}
-                  className={`flex items-center gap-1 ds-label border-b border-ds-border px-3 py-3 text-ds-text-muted ${alignClass}`}
+                  className={`dx-th flex min-h-10 items-center gap-1 px-4 py-2.5 ${alignClass}`}
                 >
                   {isSortable ? (
                     <button
                       type="button"
                       onClick={() => handleHeaderClick(column)}
-                      className="flex items-center gap-1 transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                      className="flex items-center gap-1 rounded-md font-medium transition-colors hover:text-ds-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
                     >
                       {column.label}
                       {isCurrent ? (
                         sort!.direction === "asc" ? (
-                          <ChevronUp className="size-3.5" aria-hidden="true" />
+                          <ChevronUp strokeWidth={1.75} className="size-3.5" aria-hidden="true" />
                         ) : (
-                          <ChevronDown className="size-3.5" aria-hidden="true" />
+                          <ChevronDown strokeWidth={1.75} className="size-3.5" aria-hidden="true" />
                         )
                       ) : (
-                        <ChevronsUpDown className="size-3.5 opacity-50" aria-hidden="true" />
+                        <ChevronsUpDown strokeWidth={1.75} className="size-3.5 opacity-50" aria-hidden="true" />
                       )}
                     </button>
                   ) : (
@@ -127,7 +127,7 @@ export function DataTable<T>({
 
           {pageItems.length === 0 ? (
             <div role="row" className="contents">
-              <div role="cell" className="col-span-full px-4 py-10 text-center text-sm text-ds-text-muted">
+              <div role="cell" className="col-span-full px-4 py-12 text-center text-sm text-ds-text-secondary">
                 {emptyState ?? "Nothing to show."}
               </div>
             </div>
@@ -138,9 +138,9 @@ export function DataTable<T>({
       </div>
 
       {items.length > pageSize ? (
-        <div className="flex items-center justify-between gap-3 px-1 text-xs text-ds-text-secondary">
+        <div className="flex items-center justify-between gap-3 px-1 text-sm text-ds-text-secondary">
           <span>
-            {start + 1}–{Math.min(start + pageSize, items.length)} of {items.length}
+            Showing {start + 1}–{Math.min(start + pageSize, items.length)} of {items.length}
           </span>
           <div className="flex items-center gap-1">
             <button
@@ -148,9 +148,9 @@ export function DataTable<T>({
               onClick={() => setPage((current) => Math.max(0, current - 1))}
               disabled={currentPage === 0}
               aria-label="Previous page"
-              className="flex size-7 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="flex size-9 items-center justify-center rounded-xl border border-ds-border-strong bg-ds-surface text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
             >
-              <ChevronLeft className="size-4" aria-hidden="true" />
+              <ChevronLeft strokeWidth={1.75} className="size-4" aria-hidden="true" />
             </button>
             <span className="px-1">
               {currentPage + 1} / {totalPages}
@@ -160,9 +160,9 @@ export function DataTable<T>({
               onClick={() => setPage((current) => Math.min(totalPages - 1, current + 1))}
               disabled={currentPage >= totalPages - 1}
               aria-label="Next page"
-              className="flex size-7 items-center justify-center text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="flex size-9 items-center justify-center rounded-xl border border-ds-border-strong bg-ds-surface text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
             >
-              <ChevronRight className="size-4" aria-hidden="true" />
+              <ChevronRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -242,7 +242,7 @@ export function TableCell({
     <div
       id={id}
       role="cell"
-      className={`flex min-w-0 gap-2 border-b border-ds-border px-3 py-3 text-sm text-ds-text-primary transition-colors group-hover:bg-ds-surface-elevated ${isCol ? "flex-col" : ""} ${crossAxisClass} ${mainAxisClass} ${className}`}
+      className={`flex min-h-14 min-w-0 gap-2 border-b border-ds-border px-4 py-3 text-sm text-ds-text-primary transition-colors group-hover:bg-ds-surface-soft/60 ${isCol ? "flex-col" : ""} ${crossAxisClass} ${mainAxisClass} ${className}`}
     >
       {children}
     </div>

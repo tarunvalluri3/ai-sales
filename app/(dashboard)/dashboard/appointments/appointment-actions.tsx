@@ -12,6 +12,7 @@ import {
 import type { AppointmentStatus } from "@/lib/supabase/types";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { useToast } from "../_components/toast";
+import { btnGhost, btnGhostSm, btnPrimary, btnPrimarySm } from "../_components/ui";
 
 const initialState: AppointmentActionState = {};
 
@@ -23,10 +24,6 @@ const SUCCESS_MESSAGE: Record<"confirm" | "decline" | "cancel" | "complete" | "n
   no_show: "Marked no-show",
 };
 
-const successStyle =
-  "px-2 py-1 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
-const dangerStyle =
-  "px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
 
 /**
  * Confirm/Decline for a pending appointment; a confirmed one gets Cancel
@@ -34,18 +31,28 @@ const dangerStyle =
  * `isPastDue` (2026-09-10 follow-up -- a meeting that already happened
  * shouldn't still offer "Cancel"). No action for the five terminal
  * statuses (declined/cancelled/completed/no_show).
+ *
+ * `layout="card"` is the pending-request card on the Requests page: the two
+ * buttons stretch to share the card's width. The default `"row"` is the
+ * compact pair used inside the appointments table.
  */
 export function AppointmentActions({
   id,
   status,
   isPastDue,
   canEdit = true,
+  layout = "row",
 }: {
   id: string;
   status: AppointmentStatus;
   isPastDue: boolean;
   canEdit?: boolean;
+  layout?: "row" | "card";
 }) {
+  const isCard = layout === "card";
+  const successStyle = isCard ? `${btnPrimary} w-full` : btnPrimarySm;
+  const dangerStyle = isCard ? `${btnGhost} w-full` : btnGhostSm;
+  const formClass = isCard ? "flex-1" : undefined;
   const { toast } = useToast();
   const [confirmState, confirmFormAction, isConfirming] = useActionState(confirmAppointmentAction, initialState);
   const [declineState, declineFormAction, isDeclining] = useActionState(declineAppointmentAction, initialState);
@@ -81,17 +88,17 @@ export function AppointmentActions({
   }
 
   return (
-    <div className="flex shrink-0 flex-col items-end gap-1">
-      <div className="flex items-center gap-3">
+    <div className={`flex flex-col gap-1 ${isCard ? "w-full" : "shrink-0 items-start"}`}>
+      <div className={`flex items-center ${isCard ? "gap-3" : "gap-2"}`}>
         {status === "pending" ? (
           <>
-            <form action={confirmFormAction}>
+            <form action={confirmFormAction} className={formClass}>
               <input type="hidden" name="id" value={id} />
               <button type="submit" disabled={disabled} title={disabledTitle} className={successStyle}>
                 {isConfirming ? "Confirming…" : "Confirm"}
               </button>
             </form>
-            <form action={declineFormAction}>
+            <form action={declineFormAction} className={formClass}>
               <input type="hidden" name="id" value={id} />
               <button type="submit" disabled={disabled} title={disabledTitle} className={dangerStyle}>
                 {isDeclining ? "Declining…" : "Decline"}
@@ -100,21 +107,21 @@ export function AppointmentActions({
           </>
         ) : isPastDue ? (
           <>
-            <form action={completeFormAction}>
+            <form action={completeFormAction} className={formClass}>
               <input type="hidden" name="id" value={id} />
               <button type="submit" disabled={disabled} title={disabledTitle} className={successStyle}>
                 {isCompleting ? "Marking…" : "Mark completed"}
               </button>
             </form>
-            <form action={noShowFormAction}>
+            <form action={noShowFormAction} className={formClass}>
               <input type="hidden" name="id" value={id} />
               <button type="submit" disabled={disabled} title={disabledTitle} className={dangerStyle}>
-                {isMarkingNoShow ? "Marking…" : "Mark no-show"}
+                {isMarkingNoShow ? "Marking…" : "No-show"}
               </button>
             </form>
           </>
         ) : (
-          <form action={cancelFormAction}>
+          <form action={cancelFormAction} className={formClass}>
             <input type="hidden" name="id" value={id} />
             <button type="submit" disabled={disabled} title={disabledTitle} className={dangerStyle}>
               {isCancelling ? "Cancelling…" : "Cancel"}

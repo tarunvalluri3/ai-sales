@@ -1,27 +1,23 @@
 "use client";
 
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
-import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
+import { clerkDashboardAppearance } from "@/lib/clerk-appearance";
 import { NotificationBell } from "./notification-bell";
 import { ThemeToggle } from "../../_components/theme-toggle";
+import { MobileNav } from "./mobile-nav";
 import { PublishBar, type PublishBarStatus } from "./publish-bar";
 
 /**
- * The dashboard's top bar. Visually identical to the branch it replaced in
- * `app/(dashboard)/_components/site-header.tsx`, but rendered from
- * `dashboard/layout.tsx` instead of the root layout.
+ * The dashboard top bar, rendered from `dashboard/layout.tsx` (not the root
+ * layout) so the notification bell sits inside `AttentionProvider` and can
+ * read the unread count from the existing poll; hoisting the providers to the
+ * root would mount a business-scoped poll on the marketing and sign-in pages.
  *
- * It had to move. `SiteHeader` lives in the root layout, which is *outside*
- * `AttentionProvider`, so a bell rendered there could not read the unread
- * count. The alternative -- hoisting the providers up to the root layout --
- * would mount a business-scoped 1-second poll on the marketing homepage and
- * the sign-in pages, where `requireBusinessContext()` redirects anyone without
- * an organization. Moving the chrome that genuinely belongs to the dashboard
- * into the dashboard is the smaller and safer change.
- *
- * Draft -> Publish -> Live (2026-10-29): the left side carries the agent's
- * name, its Live / "Live · Unpublished changes" pill and the "Publish
- * changes (N)" button -- the dashboard's one publish control.
+ * Draft -> Publish -> Live: the left side carries the agent pill and its
+ * Live / "Live · Unpublished changes" status, the right side the "Publish
+ * changes (N)" button (the one publish control in the dashboard), then
+ * alerts, the organization switcher and the account menu. The dashboard is
+ * light only, so there is no theme toggle here.
  */
 export function DashboardHeader({
   agentName,
@@ -33,18 +29,20 @@ export function DashboardHeader({
   canPublish: boolean;
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-16 border-b border-ds-border bg-ds-surface px-4 py-2 lg:px-6">
+    <header className="flex w-full min-h-16 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 lg:px-6">
+      <MobileNav businessName={agentName} />
       <PublishBar agentName={agentName} status={publishStatus} canPublish={canPublish} />
       <div className="flex items-center gap-3">
-        <ThemeToggle />
+        {/* Same toggle and "theme" storage key as production; size-9 to match the Wave header controls. */}
+        <ThemeToggle className="size-9! rounded-xl" />
         <NotificationBell />
         <OrganizationSwitcher
           hidePersonal
           afterSelectOrganizationUrl="/dashboard"
           afterCreateOrganizationUrl="/dashboard"
-          appearance={clerkDarkCompactAppearance}
+          appearance={clerkDashboardAppearance}
         />
-        <UserButton appearance={clerkDarkCompactAppearance} />
+        <UserButton appearance={clerkDashboardAppearance} />
       </div>
     </header>
   );

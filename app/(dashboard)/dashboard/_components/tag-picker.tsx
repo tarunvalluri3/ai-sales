@@ -68,7 +68,7 @@ export function TagPicker({
         defaultValue=""
         disabled={isPending || disabled}
         onChange={handleChange}
-        className="border border-dashed border-ds-border bg-transparent px-1.5 py-0.5 text-2xs text-ds-text-muted transition-colors hover:border-ds-border-strong focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="dx-tag-picker h-8 cursor-pointer rounded-full border border-ds-border-strong bg-ds-surface px-3 text-xs font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-60"
       >
         <option value="">+ Add tag</option>
         {availableTags.map((tag) => (

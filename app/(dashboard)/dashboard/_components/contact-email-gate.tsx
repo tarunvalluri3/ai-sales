@@ -38,9 +38,9 @@ export function ContactEmailGate({ hasContactEmail }: { hasContactEmail: boolean
       aria-labelledby="contact-email-gate-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-ds-bg/80 p-4 backdrop-blur-sm"
     >
-      <div className="flex w-full max-w-md flex-col gap-4 border border-ds-border bg-ds-surface-elevated p-6">
+      <div className="flex w-full max-w-md flex-col gap-4 rounded-3xl border border-ds-border bg-ds-surface-elevated p-6 shadow-float">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-ds-warning" aria-hidden="true" />
+          <AlertTriangle strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">
             <h2 id="contact-email-gate-title" className="text-base font-medium text-ds-text-primary">
               Add an alert email to continue
@@ -53,7 +53,7 @@ export function ContactEmailGate({ hasContactEmail }: { hasContactEmail: boolean
         </div>
         <Link
           href="/dashboard/profile"
-          className="bg-dashboard-primary px-4 py-2 text-center text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label inline-flex h-9 items-center justify-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           Add it on your business profile
         </Link>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { Tag } from "lucide-react";
 import {
   assignTagToConversationAction,
   removeTagFromConversationAction,
@@ -41,7 +42,7 @@ function SuggestionChip({
       <button
         type="submit"
         disabled={isPending}
-        className="border border-dashed border-ds-border px-2 py-0.5 text-2xs font-medium text-ds-text-secondary transition-colors hover:border-ds-accent hover:text-ds-text-primary disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="inline-flex h-7 items-center rounded-full border border-dashed border-ds-border-strong px-3 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-primary hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
         {isPending ? "Adding…" : `+ ${name}`}
       </button>
@@ -112,11 +113,28 @@ export function TagsCard({
   }
 
   return (
-    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
-      <h3 className="text-sm font-medium text-ds-text-primary">Tags</h3>
+    <div className="flex flex-col gap-3 rounded-2xl border border-ds-border p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2.5 text-sm font-medium text-ds-text-primary">
+          <Tag className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          Tags
+        </h3>
+        {canEdit ? (
+          <form action={suggestAction}>
+            <input type="hidden" name="conversationId" value={conversationId} />
+            <button
+              type="submit"
+              disabled={isSuggesting}
+              className="rounded-md text-sm font-medium text-ds-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
+            >
+              {isSuggesting ? "Suggesting…" : "Suggest tags"}
+            </button>
+          </form>
+        ) : null}
+      </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {tags.length === 0 ? <span className="text-xs text-ds-text-muted">No tags yet.</span> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {tags.length === 0 ? <span className="text-xs text-ds-text-secondary">No tags yet.</span> : null}
         {tags.map((tag) => (
           <RemovableTagChip
             key={tag.id}
@@ -127,37 +145,26 @@ export function TagsCard({
             onRemoved={() => handleRemoved(tag.id)}
           />
         ))}
+        {canEdit ? (
+          <TagPicker
+            availableTags={availableCatalogTags}
+            action={assignTagToConversationAction}
+            hiddenFields={{ conversationId }}
+            onAssigned={handleAssigned}
+          />
+        ) : null}
       </div>
 
-      {canEdit ? (
-        <TagPicker
-          availableTags={availableCatalogTags}
-          action={assignTagToConversationAction}
-          hiddenFields={{ conversationId }}
-          onAssigned={handleAssigned}
-        />
-      ) : null}
-
-      {canEdit ? (
-        <div className="flex flex-col items-start gap-1.5 border-t border-ds-border pt-2">
-          <form action={suggestAction}>
-            <input type="hidden" name="conversationId" value={conversationId} />
-            <button
-              type="submit"
-              disabled={isSuggesting}
-              className="inline-flex items-center border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-            >
-              {isSuggesting ? "Suggesting…" : "Suggest tags"}
-            </button>
-          </form>
+      {canEdit && (suggestState.error || suggestions.length > 0) ? (
+        <div className="flex flex-col items-start gap-2 border-t border-ds-border pt-3">
           {suggestState.error ? (
             <span role="alert" className="text-xs text-ds-danger">
               {suggestState.error}
             </span>
           ) : null}
           {suggestions.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-2xs text-ds-text-muted">AI-suggested — click to add:</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-ds-text-secondary">AI-suggested — click to add:</span>
               {suggestions.map((name) => (
                 <SuggestionChip key={name} name={name} conversationId={conversationId} onAccepted={handleAccepted} />
               ))}

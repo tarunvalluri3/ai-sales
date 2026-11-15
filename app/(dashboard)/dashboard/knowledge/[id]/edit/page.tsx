@@ -22,9 +22,9 @@ export default async function EditKnowledgeDocumentPage({
   const chunks = await listChunksForDocument(businessId, document.id);
 
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Edit knowledge document</h1>
-      <section className="flex w-full max-w-lg flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+    <div className="flex flex-1 flex-col gap-8">
+      <h1 className="text-[28px] leading-[1.15] font-light sm:text-[32px] text-ds-text-primary">Edit knowledge document</h1>
+      <section className="dx-card flex w-full max-w-2xl flex-col gap-4 dx-card-pad">
         {hasMinRole(orgRole, "org:member") ? (
           <KnowledgeForm
             action={updateKnowledgeDocumentAction}
@@ -39,10 +39,10 @@ export default async function EditKnowledgeDocumentPage({
         )}
       </section>
 
-      <div className="flex max-w-lg flex-col gap-3">
+      <div className="dx-card flex max-w-2xl flex-col gap-3 dx-card-pad">
         <div className="flex flex-col gap-1">
-          <h2 className="text-sm font-medium text-ds-text-primary">How your AI reads this document</h2>
-          <p className="text-xs text-ds-text-secondary">
+          <h2 className="dx-title">How your AI reads this document</h2>
+          <p className="text-sm text-ds-text-secondary">
             Long documents are automatically split into smaller pieces so your AI can search and reference the
             right part of this document when answering a prospect&rsquo;s question.
           </p>
@@ -60,9 +60,9 @@ export default async function EditKnowledgeDocumentPage({
             {chunks.map((chunk) => (
               <li
                 key={chunk.id}
-                className="max-h-40 overflow-y-auto border border-ds-border bg-ds-surface px-3 py-2 text-sm text-ds-text-secondary"
+                className="max-h-40 overflow-y-auto rounded-xl bg-ds-surface-soft px-4 py-3 text-sm text-ds-text-secondary"
               >
-                <p className="mb-1 text-2xs font-medium tracking-wide-ds text-ds-text-muted uppercase">
+                <p className="mb-1 text-xs font-medium text-ds-text-primary">
                   Piece {chunk.chunk_index + 1} · {chunk.char_count} characters
                 </p>
                 <p className="whitespace-pre-wrap">{chunk.content}</p>

@@ -7,7 +7,7 @@ import type { AnnouncementSeverity } from "@/lib/supabase/types";
 type Announcement = { id: string; message: string; severity: AnnouncementSeverity };
 
 const SEVERITY_CLASS: Record<AnnouncementSeverity, string> = {
-  info: "bg-ds-surface-raised text-ds-text-primary",
+  info: "bg-ds-surface-soft text-ds-text-primary",
   warning: "bg-ds-warning-bg text-ds-warning",
   critical: "bg-ds-danger-bg text-ds-danger",
 };
@@ -40,12 +40,12 @@ export function AnnouncementBanner({ announcements }: { announcements: Announcem
   }
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-2 px-4 pt-3 md:px-6">
       {visible.map((a) => (
-        <div key={a.id} className={`flex items-center justify-between gap-3 px-4 py-2 text-sm ${SEVERITY_CLASS[a.severity]}`}>
+        <div key={a.id} className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-2.5 text-sm ${SEVERITY_CLASS[a.severity]}`}>
           <span>{a.message}</span>
           <button type="button" onClick={() => dismiss(a.id)} aria-label="Dismiss" className="shrink-0 opacity-70 hover:opacity-100">
-            <X className="size-4" aria-hidden="true" />
+            <X strokeWidth={1.75} className="size-4" aria-hidden="true" />
           </button>
         </div>
       ))}

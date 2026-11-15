@@ -3,6 +3,8 @@ import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
 import { ProfileForm } from "./profile-form";
 import { DangerZone } from "./danger-zone";
+import { Lock, Store } from "lucide-react";
+import { Card, PageHeader } from "../_components/ui";
 
 export default async function ProfilePage() {
   const context = await requireAuthContext();
@@ -19,15 +21,10 @@ export default async function ProfilePage() {
   const isAdmin = context.orgRole === "org:admin";
 
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Business profile</h1>
-        <p className="text-sm text-ds-text-secondary">
-          This is what your AI sales employee tells prospects about who you are.
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeader icon={Store} title="Business profile" description="What your AI sales employee tells prospects about who you are." />
 
-      <section className="flex w-full max-w-lg flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+      <Card className="">
         <ProfileForm
           initialName={business.name}
           initialBusinessType={business.business_type}
@@ -37,9 +34,14 @@ export default async function ProfilePage() {
           initialWebsite={business.website ?? ""}
           canEdit={isAdmin}
         />
-      </section>
+      </Card>
 
       {isAdmin ? <DangerZone businessName={business.name} /> : null}
+
+      <p className="flex items-center gap-3 px-2 text-sm text-ds-text-secondary">
+        <Lock className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        Only organisation admins can edit this profile.
+      </p>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { dismissPriorityItemAction, type DismissState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import type { PriorityReasonKey } from "@/lib/copilot-lifecycle";
+import { Check } from "lucide-react";
 
 const initialState: DismissState = {};
 
@@ -34,8 +35,9 @@ export function MarkAsHandledButton({
         type="submit"
         disabled={isPending || !canManage}
         title={canManage ? undefined : ROLE_DENIED_TITLE}
-        className="w-fit border border-ds-border bg-ds-surface-elevated px-2.5 py-1 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60"
+        className="ds-btn-label inline-flex h-10 items-center gap-2 rounded-xl border border-ds-border-strong bg-ds-surface px-4 text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
+        <Check strokeWidth={1.75} className="size-4" aria-hidden="true" />
         {isPending ? "Marking…" : "Mark as handled"}
       </button>
       {state.error ? (

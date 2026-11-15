@@ -21,9 +21,9 @@ const initialState: PublishState = {};
  */
 const TRIGGER_CLASS = {
   primary:
-    "ds-btn-label bg-ds-primary px-3 py-1.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary",
+    "ds-btn-label inline-flex h-9 items-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary",
   menuitem:
-    "block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary",
+    "block w-full rounded-none px-4 py-2.5 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-primary",
 } as const;
 
 export function PublishToggleButton({
@@ -63,7 +63,7 @@ export function PublishToggleButton({
               role={isMenuItem ? "menuitem" : undefined}
               disabled={isPending}
               autoFocus
-              className="bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+              className="inline-flex h-9 items-center rounded-xl bg-ds-danger px-3 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
             >
               {isPending ? pendingLabel : `Confirm ${label.toLowerCase()}`}
             </button>
@@ -73,7 +73,7 @@ export function PublishToggleButton({
             role={isMenuItem ? "menuitem" : undefined}
             onClick={() => setConfirming(false)}
             disabled={isPending}
-            className="px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="inline-flex h-9 items-center rounded-xl px-3 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
           >
             Cancel
           </button>

@@ -35,14 +35,14 @@ export function ReviewActions({
   const disabled = isApproving || isRejecting || !canEdit;
 
   return (
-    <div className="flex shrink-0 items-center gap-3">
+    <div className="flex shrink-0 flex-wrap items-center gap-3">
       <form action={approveFormAction}>
         <input type="hidden" name="id" value={id} />
         <button
           type="submit"
           disabled={disabled}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="px-2 py-1 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label inline-flex h-10 items-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           {isApproving ? "Approving…" : "Approve"}
         </button>
@@ -53,7 +53,7 @@ export function ReviewActions({
           type="submit"
           disabled={disabled}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label inline-flex h-10 items-center rounded-xl border border-ds-border-strong bg-ds-surface px-4 text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           {isRejecting ? "Rejecting…" : "Reject"}
         </button>

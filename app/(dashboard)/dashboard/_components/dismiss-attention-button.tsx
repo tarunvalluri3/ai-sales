@@ -34,7 +34,7 @@ export function DismissAttentionButton({
         type="submit"
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="border border-ds-border-strong px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="inline-flex h-8 items-center rounded-full border border-ds-border-strong bg-ds-surface px-3 text-xs font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
         {isPending ? "Dismissing…" : "Dismiss alert"}
       </button>

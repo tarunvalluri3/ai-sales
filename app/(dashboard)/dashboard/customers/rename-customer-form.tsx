@@ -3,6 +3,10 @@
 import { useActionState, useState } from "react";
 import { Pencil } from "lucide-react";
 import { renameCustomerAction, type ActionState } from "./actions";
+import { btnPrimarySm, btnText } from "../_components/ui";
+import { displayContactName } from "@/lib/lead-source";
+
+const NAME_CLASS = "text-[28px] leading-[1.15] font-light sm:text-[32px] text-ds-text-primary";
 
 const initialState: ActionState = {};
 
@@ -26,7 +30,7 @@ export function RenameCustomerForm({
   }
 
   if (!canEdit) {
-    return <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{displayName ?? "Unnamed prospect"}</h1>;
+    return <h1 className={NAME_CLASS}>{displayContactName(displayName) ?? "Unnamed prospect"}</h1>;
   }
 
   if (!editing) {
@@ -34,17 +38,17 @@ export function RenameCustomerForm({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="group flex items-center gap-1.5 text-left"
+        className="group flex items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         aria-label="Rename customer"
       >
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{displayName ?? "Unnamed prospect"}</h1>
-        <Pencil className="size-3.5 text-ds-text-muted opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+        <h1 className={NAME_CLASS}>{displayContactName(displayName) ?? "Unnamed prospect"}</h1>
+        <Pencil className="size-5 text-ds-text-primary transition-colors group-hover:text-ds-primary" strokeWidth={1.75} aria-hidden="true" />
       </button>
     );
   }
 
   return (
-    <form action={formAction} className="flex items-center gap-2">
+    <form action={formAction} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={customerId} />
       <input
         type="text"
@@ -54,12 +58,12 @@ export function RenameCustomerForm({
         maxLength={200}
         autoFocus
         disabled={isPending}
-        className="border border-ds-border bg-ds-surface-elevated px-2 py-1 text-sm text-ds-text-primary focus:border-ds-accent focus:outline-none disabled:opacity-60"
+        className="h-10 w-72 max-w-full rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 text-sm font-medium text-ds-text-primary disabled:opacity-60"
       />
       <button
         type="submit"
         disabled={isPending || !name.trim()}
-        className="ds-btn-label bg-ds-primary px-2 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
+        className={btnPrimarySm}
       >
         {isPending ? "Saving…" : "Save"}
       </button>
@@ -70,7 +74,7 @@ export function RenameCustomerForm({
           setName(displayName ?? "");
         }}
         disabled={isPending}
-        className="px-2 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60"
+        className={btnText}
       >
         Cancel
       </button>

@@ -52,17 +52,17 @@ export function AddKnowledgeTabs({
   const panels: Record<AddKnowledgeMethod, ReactNode> = { manual: manualForm, file: fileForm, url: urlForm };
 
   return (
-    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-medium text-ds-text-primary">Add knowledge</h2>
-        <p className="text-xs text-ds-text-secondary">Choose how you want to add this document.</p>
+    <section className="dx-card flex flex-col gap-4 dx-card-pad xl:sticky xl:top-4">
+      <div className="flex flex-col gap-0.5">
+        <h2 className="dx-title">Add knowledge</h2>
+        <p className="dx-subtitle">Give your AI a trusted source.</p>
       </div>
 
       <div
         role="tablist"
         aria-label="Add knowledge method"
         onKeyDown={handleTabListKeyDown}
-        className="inline-flex w-fit items-center gap-4 border-b border-ds-border"
+        className="grid grid-cols-3 overflow-hidden rounded-xl border border-ds-border-strong"
       >
         {TABS.map((t) => (
           <button
@@ -74,10 +74,10 @@ export function AddKnowledgeTabs({
             aria-controls={`add-knowledge-panel-${t.id}`}
             tabIndex={method === t.id ? 0 : -1}
             onClick={() => setMethod(t.id)}
-            className={`ds-label -mb-px border-b-2 px-1 py-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+            className={`min-h-10 rounded-none px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-primary ${
               method === t.id
-                ? "border-ds-accent text-ds-text-primary"
-                : "border-transparent text-ds-text-muted hover:text-ds-text-primary"
+                ? "bg-ds-lime-soft font-medium text-ds-text-primary"
+                : "bg-ds-surface text-ds-text-primary hover:bg-ds-surface-soft"
             }`}
           >
             {t.label}
@@ -90,6 +90,18 @@ export function AddKnowledgeTabs({
           {panels[t.id]}
         </div>
       ))}
+
+      <ol className="grid grid-cols-3 gap-3 border-t border-ds-border pt-4">
+        {["Upload and process", "Review and approve", "Publish to go live"].map((label, index) => (
+          <li key={label} className="flex items-center gap-2.5 text-sm text-ds-text-primary">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ds-surface-soft text-sm font-medium text-ds-text-primary">
+              {index + 1}
+            </span>
+            {label}
+          </li>
+        ))}
+      </ol>
+      <p className="border-t border-ds-border pt-3 text-center text-sm text-ds-text-secondary">New documents start as drafts.</p>
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { Layers } from "lucide-react";
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
 import { listProductsForBusiness, listPendingReviewProducts } from "@/lib/products";
@@ -6,7 +7,8 @@ import { ReviewActions } from "../_components/review-actions";
 import { ProductForm } from "./product-form";
 import { ProductsList } from "./products-list";
 import { createProductAction, deleteProductAction, approveProductAction, rejectProductAction } from "./actions";
-import { EmptyState, PermissionNotice } from "../_components/state-views";
+import { PermissionNotice } from "../_components/state-views";
+import { Card, PageHeader, Pill } from "../_components/ui";
 
 export default async function ProductsPage() {
   const { businessId, orgRole } = await requireBusinessContext();
@@ -21,78 +23,86 @@ export default async function ProductsPage() {
   const documentTitleById = await getKnowledgeDocumentTitles(businessId, sourceDocumentIds);
 
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Products</h1>
-        <p className="text-sm text-ds-text-secondary">
-          What your AI sales employee can tell prospects you sell.
-        </p>
-      </div>
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeader icon={Layers} title="Products" description="What your AI sales employee can tell prospects you sell." />
 
-      {pendingProducts.length > 0 ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-ds-text-primary">Pending review</h2>
-          <ul className="flex flex-col gap-3">
-            {pendingProducts.map((product) => (
-              <li
-                key={product.id}
-                className="flex items-center justify-between gap-4 border border-ds-warning/40 bg-ds-warning-bg px-4 py-3"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  {product.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- catalog photo extracted from an uploaded PDF or hand-entered URL
-                    <img
-                      src={product.image_url}
-                      alt=""
-                      className="h-12 w-12 shrink-0 object-cover"
-                    />
-                  ) : null}
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="truncate font-medium text-ds-text-primary">{product.name}</p>
-                    {product.description ? (
-                      <p className="line-clamp-2 text-sm text-ds-text-secondary">{product.description}</p>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          {pendingProducts.length > 0 ? (
+            <Card className="flex flex-col gap-3">
+              <div className="flex flex-col gap-0.5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="dx-title">Review extracted products</h2>
+                  <Pill tone="amber">{pendingProducts.length} pending</Pill>
+                </div>
+                <p className="dx-subtitle">Found in your uploaded knowledge. Approve the ones your AI may recommend.</p>
+              </div>
+              <ul className="dx-rows flex flex-col">
+                {pendingProducts.map((product) => (
+                  <li key={product.id} className="flex flex-wrap items-center gap-x-5 gap-y-3 py-3.5">
+                    {product.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- catalog photo extracted from an uploaded PDF or hand-entered URL
+                      <img src={product.image_url} alt="" className="h-20 w-32 shrink-0 rounded-xl object-cover" />
                     ) : null}
-                    <p className="text-xs text-ds-text-muted">
-                      Extracted from: {product.extracted_from_document_id
-                        ? (documentTitleById.get(product.extracted_from_document_id) ?? "a deleted document")
-                        : "unknown source"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-4">
-                  {product.price ? (
-                    <span className="text-sm font-medium text-ds-accent">${product.price}</span>
-                  ) : null}
-                  <ReviewActions
-                    approveAction={approveProductAction}
-                    rejectAction={rejectProductAction}
-                    id={product.id}
-                    canEdit={canEdit}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <p className="truncate text-base font-medium text-ds-text-primary">{product.name}</p>
+                      {product.description ? (
+                        <p className="line-clamp-2 text-sm text-ds-text-secondary">{product.description}</p>
+                      ) : null}
+                      <p className="text-sm text-ds-text-muted">
+                        Extracted from:{" "}
+                        {product.extracted_from_document_id
+                          ? (documentTitleById.get(product.extracted_from_document_id) ?? "a deleted document")
+                          : "unknown source"}
+                      </p>
+                    </div>
+                    {product.price ? (
+                      <span className="text-sm font-medium text-ds-text-primary">${product.price}</span>
+                    ) : null}
+                    <ReviewActions
+                      approveAction={approveProductAction}
+                      rejectAction={rejectProductAction}
+                      id={product.id}
+                      canEdit={canEdit}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
 
-      {products.length === 0 ? (
-        <EmptyState
-          title="No products yet"
-          description="Add your first product below so your AI sales employee can answer questions about it."
-        />
-      ) : (
-        <ProductsList products={products} canEdit={canEdit} deleteProductAction={deleteProductAction} />
-      )}
+          <Card className="flex flex-col gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="dx-title">Your products</h2>
+              <p className="dx-subtitle">
+                {products.length} product{products.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            {products.length === 0 ? (
+              <p className="rounded-2xl bg-ds-surface-soft px-4 py-10 text-center text-sm text-ds-text-secondary">
+                No products yet. Add your first product so your AI sales employee can answer questions about it.
+              </p>
+            ) : (
+              <ProductsList products={products} canEdit={canEdit} deleteProductAction={deleteProductAction} />
+            )}
+            <p className="border-t border-ds-border pt-3 text-sm text-ds-text-secondary">
+              Your catalog helps the AI recommend relevant products.
+            </p>
+          </Card>
+        </div>
 
-      <section className="flex w-full max-w-sm flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-medium text-ds-text-primary">Add a product</h2>
-        {canEdit ? (
-          <ProductForm action={createProductAction} submitLabel="Add product" pendingLabel="Adding…" />
-        ) : (
-          <PermissionNotice />
-        )}
-      </section>
+        <Card className="flex flex-col gap-4 xl:sticky xl:top-4">
+          <div className="flex flex-col gap-0.5">
+            <h2 className="dx-title">Add a product</h2>
+            <p className="dx-subtitle">Give your AI the details it needs.</p>
+          </div>
+          {canEdit ? (
+            <ProductForm action={createProductAction} submitLabel="Add product" pendingLabel="Adding…" />
+          ) : (
+            <PermissionNotice />
+          )}
+        </Card>
+      </div>
     </div>
   );
 }

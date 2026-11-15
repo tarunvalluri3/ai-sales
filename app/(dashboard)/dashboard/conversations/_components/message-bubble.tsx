@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import type { Message } from "@/lib/supabase/types";
 import { getCitationDetailsAction } from "../actions";
 import type { CitedChunk } from "@/lib/knowledge";
@@ -12,10 +13,10 @@ export const MESSAGE_ROLE_LABEL: Record<Message["role"], string> = {
   human_agent: "Team member",
 };
 
-const CAPTION_STYLE: Record<Message["role"], string> = {
-  user: "text-ds-text-muted",
-  assistant: "text-ds-text-muted",
-  human_agent: "font-medium text-ds-text-primary",
+const BUBBLE_STYLE: Record<Message["role"], string> = {
+  user: "rounded-bl-md bg-ds-surface-soft text-ds-text-primary",
+  assistant: "rounded-br-md bg-ds-primary/10 text-ds-text-primary",
+  human_agent: "rounded-br-md bg-ds-primary text-ds-primary-on",
 };
 
 export function MessageBubble({ message }: { message: Message }) {
@@ -27,11 +28,9 @@ export function MessageBubble({ message }: { message: Message }) {
   const [citations, setCitations] = useState<CitedChunk[] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const bubbleClassName = isUser
-    ? "max-w-[85%] bg-ds-surface-soft px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-primary"
-    : isHumanAgent
-      ? "max-w-[85%] border border-ds-text-faint bg-ds-surface px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-primary"
-      : "max-w-[85%] border border-ds-border bg-ds-surface-raised px-3.5 py-2.5 text-sm leading-relaxed text-ds-text-secondary";
+  // Inbox convention: the prospect speaks from the left; the business's own
+  // side (the AI, and a team member in olive) answers from the right.
+  const bubbleClassName = `max-w-[82%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${BUBBLE_STYLE[message.role]}`;
 
   async function toggleExpanded() {
     const next = !expanded;
@@ -48,23 +47,25 @@ export function MessageBubble({ message }: { message: Message }) {
   }
 
   return (
-    <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+    <div className={`flex flex-col ${isUser ? "items-start" : "items-end"}`}>
       <div className={bubbleClassName}>{message.content}</div>
-      <span className={`ds-label mt-1 text-2xs ${CAPTION_STYLE[message.role]}`}>
+      <span className={`mt-1.5 text-xs ${isHumanAgent ? "font-medium text-ds-text-primary" : "text-ds-text-secondary"}`}>
         {MESSAGE_ROLE_LABEL[message.role]} · {new Date(message.created_at).toLocaleString("en-US")}
       </span>
 
       {hasCitations ? (
-        <div className="mt-1 max-w-[85%]">
+        <div className={`mt-1 flex max-w-[82%] flex-col ${isUser ? "items-start" : "items-end"}`}>
           <button
             type="button"
             onClick={toggleExpanded}
-            className="text-2xs font-medium text-ds-text-primary hover:underline"
+            aria-expanded={expanded}
+            className="inline-flex items-center gap-1 rounded-md text-xs font-medium text-ds-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
           >
             {expanded ? "Hide sources" : `Sources (${message.source_chunk_ids.length})`}
+            <ChevronDown strokeWidth={1.75} className={`size-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
           </button>
           {expanded ? (
-            <div className="mt-1.5 flex flex-col gap-1.5 border border-ds-border bg-ds-surface-soft p-2.5">
+            <div className="mt-1.5 flex flex-col gap-2 rounded-xl bg-ds-surface-soft p-3 text-left">
               {loading ? (
                 <p className="text-2xs text-ds-text-muted">Loading…</p>
               ) : citations && citations.length > 0 ? (

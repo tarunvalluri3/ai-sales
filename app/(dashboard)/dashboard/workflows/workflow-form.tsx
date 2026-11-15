@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Bell, CalendarDays, CheckSquare, Clock, Filter, Flag, Mail, Play, Plus, Sparkles, Tag, UserRound, X } from "lucide-react";
+import { Card, StepBubble, btnOutlineSm, btnPrimary, btnText } from "../_components/ui";
 import { createWorkflowAction, updateWorkflowAction, type ActionState } from "./actions";
 import { FIELD_LABEL, OPERATOR_LABEL, OPERATORS_FOR_FIELD, EXISTENCE_ONLY_FIELDS, SEGMENT_CONDITION_FIELDS } from "../customers/segment-condition-fields";
 import { WORKFLOW_TRIGGER_TYPES } from "@/lib/schemas/workflow";
@@ -18,9 +19,12 @@ import type {
 } from "@/lib/supabase/types";
 
 const SELECT_CLASS =
-  "border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors hover:border-ds-border-strong focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
+  "h-10 min-h-0 rounded-xl border border-ds-border-strong bg-ds-surface px-3 text-sm text-ds-text-primary disabled:cursor-not-allowed disabled:opacity-60";
 const INPUT_CLASS =
-  "border border-ds-border bg-ds-surface-elevated px-2 py-1 text-xs text-ds-text-primary transition-colors focus:border-ds-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
+  "h-10 min-h-0 rounded-xl border border-ds-border-strong bg-ds-surface px-3 text-sm text-ds-text-primary disabled:cursor-not-allowed disabled:opacity-60";
+const REMOVE_CLASS =
+  "flex size-8 shrink-0 items-center justify-center rounded-lg text-ds-text-primary transition-colors hover:bg-ds-danger-bg hover:text-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary";
+const STAGE_TAG = "inline-flex h-8 w-16 shrink-0 items-center justify-center rounded-lg bg-ds-surface-soft text-xs font-medium tracking-[0.06em] text-ds-text-primary uppercase";
 
 const TRIGGER_LABEL: Record<WorkflowTriggerType, string> = {
   lead_created: "Lead created",
@@ -77,7 +81,7 @@ function TriggerConfigFields({
   }
   if (triggerType === "lead_score_threshold") {
     return (
-      <span className="flex items-center gap-1.5 text-xs text-ds-text-secondary">
+      <span className="flex items-center gap-2 text-sm text-ds-text-secondary">
         score reaches
         <input
           type="number"
@@ -108,7 +112,7 @@ function TriggerConfigFields({
   }
   if (triggerType === "no_activity_hours") {
     return (
-      <span className="flex items-center gap-1.5 text-xs text-ds-text-secondary">
+      <span className="flex items-center gap-2 text-sm text-ds-text-secondary">
         after
         <input
           type="number"
@@ -135,7 +139,7 @@ function ConditionRow({ condition, onChange, onRemove }: { condition: SegmentCon
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-2">
       <select value={condition.field} onChange={(event) => handleFieldChange(event.target.value as SegmentConditionField)} className={SELECT_CLASS}>
         {SEGMENT_CONDITION_FIELDS.map((field) => (
           <option key={field} value={field}>
@@ -158,8 +162,8 @@ function ConditionRow({ condition, onChange, onRemove }: { condition: SegmentCon
           className={`${INPUT_CLASS} w-28`}
         />
       ) : null}
-      <button type="button" onClick={onRemove} aria-label="Remove condition" className="p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger">
-        <X className="size-3.5" aria-hidden="true" />
+      <button type="button" onClick={onRemove} aria-label="Remove condition" className={REMOVE_CLASS}>
+        <X strokeWidth={1.75} className="size-4" aria-hidden="true" />
       </button>
     </div>
   );
@@ -216,11 +220,50 @@ function defaultStepOfType(type: (typeof STEP_TYPES)[number], tags: LeadTag[]): 
   }
 }
 
-function StepRow({ step, tags, onChange, onRemove }: { step: WorkflowStep; tags: LeadTag[]; onChange: (next: WorkflowStep) => void; onRemove: () => void }) {
+function StepIcon({ type }: { type: WorkflowStep["type"] }) {
+  const className = "size-5 shrink-0 text-ds-text-primary";
+  switch (type) {
+    case "wait":
+      return <Clock className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "add_tag":
+    case "remove_tag":
+      return <Tag className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "update_lead_status":
+    case "flag_attention":
+      return <Flag className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "assign_owner":
+      return <UserRound className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "create_task":
+      return <CheckSquare className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "generate_followup_draft":
+      return <Sparkles className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "internal_notification":
+      return <Bell className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "email_notification":
+      return <Mail className={className} strokeWidth={1.75} aria-hidden="true" />;
+  }
+}
+
+function StepRow({
+  index,
+  step,
+  tags,
+  onChange,
+  onRemove,
+}: {
+  index: number;
+  step: WorkflowStep;
+  tags: LeadTag[];
+  onChange: (next: WorkflowStep) => void;
+  onRemove: () => void;
+}) {
   return (
-    <div className="flex flex-col gap-1.5 bg-ds-surface p-2">
-      <div className="flex items-center gap-1.5">
+    <div className="flex flex-col gap-2 rounded-xl border border-ds-border px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <StepBubble className="size-7 text-xs">{index + 1}</StepBubble>
+        <StepIcon type={step.type} />
         <select
+          aria-label={`Step ${index + 1} action`}
           value={step.type}
           onChange={(event) => onChange(defaultStepOfType(event.target.value as (typeof STEP_TYPES)[number], tags))}
           className={SELECT_CLASS}
@@ -240,7 +283,7 @@ function StepRow({ step, tags, onChange, onRemove }: { step: WorkflowStep; tags:
               max={999}
               value={step.amount}
               onChange={(event) => onChange({ ...step, amount: Number(event.target.value) })}
-              className={`${INPUT_CLASS} w-16`}
+              className={`${INPUT_CLASS} w-20`}
             />
             <select value={step.unit} onChange={(event) => onChange({ ...step, unit: event.target.value as typeof step.unit })} className={SELECT_CLASS}>
               <option value="minutes">minutes</option>
@@ -270,8 +313,12 @@ function StepRow({ step, tags, onChange, onRemove }: { step: WorkflowStep; tags:
           </select>
         ) : null}
 
-        <button type="button" onClick={onRemove} aria-label="Remove step" className="ml-auto p-1 text-ds-text-muted transition-colors hover:bg-ds-danger-bg hover:text-ds-danger">
-          <X className="size-3.5" aria-hidden="true" />
+        {step.type === "generate_followup_draft" ? (
+          <span className="text-sm text-ds-text-secondary">Draft only — never sends automatically</span>
+        ) : null}
+
+        <button type="button" onClick={onRemove} aria-label={`Remove step ${index + 1}`} className={`${REMOVE_CLASS} ml-auto`}>
+          <X strokeWidth={1.75} className="size-4" aria-hidden="true" />
         </button>
       </div>
 
@@ -346,108 +393,176 @@ export function WorkflowForm({ workflow, tags, onDone }: { workflow?: Workflow; 
 
   const definition = JSON.stringify({ triggerType, triggerConfig, matchType, conditions, steps, enabled });
 
+  const fieldLabel = "w-24 shrink-0 text-sm font-medium text-ds-text-primary";
+
   return (
-    <form action={formAction} className="flex flex-col gap-3 bg-ds-surface-soft p-3">
-      {workflow ? <input type="hidden" name="id" value={workflow.id} /> : null}
-      <input type="hidden" name="definition" value={definition} />
+    <Card as="div" padded={false}>
+      <form action={formAction} className="flex flex-col gap-4 dx-card-pad">
+        {workflow ? <input type="hidden" name="id" value={workflow.id} /> : null}
+        <input type="hidden" name="definition" value={definition} />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <input type="text" name="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Workflow name" maxLength={80} disabled={isPending} className={INPUT_CLASS} />
-        <input
-          type="text"
-          name="description"
-          value={description ?? ""}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="Description (optional)"
-          maxLength={300}
-          disabled={isPending}
-          className={`${INPUT_CLASS} w-56`}
-        />
-        <label className="flex items-center gap-1.5 text-xs text-ds-text-secondary">
-          <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
-          Enabled
-        </label>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5 text-xs text-ds-text-secondary">
-        <span className="font-medium text-ds-text-primary">When</span>
-        <select value={triggerType} onChange={(event) => setTriggerType(event.target.value as WorkflowTriggerType)} className={SELECT_CLASS}>
-          {WORKFLOW_TRIGGER_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {TRIGGER_LABEL[type]}
-            </option>
-          ))}
-        </select>
-        {needsTriggerConfig(triggerType) ? <TriggerConfigFields triggerType={triggerType} config={triggerConfig} onChange={setTriggerConfig} tags={tags} /> : null}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-1.5 text-xs text-ds-text-secondary">
-          <span className="font-medium text-ds-text-primary">And</span>
-          <select value={matchType} onChange={(event) => setMatchType(event.target.value as SegmentMatchType)} className={SELECT_CLASS}>
-            <option value="all">all</option>
-            <option value="any">any</option>
-          </select>
-          <span>of these are also true (optional):</span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="dx-title">{workflow ? "Edit workflow" : "New workflow"}</h2>
+          <label className="flex cursor-pointer items-center gap-2.5">
+            <span className="relative inline-flex">
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(event) => setEnabled(event.target.checked)}
+                className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0"
+              />
+              <span aria-hidden="true" className="dx-switch" />
+            </span>
+            <span className={`dx-pill px-3 py-1 text-sm font-medium ${enabled ? "bg-ds-success-bg text-ds-success" : "bg-ds-surface-soft text-ds-text-secondary"}`}>
+              {enabled ? "Enabled" : "Disabled"}
+            </span>
+          </label>
         </div>
-        {conditions.map((condition, index) => (
-          <ConditionRow
-            key={index}
-            condition={condition}
-            onChange={(next) => setConditions((current) => current.map((c, i) => (i === index ? next : c)))}
-            onRemove={() => setConditions((current) => current.filter((_, i) => i !== index))}
-          />
-        ))}
-        <button
-          type="button"
-          onClick={() => setConditions((current) => [...current, { field: "score", operator: "gte", value: "4" }])}
-          className="flex w-fit items-center gap-1 px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-surface-raised"
-        >
-          <Plus className="size-3.5" aria-hidden="true" />
-          Add condition
-        </button>
-      </div>
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-ds-text-primary">Then, in order:</span>
-        {steps.map((step, index) => (
-          <StepRow
-            key={index}
-            step={step}
-            tags={tags}
-            onChange={(next) => setSteps((current) => current.map((s, i) => (i === index ? next : s)))}
-            onRemove={() => setSteps((current) => current.filter((_, i) => i !== index))}
-          />
-        ))}
-        <button
-          type="button"
-          onClick={() => setSteps((current) => [...current, defaultStepOfType("internal_notification", tags)])}
-          className="flex w-fit items-center gap-1 px-2 py-1 text-xs font-medium text-ds-accent transition-colors hover:bg-ds-surface-raised"
-        >
-          <Plus className="size-3.5" aria-hidden="true" />
-          Add step
-        </button>
-      </div>
+        <div className="flex flex-col gap-2.5">
+          <label className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className={fieldLabel}>Name</span>
+            <input
+              type="text"
+              name="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Workflow name"
+              maxLength={80}
+              disabled={isPending}
+              className={`${INPUT_CLASS} min-w-0 flex-1`}
+            />
+          </label>
+          <label className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className={fieldLabel}>Description</span>
+            <input
+              type="text"
+              name="description"
+              value={description ?? ""}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="Description (optional)"
+              maxLength={300}
+              disabled={isPending}
+              className={`${INPUT_CLASS} min-w-0 flex-1`}
+            />
+          </label>
+        </div>
 
-      <div className="flex items-center gap-2">
-        <button
-          type="submit"
-          disabled={isPending || !name.trim() || steps.length === 0}
-          className="ds-btn-label bg-ds-primary px-2.5 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isPending ? "Saving…" : workflow ? "Save workflow" : "Create workflow"}
-        </button>
-        {onDone ? (
-          <button type="button" onClick={onDone} disabled={isPending} className="px-2.5 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-elevated disabled:opacity-60">
-            Cancel
-          </button>
+        <ol className="flex flex-col">
+          <li className="relative flex gap-3 pb-5">
+            <span aria-hidden="true" className="absolute top-9 bottom-0 left-4 w-px bg-ds-primary/40" />
+            <StepBubble>1</StepBubble>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-ds-primary text-ds-primary" aria-hidden="true">
+              <CalendarDays className="size-4" strokeWidth={1.75} />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
+              <span className={STAGE_TAG}>When</span>
+              <select
+                aria-label="Trigger"
+                value={triggerType}
+                onChange={(event) => setTriggerType(event.target.value as WorkflowTriggerType)}
+                className={`${SELECT_CLASS} min-w-56`}
+              >
+                {WORKFLOW_TRIGGER_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {TRIGGER_LABEL[type]}
+                  </option>
+                ))}
+              </select>
+              {needsTriggerConfig(triggerType) ? (
+                <TriggerConfigFields triggerType={triggerType} config={triggerConfig} onChange={setTriggerConfig} tags={tags} />
+              ) : null}
+            </div>
+          </li>
+
+          <li className="relative flex gap-3 pb-5">
+            <span aria-hidden="true" className="absolute top-9 bottom-0 left-4 w-px bg-ds-primary/40" />
+            <StepBubble>2</StepBubble>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-ds-primary text-ds-primary" aria-hidden="true">
+              <Filter className="size-4" strokeWidth={1.75} />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className={STAGE_TAG}>And</span>
+                <select
+                  aria-label="Condition matching"
+                  value={matchType}
+                  onChange={(event) => setMatchType(event.target.value as SegmentMatchType)}
+                  className={SELECT_CLASS}
+                >
+                  <option value="all">Match all conditions</option>
+                  <option value="any">Match any condition</option>
+                </select>
+                <span className="text-sm text-ds-text-secondary">Optional</span>
+              </div>
+              {conditions.map((condition, index) => (
+                <ConditionRow
+                  key={index}
+                  condition={condition}
+                  onChange={(next) => setConditions((current) => current.map((c, i) => (i === index ? next : c)))}
+                  onRemove={() => setConditions((current) => current.filter((_, i) => i !== index))}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setConditions((current) => [...current, { field: "score", operator: "gte", value: "4" }])}
+                className="flex w-fit items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-medium text-ds-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
+              >
+                <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />
+                Add condition
+              </button>
+            </div>
+          </li>
+
+          <li className="flex gap-3">
+            <StepBubble>3</StepBubble>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-ds-primary text-ds-primary" aria-hidden="true">
+              <Play className="size-4" strokeWidth={1.75} />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className={STAGE_TAG}>Then</span>
+                <span className="text-sm text-ds-text-primary">Run these steps in order</span>
+              </div>
+              {steps.map((step, index) => (
+                <StepRow
+                  key={index}
+                  index={index}
+                  step={step}
+                  tags={tags}
+                  onChange={(next) => setSteps((current) => current.map((s, i) => (i === index ? next : s)))}
+                  onRemove={() => setSteps((current) => current.filter((_, i) => i !== index))}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setSteps((current) => [...current, defaultStepOfType("internal_notification", tags)])}
+                className={`${btnOutlineSm} w-fit`}
+              >
+                <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />
+                Add step
+              </button>
+            </div>
+          </li>
+        </ol>
+
+        {state.error ? (
+          <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
+            {state.error}
+          </p>
         ) : null}
-      </div>
-      {state.error ? (
-        <span role="alert" className="text-xs text-ds-danger">
-          {state.error}
-        </span>
-      ) : null}
-    </form>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="submit" disabled={isPending || !name.trim() || steps.length === 0} className={`${btnPrimary} min-w-44`}>
+            {isPending ? "Saving…" : workflow ? "Save workflow" : "Create workflow"}
+          </button>
+          {onDone ? (
+            <button type="button" onClick={onDone} disabled={isPending} className={`${btnText} underline underline-offset-4`}>
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      </form>
+    </Card>
   );
 }

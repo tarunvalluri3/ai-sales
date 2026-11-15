@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Download } from "lucide-react";
 import { exportLeadsCsvAction } from "./actions";
 
 function downloadCsv(csv: string, businessName: string) {
@@ -38,12 +39,13 @@ export function ExportLeadsCsvButton({ businessName }: { businessName: string })
         type="button"
         onClick={handleExport}
         disabled={isExporting}
-        className="border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="ds-btn-label inline-flex h-9 items-center gap-2 rounded-xl border border-ds-border-strong bg-ds-surface px-4 text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
+        <Download className="size-5" strokeWidth={1.75} aria-hidden="true" />
         {isExporting ? "Preparing…" : "Export leads (CSV)"}
       </button>
       {error ? (
-        <p role="alert" className="text-2xs text-ds-danger">
+        <p role="alert" className="text-sm text-ds-danger">
           {error}
         </p>
       ) : null}

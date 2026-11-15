@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Bell, Mail, Workflow } from "lucide-react";
+import { PageHeader, linkAccent } from "../_components/ui";
 import { requireBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { listNotificationPreferences } from "@/lib/notification-preferences";
@@ -12,32 +13,40 @@ export default async function NotificationsSettingsPage() {
   const canEdit = orgRole === "org:admin";
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Notifications</h1>
-        <p className="text-sm text-ds-text-secondary">
-          Choose what reaches you immediately, what waits for the daily summary, and what stays in the dashboard only.
-        </p>
-      </header>
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeader
+        icon={Bell}
+        title="Notifications"
+        description="Choose what reaches you now, what waits for a summary, and what stays in your dashboard."
+      />
 
       {contactEmail ? (
-        <p className="text-sm text-ds-text-secondary">
-          Emails go to <span className="font-medium text-ds-text-primary">{contactEmail}</span>.{" "}
-          <Link href="/dashboard/profile" className="font-medium text-ds-accent hover:underline">
-            Change it
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl bg-ds-surface-soft px-5 py-3.5">
+          <p className="flex items-center gap-4 text-sm font-medium text-ds-text-primary">
+            <Mail className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            <span>
+              Emails go to <span className="break-all">{contactEmail}</span>
+            </span>
+          </p>
+          <Link href="/dashboard/profile" className={`${linkAccent} border-l border-ds-primary/20 pl-6 text-base underline`}>
+            Change email
+            <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
           </Link>
-          .
-        </p>
+          <p className="border-l border-ds-primary/20 pl-6 text-sm text-ds-text-primary">
+            Update the contact email on your business profile.
+          </p>
+        </div>
       ) : (
-        <div role="status" className="flex items-start gap-3 border border-ds-warning bg-ds-surface p-4">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+        <div role="status" className="flex items-start gap-4 rounded-2xl bg-ds-warning-bg px-5 py-4">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-ds-warning" strokeWidth={1.75} aria-hidden="true" />
           <div className="flex flex-col gap-1">
             <p className="text-sm font-medium text-ds-text-primary">No alert email set</p>
-            <p className="text-sm text-ds-text-secondary">
+            <p className="text-sm text-ds-text-primary">
               Nothing below can be emailed to you until you add one. In-app notifications still work.
             </p>
-            <Link href="/dashboard/profile" className="text-sm font-medium text-ds-accent hover:underline">
+            <Link href="/dashboard/profile" className={`${linkAccent} w-fit text-base underline`}>
               Add an alert email
+              <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
             </Link>
           </div>
         </div>
@@ -45,9 +54,9 @@ export default async function NotificationsSettingsPage() {
 
       <NotificationPreferencesForm preferences={preferences} canEdit={canEdit} hasContactEmail={Boolean(contactEmail)} />
 
-      <p className="text-sm text-ds-text-muted">
-        Workflow steps you built yourself always run, whatever is set here — you asked for those emails explicitly when you built the
-        workflow.
+      <p className="dx-card flex items-center gap-4 px-5 py-4 text-sm text-ds-text-primary">
+        <Workflow className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        Workflow email steps run independently of these preferences: you asked for those emails explicitly when you built the workflow.
       </p>
     </div>
   );

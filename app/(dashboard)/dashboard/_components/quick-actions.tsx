@@ -1,29 +1,32 @@
 import Link from "next/link";
+import { BookOpen, Box, CircleHelp, SlidersHorizontal, Tag, Users } from "lucide-react";
+import { Card } from "./ui";
 
 const ACTIONS = [
-  { label: "Add product", href: "/dashboard/products" },
-  { label: "Add service", href: "/dashboard/services" },
-  { label: "Add FAQ", href: "/dashboard/faqs" },
-  { label: "Add knowledge", href: "/dashboard/knowledge" },
-  { label: "Review leads", href: "/dashboard/leads" },
-  { label: "Widget settings", href: "/dashboard/widget-settings" },
+  { label: "Add product", href: "/dashboard/products", icon: Box },
+  { label: "Add service", href: "/dashboard/services", icon: Tag },
+  { label: "Add FAQ", href: "/dashboard/faqs", icon: CircleHelp },
+  { label: "Add knowledge", href: "/dashboard/knowledge", icon: BookOpen },
+  { label: "Review leads", href: "/dashboard/leads", icon: Users },
+  { label: "Widget settings", href: "/dashboard/widget-settings", icon: SlidersHorizontal },
 ];
 
 export function QuickActions() {
   return (
-    <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
-      <h2 className="text-sm font-medium text-ds-text-primary">Quick actions</h2>
-      <div className="flex flex-wrap gap-2">
+    <Card className="flex flex-col gap-4">
+      <h2 className="dx-title">Quick actions</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {ACTIONS.map((action) => (
           <Link
             key={action.href}
             href={action.href}
-            className="border border-ds-border-strong px-3.5 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="flex min-h-[5.25rem] flex-col items-center justify-center gap-2 rounded-2xl border border-ds-border px-2 py-3 text-center text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-primary hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
           >
+            <action.icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
             {action.label}
           </Link>
         ))}
       </div>
-    </section>
+    </Card>
   );
 }

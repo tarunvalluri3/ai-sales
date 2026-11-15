@@ -8,6 +8,8 @@ import { WorkflowList } from "./workflow-list";
 import { RunsList } from "./runs-list";
 import { TasksPanel } from "./tasks-panel";
 import { NotificationsPanel } from "./notifications-panel";
+import { History } from "lucide-react";
+import { Card } from "../_components/ui";
 
 export default async function WorkflowsPage() {
   const { businessId, orgRole } = await requireLiveBusinessContext();
@@ -25,22 +27,18 @@ export default async function WorkflowsPage() {
   const workflowNameById = Object.fromEntries(workflows.map((workflow) => [workflow.id, workflow.name]));
 
   return (
-    <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Workflows</h1>
-        <p className="text-sm text-ds-text-muted">
-          Automate a repetitive step: trigger → conditions → actions, with an optional delay. Every run is logged below, whether it succeeded, failed, or is still waiting.
-        </p>
-      </div>
-
+    <div className="flex flex-1 flex-col gap-6">
+      {/* Renders the page title (with "New workflow") and the list + editor. */}
       <WorkflowList workflows={workflows} tags={tags} canEdit={canManageWorkflows} />
 
-      <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4">
-        <h2 className="text-sm font-medium text-ds-text-primary">Execution history</h2>
-        <RunsList runs={runs} workflowNameById={workflowNameById} />
-      </section>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.1fr)]">
+        <Card className="flex flex-col gap-3 p-5">
+          <h2 className="dx-title flex items-center gap-3">
+            <History className="size-5" strokeWidth={1.75} aria-hidden="true" />
+            Execution history
+          </h2>
+          <RunsList runs={runs} workflowNameById={workflowNameById} />
+        </Card>
         <TasksPanel tasks={tasks} canEdit={canManageTasks} />
         <NotificationsPanel notifications={notifications} />
       </div>

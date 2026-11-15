@@ -9,6 +9,8 @@ import { AppointmentsTabs } from "../appointments-tabs";
 import { ExceptionsPanel } from "../exceptions-panel";
 import { DayCloseToggle } from "./day-close-toggle";
 import { SlotGrid } from "./slot-grid";
+import { ArrowUpRight, ChevronLeft, ChevronRight, Globe, Info } from "lucide-react";
+import { Card, InfoBanner, PageHeader, Pill, btnGhost, linkAccent } from "../../_components/ui";
 
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -52,51 +54,90 @@ export default async function AppointmentAvailabilityPage({
 
   const prevDate = shiftDateKey(date, -1);
   const nextDate = shiftDateKey(date, 1);
-  const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const relativeLabel = date === today ? "Today" : date === shiftDateKey(today, 1) ? "Tomorrow" : null;
 
   return (
-    <div className="flex flex-1 flex-col gap-6 bg-ds-bg p-6">
-      <div className="flex flex-col gap-3">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Appointments</h1>
-        <AppointmentsTabs active="availability" />
-      </div>
+    <div className="flex flex-1 flex-col gap-6">
+      <PageHeader
+        title="Appointments"
+        description="Control when prospects can book time with your team."
+        actions={
+          <span className="inline-flex h-10 items-center gap-2.5 rounded-xl border border-ds-border bg-ds-surface px-4 text-sm font-medium text-ds-text-primary">
+            <Globe className="size-5" strokeWidth={1.75} aria-hidden="true" />
+            {timezone}
+          </span>
+        }
+      />
+      <AppointmentsTabs active="availability" />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {date > today ? (
-            <Link
-              href={`?date=${prevDate}`}
-              className="text-sm text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-            >
-              ← Prev
+      <InfoBanner icon={Info}>
+        Slots follow your Business Hours.{" "}
+        <Link href="/dashboard/business-hours" className={linkAccent}>
+          Manage schedule
+          <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
+        </Link>
+      </InfoBanner>
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <Card className="flex flex-col gap-4">
+          <h2 className="dx-title">Daily availability</h2>
+
+          <div className="flex items-center justify-between gap-3">
+            {date > today ? (
+              <Link href={`?date=${prevDate}`} className={btnGhost}>
+                <ChevronLeft strokeWidth={1.75} className="size-4" aria-hidden="true" />
+                Prev
+              </Link>
+            ) : (
+              <span aria-hidden="true" className="w-24" />
+            )}
+            <div className="flex flex-col items-center text-center">
+              <span className="text-lg font-medium text-ds-text-primary">{dateLabel}</span>
+              {relativeLabel ? <span className="text-sm text-ds-text-secondary">{relativeLabel}</span> : null}
+            </div>
+            <Link href={`?date=${nextDate}`} className={btnGhost}>
+              Next
+              <ChevronRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
             </Link>
-          ) : null}
-          <span className="text-lg font-medium text-ds-text-primary">{dateLabel}</span>
-          <Link
-            href={`?date=${nextDate}`}
-            className="text-sm text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            Next →
-          </Link>
-        </div>
-        {hasPartialOverride ? (
-          <span className="text-xs text-ds-text-muted">Custom override active — see Advanced below</span>
-        ) : (
-          <DayCloseToggle date={date} closedExceptionId={isWholeDayClosed ? (todaysException?.id ?? null) : null} canEdit={canEdit} />
-        )}
-      </div>
+          </div>
 
-      <SlotGrid entries={entries} canEdit={canEdit} />
+          <div className="flex flex-col gap-2 border-b border-ds-border pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {isWholeDayClosed ? (
+                <Pill tone="gray" dot className="h-10 px-4 text-sm font-medium">
+                  Closed for bookings
+                </Pill>
+              ) : (
+                <Pill tone="lime" dot className="h-10 px-4 text-sm font-medium">
+                  Open for bookings
+                </Pill>
+              )}
+              {hasPartialOverride ? (
+                <span className="text-sm text-ds-text-secondary">Custom override active. See Advanced overrides.</span>
+              ) : (
+                <DayCloseToggle date={date} closedExceptionId={isWholeDayClosed ? (todaysException?.id ?? null) : null} canEdit={canEdit} />
+              )}
+            </div>
+            <p className="text-sm text-ds-text-secondary">Close the whole day, or block individual slots below.</p>
+          </div>
 
-      <details className="group border-t border-ds-border pt-4">
-        <summary className="cursor-pointer text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary [&::-webkit-details-marker]:hidden">
-          <span className="mr-1 inline-block transition-transform group-open:rotate-90">›</span>
-          Advanced: lunch breaks, ranges, and exceptional openings
-        </summary>
-        <div className="mt-4">
+          <SlotGrid entries={entries} canEdit={canEdit} />
+        </Card>
+
+        <Card className="flex flex-col gap-4">
+          <div className="flex flex-col gap-0.5">
+            <h2 className="dx-title">Advanced overrides</h2>
+            <p className="dx-subtitle">Breaks, exceptional hours, and closed days.</p>
+          </div>
           <ExceptionsPanel exceptions={exceptions} canEdit={canEdit} />
-        </div>
-      </details>
+        </Card>
+      </div>
     </div>
   );
 }

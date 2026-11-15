@@ -1,18 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { EmptyState } from "../_components/state-views";
 import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } from "../_components/data-table";
-import { Badge, type BadgeTone } from "../_components/badge";
+import { Avatar, ChannelIcon, Pill, type PillTone } from "../_components/ui";
 import { channelLabel } from "@/lib/conversation-channel";
 import { MAX_LEAD_SCORE } from "@/lib/lead-scoring";
 import type { LeadQualification } from "@/lib/supabase/types";
 import type { CustomerSummary } from "@/lib/customers";
+import { displayContactName } from "@/lib/lead-source";
 
-const QUALIFICATION_TONE: Record<LeadQualification, BadgeTone> = {
-  hot: "accent",
-  warm: "success",
-  cold: "muted",
+const QUALIFICATION_TONE: Record<LeadQualification, PillTone> = {
+  hot: "solid",
+  warm: "lime",
+  cold: "gray",
+};
+
+const QUALIFICATION_LABEL: Record<LeadQualification, string> = {
+  hot: "Hot",
+  warm: "Warm",
+  cold: "Cold",
 };
 
 function relativeTime(iso: string): string {
@@ -23,8 +31,9 @@ function relativeTime(iso: string): string {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return days === 1 ? "Yesterday" : `${days}d ago`;
 }
+
 
 export function CustomerList({ customers }: { customers: CustomerSummary[] }) {
   const [sort, setSort] = useState<SortState>(null);
@@ -42,12 +51,13 @@ export function CustomerList({ customers }: { customers: CustomerSummary[] }) {
 
   const columns = useMemo<DataTableColumn[]>(
     () => [
-      { key: "customer", label: "Customer", width: "1.6fr" },
-      { key: "score", label: "Score", width: "150px" },
-      { key: "channel", label: "Channel", width: "120px" },
-      { key: "activity", label: "Activity", width: "160px" },
-      { key: "tags", label: "Tags", width: "1.2fr" },
-      { key: "last_activity", label: "Last activity", width: "120px", sortable: true },
+      { key: "customer", label: "Customer", width: "minmax(15rem,1.7fr)" },
+      { key: "score", label: "Score", width: "11rem" },
+      { key: "channel", label: "Channel", width: "9rem" },
+      { key: "activity", label: "Activity", width: "minmax(11rem,1.2fr)" },
+      { key: "tags", label: "Tags", width: "minmax(11rem,1.5fr)" },
+      { key: "last_activity", label: "Last activity", width: "9.5rem", sortable: true },
+      { key: "open", label: "", width: "3rem", align: "right" },
     ],
     [],
   );
@@ -69,62 +79,76 @@ export function CustomerList({ customers }: { customers: CustomerSummary[] }) {
       sort={sort}
       onSortChange={setSort}
       caption="Customers"
-      renderRow={(customer) => (
-        <TableRow key={customer.id} href={`/dashboard/customers/${customer.id}`}>
-          <TableCell direction="col">
-            <span className="font-medium text-ds-text-primary">{customer.displayName ?? "Unnamed prospect"}</span>
-            <span className="text-xs text-ds-text-muted">{customer.email ?? customer.phone ?? "No contact info"}</span>
-          </TableCell>
-          <TableCell direction="col">
-            {customer.latestLead ? (
-              <>
-                <Badge tone={QUALIFICATION_TONE[customer.latestLead.qualification]} size="sm">
-                  {customer.latestLead.qualification}
-                </Badge>
-                <span className="text-2xs text-ds-text-muted">
-                  {customer.latestLead.score}/{MAX_LEAD_SCORE}
-                </span>
-              </>
-            ) : (
-              <span className="text-xs text-ds-text-muted">No lead yet</span>
-            )}
-          </TableCell>
-          <TableCell>{channelLabel(customer.latestChannel)}</TableCell>
-          <TableCell direction="col">
-            {customer.needsAttention ? (
-              <Badge tone="warning" size="sm">
-                Needs attention
-              </Badge>
-            ) : customer.humanControlled ? (
-              <Badge tone="muted" size="sm">
-                Human-controlled
-              </Badge>
-            ) : (
-              <span className="text-xs text-ds-text-muted">
-                {customer.conversationCount} conversation{customer.conversationCount === 1 ? "" : "s"}
-                {customer.appointmentCount > 0 ? `, ${customer.appointmentCount} appt${customer.appointmentCount === 1 ? "" : "s"}` : ""}
+      renderRow={(customer) => {
+        return (
+          <TableRow key={customer.id} href={`/dashboard/customers/${customer.id}`}>
+            <TableCell className="min-w-0 gap-3.5">
+              <Avatar name={customer.displayName} />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-medium text-ds-text-primary">{displayContactName(customer.displayName) ?? "Unnamed prospect"}</span>
+                <span className="truncate text-xs text-ds-text-secondary">{customer.email ?? customer.phone ?? "No contact info"}</span>
+                {customer.email && customer.phone ? (
+                  <span className="truncate text-sm text-ds-text-secondary">{customer.phone}</span>
+                ) : null}
               </span>
-            )}
-          </TableCell>
-          <TableCell>
-            <div className="flex flex-wrap gap-1">
+            </TableCell>
+            <TableCell>
+              {customer.latestLead ? (
+                <span className="inline-flex items-center rounded-full border border-ds-border bg-ds-surface">
+                  <Pill tone={QUALIFICATION_TONE[customer.latestLead.qualification]} className="font-medium">
+                    {QUALIFICATION_LABEL[customer.latestLead.qualification]}
+                  </Pill>
+                  <span className="px-3 text-sm font-medium tabular-nums text-ds-text-primary">
+                    {customer.latestLead.score}/{MAX_LEAD_SCORE}
+                  </span>
+                </span>
+              ) : (
+                <Pill tone="gray" className="font-medium">
+                  No lead yet
+                </Pill>
+              )}
+            </TableCell>
+            <TableCell className="gap-2.5">
+              <ChannelIcon source={customer.latestChannel} website="globe" className="size-5 shrink-0" strokeWidth={1.75} />
+              {channelLabel(customer.latestChannel)}
+            </TableCell>
+            <TableCell>
+              {customer.needsAttention ? (
+                <Pill tone="amber" className="font-medium">
+                  Needs attention
+                </Pill>
+              ) : customer.humanControlled ? (
+                <Pill tone="lime" className="font-medium">
+                  Human-controlled
+                </Pill>
+              ) : (
+                <Pill tone="lime">
+                  {customer.conversationCount} conversation{customer.conversationCount === 1 ? "" : "s"} · {customer.appointmentCount}{" "}
+                  appt{customer.appointmentCount === 1 ? "" : "s"}
+                </Pill>
+              )}
+            </TableCell>
+            <TableCell className="flex-wrap gap-1.5">
               {customer.tagNames.length === 0 ? (
                 <span className="text-xs text-ds-text-muted">—</span>
               ) : (
-                customer.tagNames.slice(0, 3).map((name) => (
-                  <Badge key={name} tone="muted" size="sm">
+                customer.tagNames.slice(0, 2).map((name) => (
+                  <Pill key={name} tone="outline">
                     {name}
-                  </Badge>
+                  </Pill>
                 ))
               )}
-              {customer.tagNames.length > 3 ? (
-                <span className="text-2xs text-ds-text-muted">+{customer.tagNames.length - 3}</span>
+              {customer.tagNames.length > 2 ? (
+                <span className="text-sm text-ds-text-secondary">+{customer.tagNames.length - 2}</span>
               ) : null}
-            </div>
-          </TableCell>
-          <TableCell>{relativeTime(customer.lastActivityAt)}</TableCell>
-        </TableRow>
-      )}
+            </TableCell>
+            <TableCell>{relativeTime(customer.lastActivityAt)}</TableCell>
+            <TableCell align="right">
+              <ChevronRight strokeWidth={1.75} className="size-5 text-ds-text-primary" aria-hidden="true" />
+            </TableCell>
+          </TableRow>
+        );
+      }}
     />
   );
 }

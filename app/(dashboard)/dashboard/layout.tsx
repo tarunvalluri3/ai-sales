@@ -5,11 +5,9 @@ import { getAgentPublishStatus, type AgentPublishStatus } from "@/lib/agent-publ
 import { getEntitlementForBusiness, type Entitlement } from "@/lib/subscription";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { Sidebar } from "./_components/sidebar";
-import { MobileNav } from "./_components/mobile-nav";
 import { AttentionProvider } from "./_components/attention-provider";
 import { ToastProvider } from "./_components/toast";
 import { DashboardHeader } from "./_components/dashboard-header";
-import { DraftNote } from "./_components/draft-note";
 import { ContactEmailGate } from "./_components/contact-email-gate";
 import { AnnouncementBanner } from "./_components/announcement-banner";
 import { SubscriptionBanner } from "./_components/subscription-banner";
@@ -35,23 +33,24 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
   return (
     <ToastProvider>
       <AttentionProvider>
-        <div className="flex min-h-0 flex-1 flex-col">
+        {/* `.dash-shell` scopes the dashboard's own light palette, font and
+            rounded primitives (globals.css); nothing outside /dashboard has it. */}
+        <div className="dash-shell flex min-h-0 flex-1 flex-col">
           <AnnouncementBanner announcements={announcements} />
           {entitlement ? (
             <SubscriptionBanner entitlement={entitlement} canManageBilling={hasMinRole(orgRole, "org:admin")} />
           ) : null}
-          <DashboardHeader
-            agentName={businessName}
-            publishStatus={publishStatus}
-            canPublish={hasMinRole(orgRole, "org:admin")}
-          />
-          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <div className="flex min-h-0 flex-1">
             <Sidebar businessName={businessName} />
-            <MobileNav businessName={businessName} />
-            <main className="flex min-w-0 flex-1 flex-col">
-              <DraftNote />
-              {children}
-            </main>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <DashboardHeader
+                agentName={businessName}
+                publishStatus={publishStatus}
+                canPublish={hasMinRole(orgRole, "org:admin")}
+              />
+              {/* The Draft -> Publish note is rendered by each page's PageHeader. */}
+              <main className="dashboard-main flex min-w-0 flex-1 flex-col">{children}</main>
+            </div>
           </div>
         </div>
         {/* Every business-facing email depends on contact_email, so a business
