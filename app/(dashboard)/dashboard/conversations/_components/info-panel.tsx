@@ -1,7 +1,8 @@
 import Link from "next/link";
+import { ArrowUpRight, CalendarDays, CircleDot, Flag, Info, Mail, Phone, ShieldAlert, Target, UserRound } from "lucide-react";
 import { AiSummaryCard } from "./ai-summary-card";
 import { TagsCard } from "./tags-card";
-import { Badge } from "../../_components/badge";
+import { Pill, linkAccent, type PillTone } from "../../_components/ui";
 import { channelLabel } from "@/lib/conversation-channel";
 import type {
   Appointment,
@@ -11,29 +12,33 @@ import type {
   LeadQualification,
   LeadTag,
 } from "@/lib/supabase/types";
+import { displayContactName } from "@/lib/lead-source";
 
-const QUALIFICATION_TONE: Record<LeadQualification, "accent" | "success" | "muted"> = {
-  hot: "accent",
-  warm: "success",
-  cold: "muted",
+const QUALIFICATION_TONE: Record<LeadQualification, PillTone> = {
+  hot: "solid",
+  warm: "amber",
+  cold: "gray",
 };
 
-const APPOINTMENT_STATUS_TONE: Record<AppointmentStatus, "accent" | "success" | "danger" | "muted"> = {
-  pending: "accent",
-  confirmed: "success",
-  declined: "danger",
-  cancelled: "muted",
-  completed: "success",
-  no_show: "danger",
-  expired: "muted",
+const APPOINTMENT_STATUS_TONE: Record<AppointmentStatus, PillTone> = {
+  pending: "amber",
+  confirmed: "lime",
+  declined: "red",
+  cancelled: "gray",
+  completed: "solid",
+  no_show: "red",
+  expired: "gray",
 };
+
+const SUB_CARD = "flex flex-col gap-2.5 rounded-2xl border border-ds-border p-4";
+const SUB_TITLE = "flex items-center gap-2.5 text-sm font-medium text-ds-text-primary";
 
 /**
- * The right-hand "useful info" pane of the conversation detail view --
- * everything the old page's single lead card showed, plus what it
- * didn't (appointment), plus the on-demand AI summary. Pure
- * server-rendered composition except `AiSummaryCard`, the one
- * interactive island.
+ * The right-hand "Prospect context" card of the conversation detail view:
+ * the recommended next action, the on-demand AI summary, tags, the lead, the
+ * appointment, anything the guardrails flagged, and the conversation's own
+ * details. Pure server-rendered composition except `AiSummaryCard` and
+ * `TagsCard`, the two interactive islands.
  */
 export function InfoPanel({
   conversation,
@@ -63,11 +68,22 @@ export function InfoPanel({
   guardrailFlags: string[];
 }) {
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4">
+      <div className="flex items-center justify-between gap-3 px-1 pt-1 pb-1">
+        <h2 className="dx-title">Prospect context</h2>
+        <span className="flex items-center gap-2 text-sm text-ds-text-primary">
+          <span aria-hidden="true" className="size-2 rounded-full bg-ds-success-bright" />
+          Live details
+        </span>
+      </div>
+
       {recommendedAction ? (
-        <div className="flex items-center justify-between gap-2 border border-ds-border bg-ds-surface-raised p-3">
-          <span className="text-xs font-medium tracking-wide-ds text-ds-text-primary uppercase">Next best action</span>
-          <span className="text-sm font-medium text-ds-text-primary">{recommendedAction}</span>
+        <div className="flex items-start gap-3 rounded-2xl bg-ds-surface-soft p-3">
+          <Target className="mt-0.5 size-5 shrink-0 text-ds-primary" strokeWidth={1.75} aria-hidden="true" />
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-xs font-medium text-ds-text-primary">Next best action</span>
+            <span className="text-sm leading-snug font-medium text-ds-text-primary">{recommendedAction}</span>
+          </div>
         </div>
       ) : null}
 
@@ -87,92 +103,136 @@ export function InfoPanel({
       />
 
       {lead ? (
-        <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-medium text-ds-text-primary">Lead</h3>
-            <Badge tone={QUALIFICATION_TONE[lead.qualification]} title="AI-assessed signal -- not verified">
-              {lead.qualification}
-            </Badge>
+        <div className={SUB_CARD}>
+          <h3 className={SUB_TITLE}>
+            <UserRound className="size-5" strokeWidth={1.75} aria-hidden="true" />
+            Lead
+          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-ds-text-primary">{displayContactName(lead.contact_name) ?? "Unnamed prospect"}</p>
+            <span className="flex items-center gap-1.5">
+              <Pill tone={QUALIFICATION_TONE[lead.qualification]} size="sm" dot className="capitalize" title="AI-assessed signal, not verified">
+                {lead.qualification}
+              </Pill>
+              <Pill tone="outline" size="sm">
+                AI-assessed
+              </Pill>
+            </span>
           </div>
-          <p className="font-medium text-ds-text-primary">{lead.contact_name ?? "Unnamed prospect"}</p>
-          <p className="text-sm text-ds-text-secondary">
-            {lead.contact_email ?? "—"} · {lead.contact_phone ?? "—"}
-          </p>
-          <p className="text-sm text-ds-text-secondary">
-            Interest: {lead.interest_type ?? "—"}
-            {lead.interest_id ? ` — ${interestName ?? "no longer available"}` : ""}
-          </p>
-          <p className="text-sm text-ds-text-muted">AI-written reason: {lead.qualification_reason}</p>
-          {lead.notes ? <p className="text-sm text-ds-text-secondary">Notes: {lead.notes}</p> : null}
-          <p className="text-xs text-ds-text-muted">Status: {lead.status}</p>
+          <ul className="flex flex-col gap-1.5 text-sm text-ds-text-primary">
+            <li className="flex items-center gap-2.5">
+              <Mail className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <span className="truncate">{lead.contact_email ?? "—"}</span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <Phone className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <span className="truncate">{lead.contact_phone ?? "—"}</span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <CircleDot className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <span>
+                Interest: {lead.interest_type ?? "—"}
+                {lead.interest_id ? ` — ${interestName ?? "no longer available"}` : ""}
+              </span>
+            </li>
+            <li className="flex items-center gap-2.5">
+              <Flag className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <span>Status:</span>
+              <Pill tone="lime" size="sm" className="capitalize">
+                {lead.status}
+              </Pill>
+            </li>
+          </ul>
+          <p className="text-sm leading-relaxed text-ds-text-secondary">AI-written reason: {lead.qualification_reason}</p>
+          {lead.notes ? <p className="text-sm leading-relaxed text-ds-text-secondary">Notes: {lead.notes}</p> : null}
           {conversation.customer_id ? (
-            <Link
-              href={`/dashboard/customers/${conversation.customer_id}`}
-              className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent"
-            >
-              View customer profile
-            </Link>
+            <div className="border-t border-ds-border pt-2.5">
+              <Link href={`/dashboard/customers/${conversation.customer_id}`} className={linkAccent}>
+                View customer profile
+                <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
+              </Link>
+            </div>
           ) : null}
         </div>
       ) : (
-        <div className="border border-dashed border-ds-border bg-ds-surface px-4 py-6 text-center text-xs text-ds-text-muted">
-          No lead captured from this conversation yet.
+        <div className={SUB_CARD}>
+          <h3 className={SUB_TITLE}>
+            <UserRound className="size-5" strokeWidth={1.75} aria-hidden="true" />
+            Lead
+          </h3>
+          <p className="text-sm text-ds-text-secondary">No lead captured from this conversation yet.</p>
         </div>
       )}
 
-      {appointment ? (
-        <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-medium text-ds-text-primary">Appointment</h3>
-            <Badge tone={APPOINTMENT_STATUS_TONE[appointment.status]}>{appointment.status.replace("_", "-")}</Badge>
-          </div>
-          <p className="text-sm text-ds-text-secondary">
-            {new Intl.DateTimeFormat("en-US", {
-              timeZone: timezone,
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-            }).format(new Date(appointment.starts_at))}
-          </p>
-          {appointment.notes ? <p className="text-sm text-ds-text-muted">{appointment.notes}</p> : null}
-          <Link
-            href="/dashboard/appointments"
-            className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent"
-          >
-            View in Appointments
-          </Link>
+      <div className={SUB_CARD}>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className={SUB_TITLE}>
+            <CalendarDays className="size-5" strokeWidth={1.75} aria-hidden="true" />
+            Appointment
+          </h3>
+          {appointment ? (
+            <Pill tone={APPOINTMENT_STATUS_TONE[appointment.status]} size="sm" className="capitalize">
+              {appointment.status.replace("_", "-")}
+            </Pill>
+          ) : null}
         </div>
-      ) : null}
+        {appointment ? (
+          <>
+            <p className="text-sm font-medium text-ds-text-primary">
+              {new Intl.DateTimeFormat("en-US", {
+                timeZone: timezone,
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(new Date(appointment.starts_at))}
+            </p>
+            {appointment.notes ? <p className="text-sm text-ds-text-secondary">{appointment.notes}</p> : null}
+            <Link href="/dashboard/appointments" className={linkAccent}>
+              View in Appointments
+              <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
+            </Link>
+          </>
+        ) : (
+          <p className="text-sm text-ds-text-secondary">No appointment booked</p>
+        )}
+      </div>
 
       {guardrailFlags.length > 0 ? (
-        <div className="flex flex-col gap-1.5 border border-ds-border bg-ds-surface p-4">
+        <div className="flex flex-col gap-2 rounded-2xl bg-ds-warning-bg p-4">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-medium text-ds-text-primary">Flagged by guardrails</h3>
-            <Badge tone="warning">Review</Badge>
+            <h3 className={SUB_TITLE}>
+              <ShieldAlert className="size-5" strokeWidth={1.75} aria-hidden="true" />
+              Flagged by guardrails
+            </h3>
+            <Pill tone="outline" size="sm">
+              Review
+            </Pill>
           </div>
-          <ul className="flex flex-col gap-0.5">
+          <ul className="flex list-disc flex-col gap-0.5 pl-5">
             {guardrailFlags.map((flag) => (
-              <li key={flag} className="text-xs text-ds-text-secondary">
+              <li key={flag} className="text-xs text-ds-text-primary">
                 {flag}
               </li>
             ))}
           </ul>
-          <p className="text-xs text-ds-text-muted">The AI&apos;s safety checks caught these in this conversation. Check the transcript before replying.</p>
+          <p className="text-xs text-ds-text-secondary">
+            The AI&apos;s safety checks caught these in this conversation. Check the transcript before replying.
+          </p>
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-1.5 border border-ds-border bg-ds-surface p-4">
-        <h3 className="text-sm font-medium text-ds-text-primary">Conversation</h3>
-        <p className="text-xs text-ds-text-muted">Channel: {channelLabel(conversation.source)}</p>
-        <p className="text-xs text-ds-text-muted">Started: {new Date(conversation.created_at).toLocaleString("en-US")}</p>
-        <p className="text-xs text-ds-text-muted">
-          {messageCount} message{messageCount === 1 ? "" : "s"}
+      <div className={SUB_CARD}>
+        <h3 className={SUB_TITLE}>
+          <Info className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          Conversation details
+        </h3>
+        <p className="text-sm text-ds-text-secondary">
+          {channelLabel(conversation.source)} · {messageCount} message{messageCount === 1 ? "" : "s"}
         </p>
-        {conversation.needs_attention ? (
-          <p className="text-xs font-medium text-ds-warning">Needs attention</p>
-        ) : null}
+        <p className="text-xs text-ds-text-secondary">Started: {new Date(conversation.created_at).toLocaleString("en-US")}</p>
+        {conversation.needs_attention ? <p className="text-sm font-medium text-ds-warning">Needs attention</p> : null}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { Info, Sparkles } from "lucide-react";
 import { generateConversationSummaryAction, type GenerateSummaryState } from "../actions";
 
 const initialState: GenerateSummaryState = {};
@@ -44,29 +45,37 @@ export function AiSummaryCard({
         : "Regenerate";
 
   return (
-    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
+    <div className="flex flex-col gap-2 rounded-2xl border border-ds-border p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-ds-text-primary">AI summary</h3>
+        <h3 className="flex items-center gap-2.5 text-sm font-medium text-ds-text-primary">
+          <Sparkles className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          AI summary
+        </h3>
         {generatedAt ? (
-          <span className="text-2xs text-ds-text-muted">{new Date(generatedAt).toLocaleString("en-US")}</span>
+          <span className="text-xs text-ds-text-secondary">Generated {new Date(generatedAt).toLocaleString("en-US")}</span>
         ) : null}
       </div>
 
       {summary ? (
-        <>
-          <p className="text-sm text-ds-text-secondary">{summary}</p>
-          <p className="text-2xs text-ds-text-muted">AI-generated — may be inaccurate, not verified.</p>
-        </>
+        <p className="text-sm leading-relaxed text-ds-text-primary">{summary}</p>
       ) : (
-        <p className="text-xs text-ds-text-muted">Generate a quick read on what this prospect is looking for.</p>
+        <p className="text-xs text-ds-text-secondary">Generate a quick read on what this prospect is looking for.</p>
       )}
 
-      <form action={formAction}>
+      <form action={formAction} className="flex flex-wrap items-center justify-between gap-2">
         <input type="hidden" name="conversationId" value={conversationId} />
+        {summary ? (
+          <span className="flex items-center gap-1.5 text-xs text-ds-text-secondary">
+            <Info className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            AI-generated · Not verified
+          </span>
+        ) : (
+          <span />
+        )}
         <button
           type="submit"
           disabled={isPending}
-          className="mt-1 inline-flex items-center border border-ds-border bg-ds-surface-elevated px-3 py-1.5 text-xs font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="rounded-md text-sm font-medium text-ds-primary underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           {buttonLabel}
         </button>

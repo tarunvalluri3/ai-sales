@@ -103,10 +103,10 @@ export function SnoozeMenu({
         title={canSnooze ? undefined : ROLE_DENIED_TITLE}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex w-fit items-center gap-1 px-2.5 py-1 text-xs font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft hover:text-ds-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+        className="ds-btn-label inline-flex h-10 w-fit items-center gap-2 rounded-xl border border-ds-border-strong bg-ds-surface px-4 text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
         {label}
-        <ChevronDown className="size-3" aria-hidden="true" />
+        <ChevronDown strokeWidth={1.75} className="size-4" aria-hidden="true" />
       </button>
 
       {open ? (
@@ -114,7 +114,7 @@ export function SnoozeMenu({
           ref={panelRef as React.RefObject<HTMLDivElement>}
           role="menu"
           style={{ maxHeight: MENU_MAX_HEIGHT_PX }}
-          className={`absolute right-0 z-20 flex w-52 flex-col gap-1 overflow-y-auto border border-ds-border bg-ds-surface-elevated p-2 ${
+          className={`absolute right-0 z-20 flex w-56 flex-col gap-1 overflow-y-auto rounded-2xl border border-ds-border bg-ds-surface-elevated p-2 shadow-float ${
             placement === "up" ? "bottom-full mb-1" : "top-full mt-1"
           }`}
         >
@@ -127,7 +127,7 @@ export function SnoozeMenu({
                 type="submit"
                 role="menuitem"
                 disabled={isPending}
-                className="w-full px-2 py-1 text-left text-xs text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60"
+                className="w-full rounded-lg px-3 py-2 text-left text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60"
               >
                 {preset.label}
               </button>
@@ -144,7 +144,7 @@ export function SnoozeMenu({
                 type="datetime-local"
                 required
                 aria-label="Custom snooze date and time"
-                className="border border-ds-border bg-ds-surface px-1.5 py-1 text-xs text-ds-text-primary [color-scheme:dark]"
+                className="h-9 min-h-0 rounded-lg border border-ds-border-strong bg-ds-surface px-2 text-sm text-ds-text-primary"
                 onChange={(event) => {
                   const hidden = document.getElementById(`snooze-until-${customerId}-${actionType}`) as HTMLInputElement | null;
                   if (hidden && event.currentTarget.value) {
@@ -155,7 +155,7 @@ export function SnoozeMenu({
               <button
                 type="submit"
                 disabled={isPending}
-                className="ds-btn-label bg-ds-primary px-2 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
+                className="ds-btn-label inline-flex h-9 items-center justify-center rounded-lg bg-ds-primary px-3 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60"
               >
                 {isPending ? "Snoozing…" : "Set"}
               </button>
@@ -164,7 +164,7 @@ export function SnoozeMenu({
             <button
               type="button"
               onClick={() => setCustomPicking(true)}
-              className="w-full px-2 py-1 text-left text-xs text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft"
             >
               Pick date/time…
             </button>

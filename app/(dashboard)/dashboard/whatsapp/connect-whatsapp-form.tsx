@@ -6,9 +6,9 @@ import { connectWhatsappAction, type WhatsappActionState } from "./actions";
 const initialState: WhatsappActionState = {};
 
 const inputClasses =
-  "w-full border border-ds-border bg-transparent px-3 py-2.5 font-mono text-sm text-ds-text-primary outline-none placeholder:text-ds-text-muted focus-visible:border-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60 aria-invalid:border-ds-danger";
+  "w-full rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 py-2.5 font-mono text-sm text-ds-text-primary placeholder:text-ds-text-faint disabled:opacity-60 aria-invalid:border-ds-danger";
 
-const linkClasses = "text-ds-text-secondary underline underline-offset-2 hover:text-ds-text-primary";
+const linkClasses = "font-medium text-ds-text-primary underline underline-offset-4 hover:text-ds-accent";
 
 /** WhatsApp Manager's Phone numbers page — where phone_number_id, the WABA ID, and the display number are all shown together. */
 export const WHATSAPP_MANAGER_URL = "https://business.facebook.com/wa/manage/phone-numbers/";
@@ -99,12 +99,12 @@ export function ConnectWhatsappForm({
   }, [state.success]);
 
   return (
-    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+    <section className="dx-card flex flex-col gap-4 dx-card-pad">
       <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-medium text-ds-text-primary">
+        <h2 className="dx-title">
           {isReconnect ? "Update your WhatsApp connection" : "Connect a WhatsApp number"}
         </h2>
-        <p className="text-xs text-ds-text-muted">
+        <p className="text-sm text-ds-text-secondary">
           {isReconnect
             ? "Your phone number ID, business account ID, and phone number are pre-filled. Enter a fresh access token to reconnect."
             : "Each field below links to exactly where to find it in Meta Business Manager."}
@@ -116,7 +116,7 @@ export function ConnectWhatsappForm({
           const errorId = `${field.name}-error`;
           return (
             <div key={field.name} className="flex flex-col gap-1">
-              <label htmlFor={field.name} className="text-xs font-medium text-ds-text-secondary">
+              <label htmlFor={field.name} className="text-xs font-medium text-ds-text-primary">
                 {field.label}
               </label>
               <p id={`${field.name}-hint`} className="text-xs text-ds-text-muted">
@@ -147,7 +147,7 @@ export function ConnectWhatsappForm({
           <button
             type="submit"
             disabled={isPending}
-            className="ds-btn-label shrink-0 self-start bg-ds-primary px-4 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
+            className="ds-btn-label inline-flex h-9 shrink-0 items-center self-start rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary disabled:opacity-60"
           >
             {isPending ? "Connecting…" : isReconnect ? "Save" : "Connect"}
           </button>
@@ -156,7 +156,7 @@ export function ConnectWhatsappForm({
               type="button"
               onClick={onCancel}
               disabled={isPending}
-              className="px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="inline-flex h-9 items-center rounded-xl px-3 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
             >
               Cancel
             </button>
@@ -164,7 +164,7 @@ export function ConnectWhatsappForm({
         </div>
       </form>
       {state.error ? (
-        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
+        <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-xs text-ds-danger">
           {state.error}
         </p>
       ) : null}

@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import { CalendarCheck, CalendarDays, Clock, Lock, MessageCircle, UserRound, Users } from "lucide-react";
 import { useToast } from "../_components/toast";
+import { btnPrimary } from "../_components/ui";
 import { saveNotificationPreferencesAction, type NotificationPreferencesState } from "./actions";
 import type { ResolvedNotificationPreference } from "@/lib/notification-preferences";
 import type { NotificationCategory, NotificationEmailMode } from "@/lib/supabase/types";
@@ -39,6 +41,24 @@ const EMAIL_MODES: { value: NotificationEmailMode; label: string; hint: string }
   { value: "off", label: "No email", hint: "Dashboard only" },
 ];
 
+function CategoryIcon({ category }: { category: string }) {
+  const className = "size-6 shrink-0 text-ds-text-primary";
+  switch (category) {
+    case "human_handover":
+      return <MessageCircle className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "appointment_request":
+      return <CalendarDays className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "appointment_status":
+      return <CalendarCheck className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "sla_breach":
+      return <Clock className={className} strokeWidth={1.75} aria-hidden="true" />;
+    case "assignment":
+      return <Users className={className} strokeWidth={1.75} aria-hidden="true" />;
+    default:
+      return <UserRound className={className} strokeWidth={1.75} aria-hidden="true" />;
+  }
+}
+
 export function NotificationPreferencesForm({
   preferences,
   canEdit,
@@ -56,76 +76,110 @@ export function NotificationPreferencesForm({
   }, [state.success, toast]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="dx-card flex flex-col gap-4 dx-card-pad">
+      <div className="flex flex-col gap-0.5">
+        <h2 className="dx-title">Notification preferences</h2>
+        <p className="dx-subtitle text-base">Set dashboard visibility and email delivery for each event.</p>
+      </div>
+
       {state.error ? (
-        <p role="alert" className="border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary">
+        <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
           {state.error}
         </p>
       ) : null}
 
-      <ul className="flex flex-col gap-3">
-        {preferences.map((preference) => (
-          <li
-            key={preference.category}
-            className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-4 md:flex-row md:items-start md:justify-between md:gap-6"
-          >
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-sm font-medium text-ds-text-primary">{CATEGORY_COPY[preference.category]?.title ?? preference.category}</p>
-              <p className="text-sm text-ds-text-secondary">{CATEGORY_COPY[preference.category]?.description}</p>
-              <label className="mt-1 flex items-center gap-2 text-sm text-ds-text-secondary">
-                <input
-                  type="checkbox"
-                  name={`in_app_${preference.category}`}
-                  defaultChecked={preference.inAppEnabled}
-                  disabled={!canEdit}
-                  className="size-4 border-ds-border accent-ds-accent"
-                />
-                Show in the dashboard
-              </label>
-            </div>
+      <div className="flex flex-col">
+        {/* Column headings (decorative on small screens, where each row stacks). */}
+        <div
+          aria-hidden="true"
+          className="hidden grid-cols-[minmax(0,1fr)_9rem_minmax(26rem,1.1fr)] items-center gap-6 rounded-xl bg-ds-surface-soft px-5 py-2.5 lg:grid"
+        >
+          <span className="text-sm font-medium text-ds-text-primary">Event</span>
+          <span className="text-center text-sm font-medium text-ds-text-primary">Show in dashboard</span>
+          <span className="flex flex-col">
+            <span className="text-sm font-medium text-ds-text-primary">Email delivery</span>
+            <span className="text-sm text-ds-text-secondary">Immediately · Once a day · Dashboard only</span>
+          </span>
+        </div>
 
-            <fieldset className="flex shrink-0 flex-col gap-1.5" disabled={!canEdit}>
-              <legend className="sr-only">Email for {CATEGORY_COPY[preference.category]?.title ?? preference.category}</legend>
-              {EMAIL_MODES.map((mode) => {
-                // "Email me now" is pointless with nowhere to send it; the page
-                // explains why directly above this form.
-                const unavailable = mode.value === "immediate" && !hasContactEmail;
-                return (
-                  <label
-                    key={mode.value}
-                    className={`flex items-center gap-2 text-sm ${unavailable ? "text-ds-text-muted" : "text-ds-text-secondary"}`}
-                  >
+        <ul className="dx-rows flex flex-col">
+          {preferences.map((preference) => {
+            const title = CATEGORY_COPY[preference.category]?.title ?? preference.category;
+            return (
+              <li
+                key={preference.category}
+                className="grid grid-cols-1 items-center gap-x-6 gap-y-3 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_9rem_minmax(26rem,1.1fr)]"
+              >
+                <div className="flex min-w-0 items-center gap-5">
+                  <CategoryIcon category={preference.category} />
+                  <div className="flex min-w-0 flex-col">
+                    <p className="text-sm leading-snug font-medium text-ds-text-primary">{title}</p>
+                    <p className="text-sm text-ds-text-secondary">{CATEGORY_COPY[preference.category]?.description}</p>
+                  </div>
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-3 lg:justify-center">
+                  <span className="relative inline-flex">
                     <input
-                      type="radio"
-                      name={`email_mode_${preference.category}`}
-                      value={mode.value}
-                      defaultChecked={preference.emailMode === mode.value}
-                      disabled={!canEdit || unavailable}
-                      className="size-4 accent-ds-accent"
+                      type="checkbox"
+                      name={`in_app_${preference.category}`}
+                      defaultChecked={preference.inAppEnabled}
+                      disabled={!canEdit}
+                      className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
                     />
-                    <span>{mode.label}</span>
-                    <span className="text-2xs text-ds-text-muted">{mode.hint}</span>
-                  </label>
-                );
-              })}
-            </fieldset>
-          </li>
-        ))}
-      </ul>
+                    <span aria-hidden="true" className="dx-switch" />
+                  </span>
+                  <span className="text-sm text-ds-text-primary lg:sr-only">Show {title} in the dashboard</span>
+                </label>
 
-      {canEdit ? (
-        <div>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="bg-dashboard-primary px-4 py-2 text-sm font-medium text-dashboard-on-primary transition-colors hover:bg-dashboard-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-60"
-          >
+                <fieldset
+                  className="m-0 grid min-w-0 grid-cols-1 overflow-hidden rounded-2xl border border-ds-border-strong p-0 sm:grid-cols-3"
+                  disabled={!canEdit}
+                >
+                  <legend className="sr-only">Email for {title}</legend>
+                  {EMAIL_MODES.map((mode) => {
+                    // "Email me now" is pointless with nowhere to send it; the page
+                    // explains why directly above this form.
+                    const unavailable = mode.value === "immediate" && !hasContactEmail;
+                    return (
+                      <label
+                        key={mode.value}
+                        title={mode.hint}
+                        className={`flex min-h-10 cursor-pointer items-center gap-3 px-4 py-2 text-sm transition-colors has-[:checked]:bg-ds-lime-soft has-[:checked]:font-bold has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-ds-primary ${
+                          unavailable ? "cursor-not-allowed text-ds-text-muted" : "text-ds-text-primary"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`email_mode_${preference.category}`}
+                          value={mode.value}
+                          defaultChecked={preference.emailMode === mode.value}
+                          disabled={!canEdit || unavailable}
+                          className="size-5 shrink-0 accent-ds-accent"
+                        />
+                        <span>{mode.label}</span>
+                        <span className="sr-only">: {mode.hint}</span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ds-border pt-4">
+        <p className="flex items-center gap-3 text-sm text-ds-text-secondary">
+          <Lock className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          Only admins can change these settings.
+        </p>
+        {canEdit ? (
+          <button type="submit" disabled={isPending} className={`${btnPrimary} min-w-64 text-base`}>
             {isPending ? "Saving…" : "Save notification settings"}
           </button>
-        </div>
-      ) : (
-        <p className="text-sm text-ds-text-muted">Only an admin can change these.</p>
-      )}
+        ) : null}
+      </div>
     </form>
   );
 }

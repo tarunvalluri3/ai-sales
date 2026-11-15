@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, UserRoundPlus } from "lucide-react";
 import { pollConversationAction } from "../actions";
 import { ControlToggle } from "./control-toggle";
 import { ReplyComposer } from "./reply-composer";
@@ -129,8 +129,8 @@ export function LiveConversationPanel({
   );
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-3 p-4 pt-3 md:p-6 md:pt-3">
-      <div className="flex shrink-0 flex-wrap items-start gap-3">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-ds-border px-4 py-3">
         <ControlToggle
           conversationId={conversationId}
           control={control}
@@ -138,21 +138,15 @@ export function LiveConversationPanel({
           onChanged={poll}
           canEdit={canEdit}
         />
-        {needsAttention ? (
-          <div className="flex items-center gap-3 border border-ds-border bg-ds-warning-bg px-4 py-2.5">
-            <span className="text-sm font-medium text-ds-warning">Needs attention</span>
-            <DismissAttentionButton conversationId={conversationId} onDismissed={poll} canEdit={canEdit} />
-          </div>
-        ) : null}
         {isStale ? (
-          <p className="ml-auto flex items-center gap-1 text-2xs text-ds-warning" role="status">
-            <RefreshCw className="size-3 animate-spin" aria-hidden="true" />
+          <p className="flex items-center gap-1.5 text-xs font-medium text-ds-warning" role="status">
+            <RefreshCw strokeWidth={1.75} className="size-3.5 animate-spin" aria-hidden="true" />
             Updates paused — retrying…
           </p>
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto border border-ds-border bg-ds-surface p-4 sm:p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4 sm:p-5">
         {messages.length === 0 ? (
           <p className="text-sm text-ds-text-muted">No messages yet.</p>
         ) : (
@@ -170,10 +164,21 @@ export function LiveConversationPanel({
             ))}
           </AnimatePresence>
         )}
+        {needsAttention ? (
+          <div className="flex flex-wrap items-center justify-center gap-3 py-1">
+            <span className="h-px min-w-6 flex-1 bg-ds-border" aria-hidden="true" />
+            <span className="inline-flex items-center gap-2 rounded-full bg-ds-warning-bg px-3 py-1 text-xs font-medium text-ds-warning">
+              <UserRoundPlus className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              Needs attention
+            </span>
+            <DismissAttentionButton conversationId={conversationId} onDismissed={poll} canEdit={canEdit} />
+            <span className="h-px min-w-6 flex-1 bg-ds-border" aria-hidden="true" />
+          </div>
+        ) : null}
       </div>
 
       {control === "human" ? (
-        <div className="shrink-0">
+        <div className="shrink-0 px-3 pb-3">
           <ReplyComposer conversationId={conversationId} onSent={handleReplySent} canEdit={canEdit} />
         </div>
       ) : null}

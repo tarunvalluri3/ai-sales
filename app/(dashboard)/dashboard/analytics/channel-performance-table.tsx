@@ -1,6 +1,6 @@
-import { Fragment } from "react";
 import { channelLabel } from "@/lib/conversation-channel";
 import { InlineEmptyState } from "../_components/state-views";
+import { ChannelIcon } from "../_components/ui";
 import { Radio } from "lucide-react";
 import type { ChannelPerformance } from "@/lib/analytics";
 
@@ -10,26 +10,49 @@ export function ChannelPerformanceTable({ channels }: { channels: ChannelPerform
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 gap-y-2 text-xs">
-        <span className="text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">Channel</span>
-        <span className="text-right text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">Conversations</span>
-        <span className="text-right text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">Leads</span>
-        <span className="text-right text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">Appointments</span>
-        <span className="text-right text-2xs font-medium tracking-wide-ds text-ds-text-secondary uppercase">Conversion</span>
-
-        {channels.map((channel) => (
-          <Fragment key={channel.channel}>
-            <span className="text-ds-text-primary">{channelLabel(channel.channel)}</span>
-            <span className="text-right text-ds-text-secondary">{channel.conversations}</span>
-            <span className="text-right text-ds-text-secondary">{channel.leads}</span>
-            <span className="text-right text-ds-text-secondary">
-              {channel.appointments} <span className="text-2xs text-ds-text-muted">({channel.completedAppointments} done)</span>
-            </span>
-            <span className="text-right font-medium text-ds-text-primary">{channel.conversionRate}%</span>
-          </Fragment>
-        ))}
-      </div>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[26rem] border-separate border-spacing-0 text-left">
+        <thead>
+          <tr>
+            <th scope="col" className="dx-th px-3 py-2">
+              Channel
+            </th>
+            <th scope="col" className="dx-th px-3 py-2">
+              Chats
+            </th>
+            <th scope="col" className="dx-th px-3 py-2">
+              Leads
+            </th>
+            <th scope="col" className="dx-th px-3 py-2">
+              Appts
+            </th>
+            <th scope="col" className="dx-th px-3 py-2">
+              Conv.
+            </th>
+          </tr>
+        </thead>
+        <tbody className="text-sm text-ds-text-primary">
+          {channels.map((channel) => (
+            <tr key={channel.channel}>
+              <th scope="row" className="border-b border-ds-border px-3 py-2.5 font-medium">
+                <span className="flex items-center gap-3">
+                  <ChannelIcon source={channel.channel} className="size-5 shrink-0" strokeWidth={1.75} />
+                  {channelLabel(channel.channel)}
+                </span>
+              </th>
+              <td className="border-b border-ds-border px-3 py-2.5 tabular-nums">{channel.conversations}</td>
+              <td className="border-b border-ds-border px-3 py-2.5 tabular-nums">{channel.leads}</td>
+              <td className="border-b border-ds-border px-3 py-2.5 tabular-nums">
+                <span className="flex flex-col leading-tight">
+                  <span className="font-medium">{channel.appointments}</span>
+                  <span className="text-xs text-ds-text-secondary">{channel.completedAppointments} done</span>
+                </span>
+              </td>
+              <td className="border-b border-ds-border px-3 py-2.5 tabular-nums">{channel.conversionRate}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

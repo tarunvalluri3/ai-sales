@@ -21,7 +21,7 @@ export function GstBreakdown({
   className?: string;
 }) {
   return (
-    <span className={`text-2xs text-ds-text-muted ${className}`}>
+    <span className={className || "text-2xs text-ds-text-muted"}>
       {formatPaiseExact(taxableValuePaise(grossPaise))} + {formatPaiseExact(taxAmountPaise(grossPaise))} GST (
       {gstRatePercent}%) = {formatPaiseAsInr(grossPaise)}
     </span>

@@ -7,6 +7,7 @@ import { listTagsForBusiness, listTagsForLeads } from "@/lib/lead-tags";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeadsList } from "./leads-list";
 import { TagManager } from "./tag-manager";
+import { PageHeader, Pill } from "../_components/ui";
 
 export default async function LeadsPage() {
   const { businessId, orgRole } = await requireLiveBusinessContext();
@@ -57,8 +58,16 @@ export default async function LeadsPage() {
   for (const service of interestServices) interestNameById[service.id] = service.name;
 
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <TagManager tags={tags} canEdit={canEdit} />
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeader
+        title="Leads"
+        description="Every conversation. Your next opportunity."
+        actions={<TagManager tags={tags} canEdit={canEdit} />}
+      >
+        <Pill tone="lime">
+          {leads.length} prospect{leads.length === 1 ? "" : "s"}
+        </Pill>
+      </PageHeader>
       <LeadsList
         leads={leads}
         interestNameById={interestNameById}

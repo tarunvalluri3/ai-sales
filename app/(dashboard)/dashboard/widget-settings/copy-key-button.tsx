@@ -27,7 +27,7 @@ export function CopyKeyButton({ value, label = "Copy" }: { value: string; label?
       onClick={handleCopy}
       disabled={!value}
       aria-live="polite"
-      className="flex shrink-0 items-center gap-1.5 border border-ds-border bg-transparent px-3 py-2.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary disabled:opacity-50"
+      className="ds-btn-label inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-ds-primary bg-ds-surface px-3.5 text-sm text-ds-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary disabled:opacity-50"
     >
       {copied ? (
         <>

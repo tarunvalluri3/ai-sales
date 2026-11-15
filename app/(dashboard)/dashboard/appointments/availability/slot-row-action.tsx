@@ -18,11 +18,7 @@ export function SlotRowAction({ startsAt, isBlocked, canEdit }: { startsAt: stri
           type="submit"
           disabled={isPending || !canEdit}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className={
-            isBlocked
-              ? "px-2 py-1 text-sm font-medium text-ds-success transition-colors hover:bg-ds-success-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-              : "px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          }
+          className="inline-flex h-9 items-center rounded-full border border-ds-border-strong bg-ds-surface px-4 text-sm font-medium text-ds-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           {isPending ? (isBlocked ? "Unblocking…" : "Blocking…") : isBlocked ? "Unblock" : "Block"}
         </button>

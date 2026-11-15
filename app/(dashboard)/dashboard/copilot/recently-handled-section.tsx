@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { DeleteButton } from "../_components/delete-button";
-import { Badge } from "../_components/badge";
+import { Pill } from "../_components/ui";
 import { undismissPriorityItemAction } from "./actions";
 import { PRIORITY_REASON_KEY_LABELS, type RecentlyHandledItem } from "@/lib/copilot";
 
@@ -30,31 +30,31 @@ export function RecentlyHandledSection({
   canDismiss: boolean;
 }) {
   return (
-    <details className="border border-ds-border bg-ds-surface p-4">
-      <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">
+    <details className="dx-card px-5 py-4">
+      <summary className="cursor-pointer rounded-lg text-sm font-medium text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary">
         Recently handled ({items.length})
       </summary>
-      <ul className="mt-3 flex flex-col gap-2">
+      <ul className="dx-rows mt-2 flex flex-col">
         {items.map((item) => (
           <li
             key={item.customerId}
-            className="flex flex-wrap items-center justify-between gap-3 border border-ds-border bg-ds-surface-soft p-3"
+            className="flex flex-wrap items-center justify-between gap-3 py-3"
           >
             <div className="flex flex-col gap-1">
               <Link
                 href={`/dashboard/customers/${item.customerId}`}
-                className="text-sm font-medium text-ds-text-primary hover:underline"
+                className="w-fit rounded-md text-sm font-medium text-ds-text-primary hover:underline"
               >
                 {item.customerName ?? "Unnamed prospect"}
               </Link>
-              <span className="text-xs text-ds-text-muted">
+              <span className="text-sm text-ds-text-secondary">
                 By {item.dismissedBy} · {timeAgo(item.dismissedAt)}
               </span>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-2">
                 {item.reasonKeys.map((key) => (
-                  <Badge key={key} tone="muted" size="sm">
+                  <Pill key={key} tone="gray" size="sm">
                     {PRIORITY_REASON_KEY_LABELS[key]}
-                  </Badge>
+                  </Pill>
                 ))}
               </div>
             </div>

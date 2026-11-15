@@ -5,21 +5,17 @@ const TABS = [
   { key: "availability", label: "Availability", href: "/dashboard/appointments/availability" },
 ] as const;
 
-/** Sub-navigation between the two appointment views -- the primary fix for "couldn't find Availability": a visible tab, not a link buried in a paragraph. */
+/** Sub-navigation between the two appointment views: a visible tab strip, not a link buried in a paragraph. */
 export function AppointmentsTabs({ active }: { active: "requests" | "availability" }) {
   return (
-    <div className="flex items-center gap-1 border-b border-ds-border" role="tablist">
+    <div className="dx-tabs" role="tablist">
       {TABS.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
           role="tab"
           aria-selected={active === tab.key}
-          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
-            active === tab.key
-              ? "border-ds-text-primary text-ds-text-primary"
-              : "border-transparent text-ds-text-secondary hover:text-ds-text-primary"
-          }`}
+          className="dx-tab px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           {tab.label}
         </Link>

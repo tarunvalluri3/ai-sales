@@ -18,6 +18,8 @@ import { PipelinePanel } from "./_components/pipeline-panel";
 import { RecentActivity } from "./_components/recent-activity";
 import { QuickActions } from "./_components/quick-actions";
 import { QualificationDonut } from "./_components/charts/qualification-donut";
+import { BarChart3, Box, CircleAlert, CircleHelp, FileText, MessageCircle, Tag, Users } from "lucide-react";
+import { Card, PageHeader } from "./_components/ui";
 
 const RECENT_LIMIT = 5;
 
@@ -66,31 +68,44 @@ export default async function DashboardOverviewPage({
   const conversionRate =
     conversationStats.total === 0 ? 0 : Math.round((leadStats.total / conversationStats.total) * 100);
 
+  // A conversation carries no name of its own; label recent rows with the
+  // prospect captured in that conversation, when one was.
+  const nameByConversationId: Record<string, string> = {};
+  for (const lead of leads) {
+    if (lead.contact_name && !nameByConversationId[lead.conversation_id]) {
+      nameByConversationId[lead.conversation_id] = lead.contact_name;
+    }
+  }
+
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
+    <div className="flex flex-1 flex-col gap-8">
       {welcome === "1" ? <LaunchCard snippet={launchSnippet} /> : null}
       {showInstallBanner ? <InstallWidgetBanner hasActiveKey={activeKeys.length > 0} /> : null}
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{businessName}</h1>
-        <p className="text-sm text-ds-text-secondary">
-          {conversationStats.last7Days} conversation{conversationStats.last7Days === 1 ? "" : "s"} in
-          the last 7 days · {leadStats.total} lead{leadStats.total === 1 ? "" : "s"} total
-          {needsAttentionCount > 0
-            ? ` · ${needsAttentionCount} need${needsAttentionCount === 1 ? "s" : ""} attention now`
-            : ""}
-        </p>
-      </div>
+      <PageHeader
+        title={businessName}
+        description={
+          <>
+            {conversationStats.last7Days} conversation{conversationStats.last7Days === 1 ? "" : "s"} in the last 7 days ·{" "}
+            {leadStats.total} lead{leadStats.total === 1 ? "" : "s"} total
+            {needsAttentionCount > 0
+              ? ` · ${needsAttentionCount} need${needsAttentionCount === 1 ? "s" : ""} attention now`
+              : ""}
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <KpiTile
+          icon={MessageCircle}
           label="Conversations"
           value={conversationStats.total}
           hint={`${conversationStats.last30Days} in the last 30 days`}
           href="/dashboard/conversations"
         />
-        <KpiTile label="Leads" value={leadStats.total} href="/dashboard/leads" />
+        <KpiTile icon={Users} label="Leads" value={leadStats.total} hint="Prospects captured" href="/dashboard/leads" />
         <KpiTile
+          icon={BarChart3}
           label="Conversion rate"
           value={conversionRate}
           suffix="%"
@@ -98,32 +113,39 @@ export default async function DashboardOverviewPage({
           href="/dashboard/analytics"
         />
         <KpiTile
+          icon={CircleAlert}
+          attention={needsAttentionCount > 0}
           label="Needs attention"
           value={needsAttentionCount}
-          hint="Conversations awaiting a human"
+          hint="Awaiting a human"
           href="/dashboard/conversations"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <RecentActivity conversations={conversations.slice(0, RECENT_LIMIT)} leads={leads.slice(0, RECENT_LIMIT)} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <RecentActivity
+          conversations={conversations.slice(0, RECENT_LIMIT)}
+          leads={leads.slice(0, RECENT_LIMIT)}
+          nameByConversationId={nameByConversationId}
+        />
         <PipelinePanel byStatus={leadStats.byStatus} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-          <h2 className="text-sm font-medium text-ds-text-primary">Lead qualification</h2>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <Card className="flex flex-col gap-4">
+          <h2 className="dx-title">Lead qualification</h2>
           <QualificationDonut byQualification={leadStats.byQualification} />
-        </section>
+        </Card>
         <ContentSummary
           items={[
-            { label: "Products", count: products.length, href: "/dashboard/products" },
-            { label: "Services", count: services.length, href: "/dashboard/services" },
-            { label: "FAQs", count: faqs.length, href: "/dashboard/faqs" },
+            { label: "Products", count: products.length, href: "/dashboard/products", icon: Box },
+            { label: "Services", count: services.length, href: "/dashboard/services", icon: Tag },
+            { label: "FAQs", count: faqs.length, href: "/dashboard/faqs", icon: CircleHelp },
             {
-              label: "Knowledge documents",
+              label: "Documents",
               count: knowledgeDocuments.length,
               href: "/dashboard/knowledge",
+              icon: FileText,
             },
           ]}
         />

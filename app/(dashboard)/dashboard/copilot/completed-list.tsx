@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PRIORITY_REASON_KEY_LABELS } from "@/lib/copilot-lifecycle";
 import type { CompletedActionItem } from "@/lib/copilot-actions";
-import { Badge } from "../_components/badge";
+import { Pill } from "../_components/ui";
 import { EmptyState } from "../_components/state-views";
 
 function timeAgo(iso: string): string {
@@ -30,29 +30,29 @@ export function CompletedList({ items }: { items: CompletedActionItem[] }) {
   }
 
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="dx-card dx-rows flex flex-col px-5 py-2">
       {items.map((item) => {
         const at = item.completedAt ?? item.dismissedAt;
         const by = item.completedBy ?? item.dismissedBy;
         return (
-          <li key={item.id} className="flex flex-col gap-1.5 border border-ds-border bg-ds-surface-soft p-3">
+          <li key={item.id} className="flex flex-col gap-2 py-3.5">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="flex flex-col">
-                <Link href={`/dashboard/customers/${item.customerId}`} className="text-sm font-medium text-ds-text-primary hover:underline">
+                <Link href={`/dashboard/customers/${item.customerId}`} className="w-fit rounded-md text-sm font-medium text-ds-text-primary hover:underline">
                   {item.customerName ?? "Unnamed prospect"}
                 </Link>
                 <span className="text-xs text-ds-text-secondary">{item.title}</span>
               </div>
               <div className="flex flex-col items-end gap-0.5">
-                <span className="text-xs text-ds-text-muted">{at ? timeAgo(at) : ""}</span>
-                <span className="text-2xs text-ds-text-muted">{by ? `By ${by}` : "Automatic"}</span>
+                <span className="text-xs text-ds-text-primary">{at ? timeAgo(at) : ""}</span>
+                <span className="text-sm text-ds-text-secondary">{by ? `By ${by}` : "Automatic"}</span>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-2">
               {item.reasonKeys.map((key) => (
-                <Badge key={key} tone="muted" size="sm">
+                <Pill key={key} tone="gray" size="sm">
                   {PRIORITY_REASON_KEY_LABELS[key]}
-                </Badge>
+                </Pill>
               ))}
             </div>
           </li>

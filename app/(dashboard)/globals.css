@@ -44,6 +44,11 @@
   --ds-danger-bg: rgba(220, 38, 38, 0.12);
   --ds-danger-on: #ffffff;
 
+  /* Attention marks (unread / needs-a-human dots and counts) and neutral
+     data marks (cold leads, lost deals, booked slots). Same in every theme. */
+  --ds-attention: #fbb424;
+  --ds-mark-neutral: #a7aba3;
+
   --ds-text-2xs: 0.6875rem;
   --ds-tracking-wide: 0.14em;
 
@@ -51,6 +56,29 @@
   --ds-radius-float: 1rem;
   --ds-shadow-float: 0 24px 64px rgba(0, 0, 0, 0.45);
   --ds-scrim: rgba(0, 0, 0, 0.6);
+
+  /* Customer-dashboard accents. The real lime values are set in the
+     `:root:has(.dash-shell)` block further down; HERE (marketing, auth,
+     onboarding, /apache) they fall back to neutral Web Studio surfaces, and
+     every Tailwind radius step is 0, because onboarding and /apache reuse
+     some dashboard components (forms, lists, Badge, DataTable) and those
+     must keep rendering sharp and on-palette outside the dashboard. */
+  --ds-lime: var(--ds-text-secondary);
+  --ds-lime-mid: var(--ds-surface-soft);
+  --ds-lime-soft: var(--ds-surface-soft);
+  --ds-success-bright: var(--ds-success);
+  --ds-coral: var(--ds-danger);
+
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-4xl: 0;
+  --dx-pill-radius: 0;
+  --dx-card-radius: 0;
 
   --dashboard-primary: var(--ds-primary);
   --dashboard-primary-hover: var(--ds-primary-hover);
@@ -65,17 +93,17 @@
 
   --ds-bg: #f5f4f0;
   --ds-surface: #ffffff;
-  --ds-surface-raised: #fafaf8;
-  --ds-surface-elevated: #fafaf8;
-  --ds-surface-soft: #f0efea;
-  --ds-border: #dcdad2;
-  --ds-border-strong: #bdbbb2;
+  --ds-surface-raised: #fbfaf7;
+  --ds-surface-elevated: #fbfaf7;
+  --ds-surface-soft: #eeece6;
+  --ds-border: #d7d4cb;
+  --ds-border-strong: #aaa69b;
 
   --ds-text-primary: #111110;
-  --ds-text-secondary: #78766e;
-  --ds-text-muted: #5c5952;
-  --ds-text-faint: #5c5952;
-  --ds-text-label-faint: #78766e;
+  --ds-text-secondary: #504d47;
+  --ds-text-muted: #625f58;
+  --ds-text-faint: #6b6860;
+  --ds-text-label-faint: #625f58;
 
   --ds-primary: #111110;
   --ds-primary-hover: #2a2926;
@@ -122,6 +150,14 @@
   --color-ds-danger-bg: var(--ds-danger-bg);
   --color-ds-danger-on: var(--ds-danger-on);
   --color-ds-scrim: var(--ds-scrim);
+  --color-ds-lime: var(--ds-lime);
+  --color-ds-lime-mid: var(--ds-lime-mid);
+  --color-ds-lime-soft: var(--ds-lime-soft);
+  --color-ds-success-bright: var(--ds-success-bright);
+  --color-ds-coral: var(--ds-coral);
+  --color-ds-attention: var(--ds-attention);
+  --color-ds-mark-neutral: var(--ds-mark-neutral);
+  --color-ds-on-bright: var(--ds-on-bright);
 
   --text-2xs: var(--ds-text-2xs);
   --tracking-wide-ds: var(--ds-tracking-wide);
@@ -217,52 +253,466 @@ html {
   }
 }
 
-/*
- * Primary button typography and motion (Web Studio): Space Grotesk label,
- * uppercase, wide tracking; hover scales up slightly and a small Signal Red
- * "node" dot appears; active scales down. Applied (via className) to every
- * paper/ink-filled button. Disabled buttons get no hover effects.
- */
+/* Formal product controls: body font, normal case, and restrained motion.
+   Space Grotesk remains reserved for compact technical metadata. */
 .ds-btn-label {
-  position: relative;
-  font-family: var(--font-space), system-ui, sans-serif;
+  font-family: var(--font-hanken), system-ui, sans-serif;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   transition:
-    transform 200ms ease,
     background-color 200ms ease,
     color 200ms ease,
     border-color 200ms ease;
 }
 
-.ds-btn-label::after {
-  content: "";
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: var(--ds-accent);
-  opacity: 0;
-  transition: opacity 200ms ease;
-  pointer-events: none;
-}
-
-.ds-btn-label:hover:not(:disabled):not([aria-disabled="true"]) {
-  transform: scale(1.02);
-}
-
-.ds-btn-label:hover:not(:disabled):not([aria-disabled="true"])::after {
-  opacity: 1;
-}
-
-.ds-btn-label:active:not(:disabled):not([aria-disabled="true"]) {
-  transform: scale(0.98);
-}
-
 .ds-btn-label:disabled,
 .ds-btn-label[aria-disabled="true"] {
   opacity: 0.4;
+}
+
+/* ==========================================================================
+   Customer dashboard (/dashboard/*) -- "Wave" look, 2026-11-15.
+   Rounded cards, olive/lime palette, Hanken Grotesk + Space Grotesk. Two
+   themes driven by the same html[data-theme] switch as the rest of the app
+   (ThemeToggle, THEME_INIT_SCRIPT): dark is the default, `data-theme="light"`
+   selects light. Everything is keyed off `.dash-shell`, the wrapper rendered
+   by dashboard/layout.tsx, so marketing, auth, onboarding and /apache keep
+   the Web Studio tokens above. `:root:has(.dash-shell)` (not `.dash-shell`
+   itself) carries the tokens so <body>, portals and Clerk popovers resolve
+   the same values.
+   Lime has two jobs: "you are here" (active nav, selected row, active
+   filter/tab) and at most one primary highlight per page.
+   Every text/background pair below is >=4.5:1 (marks >=3:1), measured.
+   ========================================================================== */
+
+/* Theme-independent dashboard tokens + the DARK palette (default). */
+:root:has(.dash-shell) {
+  color-scheme: dark;
+
+  --ds-bg: #0e100c;
+  --ds-surface: #161913;
+  --ds-surface-raised: #1b1f17;
+  --ds-surface-elevated: #1b1f17;
+  --ds-surface-soft: #21261c;
+  --ds-border: #2a2f24;
+  --ds-border-strong: #3b4234;
+
+  --ds-text-primary: #eef1ea;
+  --ds-text-secondary: #aab1a2;
+  --ds-text-muted: #949b8c;
+  --ds-text-faint: #949b8c;
+  --ds-text-label-faint: #949b8c;
+
+  /* On dark, olive ink disappears: lime becomes the action colour. */
+  --ds-primary: #b2ff38;
+  --ds-primary-hover: #c3ff63;
+  --ds-primary-on: #11160a;
+  --ds-ivory: #11160a;
+  --ds-accent: #b2ff38;
+  --ds-accent-strong: #c3ff63;
+
+  --ds-success: #4fcf8c;
+  --ds-success-bg: #13301f;
+  --ds-warning: #f2b84b;
+  --ds-warning-bg: #3a2b0d;
+  --ds-danger: #f2806d;
+  --ds-danger-bg: #3b1a14;
+  --ds-danger-on: #11160a;
+
+  --ds-lime: #b2ff38;
+  --ds-lime-mid: #3e5a12;
+  --ds-lime-soft: #232f15;
+  --ds-success-bright: #4fcf8c;
+  --ds-coral: #f2806d;
+  --ds-attention: #fbb424;
+  --ds-mark-neutral: #5c6356;
+  /* Ink for text on bright fills (lime, amber): dark in both themes. */
+  --ds-on-bright: #11160a;
+
+  --ds-shadow-float: 0 18px 48px rgba(0, 0, 0, 0.5);
+  --ds-scrim: rgba(0, 0, 0, 0.6);
+
+  /* Tailwind's own radius scale, restored for the dashboard. */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --dx-pill-radius: 999px;
+  --dx-card-radius: 1.5rem;
+  --ds-radius-float: 1.25rem;
+
+  scrollbar-color: var(--ds-border-strong) transparent;
+}
+
+/* LIGHT palette: html[data-theme="light"]. Higher specificity than the block
+   above and than the Web Studio light block, so it always wins here. */
+:root[data-theme="light"]:has(.dash-shell) {
+  color-scheme: light;
+
+  --ds-bg: #f6f7f6;
+  --ds-surface: #ffffff;
+  --ds-surface-raised: #ffffff;
+  --ds-surface-elevated: #ffffff;
+  --ds-surface-soft: #f1f3f0;
+  --ds-border: #eceeec;
+  --ds-border-strong: #d3d7d1;
+
+  --ds-text-primary: #151713;
+  --ds-text-secondary: #5c6158;
+  /* muted / faint both clear 4.5:1 on white, canvas and soft surfaces. */
+  --ds-text-muted: #646860;
+  --ds-text-faint: #6b6f67;
+  --ds-text-label-faint: #6b6f67;
+
+  /* Deep olive ink for actions, links and active borders. */
+  --ds-primary: #203509;
+  --ds-primary-hover: #2c480d;
+  --ds-primary-on: #ffffff;
+  --ds-ivory: #ffffff;
+  --ds-accent: #203509;
+  --ds-accent-strong: #2c480d;
+
+  --ds-success: #1f7a4c;
+  --ds-success-bg: #e3f6ec;
+  --ds-warning: #8a5a00;
+  --ds-warning-bg: #ffedc2;
+  --ds-danger: #b23a26;
+  --ds-danger-bg: #fdebe8;
+  --ds-danger-on: #ffffff;
+
+  --ds-lime: #b2ff38;
+  --ds-lime-mid: #d6fb93;
+  --ds-lime-soft: #e8ffc8;
+  --ds-success-bright: #41b77a;
+  --ds-coral: #e97869;
+  --ds-mark-neutral: #a7aba3;
+
+  --ds-shadow-float: 0 18px 48px rgba(21, 23, 19, 0.14);
+  --ds-scrim: rgba(21, 23, 19, 0.38);
+}
+
+.dash-shell {
+  background: var(--ds-bg);
+  color: var(--ds-text-primary);
+  font-family: var(--font-hanken), system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Type sizes and weights match the deployed (main) dashboard: page title 28px (32px from
+   sm), card title 14 (16/18 where main used them), row title 14, body 14,
+   meta 12, labels/table headers/badges 11, KPI numbers 30, unclassed text 16. */
+
+.dash-shell ::selection {
+  background: var(--ds-lime-mid);
+  color: var(--ds-text-primary);
+}
+
+.dash-shell ::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+}
+
+/* Labels: the deployed Space Grotesk technical voice (11px, uppercase, wide). */
+.dash-shell .ds-label {
+  font-family: var(--font-space), system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dash-shell .ds-section-label {
+  font-family: var(--font-space), system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ds-text-primary);
+}
+
+.dash-shell .ds-btn-label {
+  font-weight: 500;
+  letter-spacing: 0;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.dash-shell .ds-btn-label:disabled,
+.dash-shell .ds-btn-label[aria-disabled="true"] {
+  opacity: 0.5;
+}
+
+/* --- Rounded baseline -------------------------------------------------------
+   Nothing in the dashboard keeps a sharp corner. Components set their own
+   radius where it matters; this catches every remaining control and bordered
+   box so older markup still reads as part of the same system.
+   In @layer base on purpose: Tailwind utilities live in a later layer, so a
+   `rounded-full` / `min-h-0` / `border-0` on the element still wins. */
+@layer base {
+.dash-shell :is(button, [role="button"], summary, a.ds-btn-label) {
+  border-radius: 0.75rem;
+}
+
+.dash-shell :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="color"], [type="range"], [type="file"]) {
+  min-height: 2.5rem;
+  border-radius: 0.75rem;
+  border-color: var(--ds-border-strong);
+  background-color: var(--ds-surface);
+}
+
+/* Browser surfaces in the dashboard's own palette: one olive focus ring for
+   every interactive element that does not set its own, an olive caret, and
+   tabular figures in table cells so numeric columns line up. */
+.dash-shell :is(a, button, summary, [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--ds-primary);
+  outline-offset: 2px;
+}
+
+.dash-shell :is(input, textarea) {
+  caret-color: var(--ds-primary);
+}
+
+.dash-shell td {
+  font-variant-numeric: tabular-nums;
+}
+
+.dash-shell :is(input, select, textarea)::placeholder {
+  color: var(--ds-text-faint);
+}
+
+.dash-shell :is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--ds-primary);
+  outline-offset: 1px;
+  border-color: var(--ds-primary);
+}
+
+.dash-shell :is(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--ds-primary);
+}
+
+.dash-shell .border:not(input, select, textarea, button, a, [class*="rounded"]) {
+  border-radius: 1.25rem;
+}
+
+.dash-shell :is(code, pre) {
+  border-radius: 0.625rem;
+}
+
+.dash-shell [role="alert"]:not([class*="rounded"], .sr-only),
+.dash-shell [role="status"]:not([class*="rounded"], .sr-only) {
+  border-radius: 0.75rem;
+}
+
+.dash-shell [role="dialog"]:not(nav, [class*="rounded"]),
+.dash-shell [role="menu"]:not([class*="rounded"]) {
+  border-radius: 1.25rem;
+  box-shadow: var(--ds-shadow-float);
+}
+
+}
+
+/* --- Primitives -------------------------------------------------------------
+   In @layer components so utilities on the same element can refine them. */
+@layer components {
+.dx-card {
+  border: 1px solid var(--ds-border);
+  border-radius: var(--dx-card-radius);
+  background: var(--ds-surface);
+}
+
+/* Status chips (Badge, Pill): a pill in the dashboard, a sharp tag elsewhere. */
+.dx-pill {
+  border-radius: var(--dx-pill-radius);
+}
+
+/* One card padding for the whole dashboard: 20px, as deployed (p-5). */
+.dx-card-pad {
+  padding: 1.25rem;
+}
+
+.dx-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ds-text-primary);
+}
+
+.dx-subtitle {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--ds-text-secondary);
+}
+
+/* Soft divider list: rows separated by hairlines, no outer box. */
+.dx-rows > * + * {
+  border-top: 1px solid var(--ds-border);
+}
+
+/* Tab strip with an olive underline on the active tab. */
+.dx-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.75rem;
+  border-bottom: 1px solid var(--ds-border);
+}
+
+.dx-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.25rem;
+  border-radius: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ds-text-secondary);
+  transition: color 160ms ease;
+}
+
+.dx-tab:hover {
+  color: var(--ds-text-primary);
+}
+
+.dx-tab:is([aria-selected="true"], [aria-current="page"], [data-active="true"]) {
+  font-weight: 500;
+  color: var(--ds-primary);
+}
+
+.dx-tab:is([aria-selected="true"], [aria-current="page"], [data-active="true"])::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--ds-primary);
+}
+
+/* Toggle switch: a span drawn after a visually hidden checkbox, or a
+   button carrying aria-checked / aria-pressed / data-on. */
+.dx-switch {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.5rem;
+  min-height: 0;
+  border-radius: 999px;
+  background: var(--ds-border-strong);
+  transition: background-color 160ms ease;
+}
+
+.dx-switch::after {
+  content: "";
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  /* The "on" ink of the active palette: white in the dashboard, ink / paper
+     in the Web Studio themes, so the knob never vanishes into its track. */
+  background: var(--ds-primary-on);
+  box-shadow: 0 1px 2px rgba(21, 23, 19, 0.25);
+  transition: transform 160ms ease;
+}
+
+.dx-switch:is([data-on="true"], [aria-checked="true"], [aria-pressed="true"]),
+input:checked + .dx-switch {
+  background: var(--ds-primary);
+}
+
+.dx-switch:is([data-on="true"], [aria-checked="true"], [aria-pressed="true"])::after,
+input:checked + .dx-switch::after {
+  transform: translateX(1.25rem);
+}
+
+input:focus-visible + .dx-switch {
+  outline: 2px solid var(--ds-primary);
+  outline-offset: 2px;
+}
+
+input:disabled + .dx-switch,
+.dx-switch:disabled {
+  opacity: 0.5;
+}
+
+/* Progress / meter track. */
+.dx-track {
+  height: 0.625rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ds-surface-soft);
+}
+
+.dx-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ds-lime);
+}
+
+}
+
+/* DataTable chrome. /apache reuses DataTable, so the base rules are the Web
+   Studio table (boxed, uppercase technical header) and the dashboard
+   overrides them with its own (frameless, soft rounded header row). */
+.dx-table-frame {
+  border: 1px solid var(--ds-border);
+  background: var(--ds-surface);
+}
+
+.dx-th {
+  border-bottom: 1px solid var(--ds-border);
+  background: var(--ds-surface-raised);
+  color: var(--ds-text-muted);
+  font-family: var(--font-space), system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dash-shell .dx-table-frame {
+  border: 0;
+  background: transparent;
+}
+
+.dash-shell .dx-th {
+  border-bottom: 0;
+  background: var(--ds-surface-soft);
+  color: var(--ds-text-muted);
+}
+
+.dash-shell .dx-th:first-child {
+  border-radius: 0.75rem 0 0 0.75rem;
+}
+
+.dash-shell .dx-th:last-child {
+  border-radius: 0 0.75rem 0.75rem 0;
+}
+
+/* Shared customer-dashboard canvas: full width with a 24px gutter on every
+   side, matching the deployed dashboard (p-6). */
+.dashboard-main > div:not(.dashboard-conversation-workspace) {
+  width: 100%;
+  padding: 1.5rem;
+  background: transparent;
+}
+
+@media (min-width: 1280px) {
+  .dashboard-main > div:not(.dashboard-conversation-workspace) {
+    padding-inline: 2rem;
+  }
 }

@@ -26,7 +26,7 @@ export function ExtractNowButton({ id, canEdit = true }: { id: string; canEdit?:
         role="menuitem"
         disabled={isPending || !canEdit}
         title={canEdit ? undefined : ROLE_DENIED_TITLE}
-        className="block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="block w-full rounded-none px-4 py-2.5 text-left text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-primary"
       >
         {isPending ? "Extracting…" : "Extract products & services"}
       </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Trash2 } from "lucide-react";
 
 export type DeleteState = {
   error?: string;
@@ -31,13 +32,15 @@ export const ROLE_DENIED_TITLE = "You don't have permission to do this.";
  * link, for callers placing this directly in a row. `"menuitem"` (added
  * 2026-09-08, knowledge page distill pass) renders a full-width row
  * meant for a `RowActionsMenu` dropdown instead -- same logic, same
- * confirm gate, different chrome.
+ * confirm gate, different chrome. `"icon"` is the bare trash-can button
+ * used in dense rows; `label` becomes its accessible name.
  */
 const TRIGGER_CLASS = {
   inline:
-    "px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary",
+    "inline-flex h-9 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary",
+  icon: "inline-flex size-9 items-center justify-center rounded-xl text-ds-text-primary transition-colors hover:bg-ds-danger-bg hover:text-ds-danger disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary",
   menuitem:
-    "block w-full px-3.5 py-2 text-left text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary",
+    "block w-full rounded-none px-3.5 py-2 text-left text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary",
 } as const;
 
 export function DeleteButton({
@@ -53,7 +56,7 @@ export function DeleteButton({
   label?: string;
   canEdit?: boolean;
   confirmMessage?: string;
-  variant?: "inline" | "menuitem";
+  variant?: "inline" | "icon" | "menuitem";
 }) {
   const [state, formAction, isPending] = useActionState(action, initialState);
   const [confirming, setConfirming] = useState(false);
@@ -75,7 +78,7 @@ export function DeleteButton({
               role={isMenuItem ? "menuitem" : undefined}
               disabled={isPending}
               autoFocus
-              className="bg-ds-danger px-2 py-1 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+              className="inline-flex h-9 items-center rounded-xl bg-ds-danger px-3 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
             >
               {isPending ? "Deleting…" : "Confirm delete"}
             </button>
@@ -85,7 +88,7 @@ export function DeleteButton({
             role={isMenuItem ? "menuitem" : undefined}
             onClick={() => setConfirming(false)}
             disabled={isPending}
-            className="px-2 py-1 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="inline-flex h-9 items-center rounded-xl px-3 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
           >
             Cancel
           </button>
@@ -115,10 +118,12 @@ export function DeleteButton({
         type="submit"
         role={isMenuItem ? "menuitem" : undefined}
         disabled={isPending || !canEdit}
-        title={canEdit ? undefined : ROLE_DENIED_TITLE}
+        title={canEdit ? (variant === "icon" ? label : undefined) : ROLE_DENIED_TITLE}
+        aria-label={variant === "icon" ? label : undefined}
         className={TRIGGER_CLASS[variant]}
       >
-        {isPending ? "Deleting…" : label}
+        {isMenuItem ? null : <Trash2 className="size-5" strokeWidth={1.75} aria-hidden="true" />}
+        {variant === "icon" ? null : isPending ? "Deleting…" : label}
       </button>
       {state.error ? (
         <span role="alert" className={isMenuItem ? "block px-3.5 py-1 text-xs text-ds-danger" : "text-xs text-ds-danger"}>

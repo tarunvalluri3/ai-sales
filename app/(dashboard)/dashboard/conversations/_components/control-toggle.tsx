@@ -5,7 +5,8 @@ import type { SetControlState } from "../actions";
 import { setConversationControlAction } from "../actions";
 import type { ConversationControl } from "@/lib/supabase/types";
 import { ROLE_DENIED_TITLE } from "../../_components/delete-button";
-import { Badge } from "../../_components/badge";
+import { Info, Sparkles, UserRound } from "lucide-react";
+import { btnGhostSm, btnPrimarySm } from "../../_components/ui";
 
 const initialState: SetControlState = {};
 
@@ -34,12 +35,23 @@ export function ControlToggle({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  const isHuman = control === "human";
+
   return (
-    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge tone={control === "human" ? "warning" : "muted"}>
-          {control === "human" ? "Human-controlled" : "AI-handled"}
-        </Badge>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span
+          className={`inline-flex h-10 items-center gap-2.5 rounded-full px-4 text-sm font-medium ${
+            isHuman ? "bg-ds-lime-soft text-ds-primary" : "bg-ds-surface-soft text-ds-text-primary"
+          }`}
+        >
+          {isHuman ? (
+            <UserRound className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          ) : (
+            <Sparkles className="size-5" strokeWidth={1.75} aria-hidden="true" />
+          )}
+          {isHuman ? "Human-controlled" : "AI-handled"}
+        </span>
 
         <form action={formAction} className="flex items-center gap-2">
           <input type="hidden" name="id" value={conversationId} />
@@ -48,25 +60,33 @@ export function ControlToggle({
             type="submit"
             disabled={isPending || !canEdit}
             title={canEdit ? undefined : ROLE_DENIED_TITLE}
-            className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className={isHuman ? btnGhostSm : btnPrimarySm}
           >
-            {isPending ? "Updating…" : control === "human" ? "Hand back to AI" : "Take over this conversation"}
+            {isHuman ? (
+              <Sparkles className="size-4" strokeWidth={1.75} aria-hidden="true" />
+            ) : (
+              <UserRound className="size-4" strokeWidth={1.75} aria-hidden="true" />
+            )}
+            {isPending ? "Updating…" : isHuman ? "Hand back to AI" : "Take over this conversation"}
           </button>
         </form>
-
-        {state.error ? (
-          <span role="alert" className="text-xs text-ds-danger">
-            {state.error}
-          </span>
-        ) : null}
       </div>
 
-      <p className="text-xs text-ds-text-muted">
-        {control === "human"
-          ? "AI replies are paused here. Hand it back anytime to let the AI respond again."
-          : needsAttention
-            ? "Taking over pauses AI replies and clears this conversation's alert. You can hand it back anytime."
-            : "Taking over pauses AI replies for this conversation. You can hand it back anytime."}
+      {state.error ? (
+        <span role="alert" className="text-xs text-ds-danger">
+          {state.error}
+        </span>
+      ) : null}
+
+      <p className="flex items-start gap-2 text-sm text-ds-text-secondary">
+        <Info className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        <span>
+          {isHuman
+            ? "AI replies are paused while you're in control. Hand it back anytime to let the AI respond again."
+            : needsAttention
+              ? "Taking over pauses AI replies and clears this conversation's alert. You can hand it back anytime."
+              : "Taking over pauses AI replies for this conversation. You can hand it back anytime."}
+        </span>
       </p>
     </div>
   );

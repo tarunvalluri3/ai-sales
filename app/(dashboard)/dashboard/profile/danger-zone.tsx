@@ -1,5 +1,6 @@
 "use client";
 
+import { TriangleAlert } from "lucide-react";
 import { useActionState, useState, useTransition } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { deleteBusinessAction, exportBusinessDataAction } from "./actions";
@@ -59,16 +60,20 @@ export function DangerZone({ businessName }: { businessName: string }) {
   }
 
   return (
-    <details className="group w-full max-w-lg overflow-hidden border border-ds-border bg-ds-surface">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary [&::-webkit-details-marker]:hidden">
-        Danger zone
+    <details className="dx-card group w-full overflow-hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-4 px-5 py-4 transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-primary [&::-webkit-details-marker]:hidden">
+        <TriangleAlert className="size-6 shrink-0 text-ds-danger" strokeWidth={1.75} aria-hidden="true" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-sm leading-tight font-medium text-ds-text-primary">Danger zone</span>
+          <span className="text-sm text-ds-text-secondary">Export your data or permanently delete this business.</span>
+        </span>
         <svg
-          width="14"
-          height="14"
+          width="20"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden="true"
-          className="shrink-0 text-ds-text-muted transition-transform duration-150 group-open:rotate-90"
+          className="shrink-0 rotate-90 text-ds-text-primary transition-transform duration-150 group-open:-rotate-90"
         >
           <path
             d="M9 6l6 6-6 6"
@@ -80,10 +85,10 @@ export function DangerZone({ businessName }: { businessName: string }) {
         </svg>
       </summary>
 
-      <div className="flex flex-col gap-6 border-t border-ds-border p-5">
-        <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface-elevated p-5">
+      <div className="grid grid-cols-1 gap-4 border-t border-ds-border dx-card-pad lg:grid-cols-2">
+        <section className="flex flex-col gap-3 rounded-2xl border border-ds-border p-5">
           <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-medium text-ds-text-primary">Export your data</h2>
+            <h2 className="dx-title">Export your data</h2>
             <p className="text-sm text-ds-text-secondary">
               Download everything this business owns — profile, products, services, FAQs, knowledge,
               conversations, messages, leads, and the audit log — as a single JSON file.
@@ -93,16 +98,16 @@ export function DangerZone({ businessName }: { businessName: string }) {
             type="button"
             onClick={handleExport}
             disabled={isExporting}
-            className="w-fit border border-ds-border-strong px-4 py-3 text-sm font-medium text-ds-text-primary transition-colors hover:border-ds-border-strong disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label inline-flex h-9 w-fit items-center rounded-xl border border-ds-border-strong bg-ds-surface px-4 text-sm text-ds-text-primary transition-colors hover:bg-ds-surface-soft disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
           >
             {isExporting ? "Preparing export…" : "Download my data"}
           </button>
           {exportError ? <p className="text-sm text-ds-danger">{exportError}</p> : null}
         </section>
 
-        <section className="flex flex-col gap-3 border border-ds-danger/40 bg-ds-surface-elevated p-5">
+        <section className="flex flex-col gap-3 rounded-2xl border border-ds-danger/40 bg-ds-danger-bg/40 p-5">
           <div className="flex flex-col gap-1">
-            <h2 className="text-sm font-medium text-ds-danger">Delete this business</h2>
+            <h2 className="dx-title text-ds-danger">Delete this business</h2>
             <p className="text-sm text-ds-text-secondary">
               Permanently deletes this business and everything it owns — products, services, FAQs,
               knowledge, conversations, messages, and leads. This cannot be undone. Your team&apos;s
@@ -111,8 +116,8 @@ export function DangerZone({ businessName }: { businessName: string }) {
           </div>
           <form action={deleteAction} className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <label htmlFor="confirmName" className="text-sm font-medium text-ds-text-secondary">
-                Type <span className="font-medium text-ds-text-primary">{businessName}</span> to confirm
+              <label htmlFor="confirmName" className="text-sm font-medium text-ds-text-primary">
+                Type <span className="font-medium">{businessName}</span> to confirm
               </label>
               <input
                 id="confirmName"
@@ -122,7 +127,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
                 value={confirmName}
                 onChange={(event) => setConfirmName(event.target.value)}
                 disabled={isDeletePending}
-                className="border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary transition-colors focus:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger disabled:opacity-60"
+                className="h-10 w-full rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 text-sm text-ds-text-primary transition-colors focus:border-ds-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger disabled:opacity-60"
               />
             </div>
             <AnimatePresence mode="wait">
@@ -143,7 +148,7 @@ export function DangerZone({ businessName }: { businessName: string }) {
             <button
               type="submit"
               disabled={isDeletePending || confirmName !== businessName}
-              className="w-fit bg-ds-danger px-4 py-3 text-sm font-medium text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
+              className="ds-btn-label inline-flex h-9 w-fit items-center rounded-xl bg-ds-danger px-4 text-sm text-ds-danger-on transition-colors hover:bg-ds-danger/90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-danger"
             >
               {isDeletePending ? "Deleting…" : "Permanently delete this business"}
             </button>

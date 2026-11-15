@@ -8,6 +8,8 @@ import { AddKnowledgeTabs } from "./_components/add-knowledge-tabs";
 import { KnowledgeList } from "./_components/knowledge-list";
 import { PermissionNotice } from "../_components/state-views";
 import { createKnowledgeDocumentAction } from "./actions";
+import { BookOpen } from "lucide-react";
+import { Card, PageHeader } from "../_components/ui";
 
 /**
  * Extends the default Server Action timeout for every action invoked from
@@ -27,32 +29,33 @@ export default async function KnowledgePage() {
   const documents = await listKnowledgeDocumentsForBusiness(businessId);
 
   return (
-    <div className="flex flex-1 flex-col gap-8 bg-ds-bg p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">Knowledge</h1>
-        <p className="text-sm text-ds-text-secondary">
-          This is what your AI sales employee is allowed to know. New documents start as drafts —
-          approve one to include it in your agent, then use Publish changes (top of the page) to
-          make it live.
-        </p>
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeader
+        icon={BookOpen}
+        title="Knowledge"
+        description="This is what your AI sales employee is allowed to know. New documents start as drafts: approve one, then publish changes to make it live."
+      />
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Card className="min-w-0 p-5">
+          <KnowledgeList documents={documents} canEdit={canEdit} />
+        </Card>
+
+        {canEdit ? (
+          <AddKnowledgeTabs
+            manualForm={
+              <KnowledgeForm action={createKnowledgeDocumentAction} submitLabel="Add knowledge" pendingLabel="Adding…" />
+            }
+            fileForm={<FileUploadForm />}
+            urlForm={<UrlImportForm />}
+          />
+        ) : (
+          <Card className="flex flex-col gap-4">
+            <h2 className="dx-title">Add knowledge</h2>
+            <PermissionNotice />
+          </Card>
+        )}
       </div>
-
-      <KnowledgeList documents={documents} canEdit={canEdit} />
-
-      {canEdit ? (
-        <AddKnowledgeTabs
-          manualForm={
-            <KnowledgeForm action={createKnowledgeDocumentAction} submitLabel="Add knowledge" pendingLabel="Adding…" />
-          }
-          fileForm={<FileUploadForm />}
-          urlForm={<UrlImportForm />}
-        />
-      ) : (
-        <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-          <h2 className="text-sm font-medium text-ds-text-primary">Add knowledge</h2>
-          <PermissionNotice />
-        </section>
-      )}
     </div>
   );
 }

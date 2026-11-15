@@ -3,19 +3,26 @@
 import { useActionState, useState } from "react";
 import { createExceptionAction, deleteExceptionAction, type ExceptionActionState } from "./exceptions-actions";
 import type { BusinessHoursException } from "@/lib/supabase/types";
+import { CalendarDays, Info, Plus } from "lucide-react";
 import { DeleteButton, ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { btnPrimary, helpClass, inputClass, labelClass } from "../_components/ui";
 
 const initialState: ExceptionActionState = {};
 
-const inputClasses =
-  "border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary outline-none focus:border-ds-text-primary disabled:opacity-60";
+const inputClasses = inputClass;
+
+const MODE_HINT: Record<"close_all_day" | "close_range" | "open_override", string> = {
+  close_range: "Block a specific time range, such as a lunch break.",
+  open_override: "Open extra or different hours on this date. Overrides normal hours.",
+  close_all_day: "Close the whole date, such as a public holiday.",
+};
 
 type Mode = "close_all_day" | "close_range" | "open_override";
 
 const MODE_OPTIONS: { value: Mode; label: string }[] = [
-  { value: "close_range", label: "Close part of the date (e.g. a lunch break)" },
-  { value: "open_override", label: "Open extra/different hours on this date" },
-  { value: "close_all_day", label: "Close the whole date (e.g. a holiday)" },
+  { value: "close_range", label: "Close part of the date" },
+  { value: "open_override", label: "Open extra or different hours" },
+  { value: "close_all_day", label: "Close the whole date" },
 ];
 
 function describeException(exception: BusinessHoursException): string {
@@ -32,8 +39,8 @@ function describeException(exception: BusinessHoursException): string {
  * on the Availability page. For anything that toggle can't do -- a
  * partial-day range (lunch break) or an exceptional opening -- pick a
  * date and what changes. One override per date; editing means deleting
- * and re-adding. No outer card here -- this lives inside the page's own
- * `<details>` disclosure, not a second nested container.
+ * and re-adding. No outer card here: the Availability page wraps this in
+ * its own "Advanced overrides" card.
  */
 export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessHoursException[]; canEdit: boolean }) {
   const [createState, createFormAction, isCreating] = useActionState(createExceptionAction, initialState);
@@ -42,9 +49,9 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
 
   return (
     <div className="flex flex-col gap-4">
-      <form action={createFormAction} className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="exception-date" className="text-xs font-medium text-ds-text-secondary">
+      <form action={createFormAction} className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="exception-date" className={labelClass}>
             Date
           </label>
           <input
@@ -58,8 +65,8 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="exception-mode" className="text-xs font-medium text-ds-text-secondary">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="exception-mode" className={labelClass}>
             What changes
           </label>
           <select
@@ -68,7 +75,7 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
             value={mode}
             onChange={(event) => setMode(event.target.value as Mode)}
             disabled={isCreating || !canEdit}
-            className={`${inputClasses} min-w-[16rem]`}
+            className={inputClasses}
           >
             {MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -76,12 +83,13 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
               </option>
             ))}
           </select>
+          <p className={helpClass}>{MODE_HINT[mode]}</p>
         </div>
 
         {mode !== "close_all_day" ? (
-          <>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="exception-start" className="text-xs font-medium text-ds-text-secondary">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="exception-start" className={labelClass}>
                 From
               </label>
               <input
@@ -93,8 +101,8 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
                 className={inputClasses}
               />
             </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="exception-end" className="text-xs font-medium text-ds-text-secondary">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="exception-end" className={labelClass}>
                 To
               </label>
               <input
@@ -106,12 +114,12 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
                 className={inputClasses}
               />
             </div>
-          </>
+          </div>
         ) : null}
 
-        <div className="flex flex-col gap-1">
-          <label htmlFor="exception-reason" className="text-xs font-medium text-ds-text-secondary">
-            Reason (optional, staff-only)
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="exception-reason" className={labelClass}>
+            Reason <span className="font-normal text-ds-text-secondary">(optional · staff only)</span>
           </label>
           <input
             id="exception-reason"
@@ -120,7 +128,7 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
             maxLength={200}
             placeholder="e.g. Public holiday"
             disabled={isCreating || !canEdit}
-            className={`${inputClasses} min-w-[14rem]`}
+            className={inputClasses}
           />
         </div>
 
@@ -128,41 +136,51 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
           type="submit"
           disabled={isCreating || !canEdit}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className={`${btnPrimary} mt-1 w-full`}
         >
+          <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />
           {isCreating ? "Adding…" : "Add override"}
         </button>
       </form>
 
       {createState.error ? (
-        <p role="alert" className="bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
+        <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
           {createState.error}
         </p>
       ) : null}
 
-      {exceptions.length === 0 ? (
-        <p className="text-sm text-ds-text-muted">No upcoming overrides.</p>
-      ) : (
-        <ul className="flex flex-col divide-y divide-ds-border">
-          {exceptions.map((exception) => (
-            <li key={exception.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-ds-text-primary">
-                  {new Date(`${exception.date}T00:00:00`).toLocaleDateString("en-US", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}{" "}
-                  · {describeException(exception)}
-                </span>
-                {exception.reason ? <span className="text-xs text-ds-text-muted">{exception.reason}</span> : null}
-              </div>
-              <DeleteButton action={deleteExceptionAction} id={exception.id} canEdit={canEdit} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="flex flex-col gap-1 border-t border-ds-border pt-4">
+        <h3 className="text-sm font-medium text-ds-text-primary">Upcoming overrides</h3>
+        {exceptions.length === 0 ? (
+          <p className="py-2 text-sm text-ds-text-secondary">No upcoming overrides.</p>
+        ) : (
+          <ul className="dx-rows flex flex-col">
+            {exceptions.map((exception) => (
+              <li key={exception.id} className="flex items-center gap-3 py-3">
+                <CalendarDays className="size-5 shrink-0 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm font-medium text-ds-text-primary">
+                    {new Date(`${exception.date}T00:00:00`).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}{" "}
+                    · {describeException(exception)}
+                  </span>
+                  {exception.reason ? <span className="text-xs text-ds-text-secondary">{exception.reason}</span> : null}
+                </div>
+                <DeleteButton action={deleteExceptionAction} id={exception.id} canEdit={canEdit} variant="icon" label="Delete override" />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <p className="flex items-center gap-2 text-sm text-ds-text-secondary">
+        <Info className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        Overrides apply to appointment availability.
+      </p>
     </div>
   );
 }

@@ -18,6 +18,8 @@ import { describeGuardrailFlags } from "@/lib/guardrails/response-policy";
 import { LiveConversationPanel } from "../_components/live-conversation-panel";
 import { InfoPanel } from "../_components/info-panel";
 import { ConversationPanes } from "../_components/conversation-panes";
+import { Avatar } from "../../_components/ui";
+import { anonymousContactLabel, displayContactName } from "@/lib/lead-source";
 
 export default async function ConversationDetailPage({
   params,
@@ -68,14 +70,17 @@ export default async function ConversationDetailPage({
   return (
     <ConversationPanes
       transcript={
-        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-ds-bg">
-          <div className="flex shrink-0 flex-col gap-1 p-4 pb-0 md:p-6 md:pb-0">
-            <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">
-              {lead?.contact_name ?? channelLabel(conversation.source)}
-            </h1>
-            <p className="text-sm text-ds-text-secondary">
-              {new Date(conversation.created_at).toLocaleString("en-US")} · {channelLabel(conversation.source)}
-            </p>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center gap-3 border-b border-ds-border px-4 py-3 pr-14 xl:pr-4">
+            <Avatar name={lead?.contact_name} source={conversation.source} />
+            <div className="flex min-w-0 flex-col">
+              <h2 className="truncate text-base leading-tight font-medium text-ds-text-primary">
+                {displayContactName(lead?.contact_name) ?? anonymousContactLabel(conversation.source)}
+              </h2>
+              <p className="truncate text-sm text-ds-text-secondary">
+                {channelLabel(conversation.source)} · {new Date(conversation.created_at).toLocaleString("en-US")}
+              </p>
+            </div>
           </div>
 
           <LiveConversationPanel

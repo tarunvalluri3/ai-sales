@@ -47,12 +47,12 @@ export function SubscriptionBanner({
   }
 
   return (
-    <div role="alert" className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 text-sm ${tone}`}>
+    <div role="alert" className={`mx-4 mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl px-4 py-2.5 text-sm md:mx-6 ${tone}`}>
       <span>{message}</span>
       {canManageBilling ? (
         <Link
           href="/dashboard/billing"
-          className="ds-btn-label shrink-0 bg-ds-primary px-3 py-1 text-xs font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className="ds-btn-label inline-flex h-9 shrink-0 items-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           {cta}
         </Link>

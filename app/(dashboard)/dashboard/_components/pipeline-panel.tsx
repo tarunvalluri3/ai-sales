@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { BreakdownBarChart } from "./charts/breakdown-bar-chart";
-import { chartColors } from "./charts/chart-colors";
+import { ArrowUpRight } from "lucide-react";
+import { Card, linkAccent } from "./ui";
 
 const STAGE_ORDER = ["new", "contacted", "converted", "lost"] as const;
 
@@ -11,28 +11,50 @@ const STAGE_LABEL: Record<(typeof STAGE_ORDER)[number], string> = {
   lost: "Lost",
 };
 
-const STAGE_COLORS = [chartColors.accent, chartColors.accentMuted, chartColors.success, chartColors.textMuted];
+const STAGE_FILL: Record<(typeof STAGE_ORDER)[number], string> = {
+  new: "bg-ds-lime-mid",
+  contacted: "bg-ds-lime",
+  converted: "bg-ds-success",
+  lost: "bg-ds-mark-neutral",
+};
 
+/**
+ * Leads by pipeline stage as plain proportional bars (each bar is the
+ * stage's share of the largest stage, so the longest bar fills the track).
+ * Only real `getLeadStats()` counts; no synthetic series.
+ */
 export function PipelinePanel({
   byStatus,
 }: {
   byStatus: { new: number; contacted: number; converted: number; lost: number };
 }) {
-  const items = STAGE_ORDER.map((stage) => ({ label: STAGE_LABEL[stage], count: byStatus[stage] }));
+  const max = Math.max(1, ...STAGE_ORDER.map((stage) => byStatus[stage]));
 
   return (
-    <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+    <Card className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-sm font-medium text-ds-text-primary">Lead pipeline</h2>
-        <Link
-          href="/dashboard/leads"
-          className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-        >
+        <h2 className="dx-title">Lead pipeline</h2>
+        <Link href="/dashboard/leads" className={linkAccent}>
           View all
+          <ArrowUpRight strokeWidth={1.75} className="size-4" aria-hidden="true" />
         </Link>
       </div>
 
-      <BreakdownBarChart items={items} colors={STAGE_COLORS} />
-    </section>
+      <dl className="flex flex-1 flex-col justify-around gap-5">
+        {STAGE_ORDER.map((stage) => (
+          <div key={stage} className="grid grid-cols-[5.5rem_minmax(0,1fr)_2.5rem] items-center gap-3">
+            <dt className="text-sm text-ds-text-primary">{STAGE_LABEL[stage]}</dt>
+            <dd className="contents">
+              <span className="dx-track h-3.5" aria-hidden="true">
+                <span className={STAGE_FILL[stage]} style={{ width: `${(byStatus[stage] / max) * 100}%` }} />
+              </span>
+              <span className="text-right text-sm font-medium tabular-nums text-ds-text-primary">
+                {byStatus[stage]}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
   );
 }

@@ -29,7 +29,7 @@ export type BillingIdentityValues = {
 };
 
 const fieldClass =
-  "border border-ds-border bg-ds-bg px-3 py-2 text-sm text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary";
+  "w-full rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 py-2.5 text-sm text-ds-text-primary";
 
 export function BillingDetailsFields({
   defaults,
@@ -44,9 +44,9 @@ export function BillingDetailsFields({
 }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <label htmlFor={`${idPrefix}-name`} className="text-sm font-medium text-ds-text-primary">
-          Billing name <span className="text-ds-text-muted">(required)</span>
+          Billing name <span className="font-normal text-ds-text-secondary">(required)</span>
         </label>
         <input
           id={`${idPrefix}-name`}
@@ -59,14 +59,14 @@ export function BillingDetailsFields({
           aria-describedby={`${idPrefix}-name-help`}
           className={fieldClass}
         />
-        <span id={`${idPrefix}-name-help`} className="text-2xs text-ds-text-muted">
+        <span id={`${idPrefix}-name-help`} className="text-xs leading-relaxed text-ds-text-secondary">
           Exactly as it should appear on your invoice: your registered business name, if you have one.
         </span>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <label htmlFor={`${idPrefix}-state`} className="text-sm font-medium text-ds-text-primary">
-          State <span className="text-ds-text-muted">(required)</span>
+          State <span className="font-normal text-ds-text-secondary">(required)</span>
         </label>
         <select
           id={`${idPrefix}-state`}
@@ -83,15 +83,15 @@ export function BillingDetailsFields({
             </option>
           ))}
         </select>
-        <span id={`${idPrefix}-state-help`} className="text-2xs text-ds-text-muted">
+        <span id={`${idPrefix}-state-help`} className="text-xs leading-relaxed text-ds-text-secondary">
           Your place of supply. It decides how {gstRatePercent}% GST is shown on your invoice — CGST and
           SGST if you are in {supplierStateName}, IGST for any other state.
         </span>
       </div>
 
-      <div className="flex flex-col gap-1 md:col-span-2">
+      <div className="flex flex-col gap-1.5 md:col-span-2">
         <label htmlFor={`${idPrefix}-address`} className="text-sm font-medium text-ds-text-primary">
-          Billing address <span className="text-ds-text-muted">(required)</span>
+          Billing address <span className="font-normal text-ds-text-secondary">(required)</span>
         </label>
         <textarea
           id={`${idPrefix}-address`}
@@ -104,15 +104,15 @@ export function BillingDetailsFields({
           aria-describedby={`${idPrefix}-address-help`}
           className={fieldClass}
         />
-        <span id={`${idPrefix}-address-help`} className="text-2xs text-ds-text-muted">
+        <span id={`${idPrefix}-address-help`} className="text-xs leading-relaxed text-ds-text-secondary">
           Street, area, city and PIN code. Use English letters — it is printed on a tax invoice that
           cannot be edited afterwards.
         </span>
       </div>
 
-      <div className="flex flex-col gap-1 md:col-span-2">
+      <div className="flex flex-col gap-1.5 md:col-span-2">
         <label htmlFor={`${idPrefix}-gstin`} className="text-sm font-medium text-ds-text-primary">
-          GSTIN <span className="text-ds-text-muted">(optional)</span>
+          GSTIN <span className="font-normal text-ds-text-secondary">(optional)</span>
         </label>
         <input
           id={`${idPrefix}-gstin`}
@@ -126,7 +126,7 @@ export function BillingDetailsFields({
           aria-describedby={`${idPrefix}-gstin-help`}
           className={`${fieldClass} max-w-xs font-mono uppercase`}
         />
-        <span id={`${idPrefix}-gstin-help`} className="text-2xs text-ds-text-muted">
+        <span id={`${idPrefix}-gstin-help`} className="text-xs leading-relaxed text-ds-text-secondary">
           If your business is GST-registered, add it and we will print it on your invoice so you can
           claim input tax credit. We check it is valid and belongs to the state you selected.
         </span>
@@ -160,16 +160,12 @@ export function BillingDetailsCard({
   }, [state]);
 
   return (
-    <section
-      id="billing-details"
-      aria-labelledby="billing-details-heading"
-      className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5"
-    >
+    <section id="billing-details" aria-labelledby="billing-details-heading" className="dx-card flex scroll-mt-6 flex-col gap-4 dx-card-pad">
       <div className="flex flex-col gap-1">
-        <h2 id="billing-details-heading" className="text-base font-medium text-ds-text-primary">
+        <h2 id="billing-details-heading" className="dx-title text-base">
           Billing details
         </h2>
-        <p className="max-w-2xl text-sm text-ds-text-secondary">
+        <p className="dx-subtitle max-w-3xl">
           This is who your GST tax invoices are made out to.{" "}
           <strong className="font-medium text-ds-text-primary">
             Changes apply to future invoices only
@@ -185,10 +181,7 @@ export function BillingDetailsCard({
 
       <form action={formAction} className="flex flex-col gap-4">
         {state.error ? (
-          <p
-            role="alert"
-            className="border border-ds-danger bg-ds-danger-bg px-3 py-2 text-sm text-ds-text-primary"
-          >
+          <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
             {state.error}
           </p>
         ) : null}
@@ -204,7 +197,7 @@ export function BillingDetailsCard({
           <button
             type="submit"
             disabled={pending}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className="ds-btn-label inline-flex h-9 items-center justify-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
           >
             {pending ? "Saving…" : "Save billing details"}
           </button>

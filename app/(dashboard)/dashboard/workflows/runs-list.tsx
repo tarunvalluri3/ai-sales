@@ -2,17 +2,17 @@
 
 import { useActionState } from "react";
 import { cancelWorkflowRunAction, type ActionState } from "./actions";
-import { Badge, type BadgeTone } from "../_components/badge";
-import { EmptyState } from "../_components/state-views";
+import { Zap } from "lucide-react";
+import { Pill, type PillTone } from "../_components/ui";
 import type { WorkflowRun, WorkflowRunStatus } from "@/lib/supabase/types";
 
-const STATUS_TONE: Record<WorkflowRunStatus, BadgeTone> = {
-  queued: "muted",
-  running: "accent",
-  completed: "success",
-  failed: "danger",
-  skipped: "muted",
-  cancelled: "muted",
+const STATUS_TONE: Record<WorkflowRunStatus, PillTone> = {
+  queued: "amber",
+  running: "lime",
+  completed: "lime",
+  failed: "red",
+  skipped: "gray",
+  cancelled: "gray",
 };
 
 function formatDate(iso: string): string {
@@ -26,7 +26,7 @@ function CancelRunButton({ id }: { id: string }) {
   return (
     <form action={formAction}>
       <input type="hidden" name="id" value={id} />
-      <button type="submit" disabled={isPending} className="text-xs font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg px-2 py-1 disabled:opacity-60">
+      <button type="submit" disabled={isPending} className="rounded-md text-xs font-medium text-ds-primary underline-offset-4 hover:underline disabled:opacity-60">
         {isPending ? "Cancelling…" : "Cancel"}
       </button>
       {state.error ? (
@@ -41,32 +41,31 @@ function CancelRunButton({ id }: { id: string }) {
 export function RunsList({ runs, workflowNameById }: { runs: WorkflowRun[]; workflowNameById: Record<string, string> }) {
   if (runs.length === 0) {
     return (
-      <EmptyState
-        title="No runs yet"
-        description="Once an enabled workflow's trigger fires for a real lead, conversation, or appointment, its execution history shows up here -- what ran, when, and why it succeeded or failed."
-      />
+      <p className="rounded-2xl bg-ds-surface-soft px-4 py-6 text-center text-sm text-ds-text-secondary">
+        No runs yet. Once an enabled workflow&rsquo;s trigger fires for a real lead, conversation or appointment, its
+        execution history shows up here: what ran, when, and why it succeeded or failed.
+      </p>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <ul className="dx-rows flex flex-col">
       {runs.map((run) => (
-        <div key={run.id} className="flex items-center justify-between gap-3 px-2 py-2 hover:bg-ds-surface-soft">
-          <div className="flex flex-col gap-0.5">
+        <li key={run.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+          <Zap className="size-5 shrink-0 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
+          <div className="flex min-w-0 flex-1 flex-col">
             <span className="text-sm font-medium text-ds-text-primary">{workflowNameById[run.workflow_id] ?? "Deleted workflow"}</span>
-            <span className="text-xs text-ds-text-muted">
-              {run.trigger_event.replace(/_/g, " ")} · step {run.next_step_index}/{run.steps.length} · {formatDate(run.created_at)}
-            </span>
-            {run.failure_reason ? <span className="text-xs text-ds-danger">{run.failure_reason}</span> : null}
+            {run.failure_reason ? <span className="text-xs text-ds-text-secondary">{run.failure_reason}</span> : null}
           </div>
-          <div className="flex items-center gap-2">
-            <Badge tone={STATUS_TONE[run.status]} size="sm">
-              {run.status}
-            </Badge>
-            {run.status === "queued" || run.status === "running" ? <CancelRunButton id={run.id} /> : null}
-          </div>
-        </div>
+          <span className="text-sm text-ds-text-secondary">
+            {formatDate(run.created_at)} · Step {run.next_step_index}/{run.steps.length}
+          </span>
+          <Pill tone={STATUS_TONE[run.status]} size="sm" className="font-medium capitalize">
+            {run.status}
+          </Pill>
+          {run.status === "queued" || run.status === "running" ? <CancelRunButton id={run.id} /> : null}
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }

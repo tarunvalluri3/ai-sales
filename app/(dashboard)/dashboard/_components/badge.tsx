@@ -3,20 +3,21 @@ import type { ReactNode } from "react";
 export type BadgeTone = "warning" | "success" | "danger" | "muted" | "accent";
 
 const TONE_STYLE: Record<BadgeTone, string> = {
-  warning: "border-ds-warning/40 bg-ds-warning-bg text-ds-warning",
-  success: "border-ds-success/40 bg-ds-success-bg text-ds-success",
-  danger: "border-ds-danger/40 bg-ds-danger-bg text-ds-danger",
-  muted: "border-ds-border text-ds-text-secondary",
-  accent: "border-ds-accent/40 bg-ds-accent/10 text-ds-accent",
+  warning: "bg-ds-warning-bg text-ds-warning",
+  success: "bg-ds-success-bg text-ds-success",
+  danger: "bg-ds-danger-bg text-ds-danger",
+  muted: "bg-ds-surface-soft text-ds-text-secondary",
+  accent: "bg-ds-primary/10 text-ds-primary",
 };
 
 /**
- * Small uppercase status pill -- consolidates what used to be three
- * separate ad-hoc `<span>` implementations across the conversations
- * feature (control state, lead qualification, list-row status). Not
- * wired into other pages' existing badges (leads-list.tsx,
- * appointments-table.tsx, etc.) in this pass -- a legitimate follow-up,
- * not part of this redesign's scope.
+ * Small rounded status pill, shared across the dashboard (control state, lead
+ * qualification, list-row status, tag chips). Tones keep their semantic names
+ * so every existing call site and the stored `lead_tags.color` values still
+ * map; the palette is the dashboard one: pale green for "good", amber for
+ * "needs a look", pale red for failures, grey for neutral. `ds-label` and
+ * `dx-pill` are what let /apache and onboarding, which reuse this, keep
+ * the sharp uppercase Web Studio tag while the dashboard gets a pill.
  */
 export function Badge({
   tone,
@@ -29,13 +30,12 @@ export function Badge({
   title?: string;
   children: ReactNode;
 }) {
-  const sizeClass = size === "sm" ? "px-2 py-0.5" : "px-2.5 py-1";
+  const sizeClass = size === "sm" ? "px-2.5 py-0.5 text-2xs" : "px-3 py-1 text-2xs";
   return (
     <span
       title={title}
-      className={`ds-label inline-flex items-center gap-1.5 border ${sizeClass} text-2xs ${TONE_STYLE[tone]}`}
+      className={`ds-label dx-pill inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap ${sizeClass} ${TONE_STYLE[tone]}`}
     >
-      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
       {children}
     </span>
   );

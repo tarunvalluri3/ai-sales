@@ -82,12 +82,12 @@ export function PaymentHistory({
   const ourHolds = holds.length - customerHolds.length;
 
   return (
-    <section aria-labelledby="payment-history-heading" className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+    <section aria-labelledby="payment-history-heading" className="dx-card flex flex-col gap-4 dx-card-pad">
       <div className="flex flex-col gap-1">
-        <h2 id="payment-history-heading" className="text-base font-medium text-ds-text-primary">
+        <h2 id="payment-history-heading" className="dx-title text-base">
           Payment history
         </h2>
-        <p className="max-w-2xl text-sm text-ds-text-secondary">
+        <p className="dx-subtitle max-w-3xl">
           Every payment gets a GST tax invoice, and every refund a credit note. Download the PDF for
           your accountant at any time.
         </p>
@@ -97,18 +97,16 @@ export function PaymentHistory({
         <div
           key={hold.razorpay_payment_id}
           role="status"
-          className="flex items-start gap-3 border border-ds-warning bg-ds-bg p-4"
+          className="flex items-start gap-3 rounded-2xl bg-ds-warning-bg p-4"
         >
-          <FileWarning className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+          <FileWarning strokeWidth={1.75} className="mt-0.5 size-5 shrink-0 text-ds-warning" aria-hidden="true" />
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium text-ds-text-primary">
-              Invoice waiting for your billing details
-            </p>
-            <p className="text-sm text-ds-text-secondary">
+            <p className="text-sm font-medium text-ds-text-primary">Invoice waiting for your billing details</p>
+            <p className="text-sm text-ds-text-primary">
               We received {formatPaiseAsInr2dp(hold.amount_paise)} on{" "}
               {formatIsoDate(istDateString(new Date(hold.payment_at)))} but cannot issue its tax invoice yet
               {hold.detail ? ` (${hold.detail})` : ""}.{" "}
-              <a href="#billing-details" className="font-medium text-ds-accent hover:underline">
+              <a href="#billing-details" className="font-medium text-ds-primary underline underline-offset-4">
                 Add your billing details
               </a>{" "}
               and it is issued and emailed to you straight away.
@@ -118,14 +116,14 @@ export function PaymentHistory({
       ))}
 
       {ourHolds > 0 ? (
-        <div role="status" className="border border-ds-border bg-ds-bg p-4 text-sm text-ds-text-secondary">
+        <div role="status" className="rounded-2xl bg-ds-surface-soft p-4 text-sm text-ds-text-primary">
           {ourHolds === 1 ? "One invoice is" : `${ourHolds} invoices are`} being prepared and will arrive by email
           shortly. Nothing is needed from you.
         </div>
       ) : null}
 
       {rows.length === 0 ? (
-        <div className="border border-dashed border-ds-border p-6 text-center">
+        <div className="rounded-2xl bg-ds-surface-soft p-6 text-center">
           <p className="text-sm font-medium text-ds-text-primary">No payments yet</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-ds-text-secondary">
             {isTrial
@@ -135,43 +133,43 @@ export function PaymentHistory({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
+          <table className="w-full min-w-[40rem] border-separate border-spacing-0 text-left text-sm">
             <caption className="sr-only">Invoices and credit notes, newest first</caption>
             <thead>
-              <tr className="border-b border-ds-border text-2xs font-medium uppercase tracking-wide text-ds-text-muted">
-                <th scope="col" className="ds-label py-2 pr-4 font-medium">Date</th>
-                <th scope="col" className="ds-label py-2 pr-4 font-medium">Document</th>
-                <th scope="col" className="ds-label py-2 pr-4 font-medium">Details</th>
-                <th scope="col" className="ds-label py-2 pr-4 text-right font-medium">Amount</th>
-                <th scope="col" className="ds-label py-2 text-right font-medium">PDF</th>
+              <tr>
+                <th scope="col" className="dx-th px-4 py-2.5">Date</th>
+                <th scope="col" className="dx-th px-4 py-2.5">Document</th>
+                <th scope="col" className="dx-th px-4 py-2.5">Details</th>
+                <th scope="col" className="dx-th px-4 py-2.5 text-right">Amount</th>
+                <th scope="col" className="dx-th px-4 py-2.5 text-right">PDF</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.key} className="border-b border-ds-border align-top last:border-b-0">
-                  <td className="whitespace-nowrap py-3 pr-4 text-ds-text-secondary">{formatIsoDate(row.dateIso)}</td>
-                  <td className="py-3 pr-4">
+                <tr key={row.key} className="align-top">
+                  <td className="border-b border-ds-border px-4 py-3 whitespace-nowrap text-ds-text-primary">{formatIsoDate(row.dateIso)}</td>
+                  <td className="border-b border-ds-border px-4 py-3">
                     <span className="font-medium text-ds-text-primary">{row.number}</span>
-                    <span className="mt-0.5 block text-2xs text-ds-text-muted">
+                    <span className="mt-0.5 block text-sm text-ds-text-secondary">
                       {row.kind === "invoice" ? "Tax invoice" : "Credit note"}
                       {row.isTest ? (
-                        <span className="ml-2 border border-ds-warning px-1.5 py-0.5 font-medium text-ds-text-primary">
+                        <span className="dx-pill ml-2 bg-ds-warning-bg px-2 py-0.5 text-xs font-medium text-ds-warning">
                           TEST
                         </span>
                       ) : null}
                     </span>
                   </td>
-                  <td className="max-w-[22rem] py-3 pr-4 text-ds-text-secondary">{row.description}</td>
-                  <td className="whitespace-nowrap py-3 pr-4 text-right font-medium text-ds-text-primary">
+                  <td className="max-w-[22rem] border-b border-ds-border px-4 py-3 text-ds-text-primary">{row.description}</td>
+                  <td className="border-b border-ds-border px-4 py-3 text-right font-medium whitespace-nowrap text-ds-text-primary">
                     {row.kind === "credit_note" ? "-" : ""}
                     {formatPaiseAsInr2dp(row.amountPaise)}
                   </td>
-                  <td className="py-3 text-right">
+                  <td className="border-b border-ds-border px-4 py-3 text-right">
                     <a
                       href={row.href}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 text-sm font-medium text-ds-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                      className="inline-flex items-center gap-2 rounded-md text-sm font-medium text-ds-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
                     >
-                      <Download className="size-3.5" aria-hidden="true" />
+                      <Download strokeWidth={1.75} className="size-4" aria-hidden="true" />
                       <span>
                         Download<span className="sr-only"> {row.number}</span>
                       </span>

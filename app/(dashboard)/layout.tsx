@@ -17,6 +17,8 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500"],
 });
 
+
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://ai-sales-ashy-eight.vercel.app"),
   title: "Waves AI Pilot",

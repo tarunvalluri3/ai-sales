@@ -1,12 +1,14 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
+import { Plus } from "lucide-react";
 import type { FaqFormState } from "./actions";
 
 const initialState: FaqFormState = {};
 
 const inputClasses =
-  "border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-text-primary focus:outline-none disabled:opacity-60";
+  "w-full rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 py-2.5 text-sm text-ds-text-primary placeholder:text-ds-text-faint transition-colors disabled:opacity-60";
+const labelClasses = "text-sm font-medium text-ds-text-primary";
 
 export function FaqForm({
   action,
@@ -37,11 +39,11 @@ export function FaqForm({
   }, [state.success, id, onSuccess]);
 
   return (
-    <form ref={formRef} action={formAction} className="flex w-full flex-col gap-3">
+    <form ref={formRef} action={formAction} className="flex w-full flex-col gap-3.5">
       {id ? <input type="hidden" name="id" value={id} /> : null}
-      <div className="flex flex-col gap-1">
-        <label htmlFor="question" className="text-sm font-medium text-ds-text-secondary">
-          Question
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="question" className={labelClasses}>
+          Question <span className="text-ds-danger">*</span>
         </label>
         <input
           id="question"
@@ -50,39 +52,43 @@ export function FaqForm({
           required
           minLength={1}
           maxLength={300}
+          placeholder="e.g. What happens after I request a quote?"
           defaultValue={initialQuestion}
           disabled={isPending}
           className={inputClasses}
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="answer" className="text-sm font-medium text-ds-text-secondary">
-          Answer
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="answer" className={labelClasses}>
+          Answer <span className="text-ds-danger">*</span>
         </label>
         <textarea
           id="answer"
           name="answer"
-          rows={4}
+          rows={6}
+          placeholder="Give a clear, complete answer using information approved by your business."
           required
           minLength={1}
           maxLength={2000}
           defaultValue={initialAnswer}
           disabled={isPending}
-          className={inputClasses}
+          className={`${inputClasses} leading-relaxed`}
         />
       </div>
       {state.error ? (
-        <p role="alert" className="text-sm text-ds-danger">
+        <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
           {state.error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={isPending}
-        className="ds-btn-label bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="ds-btn-label inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
+        {id ? null : <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />}
         {isPending ? pendingLabel : submitLabel}
       </button>
+      <p className="text-center text-sm text-ds-text-secondary">Saves as a draft</p>
     </form>
   );
 }

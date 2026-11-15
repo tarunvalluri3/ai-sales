@@ -122,7 +122,7 @@ export function RecommendedDetails({
       <details className="flex flex-col gap-4 border-t border-ds-border pt-4" open={hours.length === 0}>
         <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">Business hours</summary>
         <div className="pt-4">
-          <BusinessHoursForm hours={hours} slaMinutes={slaMinutes} timezone={timezone} />
+          <BusinessHoursForm hours={hours} slaMinutes={slaMinutes} timezone={timezone} embedded />
         </div>
       </details>
     </section>

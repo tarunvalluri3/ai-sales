@@ -6,11 +6,12 @@ import { usePathname } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { pollConversationsAction, type ConversationLeadSummary } from "../actions";
 import { EmptyState } from "../../_components/state-views";
-import { Badge } from "../../_components/badge";
+import { Avatar, ChannelIcon, Pill } from "../../_components/ui";
 import { MESSAGE_ROLE_LABEL } from "./message-bubble";
 import { channelLabel } from "@/lib/conversation-channel";
 import type { ConversationWithMessageCount } from "@/lib/conversations";
 import type { LastMessagePreview } from "@/lib/messages";
+import { anonymousContactLabel, displayContactName } from "@/lib/lead-source";
 
 // Full speed while the list is the main view (nothing else to look at);
 // slower once a specific conversation is open, where LiveConversationPanel
@@ -172,22 +173,25 @@ export function ChatListPane({
 
   return (
     <div
-      className={`${showOnMobile ? "flex" : "hidden"} sticky top-0 h-screen w-full shrink-0 flex-col self-start overflow-hidden border-r border-ds-border bg-ds-surface md:flex md:w-80`}
+      className={`${showOnMobile ? "flex" : "hidden"} h-full min-h-0 w-full shrink-0 flex-col overflow-hidden border-r border-ds-border bg-ds-surface md:flex md:w-80`}
     >
       <div className="flex shrink-0 flex-col gap-2 border-b border-ds-border p-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-ds-text-primary">Conversations</h2>
-          {isStale ? (
-            <p className="flex items-center gap-1 text-2xs text-ds-warning" role="status">
-              <RefreshCw className="size-3 animate-spin" aria-hidden="true" />
-              Updates paused — retrying…
-            </p>
-          ) : null}
-        </div>
+        <h1 className="text-sm font-medium text-ds-text-primary">Conversations</h1>
+        {isStale ? (
+          <p className="flex items-center gap-1 text-2xs text-ds-warning" role="status">
+            <RefreshCw strokeWidth={1.75} className="size-3 animate-spin" aria-hidden="true" />
+            Updates paused — retrying…
+          </p>
+        ) : null}
         {conversations.length > 0 ? (
           <>
-            <div className="flex flex-wrap gap-1.5">
-              <FilterPill active={channelFilter === "all"} onClick={() => setChannelFilter("all")} label={`All (${conversations.length})`} />
+            <div className="flex flex-wrap gap-1.5" aria-label="Conversation channel filter">
+              <FilterPill
+                active={channelFilter === "all"}
+                onClick={() => setChannelFilter("all")}
+                label="All"
+                count={conversations.length}
+              />
               {availableChannels.map((channel) => (
                 <FilterPill
                   key={channel}
@@ -202,7 +206,7 @@ export function ChatListPane({
                 type="checkbox"
                 checked={attentionOnly}
                 onChange={(event) => setAttentionOnly(event.target.checked)}
-                className="h-3.5 w-3.5 border-ds-border text-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+                className="size-3.5 rounded border-ds-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
               />
               Needs attention only{attentionCount > 0 ? ` (${attentionCount})` : ""}
             </label>
@@ -210,7 +214,7 @@ export function ChatListPane({
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hidden">
+      <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
           <div className="p-3">
             <EmptyState
@@ -226,13 +230,12 @@ export function ChatListPane({
             />
           </div>
         ) : (
-          <ul>
+          <ul className="dx-rows flex flex-col">
             {filtered.map((conversation) => {
               const active = pathname === `/dashboard/conversations/${conversation.id}`;
               const contactName = leadByConversationId.get(conversation.id) ?? null;
               const lastMessage = lastMessageByConversationId.get(conversation.id) ?? null;
-              const primaryLabel = contactName ?? channelLabel(conversation.source);
-              const initial = (primaryLabel.trim().charAt(0) || "?").toUpperCase();
+              const primaryLabel = displayContactName(contactName) ?? anonymousContactLabel(conversation.source);
               const hasLead = leadByConversationId.has(conversation.id);
 
               return (
@@ -240,42 +243,46 @@ export function ChatListPane({
                   <Link
                     href={`/dashboard/conversations/${conversation.id}`}
                     aria-current={active ? "page" : undefined}
-                    className={`flex items-start gap-2.5 border-b border-ds-border px-3 py-3 transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-text-primary ${
-                      active ? "bg-ds-surface-elevated" : ""
+                    className={`group relative flex items-start gap-2.5 rounded-none px-3 py-3 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ds-primary ${
+                      active ? "bg-ds-lime-soft" : "hover:bg-ds-surface-soft"
                     }`}
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ds-surface-elevated text-xs font-medium text-ds-accent">
-                      {initial}
-                    </span>
+                    {active ? <span aria-hidden="true" className="absolute inset-y-0 left-0 w-0.5 bg-ds-primary" /> : null}
+                    <Avatar name={displayContactName(contactName)} source={conversation.source} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
                         <p className="truncate text-sm font-medium text-ds-text-primary">{primaryLabel}</p>
                         {conversation.needs_attention ? (
                           <span
-                            className="size-2 shrink-0 rounded-full bg-ds-warning"
+                            className="size-2 shrink-0 rounded-full bg-ds-attention"
                             aria-label="Needs attention"
                             title="Needs attention"
                           />
                         ) : null}
+                        <span className="ml-auto shrink-0 text-2xs text-ds-text-muted">
+                          {shortTimeAgo(conversation.created_at)}
+                        </span>
                       </div>
                       {lastMessage ? (
                         <p className="truncate text-xs text-ds-text-secondary">
-                          {MESSAGE_ROLE_LABEL[lastMessage.role]}: {lastMessage.content}
+                          <span className="sr-only">{MESSAGE_ROLE_LABEL[lastMessage.role]}: </span>
+                          {lastMessage.content}
                         </p>
                       ) : null}
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                        <p className="truncate text-2xs text-ds-text-muted">
-                          {channelLabel(conversation.source)} · {new Date(conversation.created_at).toLocaleDateString("en-US")}
-                        </p>
+                        <span className="flex items-center gap-1 text-2xs text-ds-text-muted">
+                          <ChannelIcon source={conversation.source} className="size-3 shrink-0" strokeWidth={1.75} />
+                          {channelLabel(conversation.source)}
+                        </span>
                         {conversation.control === "human" ? (
-                          <Badge tone="muted" size="sm">
+                          <Pill tone="lime" size="sm">
                             Human
-                          </Badge>
+                          </Pill>
                         ) : null}
                         {hasLead ? (
-                          <Badge tone="accent" size="sm">
+                          <Pill tone="lime" size="sm">
                             Lead
-                          </Badge>
+                          </Pill>
                         ) : null}
                       </div>
                     </div>
@@ -290,19 +297,45 @@ export function ChatListPane({
   );
 }
 
-function FilterPill({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
+/** "2m", "3h", "5d": the compact age shown at the end of each row. */
+function shortTimeAgo(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+
+function FilterPill({
+  active,
+  onClick,
+  label,
+  count,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count?: number;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`px-2.5 py-1 text-2xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+      className={`inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-2xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary ${
         active
-          ? "bg-dashboard-primary text-dashboard-on-primary"
-          : "bg-ds-surface-soft text-ds-text-secondary hover:text-ds-text-primary"
+          ? "bg-ds-lime-mid text-ds-text-primary"
+          : "border border-ds-border-strong bg-ds-surface text-ds-text-primary hover:bg-ds-surface-soft"
       }`}
     >
       {label}
+      {count !== undefined ? (
+        <span className={`rounded-full px-1.5 text-2xs font-medium ${active ? "bg-ds-lime text-ds-on-bright" : "bg-ds-surface-soft"}`}>
+          {count}
+        </span>
+      ) : null}
     </button>
   );
 }

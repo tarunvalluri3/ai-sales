@@ -3,32 +3,34 @@
 import { useActionState, useState } from "react";
 import type { WebhookEndpoint } from "@/lib/supabase/types";
 import { deleteWebhookEndpointAction, type WebhookActionState } from "./actions";
-import { EmptyState } from "../_components/state-views";
+import { Eye, EyeOff, Trash2 } from "lucide-react";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { DataTable, TableCell, TableRow, type DataTableColumn } from "../_components/data-table";
 
 const initialState: WebhookActionState = {};
 
 const COLUMNS: DataTableColumn[] = [
-  { key: "url", label: "Endpoint", width: "1.6fr" },
-  { key: "secret", label: "Secret", width: "1.4fr" },
-  { key: "created", label: "Created", width: "160px" },
-  { key: "actions", label: "Actions", width: "100px", align: "right" },
+  { key: "url", label: "Endpoint URL", width: "minmax(14rem,1.7fr)" },
+  { key: "secret", label: "Signing secret", width: "minmax(16rem,1.3fr)" },
+  { key: "created", label: "Created", width: "9rem" },
+  { key: "actions", label: "Actions", width: "8rem" },
 ];
 
 function SecretReveal({ secret }: { secret: string }) {
   const [revealed, setRevealed] = useState(false);
 
   return (
-    <div className="flex items-center gap-2">
-      <code className="min-w-0 flex-1 truncate border border-ds-border bg-ds-surface-elevated px-2 py-1 font-mono text-xs text-ds-text-primary">
-        {revealed ? secret : "•".repeat(24)}
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <code className={`min-w-0 flex-1 truncate font-mono text-ds-text-primary ${revealed ? "text-sm" : "text-lg tracking-widest"}`}>
+        {revealed ? secret : "•".repeat(15)}
       </code>
       <button
         type="button"
         onClick={() => setRevealed((value) => !value)}
-        className="text-xs font-medium text-ds-text-primary transition-colors hover:text-ds-accent"
+        aria-pressed={revealed}
+        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border border-ds-border-strong bg-ds-surface px-3 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
+        {revealed ? <EyeOff strokeWidth={1.75} className="size-4" aria-hidden="true" /> : <Eye strokeWidth={1.75} className="size-4" aria-hidden="true" />}
         {revealed ? "Hide" : "Reveal"}
       </button>
     </div>
@@ -42,23 +44,28 @@ function WebhookEndpointRow({ endpoint, canEdit = true }: { endpoint: WebhookEnd
     <>
       <TableRow>
         <TableCell>
-          <span className="min-w-0 truncate font-mono text-sm text-ds-text-primary">{endpoint.url}</span>
+          <span className="min-w-0 truncate font-mono text-sm text-ds-text-primary" title={endpoint.url}>
+            {endpoint.url}
+          </span>
         </TableCell>
         <TableCell>
           <SecretReveal secret={endpoint.secret} />
         </TableCell>
         <TableCell>
-          <span className="text-xs text-ds-text-muted">{new Date(endpoint.created_at).toLocaleString("en-US")}</span>
+          <span className="text-sm text-ds-text-primary">
+            {new Date(endpoint.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
         </TableCell>
-        <TableCell align="right">
+        <TableCell>
           <form action={formAction}>
             <input type="hidden" name="id" value={endpoint.id} />
             <button
               type="submit"
               disabled={isPending || !canEdit}
               title={canEdit ? undefined : ROLE_DENIED_TITLE}
-              className="px-2 py-1 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+              className="inline-flex h-9 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-ds-danger transition-colors hover:bg-ds-danger-bg disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
             >
+              <Trash2 className="size-5" strokeWidth={1.75} aria-hidden="true" />
               {isPending ? "Deleting…" : "Delete"}
             </button>
           </form>
@@ -96,10 +103,9 @@ export function WebhookEndpointList({
 }) {
   if (endpoints.length === 0) {
     return (
-      <EmptyState
-        title="No webhook endpoints yet"
-        description="Add one above to get notified on new qualified leads."
-      />
+      <p className="rounded-2xl bg-ds-surface-soft px-4 py-6 text-center text-sm text-ds-text-secondary">
+        No webhook endpoints yet. Add one above to get notified on new qualified leads.
+      </p>
     );
   }
 

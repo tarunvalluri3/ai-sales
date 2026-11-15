@@ -7,7 +7,7 @@ import type { KnowledgeFormState } from "../actions";
 const initialState: KnowledgeFormState = {};
 
 const inputClasses =
-  "border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-text-primary focus:outline-none disabled:opacity-60";
+  "w-full rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 py-2.5 text-sm text-ds-text-primary placeholder:text-ds-text-faint transition-colors disabled:opacity-60";
 
 export function UrlImportForm() {
   const [state, formAction, isPending] = useActionState(createUrlKnowledgeDocumentAction, initialState);
@@ -20,15 +20,15 @@ export function UrlImportForm() {
   }, [state.success]);
 
   return (
-    <form ref={formRef} action={formAction} className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="url-title" className="text-sm font-medium text-ds-text-secondary">
+    <form ref={formRef} action={formAction} className="flex flex-col gap-3.5">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="url-title" className="text-sm font-medium text-ds-text-primary">
           Title
         </label>
         <input id="url-title" name="title" type="text" required maxLength={200} disabled={isPending} className={inputClasses} />
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="url" className="text-sm font-medium text-ds-text-secondary">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="url" className="text-sm font-medium text-ds-text-primary">
           Page URL
         </label>
         <input
@@ -41,8 +41,8 @@ export function UrlImportForm() {
           className={inputClasses}
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="refreshIntervalHours" className="text-sm font-medium text-ds-text-secondary">
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="refreshIntervalHours" className="text-sm font-medium text-ds-text-primary">
           Auto-refresh (optional)
         </label>
         <input
@@ -55,21 +55,25 @@ export function UrlImportForm() {
           disabled={isPending}
           className={inputClasses}
         />
-        <p className="text-xs text-ds-text-muted">
+        <p className="text-xs leading-relaxed text-ds-text-secondary">
           How often to re-check this page, in hours (1-720, up to 30 days). Leave blank to import it once and
           never refresh it automatically.
         </p>
       </div>
       {state.error ? (
-        <p role="alert" className="text-sm text-ds-danger">
+        <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
           {state.error}
         </p>
       ) : null}
-      {state.success ? <p className="text-sm text-ds-success">Imported.</p> : null}
+      {state.success ? (
+        <p role="status" className="rounded-xl bg-ds-success-bg px-3 py-2 text-sm text-ds-success">
+          Imported.
+        </p>
+      ) : null}
       <button
         type="submit"
         disabled={isPending}
-        className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        className="ds-btn-label inline-flex h-9 w-full items-center justify-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
         {isPending ? "Importing…" : "Import"}
       </button>

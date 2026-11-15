@@ -17,7 +17,7 @@
 const INPUT =
   "!rounded-none !bg-transparent !text-[var(--ds-text-primary)] !border-[var(--ds-border)] focus:!border-[var(--ds-text-primary)] !shadow-none";
 const POPOVER =
-  "!rounded-2xl !bg-[var(--ds-surface)] !border !border-[var(--ds-border)] !shadow-[0_24px_64px_rgba(0,0,0,0.45)]";
+  "!rounded-[1rem] !bg-[var(--ds-surface)] !border !border-[var(--ds-border)] !shadow-[0_24px_64px_rgba(0,0,0,0.45)]";
 
 export const clerkDarkAppearance = {
   variables: {
@@ -73,6 +73,44 @@ export const clerkDarkCompactAppearance = {
     userButtonOuterIdentifier: "!text-[var(--ds-text-primary)] text-sm",
     organizationSwitcherTrigger: "!text-[var(--ds-text-primary)] hover:!bg-[var(--ds-surface-raised)] !rounded-none px-2 py-1",
     organizationPreviewMainIdentifier: "!text-[var(--ds-text-primary)] text-sm",
+    organizationSwitcherTriggerIcon: "!text-[var(--ds-text-secondary)]",
+  },
+};
+
+/**
+ * Customer dashboard (/dashboard/*) variant: the dashboard is light-only with
+ * rounded white surfaces and deep olive actions (globals.css, .dash-shell), so
+ * the literals here are that palette rather than the dark Web Studio one.
+ * The header trigger uses the --ds-* CSS variables so it follows the
+ * dashboard's light/dark theme; the popover cards stay light because Clerk
+ * 7.7.3 derives its internal shades from the `variables` values in JS, which
+ * cannot resolve CSS variables.
+ */
+const DASHBOARD_POPOVER =
+  "!rounded-[1rem] !bg-white !border !border-[#eceeec] !shadow-[0_18px_48px_rgba(21,23,19,0.14)]";
+
+export const clerkDashboardAppearance = {
+  variables: {
+    colorPrimary: "#203509",
+    colorBackground: "#ffffff",
+    colorInputBackground: "#ffffff",
+    colorInputText: "#151713",
+    colorText: "#151713",
+    colorTextSecondary: "#5c6158",
+    colorNeutral: "#151713",
+    colorDanger: "#c2412d",
+    colorSuccess: "#1f7a4c",
+    colorWarning: "#8a5a00",
+    borderRadius: "0.75rem",
+    fontFamily: "var(--font-hanken), system-ui, sans-serif",
+  },
+  elements: {
+    userButtonPopoverCard: DASHBOARD_POPOVER,
+    organizationSwitcherPopoverCard: DASHBOARD_POPOVER,
+    userButtonAvatarBox: "!size-9",
+    organizationSwitcherTrigger:
+      "!h-9 !rounded-full !border !border-[var(--ds-border)] !bg-[var(--ds-surface)] !px-3 !text-[var(--ds-text-primary)] hover:!bg-[var(--ds-surface-soft)]",
+    organizationPreviewMainIdentifier: "!text-[var(--ds-text-primary)] !text-sm !font-medium",
     organizationSwitcherTriggerIcon: "!text-[var(--ds-text-secondary)]",
   },
 };
