@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { Minus } from "lucide-react";
 import {
   GST_RATE_PERCENT,
   ORDERED_PLANS,
@@ -7,11 +9,18 @@ import {
   formatReplyQuota,
 } from "@/lib/plans";
 import { channelLaunchSwitchesFromEnv, describeLaunchedTrialChannels, entitlementConfigFromEnv } from "@/lib/entitlement-rules";
-import { MicroChip } from "@/components/marketing/fragments/_shared";
 import { launchedMetaChannelNames, planChannelsLabel, trialVsStarterNote } from "@/lib/plan-channel-copy";
+import { PageHero } from "@/components/site/feature-block";
+import { PlanCards, type PlanCardData } from "@/components/site/plan-cards";
+import { FaqList, type Faq } from "@/components/site/faq";
+import { CtaBand } from "@/components/site/cta-band";
+import { Check, Reveal, Section, SectionHeading } from "@/components/site/primitives";
 
 export const metadata = {
   title: "Pricing | Waves AI Pilot",
+  description:
+    "Waves AI Pilot plans: Starter, Growth and Scale, priced by AI replies per month, GST included. 14-day free trial on every channel, no card required.",
+  alternates: { canonical: "/pricing" },
 };
 
 // Rendered per request so the advertised trial limit is the CONFIGURED one
@@ -22,48 +31,22 @@ export const dynamic = "force-dynamic";
  * Required by Razorpay's merchant-activation website check ("Pricing
  * details"), and referenced by the fee clause in /terms.
  *
- * PRICE POINTS AND QUOTAS WERE CONFIRMED BY THE USER 2026-10-21 (Phase
- * 17a) -- Starter ₹1,499 / 1,000 replies, Growth ₹3,999 / 3,000, Scale
- * ₹9,999 / 10,000. They were a proposal from 2026-10-19 until then.
- *
- * **Every price on this page is GST-INCLUSIVE** (decided 2026-10-21): the
- * figure shown is the total charged, with 18% GST contained in it, and the
- * annual figures (ten months' gross, "two months free") are inclusive too.
- * This is a legal-accuracy matter -- the page must not promise a tax
- * treatment we do not apply. If this ever flips back to exclusive, every
- * "inclusive" sentence below, /terms and lib/usage-reminders.ts change
- * together.
- *
- * **This page no longer holds its own numbers.** Every figure rendered
- * below comes from `lib/plans.ts`, which is also what `lib/usage-limit.ts`
- * enforces against -- so the advertised quota and the enforced quota are
- * now literally the same value, and that file's compile-time assertions
- * make changing one without the other a `npm run typecheck` failure. The
- * old warning here ("the quota column is a commitment the code cannot yet
- * enforce per-plan") is resolved: quotas are counted in AI replies, per
- * plan, over the business's own billing period.
- *
- * The quotas themselves are still anchored to this app's measured usage
- * rather than guessed: Phase 21's live verification recorded a real chat
- * turn at input_tokens 3741 + output_tokens 275, i.e. ~4,000 tokens per AI
- * reply, so the three plans correspond to roughly 4M / 12M / 40M tokens a
- * month.
- *
- * Channel honesty (Consumer Protection Act, 2019): WhatsApp and Instagram
- * are on Growth and Scale (owner decision 2026-11-03: same plan access), both
- * using the customer's own Meta accounts, so they carry a footnote rather
- * than a bare tick. The free trial (no card, all three channels, one per
- * organisation) is described from lib/plans.ts + the configured trial limit,
- * the same values lib/entitlement-rules.ts enforces.
+ * Nov 2026 site redesign: visual only. Every figure still comes from
+ * `lib/plans.ts` (what `lib/usage-limit.ts` enforces), every price is
+ * GST-INCLUSIVE (decided 2026-10-21), the trial is described from the
+ * configured limit, and a Meta channel switched off for launch is shown as
+ * "coming soon", never sold as available (Consumer Protection Act, 2019).
+ * The comparison table below restates each plan's own feature list from
+ * lib/plans.ts row by row; if a plan's features change there, change the
+ * matching row here.
  */
+
+type Cell = boolean | string;
 
 export default function PricingPage() {
   const { trialReplyQuota } = entitlementConfigFromEnv();
-  // Item 7: a channel switched off for launch is shown as "coming soon", never
-  // sold as available -- the same switch the server enforces.
   const launch = channelLaunchSwitchesFromEnv();
   const trialChannels = describeLaunchedTrialChannels(launch);
-  // Round 3, item 3: the trial has WhatsApp/Instagram, Starter does not.
   const metaNames = launchedMetaChannelNames(launch);
   const starterNote = trialVsStarterNote(metaNames);
   const featureLabel = (feature: string): string => {
@@ -71,201 +54,274 @@ export default function PricingPage() {
     if (feature.startsWith("Instagram") && !launch.instagram) return `${feature.replace(" *", "")} (coming soon)`;
     return feature;
   };
+  const soon = (on: boolean): Cell => (on ? true : "Coming soon");
+
+  const cards: PlanCardData[] = ORDERED_PLANS.map((plan) => ({
+    key: plan.key,
+    name: plan.name,
+    tagline: plan.tagline,
+    featured: plan.featured,
+    monthly: formatPaiseAsInr(plan.monthlyPricePaise),
+    annual: formatPaiseAsInr(plan.annualPricePaise),
+    annualPerMonth: formatPaiseAsInr(Math.round(plan.annualPricePaise / 12 / 100) * 100),
+    quota: formatReplyQuota(plan.monthlyReplyQuota),
+    seats: plan.seatsLabel,
+    channels: planChannelsLabel(plan.key, metaNames),
+    features: plan.features.map(featureLabel),
+  }));
+
+  const [starter, growth, scale] = ORDERED_PLANS;
+  const ROWS: { group: string; rows: [string, Cell, Cell, Cell][] }[] = [
+    {
+      group: "Usage",
+      rows: [
+        ["AI replies per month", starter.monthlyReplyQuota.toLocaleString("en-IN"), growth.monthlyReplyQuota.toLocaleString("en-IN"), scale.monthlyReplyQuota.toLocaleString("en-IN")],
+        ["Team members", starter.seatsLabel.split(" ")[0], growth.seatsLabel.split(" ")[0], scale.seatsLabel.split(" ")[0]],
+      ],
+    },
+    {
+      group: "Channels",
+      rows: [
+        ["Website chat widget", true, true, true],
+        ["WhatsApp Business messaging *", false, soon(launch.whatsapp), soon(launch.whatsapp)],
+        ["Instagram direct messages *", false, soon(launch.instagram), soon(launch.instagram)],
+      ],
+    },
+    {
+      group: "AI sales agent",
+      rows: [
+        ["Answers from products, services and FAQs", true, true, true],
+        ["Lead capture, scoring and qualification", true, true, true],
+        ["Human handoff and live takeover", true, true, true],
+        ["Product and service recommendations with photos", false, true, true],
+        ["Appointment booking with availability rules", false, true, true],
+      ],
+    },
+    {
+      group: "Knowledge",
+      rows: [
+        ["Knowledge documents", "Up to 25", "Up to 200", "Unlimited"],
+        ["Pasted text", true, true, true],
+        ["File upload and website import", false, true, true],
+      ],
+    },
+    {
+      group: "Sales tools",
+      rows: [
+        ["Full funnel analytics with CSV export", false, true, true],
+        ["Customer profiles, tags and segments", false, true, true],
+        ["Business hours, team assignment and SLA routing", false, true, true],
+        ["Automation workflows with delays and conditions", false, false, true],
+        ["AI Sales Copilot daily priorities and briefs", false, false, true],
+        ["Outbound webhooks on qualified leads", false, false, true],
+      ],
+    },
+    {
+      group: "Admin & support",
+      rows: [
+        ["Consent notice and 24-month data retention", true, true, true],
+        ["Role-based access across four permission tiers", false, false, true],
+        ["Audit log of sensitive actions", false, false, true],
+        ["Support", "Email", "Email", "Priority email & phone"],
+      ],
+    },
+  ];
+
+  const FAQS: Faq[] = [
+    {
+      q: "How does the free trial work?",
+      a: (
+        <>
+          <p>
+            Every new business starts with a free trial. No card is needed. It lasts {TRIAL_DAYS} days or{" "}
+            {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first, and includes {trialChannels}.
+          </p>
+          {starterNote ? <p className="mt-3 font-medium text-ds-text-primary">{starterNote}</p> : null}
+          <p className="mt-3">
+            When the trial ends, your AI stops replying to prospects until you choose a plan — nothing is charged
+            automatically. There is one free trial per person and one per organisation, including if the business is
+            deleted and set up again or a new organisation is created.
+          </p>
+        </>
+      ),
+    },
+    {
+      q: "What counts as an AI reply?",
+      a: (
+        <>
+          <p>
+            An AI reply is one answer your AI employee generates for a prospect. Messages your own team sends during a
+            human takeover do not count, and neither do messages you send yourself while testing in the sandbox.
+          </p>
+          <p className="mt-3">
+            If you reach your monthly quota, your widget does not break and it never invents an answer: the visitor is
+            told that a person will follow up, and the conversation is flagged for your team. We email you when you have
+            used half of your replies, and again as you get closer, so you can upgrade if you want to. Quotas reset at the
+            start of each billing period.
+          </p>
+        </>
+      ),
+    },
+    {
+      q: "How does billing work?",
+      a: (
+        <>
+          <p>
+            Plans are billed monthly or annually in advance, in Indian Rupees. The price you see includes{" "}
+            {GST_RATE_PERCENT}% GST, so that is the total you are charged. We issue a GST invoice for every payment to the
+            email address on your account, showing the taxable value and the GST contained in the price. You can upgrade
+            at any time and we charge only the difference for the rest of your period; downgrades take effect at your
+            next renewal.
+          </p>
+          <p className="mt-3">
+            You can cancel any time from your dashboard and keep access until the end of the period you have paid for.
+            Fees already paid are not refundable — the full terms, including the situations where we do refund, are in our{" "}
+            <Link href="/refunds" className="site-link">
+              Cancellation and Refunds Policy
+            </Link>
+            .
+          </p>
+        </>
+      ),
+    },
+    {
+      q: "Need more replies, more seats or different terms?",
+      a: (
+        <p>
+          Email{" "}
+          <a href="mailto:support@waveswebstudio.in" className="site-link">
+            support@waveswebstudio.in
+          </a>{" "}
+          or call{" "}
+          <a href="tel:+917981596249" className="site-link">
+            +91 79815 96249
+          </a>
+          . Our full business details are on the{" "}
+          <Link href="/contact" className="site-link">
+            Contact
+          </Link>{" "}
+          page.
+        </p>
+      ),
+    },
+  ];
+
   return (
-    <div className="flex flex-1 flex-col bg-ds-bg px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        <div className="flex max-w-2xl flex-col items-start gap-3 text-left">
-          <span className="ds-label inline-flex w-fit items-center gap-2 text-xs tracking-[0.32em] text-ds-text-secondary">
-            <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
-            Pricing
-          </span>
-          <h1 className="text-[32px] leading-[1.12] font-light tracking-[-0.015em] text-ds-text-primary sm:text-[42px] lg:text-[58px]">Pricing</h1>
-          <p className="text-sm leading-relaxed text-ds-text-secondary">
-            One AI sales employee, grounded in your own business. Start with a {TRIAL_DAYS}-day free
-            trial — no card required, up to {trialReplyQuota.toLocaleString("en-IN")} AI replies, on{" "}
-            {trialChannels}. Cancel any time.
+    <main className="flex flex-1 flex-col">
+      <PageHero
+        eyebrow="Pricing"
+        title="Simple plans that grow with your sales."
+        lead={
+          <>
+            Pay for the AI replies you need. Start with a {TRIAL_DAYS}-day free trial — no card required, up to{" "}
+            {trialReplyQuota.toLocaleString("en-IN")} AI replies, on {trialChannels}. Cancel any time.
+          </>
+        }
+      />
+
+      <section className="px-5 pb-8 sm:px-8 lg:px-12">
+        <div className="mx-auto max-w-[1200px]">
+          <PlanCards plans={cards} />
+          <p className="mt-8 text-center text-[13.5px] text-ds-text-muted">
+            All prices are in Indian Rupees and inclusive of {GST_RATE_PERCENT}% GST — the price you see is the total you
+            pay. Annual billing gives you two months free.
           </p>
-          <p className="text-2xs text-ds-text-muted">
-            All prices are in Indian Rupees and inclusive of {GST_RATE_PERCENT}% GST — the price you
-            see is the total you pay. Annual billing gives you two months free.
+          <div className="mx-auto mt-6 max-w-[860px] rounded-[20px] border border-ds-border bg-ds-surface p-6 text-[14px] leading-relaxed text-ds-text-secondary">
+            <p className="mb-3 font-medium text-ds-text-primary">* About WhatsApp and Instagram</p>
+            <>
+          <p>
+            <strong>WhatsApp</strong> messaging on the Growth and Scale plans works through the official Meta WhatsApp
+            Business Platform, using <em>your own</em> WhatsApp Business account. You will need a Meta Business account and
+            a phone number dedicated to it; we guide you through the setup and there is no extra charge from us. Meta may
+            charge you separately for conversations under its own pricing.
           </p>
+          <p className="mt-3">
+            <strong>Instagram</strong> direct messaging on the Growth and Scale plans uses <em>your own</em> Instagram
+            professional account, linked to a Facebook Page. Starter includes neither WhatsApp nor Instagram.
+          </p>
+          {!launch.whatsapp || !launch.instagram ? (
+            <p className="mt-3">
+              {!launch.whatsapp && !launch.instagram ? "WhatsApp and Instagram are" : !launch.whatsapp ? "WhatsApp is" : "Instagram is"}{" "}
+              <strong>coming soon</strong>: we&apos;re waiting for Meta&apos;s approval. They switch on for Growth, Scale
+              and trial accounts as soon as it arrives.
+            </p>
+          ) : null}
+        </>
+          </div>
         </div>
+      </section>
 
-        <div className="grid gap-px border border-ds-border bg-ds-border lg:grid-cols-3">
-          {ORDERED_PLANS.map((plan) => (
-            <div
-              key={plan.key}
-              className={`flex flex-col gap-5 p-6 lg:p-8 ${
-                plan.featured ? "bg-ds-surface-raised" : "bg-ds-bg"
-              }`}
-            >
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xl font-medium text-ds-text-primary">{plan.name}</h2>
-                  {plan.featured ? <MicroChip tone="accent">Most popular</MicroChip> : null}
-                </div>
-                <p className="text-sm leading-relaxed text-ds-text-secondary">{plan.tagline}</p>
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <p className="font-label text-[32px] leading-[1.12] font-normal tabular-nums text-ds-text-primary">
-                  {formatPaiseAsInr(plan.monthlyPricePaise)}
-                  <span className="text-sm font-normal text-ds-text-muted">
-                    {" "}
-                    / month, incl. GST
-                  </span>
-                </p>
-                <p className="text-2xs text-ds-text-muted">
-                  or {formatPaiseAsInr(plan.annualPricePaise)} / year, incl. GST — two months free
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-1 border-y border-ds-border py-3 text-sm">
-                <p className="font-medium text-ds-text-primary">
-                  {formatReplyQuota(plan.monthlyReplyQuota)}
-                </p>
-                <p className="text-ds-text-secondary">{plan.seatsLabel}</p>
-                <p className="text-ds-text-secondary">{planChannelsLabel(plan.key, metaNames)}</p>
-              </div>
-
-              <ul className="flex flex-1 flex-col gap-2 text-sm text-ds-text-secondary">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex gap-2">
-                    <span aria-hidden="true" className="text-ds-accent">
-                      ✓
-                    </span>
-                    <span>{featureLabel(feature)}</span>
-                  </li>
+      <Section labelledBy="compare-heading">
+        <SectionHeading align="center" eyebrow="Compare" id="compare-heading" title="Every feature, plan by plan." />
+        <Reveal className="mt-12 overflow-x-auto rounded-[24px] border border-ds-border bg-ds-surface">
+          <table className="w-full min-w-[720px] border-collapse text-left text-[14px]">
+            <thead>
+              <tr className="border-b border-ds-border">
+                <th scope="col" className="w-[40%] px-6 py-5 font-label text-[11px] font-medium uppercase tracking-[0.16em] text-ds-text-muted">
+                  Feature
+                </th>
+                {ORDERED_PLANS.map((p) => (
+                  <th key={p.key} scope="col" className={`px-6 py-5 text-[16px] font-medium ${p.featured ? "bg-ds-lime-soft/60" : ""}`}>
+                    {p.name}
+                    <span className="block text-[13px] font-normal text-ds-text-muted">{formatPaiseAsInr(p.monthlyPricePaise)} / mo</span>
+                  </th>
                 ))}
-              </ul>
+              </tr>
+            </thead>
+            {ROWS.map((g) => (
+              <tbody key={g.group}>
+                <tr>
+                  <th colSpan={4} scope="colgroup" className="bg-ds-surface-soft px-6 py-2.5 font-label text-[11px] font-medium uppercase tracking-[0.16em] text-ds-text-muted">
+                    {g.group}
+                  </th>
+                </tr>
+                {g.rows.map(([label, ...cells]) => (
+                  <tr key={label} className="border-t border-ds-border">
+                    <th scope="row" className="px-6 py-3.5 font-normal text-ds-text-secondary">
+                      {label}
+                    </th>
+                    {cells.map((c, i) => (
+                      <td key={i} className={`px-6 py-3.5 ${ORDERED_PLANS[i].featured ? "bg-ds-lime-soft/40" : ""}`}>
+                        <CellMark value={c} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </Reveal>
+      </Section>
 
-              <Link
-                href="/sign-up"
-                className={`ds-btn-label inline-flex h-12 items-center justify-center px-8 text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
-                  plan.featured
-                    ? "bg-ds-primary text-ds-primary-on"
-                    : "border border-ds-text-primary text-ds-text-primary hover:border-ds-accent"
-                }`}
-              >
-                Start free trial
-              </Link>
-            </div>
-          ))}
+      <Section className="bg-ds-surface" labelledBy="pfaq-heading">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+          <Reveal className="lg:col-span-4">
+            <p className="site-eyebrow">Billing FAQ</p>
+            <h2 id="pfaq-heading" className="site-h2 mt-5">
+              Trial, quotas and billing.
+            </h2>
+          </Reveal>
+          <Reveal delay={0.08} className="lg:col-span-8">
+            <FaqList items={FAQS} />
+          </Reveal>
         </div>
+      </Section>
 
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-          <Section title="Free trial">
-            <p>
-              Every new business starts with a free trial. No card is needed. It lasts {TRIAL_DAYS} days
-              or {trialReplyQuota.toLocaleString("en-IN")} AI replies, whichever comes first, and includes{" "}
-              {trialChannels}.
-            </p>
-            {starterNote ? <p className="font-medium text-ds-text-primary">{starterNote}</p> : null}
-            <p>
-              When the trial ends, your AI stops replying to prospects until you choose a plan — nothing
-              is charged automatically. There is one free trial per person and one per organisation,
-              including if the business is deleted and set up again or a new organisation is created.
-            </p>
-          </Section>
-
-          <Section title="* About WhatsApp and Instagram">
-            <p>
-              <strong>WhatsApp</strong> messaging on the Growth and Scale plans works through the
-              official Meta WhatsApp Business Platform, using <em>your own</em> WhatsApp Business
-              account. You will need a Meta Business account and a phone number dedicated to it; we
-              guide you through the setup and there is no extra charge from us. Meta may charge you
-              separately for conversations under its own pricing.
-            </p>
-            <p>
-              <strong>Instagram</strong> direct messaging on the Growth and Scale plans uses{" "}
-              <em>your own</em> Instagram professional account, linked to a Facebook Page. Starter
-              includes neither WhatsApp nor Instagram.
-            </p>
-            {!launch.whatsapp || !launch.instagram ? (
-              <p>
-                {!launch.whatsapp && !launch.instagram
-                  ? "WhatsApp and Instagram are"
-                  : !launch.whatsapp
-                    ? "WhatsApp is"
-                    : "Instagram is"}{" "}
-                <strong>coming soon</strong>: we&apos;re waiting for Meta&apos;s approval. They switch on for
-                Growth, Scale and trial accounts as soon as it arrives.
-              </p>
-            ) : null}
-          </Section>
-
-          <Section title="What counts as an AI reply">
-            <p>
-              An AI reply is one answer your AI employee generates for a prospect. Messages your own
-              team sends during a human takeover do not count, and neither do messages you send
-              yourself while testing in the sandbox.
-            </p>
-            <p>
-              If you reach your monthly quota, your widget does not break and it never invents an
-              answer: the visitor is told that a person will follow up, and the conversation is
-              flagged for your team. We email you when you have used half of your replies, and again
-              as you get closer, so you can upgrade if you want to. Quotas reset at the start of each
-              billing period.
-            </p>
-          </Section>
-
-          <Section title="Billing">
-            <p>
-              Plans are billed monthly or annually in advance, in Indian Rupees. The price you see
-              includes {GST_RATE_PERCENT}% GST, so that is the total you are charged. We issue a GST
-              invoice for every payment to the email address on your account, showing the taxable
-              value and the GST contained in the price. You can upgrade at any time and we charge
-              only the difference for the rest of your period; downgrades take effect at your next
-              renewal.
-            </p>
-            <p>
-              You can cancel any time from your dashboard and keep access until the end of the period
-              you have paid for. Fees already paid are not refundable — the full terms, including the
-              situations where we do refund, are in our{" "}
-              <Link href="/refunds" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-                Cancellation and Refunds Policy
-              </Link>
-              .
-            </p>
-          </Section>
-
-          <Section title="Questions, or need something different?">
-            <p>
-              If you need more replies, more seats, or terms these plans do not cover, email{" "}
-              <a
-                href="mailto:support@waveswebstudio.in"
-                className="font-medium text-ds-accent hover:text-ds-accent-strong"
-              >
-                support@waveswebstudio.in
-              </a>{" "}
-              or call{" "}
-              <a href="tel:+917981596249" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-                +91 79815 96249
-              </a>
-              . Our full business details are on the{" "}
-              <Link href="/contact" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-                Contact
-              </Link>{" "}
-              page.
-            </p>
-          </Section>
-
-          <Link href="/" className="text-sm font-medium text-ds-accent hover:text-ds-accent-strong">
-            ← Back home
-          </Link>
-        </div>
+      <div className="pt-20 lg:pt-28">
+        <CtaBand />
       </div>
-    </div>
+    </main>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3 border-t border-ds-border pt-6">
-      <h2 className="text-xl font-medium text-ds-text-primary">{title}</h2>
-      <div className="flex flex-col gap-2 text-sm leading-relaxed text-ds-text-secondary">
-        {children}
-      </div>
-    </section>
-  );
+function CellMark({ value }: { value: Cell }): ReactNode {
+  if (value === true)
+    return (
+      <>
+        <Check className="!mt-0" />
+        <span className="sr-only">Included</span>
+      </>
+    );
+  if (value === false) return <Minus className="size-4 text-ds-border-strong" aria-label="Not included" />;
+  return <span className="text-ds-text-primary">{value}</span>;
 }

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Public product site tokens and motion (scoped to .site-shell). */
+@import "./site.css";
 
 /*
  * Waves Web Studio design system. Dark is the default; the light theme only
