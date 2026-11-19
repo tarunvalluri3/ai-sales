@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import {
   ArrowRight,
@@ -42,29 +41,15 @@ import {
 } from "@/components/site/illustrations";
 import { InstagramIcon, WebsiteIcon, WhatsAppIcon } from "@/components/site/brand-icons";
 import { INDUSTRIES } from "@/components/site/nav-data";
+import { JsonLd, faqLd, organizationLd, pageMetadata, softwareLd, websiteLd } from "@/components/site/seo";
 
-export const metadata: Metadata = {
-  title: "Waves AI Pilot — AI sales agent for website, WhatsApp & Instagram",
+export const metadata = pageMetadata({
+  title: "Waves AI Pilot — AI Sales Agent & Chatbot for WhatsApp, Instagram and Website",
   description:
-    "Waves AI Pilot is an AI sales employee that answers prospects from your own approved knowledge, qualifies leads, books appointments and hands off to your team — on your website, WhatsApp and Instagram. 14-day free trial, no card required.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "Waves AI Pilot — the AI sales employee that knows your business",
-    description:
-      "Grounded answers, lead qualification, appointment booking and human handoff on website, WhatsApp and Instagram.",
-    images: [{ url: "/marketing/og-overview.jpg", width: 1200, height: 630 }],
-  },
-};
-
-const STACK = [
-  "Meta WhatsApp Business Platform",
-  "Instagram Messaging API",
-  "Google Gemini",
-  "PostgreSQL + row-level security",
-  "pgvector retrieval",
-  "Razorpay billing",
-  "GST invoicing",
-];
+    "Waves AI Pilot is an AI sales agent for businesses. It answers enquiries from your approved knowledge, qualifies leads, books appointments and hands off to your team on website chat, WhatsApp Business and Instagram DMs.",
+  path: "/",
+  keywords: ["AI sales agent", "AI chatbot for business", "WhatsApp chatbot", "Instagram DM automation", "AI lead qualification", "appointment booking chatbot", "AI sales assistant India", "website chatbot"],
+});
 
 const STEPS: { n: string; title: string; body: string; visual: ReactNode }[] = [
   {
@@ -166,27 +151,20 @@ const FAQS: Faq[] = [
   },
 ];
 
+/** Plain-text answers for FAQPage structured data (rich results need text). */
+const FAQ_TEXT = FAQS.map((f) => ({
+  q: f.q,
+  a:
+    typeof f.a === "string"
+      ? f.a
+      : `Plans start at ${formatPaiseAsInr(ORDERED_PLANS[0].monthlyPricePaise)} a month including GST, based on how many AI replies you need. Every business starts with a ${TRIAL_DAYS}-day free trial.`,
+}));
+
 export default function HomePage() {
   return (
     <main className="flex flex-1 flex-col">
+      <JsonLd data={[organizationLd, websiteLd, softwareLd, faqLd(FAQ_TEXT)]} />
       <HomeHero />
-
-      {/* Built on */}
-      <section aria-label="Built on" className="border-y border-ds-border bg-ds-surface px-5 py-8 sm:px-8 lg:px-12">
-        <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-5 lg:flex-row lg:gap-10">
-          <p className="shrink-0 font-label text-[11px] font-medium uppercase tracking-[0.2em] text-ds-text-muted">Built on</p>
-          <div className="site-marquee-mask w-full overflow-hidden">
-            <ul className="site-marquee flex w-max items-center gap-10">
-              {[...STACK, ...STACK].map((s, i) => (
-                <li key={i} aria-hidden={i >= STACK.length ? "true" : undefined} className="flex items-center gap-10 whitespace-nowrap text-[15px] text-ds-text-secondary">
-                  {s}
-                  <span aria-hidden="true" className="size-1 rounded-full bg-ds-border-strong" />
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
 
       {/* The gap */}
       <Section dark className="overflow-hidden" labelledBy="gap-heading">
@@ -380,7 +358,7 @@ export default function HomePage() {
             </Reveal>
           ))}
           <Reveal as="li" delay={0.15}>
-            <Link href="/solutions" className="flex h-full flex-col justify-between rounded-[22px] bg-[#151713] p-6 text-white">
+            <Link href="/solutions" className="flex h-full flex-col justify-between site-ink rounded-[22px] p-6">
               <Building2 className="size-6 text-[#b2ff38]" aria-hidden="true" />
               <span>
                 <span className="block text-[16.5px] font-medium">Your industry not listed?</span>
@@ -405,7 +383,7 @@ export default function HomePage() {
             <Reveal key={plan.key} delay={i * 0.06}>
               <div
                 className={`relative flex h-full flex-col rounded-[26px] border p-7 ${
-                  plan.featured ? "border-[#151713] bg-[#151713] text-white" : "border-ds-border bg-ds-bg"
+                  plan.featured ? "site-ink border-transparent" : "border-ds-border bg-ds-bg"
                 }`}
               >
                 {plan.featured ? (

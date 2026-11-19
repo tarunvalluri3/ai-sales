@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { Metadata } from "next";
 import {
   Ban,
   Database,
@@ -19,13 +18,15 @@ import { PageHero } from "@/components/site/feature-block";
 import { CtaBand } from "@/components/site/cta-band";
 import { Btn, Reveal, Section, SectionHeading } from "@/components/site/primitives";
 import { PilotTile } from "@/components/site/brand-icons";
+import { JsonLd, breadcrumbLd, pageMetadata } from "@/components/site/seo";
 
-export const metadata: Metadata = {
-  title: "Security & Trust | Waves AI Pilot",
+export const metadata = pageMetadata({
+  title: "Security, Privacy & Responsible AI | Waves AI Pilot",
   description:
-    "How Waves AI Pilot keeps businesses' data isolated, keeps the AI grounded in approved knowledge, keeps people in control, and handles privacy under India's DPDP Act.",
-  alternates: { canonical: "/security" },
-};
+    "How Waves AI Pilot keeps each business's data isolated with row-level security, keeps AI answers grounded in approved knowledge, keeps people in control, and handles privacy under India's DPDP Act.",
+  path: "/security",
+  keywords: ["AI chatbot security", "DPDP Act compliance", "data privacy AI", "responsible AI", "tenant isolation"],
+});
 
 function IsolationDiagram() {
   const tenants = [
@@ -36,7 +37,7 @@ function IsolationDiagram() {
   return (
     <div className="rounded-[28px] border border-ds-border bg-ds-surface p-6 sm:p-8">
       <div className="flex justify-center">
-        <span className="flex items-center gap-2 rounded-full bg-[#151713] px-3.5 py-2 text-[12.5px] text-white">
+        <span className="flex items-center gap-2 site-ink rounded-full px-3.5 py-2 text-[12.5px]">
           <PilotTile className="size-6 rounded-md" /> Waves AI Pilot
         </span>
       </div>
@@ -116,9 +117,10 @@ const PROCESSORS = [
 export default function SecurityPage() {
   return (
     <main className="flex flex-1 flex-col">
+      <JsonLd data={breadcrumbLd([{ name: "Security", path: "/security" }])} />
       <PageHero
         eyebrow="Security & trust"
-        title="An AI that speaks for your business has to be trustworthy."
+        title="Security, privacy and responsible AI, built in."
         lead="Waves AI Pilot is built on four rules: every business's data stays its own, the AI never invents facts, people stay in control, and nothing you share trains anyone's model."
         aside={<IsolationDiagram />}
       >

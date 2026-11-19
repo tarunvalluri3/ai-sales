@@ -8,6 +8,7 @@ import { Btn } from "./primitives";
 import { INSTAGRAM_SCRIPT, InstagramPhone, WHATSAPP_SCRIPT, WhatsAppPhone } from "./chat-illustrations";
 import { InstagramIcon, WebsiteIcon, WhatsAppIcon } from "./brand-icons";
 import { DEMO_HREF } from "./links";
+import { BuiltOn } from "./built-on";
 
 /*
  * Home hero. First screen: the promise, two CTAs and the trial terms.
@@ -79,53 +80,51 @@ export function HomeHero() {
   const shownChips = reduced ? CHIPS.length : chips;
 
   return (
-    <section aria-labelledby="hero-heading" className="relative overflow-hidden px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">
+    <section aria-labelledby="hero-heading" className="relative overflow-hidden border-b border-ds-border px-5 pb-24 sm:px-8 lg:px-12 lg:pb-32">
       <div aria-hidden="true" className="site-grid-bg pointer-events-none absolute inset-x-0 top-0 h-[900px]" />
       <div aria-hidden="true" className="site-glow left-1/2 top-[-180px] h-[420px] w-[820px] -translate-x-1/2 opacity-50" />
 
-      <div className="relative mx-auto flex max-w-[980px] flex-col items-center pt-16 text-center sm:pt-24 lg:pt-28">
-        <a
-          href="#channels"
-          className="site-rise group inline-flex items-center gap-2.5 rounded-full border border-ds-border bg-ds-surface py-1 pl-1 pr-3.5 text-[13px] text-ds-text-secondary shadow-[0_6px_20px_-12px_rgba(21,23,19,0.3)]"
-          style={{ "--d": "0.02s" } as CSSProperties}
-        >
-          <span className="flex -space-x-1.5">
-            <WebsiteIcon className="size-6 rounded-[8px] ring-2 ring-white" />
-            <WhatsAppIcon className="size-6 rounded-[8px] ring-2 ring-white" />
-            <InstagramIcon className="size-6 rounded-[8px] ring-2 ring-white" />
-          </span>
-          Live on website, WhatsApp &amp; Instagram
-          <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
-        </a>
+      {/* First screen: fills the viewport under the 68px header, so the
+          product window always starts below the fold. */}
+      <div className="relative mx-auto flex min-h-[calc(100svh-68px)] max-w-[1100px] flex-col items-center text-center">
+        <div className="flex w-full flex-1 flex-col items-center justify-center py-14">
+          <a
+            href="#channels"
+            className="site-rise group inline-flex items-center gap-2.5 rounded-full border border-ds-border bg-ds-surface py-1 pl-1 pr-3.5 text-[13px] text-ds-text-secondary shadow-[0_6px_20px_-12px_rgba(21,23,19,0.3)]"
+            style={{ "--d": "0.02s" } as CSSProperties}
+          >
+            <span className="flex -space-x-1.5">
+              <WebsiteIcon className="size-6 rounded-[8px] ring-2 ring-ds-surface" />
+              <WhatsAppIcon className="size-6 rounded-[8px] ring-2 ring-ds-surface" />
+              <InstagramIcon className="size-6 rounded-[8px] ring-2 ring-ds-surface" />
+            </span>
+            <span className="hidden sm:inline">AI sales agent for website, WhatsApp &amp; Instagram</span>
+            <span className="sm:hidden">AI sales agent · WhatsApp, Instagram, web</span>
+            <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">→</span>
+          </a>
 
-        <h1 id="hero-heading" className="site-h1 site-rise mt-7 max-w-[920px] text-ds-text-primary" style={{ "--d": "0.1s" } as CSSProperties}>
-          The AI sales employee that knows your business.
-        </h1>
+          <h1 id="hero-heading" className="site-h1 site-rise mt-7 max-w-[940px] text-ds-text-primary" style={{ "--d": "0.1s" } as CSSProperties}>
+            The AI sales agent that knows your business.
+          </h1>
 
-        <p className="site-lead site-rise mt-6 max-w-[680px]" style={{ "--d": "0.18s" } as CSSProperties}>
-          Waves AI Pilot answers every prospect in seconds using only what you approve, qualifies who&apos;s ready
-          to buy, books appointments and hands off to your team the moment a human is needed.
-        </p>
+          <p className="site-lead site-rise mt-6 max-w-[700px]" style={{ "--d": "0.18s" } as CSSProperties}>
+            Waves AI Pilot answers every enquiry in seconds from the knowledge you approve, qualifies leads, books
+            appointments and hands off to your team, on your website chat, WhatsApp Business and Instagram DMs.
+          </p>
 
-        <div className="site-rise mt-9 flex flex-col items-center gap-3 sm:flex-row" style={{ "--d": "0.26s" } as CSSProperties}>
-          <Btn href="/sign-up">Start your free trial</Btn>
-          <Btn href={DEMO_HREF} variant="secondary">
-            Book a demo
-          </Btn>
+          <div className="site-rise mt-9 flex flex-col items-center gap-3 sm:flex-row" style={{ "--d": "0.26s" } as CSSProperties}>
+            <Btn href="/sign-up">Start your free trial</Btn>
+            <Btn href={DEMO_HREF} variant="secondary">
+              Book a demo
+            </Btn>
+          </div>
         </div>
 
-        <ul className="site-rise mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13.5px] text-ds-text-muted" style={{ "--d": "0.32s" } as CSSProperties}>
-          {["14-day free trial", "No card required", "Cancel any time"].map((t) => (
-            <li key={t} className="flex items-center gap-2">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-[#7fbf1f]" />
-              {t}
-            </li>
-          ))}
-        </ul>
+        <BuiltOn className="site-rise pb-10" />
       </div>
 
       {/* Product window + phones */}
-      <div ref={stageRef} data-inview={inView} className="site-tilt-stage relative mx-auto mt-16 max-w-[1180px] sm:mt-20">
+      <div ref={stageRef} data-inview={inView} className="site-tilt-stage relative mx-auto mt-10 max-w-[1180px] sm:mt-14">
         <div className="site-rise" style={{ "--d": "0.4s" } as CSSProperties}>
           <div ref={tiltRef} className="site-tilt relative mx-auto max-w-[1040px]">
             <MacWindow

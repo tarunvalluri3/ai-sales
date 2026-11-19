@@ -41,7 +41,7 @@ export function PlanCards({ plans }: { plans: PlanCardData[] }) {
               aria-checked={yearly === o.v}
               onClick={() => setYearly(o.v)}
               className={`flex items-center gap-2 rounded-full px-4 py-2 text-[14px] transition-colors ${
-                yearly === o.v ? "bg-[#151713] text-white" : "text-ds-text-secondary hover:text-ds-text-primary"
+                yearly === o.v ? "site-active" : "text-ds-text-secondary hover:text-ds-text-primary"
               }`}
             >
               {o.l}
@@ -62,7 +62,7 @@ export function PlanCards({ plans }: { plans: PlanCardData[] }) {
             <div
               key={plan.key}
               className={`relative flex flex-col rounded-[28px] border p-7 lg:p-8 ${
-                f ? "border-[#151713] bg-[#151713] text-white shadow-[0_40px_80px_-40px_rgba(21,23,19,0.7)]" : "border-ds-border bg-ds-surface"
+                f ? "site-ink border-transparent shadow-[0_40px_80px_-40px_rgba(21,23,19,0.7)]" : "border-ds-border bg-ds-surface"
               }`}
             >
               <div className="flex items-center justify-between gap-2">

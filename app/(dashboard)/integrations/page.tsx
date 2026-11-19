@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Bell, Code2, CreditCard, FileSpreadsheet, FileText, Globe, Link2, Mail, Webhook } from "lucide-react";
 import { PageHero } from "@/components/site/feature-block";
@@ -6,13 +5,15 @@ import { CtaBand } from "@/components/site/cta-band";
 import { Btn, CheckList, Eyebrow, Reveal, Section, SectionHeading } from "@/components/site/primitives";
 import { InstagramIcon, PilotTile, WebsiteIcon, WhatsAppIcon } from "@/components/site/brand-icons";
 import { DEMO_HREF } from "@/components/site/links";
+import { JsonLd, breadcrumbLd, pageMetadata } from "@/components/site/seo";
 
-export const metadata: Metadata = {
-  title: "Integrations | Waves AI Pilot",
+export const metadata = pageMetadata({
+  title: "Integrations: WhatsApp Business, Instagram, Website Chat & Webhooks | Waves AI Pilot",
   description:
-    "Connect Waves AI Pilot to your website, WhatsApp Business and Instagram, import knowledge from files and web pages, and send qualified leads to your CRM, Zapier or Make with signed webhooks.",
-  alternates: { canonical: "/integrations" },
-};
+    "Connect Waves AI Pilot to your website (WordPress, Shopify, Wix, Webflow or custom), WhatsApp Business Platform and Instagram, import knowledge from PDFs and web pages, and send qualified leads to your CRM, Zapier or Make with signed webhooks.",
+  path: "/integrations",
+  keywords: ["WhatsApp Business API chatbot", "Instagram messaging integration", "website chat widget", "chatbot for WordPress", "chatbot for Shopify", "CRM webhook integration", "Zapier lead integration"],
+});
 
 function Tile({ children, label }: { children: ReactNode; label: string }) {
   return (
@@ -89,9 +90,10 @@ const GROUPS: { title: string; body: string; items: { icon: ReactNode; name: str
 export default function IntegrationsPage() {
   return (
     <main className="flex flex-1 flex-col">
+      <JsonLd data={breadcrumbLd([{ name: "Integrations", path: "/integrations" }])} />
       <PageHero
         eyebrow="Integrations"
-        title="Connects to the channels and tools you already use."
+        title="Integrations for WhatsApp Business, Instagram and your website."
         lead="Put your AI employee on your website, WhatsApp and Instagram, teach it from your files and web pages, and send every qualified lead wherever your team works."
         aside={<Orbit />}
       >

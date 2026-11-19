@@ -15,13 +15,15 @@ import { PlanCards, type PlanCardData } from "@/components/site/plan-cards";
 import { FaqList, type Faq } from "@/components/site/faq";
 import { CtaBand } from "@/components/site/cta-band";
 import { Check, Reveal, Section, SectionHeading } from "@/components/site/primitives";
+import { JsonLd, breadcrumbLd, pageMetadata, softwareLd } from "@/components/site/seo";
 
-export const metadata = {
-  title: "Pricing | Waves AI Pilot",
+export const metadata = pageMetadata({
+  title: `Pricing: AI Sales Agent Plans from ${formatPaiseAsInr(ORDERED_PLANS[0].monthlyPricePaise)}/month | Waves AI Pilot`,
   description:
-    "Waves AI Pilot plans: Starter, Growth and Scale, priced by AI replies per month, GST included. 14-day free trial on every channel, no card required.",
-  alternates: { canonical: "/pricing" },
-};
+    `Waves AI Pilot pricing in Indian Rupees, GST included. Starter, Growth and Scale plans priced by AI replies per month, with WhatsApp and Instagram on Growth and Scale. ${TRIAL_DAYS}-day free trial.`,
+  path: "/pricing",
+  keywords: ["AI chatbot pricing India", "WhatsApp chatbot price", "AI sales agent pricing", "chatbot subscription plans"],
+});
 
 // Rendered per request so the advertised trial limit is the CONFIGURED one
 // (TRIAL_REPLY_QUOTA), i.e. exactly what lib/entitlement-rules.ts enforces.
@@ -208,21 +210,18 @@ export default function PricingPage() {
 
   return (
     <main className="flex flex-1 flex-col">
+      <JsonLd data={[softwareLd, breadcrumbLd([{ name: "Pricing", path: "/pricing" }])]} />
       <PageHero
         eyebrow="Pricing"
-        title="Simple plans that grow with your sales."
-        lead={
-          <>
-            Pay for the AI replies you need. Start with a {TRIAL_DAYS}-day free trial — no card required, up to{" "}
-            {trialReplyQuota.toLocaleString("en-IN")} AI replies, on {trialChannels}. Cancel any time.
-          </>
-        }
+        align="center"
+        title="Simple pricing for your AI sales agent."
+        lead={`Plans are priced by the AI replies you need each month, with ${GST_RATE_PERCENT}% GST included. Every business starts with a ${TRIAL_DAYS}-day free trial.`}
+        below={<PlanCards plans={cards} />}
       />
 
-      <section className="px-5 pb-8 sm:px-8 lg:px-12">
+      <section className="px-5 pt-10 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-[1200px]">
-          <PlanCards plans={cards} />
-          <p className="mt-8 text-center text-[13.5px] text-ds-text-muted">
+          <p className="text-center text-[13.5px] text-ds-text-muted">
             All prices are in Indian Rupees and inclusive of {GST_RATE_PERCENT}% GST — the price you see is the total you
             pay. Annual billing gives you two months free.
           </p>

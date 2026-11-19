@@ -29,7 +29,7 @@ export function AnchorNav({ items }: { items: readonly { id: string; label: stri
   }, [active]);
 
   return (
-    <nav aria-label="On this page" className="sticky top-[68px] z-40 border-y border-ds-border bg-[rgba(246,247,245,0.9)] backdrop-blur-xl">
+    <nav aria-label="On this page" className="sticky top-[68px] z-40 border-y border-ds-border site-nav-bg backdrop-blur-xl">
       <ul ref={listRef} className="scrollbar-hidden mx-auto flex max-w-[1280px] gap-1 overflow-x-auto px-5 py-2.5 sm:px-8 lg:justify-center lg:px-12">
         {items.map((item) => (
           <li key={item.id} data-id={item.id} className="shrink-0">
@@ -37,7 +37,7 @@ export function AnchorNav({ items }: { items: readonly { id: string; label: stri
               href={`#${item.id}`}
               aria-current={active === item.id ? "true" : undefined}
               className={`block rounded-full px-3.5 py-1.5 text-[13.5px] transition-colors ${
-                active === item.id ? "bg-[#151713] text-white" : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
+                active === item.id ? "site-active" : "text-ds-text-secondary hover:bg-ds-surface-soft hover:text-ds-text-primary"
               }`}
             >
               {item.label}

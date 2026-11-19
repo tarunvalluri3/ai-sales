@@ -58,31 +58,41 @@ export function FeatureBlock({
   );
 }
 
-/** A page hero for inner pages. */
+/**
+ * Inner-page hero. Fills the first screen under the header (so nothing below
+ * peeks in), with the copy left and a visual right, or centred copy with
+ * content underneath (`align="center"`, e.g. pricing cards).
+ */
 export function PageHero({
   eyebrow,
   title,
   lead,
   children,
   aside,
+  align = "left",
+  below,
 }: {
   eyebrow: string;
   title: ReactNode;
   lead: ReactNode;
   children?: ReactNode;
   aside?: ReactNode;
+  align?: "left" | "center";
+  /** Rendered under the copy inside the hero (centre layout only). */
+  below?: ReactNode;
 }) {
+  const centered = align === "center";
   return (
-    <section className="relative overflow-hidden px-5 pb-16 pt-16 sm:px-8 sm:pt-24 lg:px-12 lg:pb-24">
-      <div aria-hidden="true" className="site-grid-bg pointer-events-none absolute inset-x-0 top-0 h-[700px]" />
-      <div aria-hidden="true" className="site-glow left-[20%] top-[-160px] h-[360px] w-[640px] opacity-40" />
-      <div className={`relative mx-auto grid max-w-[1200px] items-center gap-12 ${aside ? "lg:grid-cols-[1.1fr_1fr] lg:gap-16" : ""}`}>
-        <div className={aside ? "" : "max-w-[860px]"}>
+    <section className="relative flex min-h-[calc(100svh-68px)] items-center overflow-hidden border-b border-ds-border px-5 py-16 sm:px-8 lg:px-12">
+      <div aria-hidden="true" className="site-grid-bg pointer-events-none absolute inset-x-0 top-0 h-[760px]" />
+      <div aria-hidden="true" className={`site-glow top-[-160px] h-[380px] w-[680px] opacity-40 ${centered ? "left-1/2 -translate-x-1/2" : "left-[18%]"}`} />
+      <div className={`relative mx-auto w-full max-w-[1200px] ${aside ? "grid items-center gap-14 lg:grid-cols-[1.05fr_1fr] lg:gap-16" : ""}`}>
+        <div className={centered ? "mx-auto flex max-w-[860px] flex-col items-center text-center" : "max-w-[720px]"}>
           <p className="site-eyebrow site-rise">{eyebrow}</p>
-          <h1 className="site-h1 site-rise mt-6 !text-[clamp(2.25rem,3.4vw+1rem,3.75rem)]" style={{ animationDelay: "0.08s" }}>
+          <h1 className="site-h1 site-rise mt-6 !text-[clamp(2.25rem,3.6vw+1rem,4rem)]" style={{ animationDelay: "0.08s" }}>
             {title}
           </h1>
-          <p className="site-lead site-rise mt-6 max-w-[640px]" style={{ animationDelay: "0.16s" }}>
+          <p className={`site-lead site-rise mt-6 max-w-[660px] ${centered ? "mx-auto" : ""}`} style={{ animationDelay: "0.16s" }}>
             {lead}
           </p>
           {children ? (
@@ -94,6 +104,11 @@ export function PageHero({
         {aside ? (
           <div className="site-rise" style={{ animationDelay: "0.3s" }}>
             {aside}
+          </div>
+        ) : null}
+        {below ? (
+          <div className="site-rise mt-14 w-full" style={{ animationDelay: "0.32s" }}>
+            {below}
           </div>
         ) : null}
       </div>

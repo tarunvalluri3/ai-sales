@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { Metadata } from "next";
 import { ArrowRight, Eye, HandHeart, Lock, MessageSquareQuote, Target } from "lucide-react";
 import { PageHero } from "@/components/site/feature-block";
 import { CtaBand } from "@/components/site/cta-band";
@@ -8,13 +7,16 @@ import { Eyebrow, Reveal, Section, SectionHeading } from "@/components/site/prim
 import { LitStatement } from "@/components/site/statement";
 import { GENERAL_EMAIL, PHONE_PRIMARY, PHONE_WHATSAPP, SUPPORT_EMAIL } from "@/lib/site-contact";
 import { STUDIO_HREF } from "@/components/site/links";
+import { CompanyCard } from "@/components/site/hero-asides";
+import { JsonLd, breadcrumbLd, organizationLd, pageMetadata } from "@/components/site/seo";
 
-export const metadata: Metadata = {
-  title: "About Us | Waves AI Pilot",
+export const metadata = pageMetadata({
+  title: "About Waves AI Pilot | AI Sales Agent Startup from Hyderabad, India",
   description:
-    "Waves AI Pilot is built by Waves Web Studio, a bootstrapped AI and software company in Hyderabad, India, founded in 2026. Our mission, our story, our founder and our company details.",
-  alternates: { canonical: "/about" },
-};
+    "Waves AI Pilot is built by Waves Web Studio, a bootstrapped AI and software startup in Hyderabad, India, founded in 2026 by Tarun Valluri. Our mission, story, principles and registered company details.",
+  path: "/about",
+  keywords: ["Waves Web Studio", "AI startup Hyderabad", "Indian SaaS startup", "Tarun Valluri"],
+});
 
 /**
  * Required by Razorpay's merchant-activation website check ("About us"),
@@ -58,10 +60,12 @@ const TIMELINE = [
 export default function AboutPage() {
   return (
     <main className="flex flex-1 flex-col">
+      <JsonLd data={[organizationLd, breadcrumbLd([{ name: "About", path: "/about" }])]} />
       <PageHero
         eyebrow="About us"
         title="We're building the AI sales employee every business deserves."
         lead="Waves AI Pilot is made by Waves Web Studio, an independent, bootstrapped AI and software company in Hyderabad, India. We fund our own products with client work, not outside investment, and answer only to the businesses that use them."
+        aside={<CompanyCard />}
       />
 
       {/* Mission */}
