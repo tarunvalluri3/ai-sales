@@ -6,7 +6,19 @@ Last updated: 2026-11-15 (**`production-readiness` merged to `main` (PR #147, CI
 
 ---
 
-## Marketing site follow-up pass — 2026-11-19 — merged to `main` via PR, UI only
+## Marketing site responsive/typography fix pass — 2026-11-19 — UI only
+
+**Method:** rendered every marketing page (`/`, `/product`, `/solutions`, `/solutions/clinics`, `/security`, `/integrations`, `/pricing`, `/about`, `/contact`, `/privacy`, `/terms`, `/refunds`, `/shipping`, `/data-deletion`) at 390, 768 and 1440px with `puppeteer-core` against a local `next start` (`APP_ENV=staging`, static pages only, no DB access), measuring overflow, text size and tap targets.
+
+**Fixed:** `/integrations` code cards stretched the two-column grid to 447px on a 390px screen (grid cells now `min-w-0`); `/pricing` comparison table was clipped with no hint (sticky feature column, tighter cell padding below `sm`, "Swipe sideways" hint, scroll wrapper isolated with `contain: paint`); footer links 18px tall → ~30px tap targets; closing CTA buttons full-width on phones; `LitStatement` resting opacity 0.16 → 0.3 so unscrolled text stays legible. **Left as is:** text under 12px exists only inside the miniature product mockups; the logo marquee and the pricing table scroll horizontally by design.
+
+**Files:** `app/(dashboard)/integrations/page.tsx`, `app/(dashboard)/pricing/page.tsx`, `components/site/{cta-band,site-footer,statement}.tsx`. No route, data, package, env, migration or auth change.
+
+**Checks (real output):** `npm run lint` 0 problems; `npm run typecheck` PASS; `npm run build` PASS (82 pages); overflow audit: 0px horizontal overflow on all 14 pages at all 3 widths; Impeccable detector: no findings. pgTAP not run locally (production-linked, no DB impact; CI runs it).
+
+---
+
+## Marketing site follow-up pass — 2026-11-19 — merged to `main` via PR #152, UI only
 
 **What:** second pass over the marketing pages after PR #151: new `/solutions/[slug]` industry pages (8 paths, SSG), `robots.ts`, `sitemap.ts`, `components/site/` additions (`brand-logos`, `built-on`, `hero-asides`, `industries`, `seo`, `site-theme-toggle`), restyled site components and `site.css`. Unused `Metadata`/`Hand` imports removed. No route handler, data, package, env, migration or auth change. `style-backup-*.zip` stay uncommitted. `main` is protected (direct push rejected: required check `build-and-test`), so this landed via PR; `main` is the only branch after merge.
 

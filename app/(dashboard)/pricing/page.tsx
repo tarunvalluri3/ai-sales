@@ -252,15 +252,17 @@ export default function PricingPage() {
 
       <Section labelledBy="compare-heading">
         <SectionHeading align="center" eyebrow="Compare" id="compare-heading" title="Every feature, plan by plan." />
-        <Reveal className="mt-12 overflow-x-auto rounded-[24px] border border-ds-border bg-ds-surface">
-          <table className="w-full min-w-[720px] border-collapse text-left text-[14px]">
+        <p className="mt-8 text-center text-[13px] text-ds-text-muted sm:hidden">Swipe sideways to compare every plan.</p>
+        <Reveal className="mt-4 sm:mt-12">
+        <div className="[contain:paint] overflow-x-auto overscroll-x-contain rounded-[24px] border border-ds-border bg-ds-surface">
+          <table className="w-full min-w-[680px] border-collapse text-left text-[14px]">
             <thead>
               <tr className="border-b border-ds-border">
-                <th scope="col" className="w-[40%] px-6 py-5 font-label text-[11px] font-medium uppercase tracking-[0.16em] text-ds-text-muted">
+                <th scope="col" className="sticky left-0 z-10 w-[150px] bg-ds-surface px-4 py-5 sm:w-[40%] sm:px-6 font-label text-[11px] font-medium uppercase tracking-[0.16em] text-ds-text-muted">
                   Feature
                 </th>
                 {ORDERED_PLANS.map((p) => (
-                  <th key={p.key} scope="col" className={`px-6 py-5 text-[16px] font-medium ${p.featured ? "bg-ds-lime-soft/60" : ""}`}>
+                  <th key={p.key} scope="col" className={`px-4 py-5 sm:px-6 text-[16px] font-medium ${p.featured ? "bg-ds-lime-soft/60" : ""}`}>
                     {p.name}
                     <span className="block text-[13px] font-normal text-ds-text-muted">{formatPaiseAsInr(p.monthlyPricePaise)} / mo</span>
                   </th>
@@ -276,11 +278,11 @@ export default function PricingPage() {
                 </tr>
                 {g.rows.map(([label, ...cells]) => (
                   <tr key={label} className="border-t border-ds-border">
-                    <th scope="row" className="px-6 py-3.5 font-normal text-ds-text-secondary">
+                    <th scope="row" className="sticky left-0 z-10 bg-ds-surface px-4 py-3.5 sm:px-6 font-normal text-ds-text-secondary">
                       {label}
                     </th>
                     {cells.map((c, i) => (
-                      <td key={i} className={`px-6 py-3.5 ${ORDERED_PLANS[i].featured ? "bg-ds-lime-soft/40" : ""}`}>
+                      <td key={i} className={`px-4 py-3.5 sm:px-6 ${ORDERED_PLANS[i].featured ? "bg-ds-lime-soft/40" : ""}`}>
                         <CellMark value={c} />
                       </td>
                     ))}
@@ -289,6 +291,7 @@ export default function PricingPage() {
               </tbody>
             ))}
           </table>
+        </div>
         </Reveal>
       </Section>
 
