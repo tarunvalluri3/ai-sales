@@ -3,10 +3,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Show, UserButton } from "@clerk/nextjs";
+import { UserButton, useAuth } from "@clerk/nextjs";
 import { ArrowRight, ChevronDown, ShieldCheck } from "lucide-react";
 import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
 import { WavesLogo } from "@/app/(dashboard)/_components/waves-logo";
+import { SiteThemeToggle } from "./site-theme-toggle";
 import { INDUSTRIES, PRIMARY_NAV, PRODUCT_FEATURES, USE_CASES, type NavEntry } from "./nav-data";
 
 /*
@@ -51,7 +52,7 @@ function ProductMenu({ onNavigate }: { onNavigate: () => void }) {
           <MenuItem key={item.href} item={item} onNavigate={onNavigate} />
         ))}
       </div>
-      <div className="flex flex-col justify-between rounded-2xl bg-[#151713] p-5 text-white">
+      <div className="flex flex-col justify-between site-ink rounded-2xl p-5">
         <div>
           <p className="font-label text-[11px] uppercase tracking-[0.18em] text-white/50">Platform tour</p>
           <p className="mt-3 text-[17px] leading-snug">One AI employee for your website, WhatsApp and Instagram.</p>
@@ -176,13 +177,14 @@ export function SiteNav() {
       <div
         className={`border-b transition-[background-color,border-color,box-shadow] duration-300 ${
           scrolled || open || drawerOpen
-            ? "border-ds-border bg-[rgba(246,247,245,0.86)] shadow-[0_8px_30px_-20px_rgba(21,23,19,0.25)] backdrop-blur-xl"
-            : "border-transparent bg-[rgba(246,247,245,0.6)] backdrop-blur-md"
+            ? "site-nav-bg border-ds-border shadow-[0_8px_30px_-20px_rgba(21,23,19,0.25)] backdrop-blur-xl"
+            : "site-nav-bg-rest border-transparent backdrop-blur-md"
         }`}
       >
         <div ref={navRef} className="relative mx-auto flex h-[68px] max-w-[1280px] items-center gap-8 px-5 sm:px-8 lg:px-12">
           <Link href="/" aria-label="Waves AI Pilot home" className="flex items-center">
-            <WavesLogo tone="light" />
+            <WavesLogo tone="light" className="site-only-light" />
+            <WavesLogo tone="dark" className="site-only-dark" />
           </Link>
 
           <nav aria-label="Main" className="hidden h-full items-center gap-1 lg:flex">
@@ -234,9 +236,12 @@ export function SiteNav() {
             )}
           </nav>
 
-          <div className="ml-auto hidden items-center gap-3 lg:flex">
+          <div className="ml-auto hidden items-center gap-2.5 lg:flex">
+            <SiteThemeToggle />
             <AuthActions />
           </div>
+
+          <SiteThemeToggle className="ml-auto lg:hidden" />
 
           <button
             type="button"
@@ -244,7 +249,7 @@ export function SiteNav() {
             aria-expanded={drawerOpen}
             aria-controls="site-drawer"
             aria-label={drawerOpen ? "Close menu" : "Open menu"}
-            className="ml-auto flex size-10 items-center justify-center rounded-xl border border-ds-border bg-ds-surface text-ds-text-primary lg:hidden"
+            className="-ml-6 flex size-[38px] items-center justify-center rounded-xl border border-ds-border bg-ds-surface text-ds-text-primary lg:hidden"
           >
             <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" className="size-5">
               {drawerOpen ? (
@@ -319,24 +324,31 @@ export function SiteNav() {
 }
 
 function AuthActions({ stacked = false }: { stacked?: boolean }) {
+  // Signed-out buttons render immediately (and while Clerk is still loading),
+  // so a visitor always sees a way in; they swap to the dashboard link once
+  // Clerk confirms a session.
+  const { isLoaded, isSignedIn } = useAuth();
   const full = stacked ? "w-full" : "";
-  return (
-    <>
-      <Show when="signed-out">
-        <Link href="/sign-in" className={`site-btn site-btn-secondary site-btn-sm ${full} ${stacked ? "" : "border-transparent bg-transparent"}`}>
-          Sign in
-        </Link>
-        <Link href="/sign-up" className={`site-btn site-btn-primary site-btn-sm ${full}`}>
-          Start free trial
+  if (isLoaded && isSignedIn) {
+    return (
+      <>
+        <Link href="/dashboard" className={`site-btn site-btn-primary site-btn-sm ${full}`}>
+          Dashboard
           <span aria-hidden="true" className="site-btn-dot" />
         </Link>
-      </Show>
-      <Show when="signed-in">
-        <Link href="/dashboard" className={`site-btn site-btn-primary site-btn-sm ${full}`}>
-          Go to dashboard
-        </Link>
-        <UserButton appearance={clerkDarkCompactAppearance} />
-      </Show>
+        {stacked ? null : <UserButton appearance={clerkDarkCompactAppearance} />}
+      </>
+    );
+  }
+  return (
+    <>
+      <Link href="/sign-in" className={`site-btn site-btn-secondary site-btn-sm ${full} ${stacked ? "" : "border-transparent bg-transparent"}`}>
+        Log in
+      </Link>
+      <Link href="/sign-up" className={`site-btn site-btn-primary site-btn-sm ${full}`}>
+        Start free trial
+        <span aria-hidden="true" className="site-btn-dot" />
+      </Link>
     </>
   );
 }

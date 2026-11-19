@@ -6,6 +6,14 @@ Last updated: 2026-11-15 (**`production-readiness` merged to `main` (PR #147, CI
 
 ---
 
+## Marketing site follow-up pass — 2026-11-19 — merged to `main` via PR, UI only
+
+**What:** second pass over the marketing pages after PR #151: new `/solutions/[slug]` industry pages (8 paths, SSG), `robots.ts`, `sitemap.ts`, `components/site/` additions (`brand-logos`, `built-on`, `hero-asides`, `industries`, `seo`, `site-theme-toggle`), restyled site components and `site.css`. Unused `Metadata`/`Hand` imports removed. No route handler, data, package, env, migration or auth change. `style-backup-*.zip` stay uncommitted. `main` is protected (direct push rejected: required check `build-and-test`), so this landed via PR; `main` is the only branch after merge.
+
+**Checks (real output):** `npm run lint` 0 errors, 0 warnings (after removing 5 unused imports); `npm run typecheck` PASS; `npm run build` PASS. `npm test` (pgTAP) NOT run locally: it targets the linked Supabase project, which is production, and there is no database impact; CI runs it.
+
+---
+
 ## Marketing site redesign — 2026-11-19 — branch `ui/marketing-site`, UI only
 
 **What:** marketing pages under `app/(dashboard)/` restyled with a new `site.css`; new `/product`, `/solutions`, `/security`, `/integrations` pages; updated home, about, pricing and site header; new `components/site/*`; new assets in `public/marketing/` (founder photo, OG image, screens). Unused `Hand` import removed from the home page. No route handler, data, package, env, migration or auth change. The two `style-backup-*.zip` files in the repo root are local backups and are NOT committed.

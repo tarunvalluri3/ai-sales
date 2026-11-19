@@ -66,6 +66,53 @@
 
   --site-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --site-ease-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  --site-nav-bg: rgba(246, 247, 245, 0.86);
+  --site-nav-bg-rest: rgba(246, 247, 245, 0.6);
+}
+
+/* Dark site theme: chosen with the header toggle (stored as "site-theme",
+   separate from the dashboard's own "theme"), or the visitor's system
+   preference when they haven't chosen. Set before first paint by
+   THEME_INIT_SCRIPT as html[data-site-theme="dark"]. Product illustrations
+   stay light on purpose: light product UI on a dark stage. */
+:root:root[data-site-theme="dark"]:has(.site-shell) {
+  color-scheme: dark;
+
+  --ds-bg: #0c0e0a;
+  --ds-surface: #13160f;
+  --ds-surface-raised: #181c14;
+  --ds-surface-elevated: #181c14;
+  --ds-surface-soft: #1c2118;
+  --ds-border: #262b21;
+  --ds-border-strong: #3a4132;
+
+  --ds-text-primary: #eef1ea;
+  --ds-text-secondary: #aab1a2;
+  --ds-text-muted: #959c8d;
+  --ds-text-faint: #959c8d;
+  --ds-text-label-faint: #959c8d;
+
+  --ds-primary: #b2ff38;
+  --ds-primary-hover: #c3ff63;
+  --ds-primary-on: #11160a;
+  --ds-ivory: #11160a;
+
+  --ds-accent: #b2ff38;
+  --ds-accent-strong: #c3ff63;
+
+  --ds-success: #4fcf8c;
+  --ds-success-bg: #13301f;
+  --ds-warning: #f2b84b;
+  --ds-warning-bg: #3a2b0d;
+  --ds-danger: #f2806d;
+  --ds-danger-bg: #3b1a14;
+
+  --ds-lime-mid: #3e5a12;
+  --ds-lime-soft: #1f2a12;
+
+  --ds-shadow-float: 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+  --site-nav-bg: rgba(12, 14, 10, 0.82);
+  --site-nav-bg-rest: rgba(12, 14, 10, 0.55);
 }
 
 :root:root:has(.site-shell) body {
@@ -106,6 +153,60 @@
   color-scheme: dark;
   background: var(--ds-bg);
   color: var(--ds-text-primary);
+}
+
+/* On the dark site the bands sit one step lighter, with hairlines, so they
+   still read as distinct sections (and the closing card never merges with
+   the footer). */
+[data-site-theme="dark"] .band-dark {
+  --ds-bg: #121610;
+  --ds-surface: #171b13;
+  box-shadow:
+    inset 0 1px 0 rgba(238, 241, 234, 0.06),
+    inset 0 -1px 0 rgba(238, 241, 234, 0.06);
+}
+
+/* Inverse emphasis surface (featured plan, menu promo, callout cards):
+   ink on the light site, a raised olive panel with a lime edge on dark. */
+.site-ink {
+  background: #151713;
+  color: #fff;
+}
+
+[data-site-theme="dark"] .site-ink {
+  background: #1a2014;
+  box-shadow: inset 0 0 0 1px rgba(178, 255, 56, 0.28);
+}
+
+/* Selected pill (tabs, anchor nav, billing switch). */
+.site-active {
+  background: #151713;
+  color: #fff;
+}
+
+[data-site-theme="dark"] .site-active {
+  background: #b2ff38;
+  color: #11160a;
+}
+
+.site-nav-bg {
+  background: var(--site-nav-bg);
+}
+
+.site-nav-bg-rest {
+  background: var(--site-nav-bg-rest);
+}
+
+/* Elements that exist once per theme (e.g. the logo lockup). */
+[data-site-theme="dark"] .site-only-light,
+:root:not([data-site-theme="dark"]) .site-only-dark {
+  display: none !important;
+}
+
+/* Theme toggle icons: show the theme you'd switch to. */
+:root:not([data-site-theme="dark"]) .site-theme-sun,
+[data-site-theme="dark"] .site-theme-moon {
+  display: none;
 }
 
 /* ---------------------------------------------------------------- type --- */
@@ -212,7 +313,8 @@
   transition: transform 200ms var(--site-ease);
 }
 
-.band-dark .site-btn-primary .site-btn-dot {
+.band-dark .site-btn-primary .site-btn-dot,
+[data-site-theme="dark"] .site-btn-primary .site-btn-dot {
   background: #11160a;
 }
 
@@ -322,7 +424,8 @@
   mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
 }
 
-.band-dark .site-grid-bg {
+.band-dark .site-grid-bg,
+[data-site-theme="dark"] .site-grid-bg {
   background-image:
     linear-gradient(to right, rgba(238, 241, 234, 0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(238, 241, 234, 0.05) 1px, transparent 1px);
@@ -333,7 +436,8 @@
   background-size: 18px 18px;
 }
 
-.band-dark .site-dots-bg {
+.band-dark .site-dots-bg,
+[data-site-theme="dark"] .site-dots-bg {
   background-image: radial-gradient(rgba(238, 241, 234, 0.08) 1px, transparent 1px);
 }
 
@@ -613,7 +717,8 @@
     0 18px 36px -24px rgba(21, 23, 19, 0.25);
 }
 
-.band-dark .site-mac {
+.band-dark .site-mac,
+[data-site-theme="dark"] .site-mac {
   box-shadow:
     0 0 0 1px rgba(238, 241, 234, 0.08),
     0 50px 100px -30px rgba(0, 0, 0, 0.85);

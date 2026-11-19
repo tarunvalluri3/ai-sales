@@ -28,7 +28,6 @@ export function CtaBand({
               Book a demo
             </Btn>
           </div>
-          <p className="mt-6 text-[13px] text-ds-text-muted">14 days free · No card required · Cancel any time</p>
           {children}
         </div>
       </Reveal>

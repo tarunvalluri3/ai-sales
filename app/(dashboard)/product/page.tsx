@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import {
   Bell,
   BookOpen,
@@ -31,13 +30,15 @@ import {
   WorkflowIllustration,
 } from "@/components/site/illustrations";
 import { DEMO_HREF } from "@/components/site/links";
+import { JsonLd, breadcrumbLd, pageMetadata, softwareLd } from "@/components/site/seo";
 
-export const metadata: Metadata = {
-  title: "Platform | Waves AI Pilot",
+export const metadata = pageMetadata({
+  title: "AI Sales Agent Platform & Features | Waves AI Pilot",
   description:
-    "Every feature of Waves AI Pilot: an AI sales agent grounded in your knowledge, omnichannel inbox, lead qualification, appointment booking, human handoff, customer profiles, workflows, sales copilot and analytics.",
-  alternates: { canonical: "/product" },
-};
+    "Every feature of Waves AI Pilot: an AI sales chatbot grounded in your knowledge, omnichannel inbox for website, WhatsApp and Instagram, AI lead qualification, appointment booking, human handoff, workflows, sales copilot and analytics.",
+  path: "/product",
+  keywords: ["AI sales agent features", "omnichannel inbox", "AI lead scoring", "chatbot appointment booking", "sales automation workflows", "AI sales copilot", "conversation analytics"],
+});
 
 const SECTIONS = [
   { id: "agent", label: "AI Sales Agent" },
@@ -89,9 +90,10 @@ const ADMIN = [
 export default function ProductPage() {
   return (
     <main className="flex flex-1 flex-col">
+      <JsonLd data={[softwareLd, breadcrumbLd([{ name: "Product", path: "/product" }])]} />
       <PageHero
         eyebrow="The platform"
-        title="Everything your AI sales employee does, in one platform."
+        title="The AI sales agent platform for website, WhatsApp and Instagram."
         lead="Waves AI Pilot pairs an AI agent that talks to your prospects with the tools your team needs after the first message: an inbox, lead qualification, bookings, automation, a copilot and analytics."
         aside={<ChannelHub />}
       >

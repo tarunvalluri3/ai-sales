@@ -42,13 +42,13 @@ export const PRODUCT_FEATURES: NavEntry[] = [
 ];
 
 export const INDUSTRIES: NavEntry[] = [
-  { label: "Real estate", href: "/solutions#real-estate", description: "Qualify buyers and book site visits", icon: Building2 },
-  { label: "Clinics & healthcare", href: "/solutions#clinics", description: "Answer treatment questions, fill the calendar", icon: HeartPulse },
-  { label: "Education & coaching", href: "/solutions#education", description: "Course enquiries, fees and demo classes", icon: GraduationCap },
-  { label: "Salons & wellness", href: "/solutions#salons", description: "Services, prices and bookings on Instagram", icon: Scissors },
-  { label: "Retail & D2C brands", href: "/solutions#retail", description: "Product recommendations in every DM", icon: ShoppingBag },
-  { label: "Agencies & services", href: "/solutions#services", description: "Scope enquiries and book discovery calls", icon: Briefcase },
-  { label: "Travel & hospitality", href: "/solutions#travel", description: "Packages, availability and callbacks", icon: Plane },
+  { label: "Real estate", href: "/solutions/real-estate", description: "Qualify buyers and book site visits", icon: Building2 },
+  { label: "Clinics & healthcare", href: "/solutions/clinics", description: "Answer treatment questions, fill the calendar", icon: HeartPulse },
+  { label: "Education & coaching", href: "/solutions/education", description: "Course enquiries, fees and demo classes", icon: GraduationCap },
+  { label: "Salons & wellness", href: "/solutions/salons", description: "Services, prices and bookings on Instagram", icon: Scissors },
+  { label: "Retail & D2C brands", href: "/solutions/retail", description: "Product recommendations in every DM", icon: ShoppingBag },
+  { label: "Agencies & services", href: "/solutions/services", description: "Scope enquiries and book discovery calls", icon: Briefcase },
+  { label: "Travel & hospitality", href: "/solutions/travel", description: "Packages, availability and callbacks", icon: Plane },
 ];
 
 export const USE_CASES: NavEntry[] = [
@@ -82,12 +82,12 @@ export const FOOTER_COLUMNS: { title: string; links: { label: string; href: stri
   {
     title: "Solutions",
     links: [
-      { label: "Real estate", href: "/solutions#real-estate" },
-      { label: "Clinics & healthcare", href: "/solutions#clinics" },
-      { label: "Education & coaching", href: "/solutions#education" },
-      { label: "Salons & wellness", href: "/solutions#salons" },
-      { label: "Retail & D2C", href: "/solutions#retail" },
-      { label: "Agencies & services", href: "/solutions#services" },
+      { label: "Real estate", href: "/solutions/real-estate" },
+      { label: "Clinics & healthcare", href: "/solutions/clinics" },
+      { label: "Education & coaching", href: "/solutions/education" },
+      { label: "Salons & wellness", href: "/solutions/salons" },
+      { label: "Retail & D2C", href: "/solutions/retail" },
+      { label: "Agencies & services", href: "/solutions/services" },
     ],
   },
   {
