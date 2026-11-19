@@ -22,7 +22,7 @@ export function CtaBand({
           <PilotTile className="size-14 rounded-2xl ring-1 ring-white/10" />
           <h2 className="site-h2 mt-7 text-ds-text-primary">{title}</h2>
           <p className="site-lead mt-5 max-w-[580px]">{body}</p>
-          <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row">
+          <div className="mt-9 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
             <Btn href="/sign-up">Start your free trial</Btn>
             <Btn href={DEMO_HREF} variant="secondary">
               Book a demo

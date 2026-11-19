@@ -48,28 +48,28 @@ export function SiteFooter() {
               An AI sales employee that answers, qualifies and books your prospects on your website, WhatsApp and
               Instagram, using only what your business approves.
             </p>
-            <ul className="mt-7 flex flex-col gap-3 text-[14px] text-ds-text-secondary">
+            <ul className="mt-7 flex flex-col gap-2 text-[14px] text-ds-text-secondary">
               <li className="flex items-center gap-3">
                 <Mail className="size-4 shrink-0 text-ds-text-muted" aria-hidden="true" />
                 <span>
-                  <a href={`mailto:${SUPPORT_EMAIL}`} className="transition-colors hover:text-ds-text-primary">
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-block py-1 transition-colors hover:text-ds-text-primary">
                     {SUPPORT_EMAIL}
                   </a>
                   <span className="text-ds-text-muted"> · </span>
-                  <a href={`mailto:${GENERAL_EMAIL}`} className="transition-colors hover:text-ds-text-primary">
+                  <a href={`mailto:${GENERAL_EMAIL}`} className="inline-block py-1 transition-colors hover:text-ds-text-primary">
                     {GENERAL_EMAIL}
                   </a>
                 </span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone className="size-4 shrink-0 text-ds-text-muted" aria-hidden="true" />
-                <a href={PHONE_PRIMARY.tel} className="transition-colors hover:text-ds-text-primary">
+                <a href={PHONE_PRIMARY.tel} className="inline-block py-1 transition-colors hover:text-ds-text-primary">
                   {PHONE_PRIMARY.display}
                 </a>
               </li>
               <li className="flex items-center gap-3">
                 <WhatsAppIcon className="size-4 shrink-0" />
-                <a href={PHONE_WHATSAPP.whatsapp} className="transition-colors hover:text-ds-text-primary">
+                <a href={PHONE_WHATSAPP.whatsapp} className="inline-block py-1 transition-colors hover:text-ds-text-primary">
                   {PHONE_WHATSAPP.display} <span className="text-ds-text-muted">(WhatsApp)</span>
                 </a>
               </li>
@@ -86,12 +86,12 @@ export function SiteFooter() {
                 <p className="font-label text-[11px] font-medium uppercase tracking-[0.18em] text-ds-text-muted">
                   {col.title}
                 </p>
-                <ul className="mt-4 flex flex-col gap-2.5">
+                <ul className="mt-4 flex flex-col gap-0.5">
                   {col.links.map((link) => (
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        className="text-[14px] text-ds-text-secondary transition-colors hover:text-ds-text-primary"
+                        className="inline-block py-1.5 text-[14px] text-ds-text-secondary transition-colors hover:text-ds-text-primary"
                       >
                         {link.label}
                       </Link>

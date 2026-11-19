@@ -45,7 +45,7 @@ export function LitStatement({ text, accent = [] }: { text: string; accent?: str
           <span
             key={i}
             className="transition-opacity duration-300"
-            style={{ opacity: on ? 1 : 0.16, color: isAccent ? "var(--ds-lime)" : undefined }}
+            style={{ opacity: on ? 1 : 0.3, color: isAccent ? "var(--ds-lime)" : undefined }}
           >
             {w}{" "}
           </span>

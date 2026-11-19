@@ -126,7 +126,7 @@ export default function IntegrationsPage() {
       {/* Developer view */}
       <Section dark labelledBy="dev-heading" className="overflow-hidden">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          <Reveal>
+          <Reveal className="min-w-0">
             <Eyebrow>For developers</Eyebrow>
             <h2 id="dev-heading" className="site-h2 mt-5">
               Two lines to install. One signed event to integrate.
@@ -145,7 +145,7 @@ export default function IntegrationsPage() {
               ]}
             />
           </Reveal>
-          <Reveal delay={0.1} className="flex flex-col gap-4">
+          <Reveal delay={0.1} className="flex min-w-0 flex-col gap-4">
             <CodeCard title="index.html" icon={<Code2 className="size-4" />}>
               <span className="text-[#949b8c]">{"<!-- Waves AI Pilot widget -->"}</span>
               {"\n"}
