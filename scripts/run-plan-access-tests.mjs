@@ -413,7 +413,7 @@ test("plan picker: Starter + connected channel needs an explicit acknowledgement
 test("pricing, trial and upgrade screens all use the shared copy; connections read safely", () => {
   const pricing = read("app/(dashboard)/pricing/page.tsx");
   assert.match(pricing, /const starterNote = trialVsStarterNote\(metaNames\);/);
-  assert.match(pricing, /\{planChannelsLabel\(plan\.key, metaNames\)\}/);
+  assert.match(pricing, /planChannelsLabel\(plan\.key, metaNames\)/);
   const step = read("app/(dashboard)/onboarding/_components/steps/plan-step.tsx");
   assert.match(step, /const starterNote = trialVsStarterNote\(metaChannelNames\);/);
   assert.match(step, /connectedChannels=\{connectedChannels\}/);
