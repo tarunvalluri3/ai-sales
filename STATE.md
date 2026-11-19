@@ -6,6 +6,14 @@ Last updated: 2026-11-15 (**`production-readiness` merged to `main` (PR #147, CI
 
 ---
 
+## Marketing site redesign — 2026-11-19 — branch `ui/marketing-site`, UI only
+
+**What:** marketing pages under `app/(dashboard)/` restyled with a new `site.css`; new `/product`, `/solutions`, `/security`, `/integrations` pages; updated home, about, pricing and site header; new `components/site/*`; new assets in `public/marketing/` (founder photo, OG image, screens). Unused `Hand` import removed from the home page. No route handler, data, package, env, migration or auth change. The two `style-backup-*.zip` files in the repo root are local backups and are NOT committed.
+
+**Checks (real output):** `npm run lint` 0 errors, 0 warnings; `npm run typecheck` PASS; `npm run build` PASS (new routes listed as static). `npm test` (pgTAP) NOT run locally: it runs against the linked Supabase project, which is production, and this change has no database impact; CI runs it on the PR.
+
+---
+
 ## Dashboard UI polish: readable labels, calmer colour, dark mode back — 2026-11-15 — branch `codex-ui`, UI only, NOT committed
 
 **Prompt:** `prompts/dashboard-ui-polish-labels-colour-dark.md` (approved by the owner).

@@ -1,188 +1,164 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { AtSign, Globe, MessageCircle } from "lucide-react";
-import { Reveal } from "./_components/homepage/reveal";
-import { WavesLogo } from "./_components/waves-logo";
-import { GENERAL_EMAIL, PHONE_PRIMARY, PHONE_WHATSAPP, SUPPORT_EMAIL } from "@/lib/site-contact";
-import { HeroConversation } from "@/components/marketing/fragments/hero-conversation";
-import { GroundedAnswer } from "@/components/marketing/fragments/grounded-answer";
-import { BusinessSetup } from "@/components/marketing/fragments/business-setup";
-import { KnowledgeSources } from "@/components/marketing/fragments/knowledge-sources";
-import { Qualification } from "@/components/marketing/fragments/qualification";
-import { HandoffInbox } from "@/components/marketing/fragments/handoff-inbox";
-import { AnalyticsMini } from "@/components/marketing/fragments/analytics-mini";
-import { BookingCard } from "@/components/marketing/fragments/booking-card";
-import { MicroChip } from "@/components/marketing/fragments/_shared";
-import { BrowserFrame } from "@/components/marketing/browser-frame";
-import { ScreenshotCallout } from "@/components/marketing/screenshot-callout";
-import { TenantIsolationDiagram } from "@/components/marketing/tenant-isolation-diagram";
-import { FaqAccordion, type FaqItem } from "@/components/marketing/faq-accordion";
-import { DotGridBackground } from "@/components/marketing/dot-grid-background";
-import { MagneticLink } from "@/components/marketing/magnetic-link";
-import { Parallax } from "@/components/marketing/parallax";
+import {
+  ArrowRight,
+  Ban,
+  Building2,
+  Database,
+  EyeOff,
+  KeyRound,
+  ShieldCheck,
+  UserCheck,
+} from "lucide-react";
+import { ORDERED_PLANS, TRIAL_DAYS, formatPaiseAsInr, formatReplyQuota } from "@/lib/plans";
+import { HomeHero } from "@/components/site/home-hero";
+import { ProductStory } from "@/components/site/product-story";
+import { LitStatement } from "@/components/site/statement";
+import { FaqList, type Faq } from "@/components/site/faq";
+import { CtaBand } from "@/components/site/cta-band";
+import { Btn, CheckList, Eyebrow, Reveal, Section, SectionHeading } from "@/components/site/primitives";
+import {
+  INSTAGRAM_SCRIPT,
+  InstagramPhone,
+  WEBSITE_SCRIPT,
+  WHATSAPP_SCRIPT,
+  WebsiteWidget,
+  WhatsAppPhone,
+} from "@/components/site/chat-illustrations";
+import {
+  AnalyticsIllustration,
+  ConvertIllustration,
+  CopilotIllustration,
+  GoLiveIllustration,
+  HoursVisual,
+  InstantAnswersVisual,
+  LanguagesVisual,
+  LeadScoreIllustration,
+  NotifyVisual,
+  PersonalizeIllustration,
+  TrainIllustration,
+  WorkflowIllustration,
+} from "@/components/site/illustrations";
+import { InstagramIcon, WebsiteIcon, WhatsAppIcon } from "@/components/site/brand-icons";
+import { INDUSTRIES } from "@/components/site/nav-data";
 
 export const metadata: Metadata = {
-  title: "Waves AI Pilot — an AI sales employee that knows your business",
+  title: "Waves AI Pilot — AI sales agent for website, WhatsApp & Instagram",
   description:
-    "Waves AI Pilot answers prospects from your own approved knowledge, qualifies leads as hot, warm, or cold, books appointments, and hands off to a human — on your website, WhatsApp, and Instagram.",
+    "Waves AI Pilot is an AI sales employee that answers prospects from your own approved knowledge, qualifies leads, books appointments and hands off to your team — on your website, WhatsApp and Instagram. 14-day free trial, no card required.",
+  alternates: { canonical: "/" },
   openGraph: {
-    title: "Waves AI Pilot — an AI sales employee that knows your business",
+    title: "Waves AI Pilot — the AI sales employee that knows your business",
     description:
-      "Grounded answers, lead qualification, appointment booking, and human handoff — on website, WhatsApp, and Instagram.",
-    images: [{ url: "/marketing/dashboard-conversations.png", width: 1920, height: 920 }],
+      "Grounded answers, lead qualification, appointment booking and human handoff on website, WhatsApp and Instagram.",
+    images: [{ url: "/marketing/og-overview.jpg", width: 1200, height: 630 }],
   },
 };
 
-const CHANNELS = [
+const STACK = [
+  "Meta WhatsApp Business Platform",
+  "Instagram Messaging API",
+  "Google Gemini",
+  "PostgreSQL + row-level security",
+  "pgvector retrieval",
+  "Razorpay billing",
+  "GST invoicing",
+];
+
+const STEPS: { n: string; title: string; body: string; visual: ReactNode }[] = [
   {
-    icon: Globe,
-    label: "Website",
-    detail: "A chat panel embedded on your site, answering visitors the moment they ask.",
+    n: "01",
+    title: "Train it on your business",
+    body: "Add products, services and FAQs, upload PDFs or import pages from your website. It's read, indexed and kept private to your business.",
+    visual: <TrainIllustration />,
   },
   {
-    icon: MessageCircle,
-    label: "WhatsApp",
-    detail: "Replies through your own WhatsApp Business number, same knowledge, same rules.",
+    n: "02",
+    title: "Give it your voice",
+    body: "Pick a tone, a language and your brand colour. Choose what it may do: capture leads, recommend products, book appointments.",
+    visual: <PersonalizeIllustration />,
   },
   {
-    icon: AtSign,
-    label: "Instagram",
-    detail: "Answers direct messages automatically, with the same escalation rules as everywhere else.",
+    n: "03",
+    title: "Go live on every channel",
+    body: "Paste one script tag on your site. Connect your WhatsApp Business number and Instagram account through Meta. Test in the sandbox, then publish.",
+    visual: <GoLiveIllustration />,
+  },
+  {
+    n: "04",
+    title: "Watch leads arrive",
+    body: "Every chat becomes a qualified lead with a score, a summary and a next step, ready for your team in one dashboard.",
+    visual: <ConvertIllustration />,
   },
 ];
 
-const WORKFLOW_STEPS: { label: string; detail: string; fragment: ReactNode }[] = [
+const PILLARS = [
   {
-    label: "Configure your business",
-    detail: "Identity, products, services, and FAQs.",
-    fragment: <BusinessSetup />,
+    icon: Ban,
+    title: "Never invents an answer",
+    body: "It replies only from your approved knowledge. When it doesn't know, it says so and asks a question.",
   },
   {
-    label: "Add approved knowledge",
-    detail: "Chunked, embedded, and scoped to your business only.",
-    fragment: <KnowledgeSources />,
+    icon: Database,
+    title: "Your data stays yours",
+    body: "Each business's knowledge and conversations are isolated at the database level with row-level security.",
   },
   {
-    label: "AI talks to prospects",
-    detail: "Grounded answers from your own approved information.",
-    fragment: <GroundedAnswer />,
+    icon: UserCheck,
+    title: "People make the calls",
+    body: "The AI drafts, recommends and requests. Your team confirms bookings, sends follow-ups and takes over chats.",
   },
   {
-    label: "AI qualifies leads",
-    detail: "Hot, warm, or cold — a signal for your team, not a verdict.",
-    fragment: <Qualification />,
+    icon: EyeOff,
+    title: "Not used to train AI models",
+    body: "Your content and your customers' conversations are never used to train general-purpose AI models.",
   },
   {
-    label: "Human takes over",
-    detail: "On request, on a repeated unknown, or on a complaint.",
-    fragment: <HandoffInbox />,
-  },
-];
-
-const CAPABILITIES: {
-  title: string;
-  detail: string;
-  span: "wide" | "normal";
-  visual: ReactNode;
-}[] = [
-  {
-    title: "Grounded conversations",
-    detail:
-      "Every answer comes from your business's own products, services, FAQs, and approved knowledge — never invented, never borrowed from another business.",
-    span: "wide",
-    visual: (
-      <div className="flex flex-wrap gap-1.5">
-        <MicroChip>SOURCE · Pricing FAQ</MicroChip>
-        <MicroChip>SOURCE · Service List</MicroChip>
-      </div>
-    ),
+    icon: ShieldCheck,
+    title: "Guardrails built in",
+    body: "Abusive or out-of-scope messages are flagged for review. It never discusses competitors or reveals its instructions.",
   },
   {
-    title: "Tenant-scoped knowledge",
-    detail: "Your knowledge is chunked, embedded, and retrieved against your business only.",
-    span: "normal",
-    visual: <MicroChip tone="success">Scoped · zero cross-tenant access</MicroChip>,
-  },
-  {
-    title: "Lead qualification",
-    detail:
-      "The AI reads intent across a conversation and assigns hot/warm/cold with a short reason — always an AI signal, never a substitute for your judgment.",
-    span: "wide",
-    visual: <Qualification />,
-  },
-  {
-    title: "Human handoff",
-    detail: "When a prospect asks for a person, hits a repeated unknown, or raises a complaint, a team member can take over live.",
-    span: "wide",
-    visual: <HandoffInbox />,
-  },
-  {
-    title: "Conversations, in one place",
-    detail: "Every conversation — live, searchable, and reviewable — with clear attribution between AI, prospect, and staff.",
-    span: "normal",
-    visual: <MicroChip>32 conversations · 3 channels</MicroChip>,
-  },
-  {
-    title: "Appointment booking",
-    detail: "Prospects book straight into your availability — you confirm, nothing is assumed.",
-    span: "normal",
-    visual: <BookingCard />,
-  },
-  {
-    title: "Analytics that mean something",
-    detail: "Conversation volume, conversion rate, and lead breakdowns pulled from what actually happened.",
-    span: "wide",
-    visual: <AnalyticsMini />,
+    icon: KeyRound,
+    title: "Export or delete, any time",
+    body: "Download your leads as CSV, and delete your business and its data from your own dashboard.",
   },
 ];
 
-const BOUNDARIES = [
-  "Invent an answer outside your approved knowledge.",
-  "Share one business's knowledge or conversations with another.",
-  "Pretend to be a person when a prospect asks for one.",
-];
-
-const FAQ_ITEMS: FaqItem[] = [
+const FAQS: Faq[] = [
   {
-    question: "How long does setup take?",
-    answer:
-      "Most businesses are live the same day: add your business profile, products, services, and FAQs, and the AI starts answering from them immediately. There is no approval wait for the website widget.",
+    q: "What exactly is Waves AI Pilot?",
+    a: "A subscription software (SaaS) that gives your business an AI sales employee. It chats with prospects on your website, WhatsApp and Instagram, answers from information you approve, qualifies them, captures their details, requests appointments and hands over to your team when a human is needed. Everything is managed from one dashboard.",
   },
   {
-    question: "What knowledge can the AI use?",
-    answer:
-      "Only what you add and approve — your products, services, FAQs, and any documents you upload. It never pulls from the open internet and never answers from another business's data.",
+    q: "How is this different from a regular chatbot?",
+    a: "A chatbot answers questions. Waves AI Pilot is built to sell: it asks one focused question when a request is vague, recommends specific products or services that fit, handles price and timing objections using your real information, and ends every reply with a next step. And it is grounded: it never answers a business question it has no source for.",
   },
   {
-    question: "How does handoff to a human actually work?",
-    answer:
-      "When a prospect asks for a person, the AI hits the same unknown twice, or a conversation looks like a complaint, the conversation is flagged and the AI pauses. A team member can take it over from the dashboard and reply directly; handing it back resumes the AI.",
+    q: "How long does setup take?",
+    a: "A guided onboarding walks you through your business details, knowledge, products, FAQs, personality and channels, and you test the agent in a sandbox before publishing. The website widget goes live as soon as you paste one script tag. WhatsApp and Instagram need your own Meta business accounts, which the setup guides you through.",
   },
   {
-    question: "Which channels are live today?",
-    answer:
-      "Website, WhatsApp, and Instagram, all live. WhatsApp uses your own WhatsApp Business account; Instagram uses your own professional account through Meta.",
+    q: "Which channels and languages are supported?",
+    a: "Your website (an embeddable chat widget), WhatsApp through Meta's official WhatsApp Business Platform with your own number, and Instagram direct messages through your professional account. The widget speaks English, Hindi, Spanish, French, German and Portuguese.",
   },
   {
-    question: "What happens to our data and our customers' conversations?",
-    answer:
-      "Your business content and your visitors' conversations are not used to train general-purpose AI models. Every business's knowledge and conversations are isolated at the database level, and you can export or delete everything from your own dashboard.",
+    q: "Can it book appointments on its own?",
+    a: "It offers real open slots from the business hours you set, collects the prospect's details and creates the request. Every booking stays pending until someone on your team confirms it, and the prospect is told so. Once confirmed, they're notified by email and, for WhatsApp chats, on WhatsApp.",
   },
   {
-    question: "Can the AI book appointments on its own?",
-    answer:
-      "It offers your real availability and books a requested slot, but it never invents availability — every booking draws from the schedule you've configured.",
+    q: "What happens when it can't answer?",
+    a: "It says plainly that it doesn't have that information and asks a clarifying question. If the prospect asks for a person, repeats an unknown, or raises a complaint, the conversation is flagged for your team, and you can take it over live from the inbox.",
   },
   {
-    question: "What does it cost?",
-    answer: (
+    q: "What does it cost?",
+    a: (
       <>
-        Plans are based on how many AI replies you use per month, with a 14-day free trial and no card
-        required. See the full breakdown on{" "}
-        <Link href="/pricing" className="font-medium text-ds-accent hover:text-ds-accent-strong">
-          Pricing
+        Plans start at {formatPaiseAsInr(ORDERED_PLANS[0].monthlyPricePaise)} a month (GST included), based on how many AI
+        replies you need. Every business starts with a {TRIAL_DAYS}-day free trial, no card required. See{" "}
+        <Link href="/pricing" className="site-link">
+          pricing
         </Link>
         .
       </>
@@ -192,302 +168,331 @@ const FAQ_ITEMS: FaqItem[] = [
 
 export default function HomePage() {
   return (
-    <div className="relative flex flex-1 flex-col bg-ds-bg">
-      <DotGridBackground />
-      <div className="relative z-10 flex flex-1 flex-col">
-      {/* Hero -- headline, subcopy and CTAs render immediately, no animation
-          wrapper and no JS dependency, so they never wait on the client. */}
-      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
-          <div className="flex flex-col gap-6">
-            <span className="ds-label inline-flex w-fit items-center gap-2 text-xs tracking-[0.32em] text-ds-text-secondary">
-              <span className="size-1.5 rounded-full bg-ds-primary" aria-hidden="true" />
-              AI sales employee
-            </span>
-            <h1 className="max-w-[900px] text-[32px] leading-[1.12] font-light tracking-[-0.015em] text-ds-text-primary sm:text-[42px] lg:text-[58px]">
-              An AI employee that actually knows your business.
-            </h1>
-            <p className="max-w-[600px] text-[15px] leading-[1.75] text-ds-text-secondary">
-              Waves AI Pilot answers prospects using your own products, services, FAQs, and approved
-              knowledge — qualifies who&apos;s worth your time, and hands off to a human the moment one
-              is genuinely needed.
-            </p>
-            <p className="font-mono text-2xs tracking-wide-ds text-ds-text-muted uppercase">
-              Website · WhatsApp · Instagram · Bookings
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <MagneticLink
-                href="/sign-up"
-                className="ds-btn-label inline-flex h-12 items-center bg-ds-primary px-8 text-[13px] text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-              >
-                Get started
-              </MagneticLink>
-              <Link
-                href="/sign-in"
-                className="ds-btn-label inline-flex h-12 items-center border border-ds-text-primary px-8 text-[13px] text-ds-text-primary hover:border-ds-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-              >
-                Sign in
-              </Link>
-            </div>
-          </div>
-          <Parallax strength={16} className="flex justify-center lg:justify-end">
-            <HeroConversation />
-          </Parallax>
-        </div>
-      </section>
+    <main className="flex flex-1 flex-col">
+      <HomeHero />
 
-      {/* Channels strip */}
-      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <div className="mx-auto max-w-5xl">
-          <Reveal>
-            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
-              Works where your customers already message you
-            </h2>
-          </Reveal>
-          <div className="mt-12 grid grid-cols-1 gap-px border border-ds-border bg-ds-border sm:grid-cols-3">
-            {CHANNELS.map((channel, index) => (
-              <Reveal key={channel.label} delay={index * 0.05}>
-                <div className="flex h-full flex-col gap-3 bg-ds-bg p-6 lg:p-8">
-                  <channel.icon className="size-5 text-ds-text-primary" aria-hidden="true" />
-                  <span className="text-sm font-medium text-ds-text-primary">{channel.label}</span>
-                  <p className="text-sm text-ds-text-secondary">{channel.detail}</p>
-                </div>
-              </Reveal>
-            ))}
+      {/* Built on */}
+      <section aria-label="Built on" className="border-y border-ds-border bg-ds-surface px-5 py-8 sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-[1200px] flex-col items-center gap-5 lg:flex-row lg:gap-10">
+          <p className="shrink-0 font-label text-[11px] font-medium uppercase tracking-[0.2em] text-ds-text-muted">Built on</p>
+          <div className="site-marquee-mask w-full overflow-hidden">
+            <ul className="site-marquee flex w-max items-center gap-10">
+              {[...STACK, ...STACK].map((s, i) => (
+                <li key={i} aria-hidden={i >= STACK.length ? "true" : undefined} className="flex items-center gap-10 whitespace-nowrap text-[15px] text-ds-text-secondary">
+                  {s}
+                  <span aria-hidden="true" className="size-1 rounded-full bg-ds-border-strong" />
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      {/* How it works -- each step paired with the fragment that shows it. */}
-      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <div className="mx-auto max-w-5xl">
-          <Reveal>
-            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
-              How it works
-            </h2>
-          </Reveal>
-          <div className="mt-14 flex flex-col gap-16">
-            {WORKFLOW_STEPS.map((step, index) => (
-              <Reveal key={step.label}>
-                <div
-                  className={`flex flex-col items-center gap-8 md:gap-12 ${
-                    index % 2 === 1 ? "md:flex-row-reverse" : "md:flex-row"
-                  }`}
-                >
-                  <div className="flex flex-1 items-start gap-4">
-                    <span className="ds-label flex size-9 shrink-0 items-center justify-center border border-ds-border-strong text-ds-text-secondary">
-                      {index + 1}
-                    </span>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-base font-medium text-ds-text-primary">{step.label}</p>
-                      <p className="text-sm text-ds-text-secondary">{step.detail}</p>
-                    </div>
-                  </div>
-                  <div className="w-full max-w-sm flex-1">{step.fragment}</div>
-                </div>
-              </Reveal>
-            ))}
+      {/* The gap */}
+      <Section dark className="overflow-hidden" labelledBy="gap-heading">
+        <div aria-hidden="true" className="site-grid-bg absolute inset-0 -mx-12 opacity-70" />
+        <div className="relative max-w-[980px]">
+          <Eyebrow>Why it matters</Eyebrow>
+          <h2 id="gap-heading" className="sr-only">
+            Why it matters
+          </h2>
+          <div className="mt-8">
+            <LitStatement
+              text="A prospect messages at 11 PM with one specific question. If nobody answers, they buy from someone who did. Waves AI Pilot answers in seconds, from your own knowledge, on every channel, every hour."
+              accent={["Waves", "AI", "Pilot"]}
+            />
           </div>
         </div>
-      </section>
+      </Section>
 
-      {/* Dashboard shot -- a real screenshot of the inbox, framed. */}
-      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <div className="mx-auto max-w-5xl">
-          <Reveal>
-            <div className="flex flex-col items-start gap-4 text-left">
-              <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
-                Every conversation, with full context
-              </h2>
-              <p className="max-w-xl text-sm text-ds-text-secondary">
-                The real dashboard: an open thread, its handoff state, and the tags your team added.
-              </p>
-            </div>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <Parallax strength={24} className="relative mt-10">
-              <BrowserFrame urlLabel="aipilot.waveswebstudio.in/dashboard/conversations">
-                <Image
-                  src="/marketing/dashboard-conversations.png"
-                  alt="Waves AI Pilot dashboard, open conversation showing a handoff to a staff member and the AI-generated summary and tags"
-                  width={1920}
-                  height={920}
-                  sizes="(min-width: 1024px) 1000px, 100vw"
-                  className="h-auto w-full"
-                  priority={false}
-                />
-              </BrowserFrame>
-              <div className="pointer-events-none absolute inset-0 hidden sm:block">
-                <ScreenshotCallout label="Inbox" left={6} top={46} />
-                <ScreenshotCallout label="Handoff state" left={40} top={16} />
-                <ScreenshotCallout label="AI summary & tags" left={78} top={30} align="left" />
+      {/* Channels */}
+      <Section id="channels" labelledBy="channels-heading">
+        <SectionHeading
+          align="center"
+          eyebrow="Omnichannel"
+          id="channels-heading"
+          title="One AI employee. Every channel your customers use."
+          lead="The same knowledge, the same rules and the same lead capture on your website, WhatsApp and Instagram, with every conversation in one inbox."
+        />
+        <div className="mt-16 grid items-start gap-10 md:grid-cols-3 md:gap-6 lg:gap-10">
+          {[
+            {
+              icon: <WebsiteIcon className="size-8" />,
+              title: "Website",
+              body: "A branded chat widget on any site, from one script tag.",
+              node: <WebsiteWidget business="Skyline Homes" script={WEBSITE_SCRIPT} compact />,
+            },
+            {
+              icon: <WhatsAppIcon className="size-8" />,
+              title: "WhatsApp",
+              body: "Replies through your own WhatsApp Business number.",
+              node: <WhatsAppPhone business="Smile Dental Care" script={WHATSAPP_SCRIPT} />,
+            },
+            {
+              icon: <InstagramIcon className="size-8" />,
+              title: "Instagram",
+              body: "Answers DMs on your professional account, with product cards.",
+              node: <InstagramPhone handle="threadandloom.in" script={INSTAGRAM_SCRIPT} />,
+            },
+          ].map((c, i) => (
+            <Reveal key={c.title} delay={i * 0.08} className="flex flex-col items-center text-center">
+              <div className="flex h-[520px] w-full items-center justify-center">{c.node}</div>
+              <div className="mt-8 flex items-center gap-3">
+                {c.icon}
+                <h3 className="site-h3">{c.title}</h3>
               </div>
-            </Parallax>
-          </Reveal>
+              <p className="mt-2 max-w-[280px] text-[15px] text-ds-text-secondary">{c.body}</p>
+            </Reveal>
+          ))}
         </div>
-      </section>
+        <p className="mt-10 text-center text-[12.5px] text-ds-text-muted">Sample conversations with illustrative businesses.</p>
+      </Section>
 
-      {/* Capabilities bento */}
-      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <div className="mx-auto max-w-6xl">
-          <Reveal>
-            <div className="flex flex-col items-start gap-4 text-left">
-              <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
-                What your AI employee actually does
-              </h2>
-              <p className="max-w-xl text-sm text-ds-text-secondary">
-                Not a generic chatbot — an employee of your specific business, scoped to what
-                you&apos;ve approved it to know.
-              </p>
-            </div>
-          </Reveal>
-          <div className="mt-12 grid grid-cols-1 gap-px border border-ds-border bg-ds-border sm:grid-cols-2 lg:grid-cols-3">
-            {CAPABILITIES.map((capability, index) => (
-              <Reveal key={capability.title} delay={(index % 3) * 0.05}>
-                <div
-                  className={`flex h-full flex-col gap-4 bg-ds-bg p-6 lg:p-8 ${
-                    capability.span === "wide" ? "lg:col-span-2" : ""
-                  }`}
-                >
-                  <div className="flex flex-col gap-2">
-                    <h3 className="text-sm font-medium text-ds-text-primary">{capability.title}</h3>
-                    <p className="text-sm text-ds-text-secondary">{capability.detail}</p>
-                  </div>
-                  <div className="mt-auto">{capability.visual}</div>
-                </div>
-              </Reveal>
-            ))}
+      {/* How it works */}
+      <Section className="bg-ds-surface" labelledBy="how-heading">
+        <SectionHeading
+          align="split"
+          eyebrow="How it works"
+          id="how-heading"
+          title="From sign-up to your first qualified lead."
+          lead="A guided setup takes you from your business details to a published agent. No code beyond one script tag, and nothing goes live until you've tested it."
+        />
+        <ol className="mt-16 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map((s, i) => (
+            <Reveal as="li" key={s.n} delay={i * 0.06} className="flex flex-col rounded-[28px] border border-ds-border bg-ds-bg p-5">
+              <div className="min-h-[330px]">{s.visual}</div>
+              <p className="mt-6 font-label text-[13px] font-medium text-ds-accent">{s.n}</p>
+              <h3 className="site-h3 mt-2">{s.title}</h3>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-ds-text-secondary">{s.body}</p>
+            </Reveal>
+          ))}
+        </ol>
+      </Section>
+
+      {/* Product story */}
+      <Section id="tour" labelledBy="tour-heading">
+        <SectionHeading
+          eyebrow="See it work"
+          id="tour-heading"
+          title="Real screens. Real behaviour. Nothing staged."
+          lead="This is the Waves AI Pilot dashboard your team works in every day: grounded answers, qualified leads, bookings, handoff and every channel in one place."
+        />
+        <ProductStory />
+      </Section>
+
+      {/* Bento */}
+      <Section className="bg-ds-surface" labelledBy="platform-heading">
+        <SectionHeading
+          align="center"
+          eyebrow="The platform"
+          id="platform-heading"
+          title="Everything after the first message, handled."
+          lead="Qualification, follow-up, automation and reporting are built in, so a lead never goes cold because someone was busy."
+        />
+        <div className="mt-16 grid gap-5 md:grid-cols-6">
+          <BentoCard className="md:col-span-3 lg:col-span-2" title="Lead scoring you can read" body="A 0–9 score from real signals, itemised point by point." href="/product#leads">
+            <LeadScoreIllustration />
+          </BentoCard>
+          <BentoCard className="md:col-span-3 lg:col-span-2" title="Workflows that follow up" body="Trigger, conditions, waits and actions, running reliably in the background." href="/product#workflows">
+            <WorkflowIllustration />
+          </BentoCard>
+          <BentoCard className="md:col-span-6 lg:col-span-2" title="A copilot for your day" body="Who to talk to first, and the one thing to do next." href="/product#copilot">
+            <CopilotIllustration />
+          </BentoCard>
+          <BentoCard className="md:col-span-6 lg:col-span-3" title="Analytics that mean something" body="Conversations to conversions, by channel and by the page a chat started on." href="/product#analytics">
+            <AnalyticsIllustration />
+          </BentoCard>
+          <div className="grid gap-5 md:col-span-6 md:grid-cols-2 lg:col-span-3">
+            <BentoCard small title="Instant answers" body="Common questions answered instantly from replies you approve.">
+              <InstantAnswersVisual />
+            </BentoCard>
+            <BentoCard small title="Six languages" body="The widget greets and replies in your customers' language.">
+              <LanguagesVisual />
+            </BentoCard>
+            <BentoCard small title="Business hours & routing" body="After-hours coverage and team assignment with SLA routing.">
+              <HoursVisual />
+            </BentoCard>
+            <BentoCard small title="Never miss a lead" body="Email alerts for hot leads, bookings and handoff requests.">
+              <NotifyVisual />
+            </BentoCard>
           </div>
         </div>
-      </section>
-
-      {/* Trust and boundaries */}
-      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <div className="mx-auto max-w-5xl">
-          <Reveal>
-            <div className="flex flex-col items-start gap-4 text-left">
-              <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
-                What your AI employee will never do
-              </h2>
-            </div>
-          </Reveal>
-          <div className="mt-12 grid grid-cols-1 gap-px border border-ds-border bg-ds-border sm:grid-cols-3">
-            {BOUNDARIES.map((boundary, index) => (
-              <Reveal key={boundary} delay={index * 0.05}>
-                <div className="flex h-full items-start gap-3 bg-ds-bg p-6 lg:p-8">
-                  <span aria-hidden="true" className="mt-0.5 text-ds-danger">
-                    ✕
-                  </span>
-                  <p className="text-sm text-ds-text-secondary">{boundary}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-          <Reveal delay={0.15}>
-            <div className="mt-12 border border-ds-border bg-ds-surface p-6">
-              <p className="ds-label mb-6 text-ds-text-muted text-ds-text-primary">
-                Tenant isolation, enforced at the database level
-              </p>
-              <TenantIsolationDiagram />
-            </div>
-          </Reveal>
+        <div className="mt-12 flex justify-center">
+          <Btn href="/product" variant="secondary">
+            Explore every feature <ArrowRight className="size-4" aria-hidden="true" />
+          </Btn>
         </div>
-      </section>
+      </Section>
+
+      {/* Trust band */}
+      <Section dark labelledBy="trust-heading" className="overflow-hidden">
+        <div aria-hidden="true" className="site-glow -right-40 top-10 h-[360px] w-[520px] opacity-25" />
+        <SectionHeading
+          align="split"
+          eyebrow="Trust by design"
+          id="trust-heading"
+          title="Accurate, private and always under your control."
+          lead="An AI that speaks for your business has to be one you can trust. These are rules in the product, not promises in a brochure."
+        >
+          <Link href="/security" className="mt-6 inline-flex items-center gap-2 text-[15px] font-medium text-ds-accent">
+            Security &amp; trust <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </SectionHeading>
+        <ul className="mt-16 grid gap-px overflow-hidden rounded-[28px] border border-ds-border bg-ds-border sm:grid-cols-2 lg:grid-cols-3">
+          {PILLARS.map((p, i) => (
+            <Reveal as="li" key={p.title} delay={(i % 3) * 0.06} className="bg-ds-bg p-7 lg:p-8">
+              <span className="flex size-10 items-center justify-center rounded-xl border border-ds-border bg-ds-surface text-ds-accent">
+                <p.icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
+              </span>
+              <h3 className="mt-5 text-[17px] font-medium text-ds-text-primary">{p.title}</h3>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-ds-text-secondary">{p.body}</p>
+            </Reveal>
+          ))}
+        </ul>
+      </Section>
+
+      {/* Solutions */}
+      <Section labelledBy="solutions-heading">
+        <SectionHeading
+          align="split"
+          eyebrow="Solutions"
+          id="solutions-heading"
+          title="Made for businesses that sell through conversations."
+          lead="If your customers ask before they buy, Waves AI Pilot answers them, qualifies them and gets them booked."
+        >
+          <Link href="/solutions" className="mt-6 inline-flex items-center gap-2 text-[15px] font-medium text-ds-accent">
+            All solutions <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </SectionHeading>
+        <ul className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {INDUSTRIES.slice(0, 7).map((ind, i) => (
+            <Reveal as="li" key={ind.href} delay={(i % 4) * 0.05}>
+              <Link href={ind.href} className="group flex h-full flex-col rounded-[22px] border border-ds-border bg-ds-surface p-6 transition-[border-color,transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:border-ds-border-strong hover:shadow-[0_20px_40px_-28px_rgba(21,23,19,0.4)]">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-ds-lime-soft text-ds-accent">
+                  <ind.icon className="size-5" strokeWidth={1.75} aria-hidden="true" />
+                </span>
+                <h3 className="mt-5 text-[16.5px] font-medium text-ds-text-primary">{ind.label}</h3>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-ds-text-secondary">{ind.description}</p>
+                <span className="mt-auto inline-flex items-center gap-1.5 pt-5 text-[13.5px] font-medium text-ds-accent">
+                  Learn more <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                </span>
+              </Link>
+            </Reveal>
+          ))}
+          <Reveal as="li" delay={0.15}>
+            <Link href="/solutions" className="flex h-full flex-col justify-between rounded-[22px] bg-[#151713] p-6 text-white">
+              <Building2 className="size-6 text-[#b2ff38]" aria-hidden="true" />
+              <span>
+                <span className="block text-[16.5px] font-medium">Your industry not listed?</span>
+                <span className="mt-1.5 block text-[14px] text-white/60">If you sell through conversations, it fits.</span>
+              </span>
+            </Link>
+          </Reveal>
+        </ul>
+      </Section>
+
+      {/* Pricing teaser */}
+      <Section className="bg-ds-surface" labelledBy="pricing-heading">
+        <SectionHeading
+          align="center"
+          eyebrow="Pricing"
+          id="pricing-heading"
+          title="Simple plans. GST included."
+          lead={`Pay for the AI replies you need. Start with a ${TRIAL_DAYS}-day free trial on every channel, no card required.`}
+        />
+        <div className="mx-auto mt-14 grid max-w-[1040px] gap-5 md:grid-cols-3">
+          {ORDERED_PLANS.map((plan, i) => (
+            <Reveal key={plan.key} delay={i * 0.06}>
+              <div
+                className={`relative flex h-full flex-col rounded-[26px] border p-7 ${
+                  plan.featured ? "border-[#151713] bg-[#151713] text-white" : "border-ds-border bg-ds-bg"
+                }`}
+              >
+                {plan.featured ? (
+                  <span className="absolute right-6 top-6 rounded-full bg-[#b2ff38] px-2.5 py-1 text-[11px] font-semibold text-[#11160a]">Most popular</span>
+                ) : null}
+                <h3 className="text-[18px] font-medium">{plan.name}</h3>
+                <p className={`mt-2 text-[14px] leading-relaxed ${plan.featured ? "text-white/65" : "text-ds-text-secondary"}`}>{plan.tagline}</p>
+                <p className="mt-6 flex items-baseline gap-1.5">
+                  <span className="text-[38px] font-normal tracking-[-0.03em] tabular-nums">{formatPaiseAsInr(plan.monthlyPricePaise)}</span>
+                  <span className={`text-[14px] ${plan.featured ? "text-white/60" : "text-ds-text-muted"}`}>/ month</span>
+                </p>
+                <p className={`mt-1 text-[13px] ${plan.featured ? "text-white/55" : "text-ds-text-muted"}`}>{formatReplyQuota(plan.monthlyReplyQuota)} · {plan.seatsLabel}</p>
+                <div className="mt-auto pt-7">
+                  <Link
+                    href="/sign-up"
+                    className={`site-btn w-full ${plan.featured ? "bg-[#b2ff38] text-[#11160a] hover:bg-[#c3ff63]" : "site-btn-secondary"}`}
+                  >
+                    Start free trial
+                  </Link>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+        <p className="mt-8 text-center text-[14px] text-ds-text-secondary">
+          Annual billing gives you two months free.{" "}
+          <Link href="/pricing" className="site-link">
+            Compare plans in detail
+          </Link>
+        </p>
+      </Section>
 
       {/* FAQ */}
-      <section className="border-b border-ds-border px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <div className="mx-auto max-w-3xl">
-          <Reveal>
-            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
-              Frequently asked questions
-            </h2>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <div className="mt-10">
-              <FaqAccordion items={FAQ_ITEMS} />
-            </div>
-          </Reveal>
+      <Section labelledBy="faq-heading">
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-16">
+          <div className="lg:col-span-4">
+            <Reveal>
+              <Eyebrow>FAQ</Eyebrow>
+              <h2 id="faq-heading" className="site-h2 mt-5">
+                Questions, answered.
+              </h2>
+              <p className="site-lead mt-5">Can&apos;t find what you need? Talk to us directly.</p>
+              <div className="mt-6">
+                <CheckList items={["support@waveswebstudio.in", "+91 79815 96249"]} />
+              </div>
+            </Reveal>
+          </div>
+          <div className="lg:col-span-8">
+            <Reveal delay={0.08}>
+              <FaqList items={FAQS} />
+            </Reveal>
+          </div>
         </div>
-      </section>
+      </Section>
 
-      {/* Final CTA */}
-      <section className="px-6 py-16 sm:py-20 lg:px-[72px] lg:py-[104px]">
-        <Reveal>
-          <div className="mx-auto flex max-w-3xl flex-col items-start gap-6 border border-ds-border bg-ds-surface px-8 py-14 text-left">
-            <h2 className="max-w-[640px] text-[32px] leading-[1.18] font-light text-ds-text-primary sm:text-[42px] lg:text-5xl">
-              Your business already has the answers. Give your AI employee access to them.
-            </h2>
-            <MagneticLink
-              href="/sign-up"
-              className="ds-btn-label inline-flex h-12 items-center bg-ds-primary px-8 text-[13px] text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-            >
-              Get started
-            </MagneticLink>
-          </div>
-        </Reveal>
-      </section>
+      <CtaBand />
+    </main>
+  );
+}
 
-      {/* Footer */}
-      <footer className="border-t border-ds-border px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4">
-          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <WavesLogo />
-            <p className="text-2xs text-ds-text-muted">An AI sales employee, grounded in your own business.</p>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-2xs text-ds-text-muted">
-            <Link href="/pricing" className="transition-colors hover:text-ds-text-primary">
-              Pricing
-            </Link>
-            <Link href="/about" className="transition-colors hover:text-ds-text-primary">
-              About Us
-            </Link>
-            <Link href="/contact" className="transition-colors hover:text-ds-text-primary">
-              Contact Us
-            </Link>
-            <Link href="/privacy" className="transition-colors hover:text-ds-text-primary">
-              Privacy Policy
-            </Link>
-            <Link href="/data-deletion" className="transition-colors hover:text-ds-text-primary">
-              Data Deletion
-            </Link>
-            <Link href="/terms" className="transition-colors hover:text-ds-text-primary">
-              Terms of Service
-            </Link>
-            <Link href="/refunds" className="transition-colors hover:text-ds-text-primary">
-              Cancellation &amp; Refunds
-            </Link>
-            <Link href="/shipping" className="transition-colors hover:text-ds-text-primary">
-              Service Delivery
-            </Link>
-          </div>
-          <p className="text-center text-2xs text-ds-text-muted">
-            Waves AI Pilot is a product of Waves Web Studio, Hyderabad, India · GSTIN 36BYQPT2686E1ZR
-          </p>
-          <p className="text-center text-2xs text-ds-text-muted">
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="transition-colors hover:text-ds-text-primary">
-              {SUPPORT_EMAIL}
-            </a>
-            {" · "}
-            <a href={`mailto:${GENERAL_EMAIL}`} className="transition-colors hover:text-ds-text-primary">
-              {GENERAL_EMAIL}
-            </a>
-            {" · "}
-            <a href={PHONE_PRIMARY.tel} className="transition-colors hover:text-ds-text-primary">
-              {PHONE_PRIMARY.display}
-            </a>
-            {" · "}
-            <a href={PHONE_WHATSAPP.tel} className="transition-colors hover:text-ds-text-primary">
-              {PHONE_WHATSAPP.display}
-            </a>{" "}
-            (
-            <a href={PHONE_WHATSAPP.whatsapp} className="transition-colors hover:text-ds-text-primary">
-              WhatsApp
-            </a>
-            )
-          </p>
-        </div>
-      </footer>
+function BentoCard({
+  title,
+  body,
+  href,
+  className = "",
+  small = false,
+  children,
+}: {
+  title: string;
+  body: string;
+  href?: string;
+  className?: string;
+  small?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Reveal className={`flex flex-col overflow-hidden rounded-[28px] border border-ds-border bg-ds-bg ${small ? "p-5" : "p-6"} ${className}`}>
+      <div className={small ? "min-h-[96px]" : "min-h-[300px]"}>{children}</div>
+      <div className={small ? "mt-5" : "mt-7"}>
+        <h3 className={small ? "text-[15.5px] font-medium" : "site-h3"}>{title}</h3>
+        <p className={`mt-1.5 leading-relaxed text-ds-text-secondary ${small ? "text-[13.5px]" : "text-[14.5px]"}`}>{body}</p>
+        {href ? (
+          <Link href={href} className="mt-3 inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ds-accent">
+            Learn more <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        ) : null}
       </div>
-    </div>
+    </Reveal>
   );
 }

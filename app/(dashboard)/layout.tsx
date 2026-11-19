@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Hanken_Grotesk, Space_Grotesk } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { SiteHeader } from "./_components/site-header";
+import { SiteFooter } from "@/components/site/site-footer";
 import { THEME_INIT_SCRIPT } from "./_components/theme-init-script";
 import "./globals.css";
 
@@ -20,9 +21,18 @@ const spaceGrotesk = Space_Grotesk({
 
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://ai-sales-ashy-eight.vercel.app"),
-  title: "Waves AI Pilot",
-  description: "An AI sales employee grounded in your business's own knowledge.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://aipilot.waveswebstudio.in"),
+  // Plain default (no title template): every page already sets its full
+  // "<Page> | Waves AI Pilot" title, including the legal pages.
+  title: "Waves AI Pilot — AI sales agent for website, WhatsApp & Instagram",
+  description:
+    "Waves AI Pilot is an AI sales employee for businesses: it answers prospects from your own approved knowledge, qualifies leads, books appointments and hands off to your team on your website, WhatsApp and Instagram.",
+  applicationName: "Waves AI Pilot",
+  openGraph: {
+    type: "website",
+    siteName: "Waves AI Pilot",
+    images: [{ url: "/marketing/og-overview.jpg", width: 1200, height: 630 }],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -41,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <body className="flex min-h-full flex-col bg-ds-bg">
           <SiteHeader />
           {children}
+          <SiteFooter />
         </body>
       </html>
     </ClerkProvider>
