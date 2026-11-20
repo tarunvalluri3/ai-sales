@@ -973,3 +973,52 @@ test("overscroll: the iframe root and every scroller contain their scroll", () =
   }
   assert.match(source("app/(widget)/widget/embed/_components/composer.tsx"), /resize-none overscroll-contain/);
 });
+
+// --- Item 6: replies scroll into view; a "New message" pill when scrolled up --
+
+const stick = await import(new URL("../lib/stick-to-bottom.ts", import.meta.url).href);
+
+test("scroll: at the bottom means within 80px of the end", () => {
+  assert.equal(stick.isNearBottom({ scrollHeight: 1000, scrollTop: 600, clientHeight: 400 }), true);
+  assert.equal(stick.isNearBottom({ scrollHeight: 1000, scrollTop: 530, clientHeight: 400 }), true);
+  assert.equal(stick.isNearBottom({ scrollHeight: 1000, scrollTop: 500, clientHeight: 400 }), false);
+});
+
+test("scroll: a reply arriving at the bottom scrolls into view (the onboarding test-chat bug)", () => {
+  assert.equal(stick.decideOnNewMessage({ atBottom: true, ownMessage: false }), "scroll");
+});
+
+test("scroll: a reply arriving while scrolled up shows the pill instead of jumping", () => {
+  assert.equal(stick.decideOnNewMessage({ atBottom: false, ownMessage: false }), "show_pill");
+});
+
+test("scroll: the reader's own message always scrolls to it", () => {
+  assert.equal(stick.decideOnNewMessage({ atBottom: false, ownMessage: true }), "scroll");
+});
+
+test("scroll: in-place growth (streaming text, images) is followed only at the bottom", () => {
+  assert.equal(stick.shouldFollowGrowth(true), true);
+  assert.equal(stick.shouldFollowGrowth(false), false);
+});
+
+test("wiring: the widget AND the dashboard/onboarding test chat use the same hook and pill", () => {
+  const list = source("app/(widget)/widget/embed/_components/message-list.tsx");
+  assert.match(list, /useStickToBottom\(\s*visibleCount,\s*lastOwnMessageId,?\s*\)/);
+  assert.match(list, /showNewMessagePill \? <NewMessagePill label=\{strings\.newMessageLabel\}/);
+  assert.match(list, /ref=\{contentRef\}/);
+  const sandbox = source("app/(dashboard)/dashboard/_components/sandbox-chat/sandbox-chat-panel.tsx");
+  assert.match(sandbox, /useStickToBottom\(\s*messages\.length,\s*lastOwnMessageId,?\s*\)/);
+  assert.match(sandbox, /New message/);
+  assert.match(sandbox, /ref=\{contentRef\}/);
+  // the onboarding review step renders the same panel
+  assert.match(source("app/(dashboard)/onboarding/_components/steps/review-step.tsx"), /SandboxChatPanel/);
+  const hook = source("lib/use-stick-to-bottom.ts");
+  assert.match(hook, /new ResizeObserver/);
+  assert.match(hook, /decideOnNewMessage\(\{ atBottom: atBottomRef\.current, ownMessage \}\)/);
+});
+
+test("New message label exists in every widget language", () => {
+  for (const language of ["en", "es", "fr", "de", "pt", "hi"]) {
+    assert.ok(getWidgetStrings(language).newMessageLabel.length > 0, language);
+  }
+});

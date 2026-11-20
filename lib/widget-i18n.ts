@@ -72,6 +72,8 @@ export type WidgetStrings = {
   defaultQuestionPrice: string;
   /** Widget reliability item 4: default chip for a catalog item without a price. Must contain "{name}". */
   defaultQuestionAbout: string;
+  /** Widget reliability item 6: pill shown when a message arrives while the visitor has scrolled up. */
+  newMessageLabel: string;
 };
 
 const EN: WidgetStrings = {
@@ -108,6 +110,7 @@ const EN: WidgetStrings = {
   suggestedQuestionsLabel: "Suggested questions",
   defaultQuestionPrice: "How much is {name}?",
   defaultQuestionAbout: "Tell me about {name}.",
+  newMessageLabel: "New message",
 };
 
 const ES: WidgetStrings = {
@@ -144,6 +147,7 @@ const ES: WidgetStrings = {
   suggestedQuestionsLabel: "Preguntas sugeridas",
   defaultQuestionPrice: "¿Cuánto cuesta {name}?",
   defaultQuestionAbout: "Cuéntame sobre {name}.",
+  newMessageLabel: "Nuevo mensaje",
 };
 
 const FR: WidgetStrings = {
@@ -180,6 +184,7 @@ const FR: WidgetStrings = {
   suggestedQuestionsLabel: "Questions suggérées",
   defaultQuestionPrice: "Combien coûte {name} ?",
   defaultQuestionAbout: "Parlez-moi de {name}.",
+  newMessageLabel: "Nouveau message",
 };
 
 const DE: WidgetStrings = {
@@ -216,6 +221,7 @@ const DE: WidgetStrings = {
   suggestedQuestionsLabel: "Vorgeschlagene Fragen",
   defaultQuestionPrice: "Was kostet {name}?",
   defaultQuestionAbout: "Erzählen Sie mir mehr über {name}.",
+  newMessageLabel: "Neue Nachricht",
 };
 
 const PT: WidgetStrings = {
@@ -252,6 +258,7 @@ const PT: WidgetStrings = {
   suggestedQuestionsLabel: "Perguntas sugeridas",
   defaultQuestionPrice: "Quanto custa {name}?",
   defaultQuestionAbout: "Fale-me sobre {name}.",
+  newMessageLabel: "Nova mensagem",
 };
 
 const HI: WidgetStrings = {
@@ -287,6 +294,7 @@ const HI: WidgetStrings = {
   suggestedQuestionsLabel: "सुझाए गए प्रश्न",
   defaultQuestionPrice: "{name} की कीमत क्या है?",
   defaultQuestionAbout: "{name} के बारे में बताइए।",
+  newMessageLabel: "नया संदेश",
 };
 
 const DICTIONARIES: Record<WidgetLanguage, WidgetStrings> = { en: EN, es: ES, fr: FR, de: DE, pt: PT, hi: HI };
