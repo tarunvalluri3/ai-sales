@@ -8,6 +8,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversationAfter } from "@/lib/messages";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
+import { conversationBelongsToVisitor } from "@/lib/widget-conversation-ownership";
 
 /**
  * Public, unauthenticated read endpoint (docs/security.md §4), mirroring
@@ -37,6 +38,9 @@ const bodySchema = z.object({
   widgetKey: z.string().uuid(),
   conversationId: z.string().uuid(),
   after: z.iso.datetime({ offset: true }),
+  // Widget reliability item 2: polls are scoped to the visitor as well as the
+  // widget key's business (lib/widget-conversation-ownership.ts).
+  visitorId: z.string().trim().min(1).max(100),
 });
 
 export async function OPTIONS() {
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId, after } = parsed.data;
+  const { widgetKey, conversationId, after, visitorId } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
 
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const conversation = await getConversationForBusiness(supabase, business.businessId, conversationId);
-    if (!conversation) {
+    if (!conversation || !conversationBelongsToVisitor(conversation, visitorId)) {
       return withCors(jsonError("Invalid request.", 400));
     }
 

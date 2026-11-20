@@ -565,3 +565,156 @@ test("loader: a JSON (human-control) reply is still a single widget:response", a
   await h.flush();
   assert.equal(h.postedOfType("widget:response").length, 1);
 });
+
+// --- Item 2: reload restores the visible conversation, scoped to visitor + key
+
+const { conversationBelongsToVisitor } = await import(
+  new URL("../lib/widget-conversation-ownership.ts", import.meta.url).href
+);
+const { WIDGET_KEY } = await import(new URL("./lib/widget-loader-harness.mjs", import.meta.url).href);
+const { readFileSync: readSource } = await import("node:fs");
+const source = (path) => readSource(new URL(`../${path}`, import.meta.url), "utf8");
+
+const CONV = "33333333-3333-4333-8333-333333333333";
+const VISITOR = "00000000-0000-4000-8000-0000000000aa";
+
+function storedVisitorSession() {
+  return new Map([
+    [`ai_sales_widget_conversation:${WIDGET_KEY}`, CONV],
+    [`ai_sales_widget_visitor:${WIDGET_KEY}`, VISITOR],
+  ]);
+}
+
+const restoreBody = {
+  ok: true,
+  data: {
+    conversationId: CONV,
+    control: "ai",
+    consentGiven: true,
+    messages: [
+      { id: "m1", role: "user", content: "Whitening on Monday at 6 PM?" },
+      { id: "m2", role: "assistant", content: "Our team will call you to arrange it." },
+    ],
+    asOf: "2026-11-20T10:00:00.000Z",
+  },
+};
+
+test("reload: restore is held until the iframe is READY (the live bug: it was posted at load, before React listened)", async () => {
+  const h = createLoaderHarness({
+    storage: storedVisitorSession(),
+    fetchHandler: (r) => (r.path === "/api/chat/restore" ? jsonResponse(restoreBody) : undefined),
+  });
+  await h.flush();
+  h.iframeLoad(); // the document loaded, but React has not hydrated yet
+  await h.flush();
+  assert.equal(h.postedOfType("widget:restore").length, 0, "nothing posted into a page that is not listening yet");
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  const [restore] = h.postedOfType("widget:restore");
+  assert.equal(restore.messages.length, 2);
+  assert.equal(restore.consentGiven, true, "consent stays ticked for this conversation");
+});
+
+test("reload: a restore that resolves after ready is posted immediately", async () => {
+  let resolveRestore;
+  const h = createLoaderHarness({
+    storage: storedVisitorSession(),
+    fetchHandler: (r) =>
+      r.path === "/api/chat/restore"
+        ? new Promise((resolve) => {
+            resolveRestore = () => resolve(jsonResponse(restoreBody));
+          })
+        : undefined,
+  });
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  assert.equal(h.postedOfType("widget:restore").length, 0);
+  resolveRestore();
+  await h.flush();
+  assert.equal(h.postedOfType("widget:restore").length, 1);
+});
+
+test("reload: restore and poll requests carry the visitor id", async () => {
+  const h = createLoaderHarness({
+    storage: storedVisitorSession(),
+    fetchHandler: (r) =>
+      r.path === "/api/chat/restore"
+        ? jsonResponse({ ...restoreBody, data: { ...restoreBody.data, control: "human" } })
+        : r.path === "/api/chat/poll"
+          ? jsonResponse({ ok: true, data: { conversationId: CONV, control: "human", messages: [], asOf: "2026-11-20T10:00:00.000Z" } })
+          : undefined,
+  });
+  h.fromIframe({ type: "widget:ready" });
+  h.fromIframe({ type: "widget:panel_open", open: true });
+  await h.flush();
+  await h.advance(10_000);
+  assert.equal(h.requestsTo("/api/chat/restore")[0].body.visitorId, VISITOR);
+  assert.ok(h.requestsTo("/api/chat/poll").length > 0);
+  for (const poll of h.requestsTo("/api/chat/poll")) assert.equal(poll.body.visitorId, VISITOR);
+});
+
+test("reload: a restore the server refuses (other visitor) clears the stored id and shows nothing", async () => {
+  const storage = storedVisitorSession();
+  const h = createLoaderHarness({
+    storage,
+    fetchHandler: (r) => (r.path === "/api/chat/restore" ? jsonResponse({ ok: false, error: "Invalid request." }, 400) : undefined),
+  });
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  assert.equal(h.postedOfType("widget:restore").length, 0);
+  assert.equal(storage.has(`ai_sales_widget_conversation:${WIDGET_KEY}`), false);
+});
+
+test("reload: a conversation stored under a DIFFERENT widget key is never restored here", async () => {
+  const otherKey = "99999999-9999-4999-8999-999999999999";
+  const h = createLoaderHarness({
+    storage: new Map([[`ai_sales_widget_conversation:${otherKey}`, CONV]]),
+    fetchHandler: (r) => (r.path === "/api/chat/restore" ? jsonResponse(restoreBody) : undefined),
+  });
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  assert.equal(h.requestsTo("/api/chat/restore").length, 0);
+  assert.equal(h.postedOfType("widget:restore").length, 0);
+});
+
+test("ownership: only the same, non-empty visitor id matches", () => {
+  assert.equal(conversationBelongsToVisitor({ visitor_id: "v1" }, "v1"), true);
+  assert.equal(conversationBelongsToVisitor({ visitor_id: "v1" }, "v2"), false, "another visitor");
+  assert.equal(conversationBelongsToVisitor({ visitor_id: null }, "v1"), false, "pre-visitor-id row");
+  assert.equal(conversationBelongsToVisitor({ visitor_id: "v1" }, undefined), false, "request without a visitor");
+  assert.equal(conversationBelongsToVisitor({ visitor_id: "" }, ""), false);
+  assert.equal(conversationBelongsToVisitor(null, "v1"), false, "another business's id resolves to no row");
+});
+
+test("restore and poll: tenant-scoped lookup by the key's business AND the visitor check, generic 400 otherwise", () => {
+  for (const path of ["app/api/chat/restore/route.ts", "app/api/chat/poll/route.ts"]) {
+    const route = source(path);
+    assert.match(route, /visitorId: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(100\)/, path);
+    assert.match(route, /business = await resolveBusinessFromWidgetKey\(widgetKey, origin\)/, path);
+    assert.match(route, /getConversationForBusiness\(supabase, business\.businessId, conversationId\)/, path);
+    assert.match(
+      route,
+      /if \(!conversation \|\| !conversationBelongsToVisitor\(conversation, visitorId\)\) \{\s*return withCors\(jsonError\("Invalid request\.", 400\)\);/,
+      path,
+    );
+  }
+  assert.match(source("app/api/chat/restore/route.ts"), /consentGiven: conversation\.consent_given === true/);
+  assert.match(source("lib/conversations.ts"), /\.eq\("business_id", businessId\)\s*\.eq\("id", id\)/);
+});
+
+test("chat: a conversation id from another visitor starts a NEW conversation and never reads the old history", () => {
+  const route = source("app/api/chat/route.ts");
+  assert.match(route, /if \(conversation && !conversationBelongsToVisitor\(conversation, visitorId\)\) \{/);
+  assert.match(route, /conversation = null;\s*startedFreshForVisitor = true;/);
+  assert.match(route, /startedFreshForVisitor\s*\? Promise\.resolve\(\[\]\)/, "the other conversation's history is discarded");
+  assert.match(route, /existingConversationLimit && !startedFreshForVisitor && !\(await existingConversationLimit\)/);
+  // the fresh conversation is created for THIS visitor
+  assert.match(route, /createConversation\(\s*supabase,\s*business\.businessId,\s*"chat_widget",\s*sanitizeSourceUrl\(pageUrl\),\s*visitorId \?\? null,/);
+});
+
+test("iframe: announces ready after attaching its listener, applies restored consent, new chat resets it", () => {
+  const hook = source("app/(widget)/widget/embed/_lib/use-widget-chat.ts");
+  assert.match(hook, /window\.addEventListener\("message", handleMessage\);[\s\S]{0,300}postToParent\(\{ type: "widget:ready" \}\);/);
+  assert.match(hook, /if \(message\.consentGiven\) \{\s*consentGivenRef\.current = true;\s*setConsentGiven\(true\);/);
+  assert.match(hook, /consentGivenRef\.current = false;\s*setConsentGiven\(false\);\s*setMessages\(\[\]\);/);
+});

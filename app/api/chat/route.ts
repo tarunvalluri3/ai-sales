@@ -38,6 +38,7 @@ import { CORS_HEADERS } from "@/lib/http/widget-cors";
 import { clientWantsStream, CHAT_STREAM_CONTENT_TYPE } from "@/lib/chat-stream";
 import { createChatSseStream } from "@/lib/chat-sse-response";
 import { applyLateJudgement } from "@/lib/chat-late-judgement";
+import { conversationBelongsToVisitor } from "@/lib/widget-conversation-ownership";
 import { logEvent } from "@/lib/logger";
 import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import {
@@ -388,6 +389,31 @@ export async function POST(request: NextRequest) {
       return withCors(jsonError("Invalid request.", 400));
     }
 
+    // Widget reliability item 2: a conversation id is only continued by the
+    // visitor it belongs to (lib/widget-conversation-ownership.ts). Any other
+    // visitor -- a different browser, a copied id, a pre-visitor-id row --
+    // silently starts a NEW conversation: nothing of the old one is read
+    // (its history is discarded below) or written.
+    let startedFreshForVisitor = false;
+    if (conversation && !conversationBelongsToVisitor(conversation, visitorId)) {
+      logEvent("chat_conversation_visitor_mismatch", business.businessId, { conversationId: conversation.id });
+      // A fresh conversation normally passes Turnstile when it starts; keep
+      // that true for this path too when Turnstile is enforcing.
+      if (protection.turnstile.mode === "enforce" && protection.turnstile.secretKey) {
+        const turnstile = await verifyTurnstileToken({
+          token: parsed.data.turnstileToken,
+          secretKey: protection.turnstile.secretKey,
+          remoteIp: ip,
+          expectedHostname: protection.turnstile.expectedHostname,
+        });
+        if (turnstileDecision(protection.turnstile.mode, turnstile) === "reject") {
+          return withCors(jsonError("Please refresh the page and try again.", 403));
+        }
+      }
+      conversation = null;
+      startedFreshForVisitor = true;
+    }
+
     if (!conversation) {
       conversation = await timer.time("conversation_create", () =>
         createConversation(
@@ -403,7 +429,7 @@ export async function POST(request: NextRequest) {
     // Read out before the closure below, which would otherwise widen
     // `conversation` back to possibly-null and need an assertion.
     const conversationRowId = conversation.id;
-    if (existingConversationLimit && !(await existingConversationLimit)) {
+    if (existingConversationLimit && !startedFreshForVisitor && !(await existingConversationLimit)) {
       logEvent("rate_limit_exceeded", business.businessId, { scope: "conversation" }); // info, not Sentry: a flood must not burn the error quota (LAUNCH_AUDIT.md §1)
       return withCors(jsonTooManyRequests(secondsUntilWindowEnd(Date.now(), RATE_LIMIT_WINDOW_SECONDS)));
     }
@@ -453,17 +479,21 @@ export async function POST(request: NextRequest) {
       timer.time("rate_limit_business_burst", () =>
         incrementRateLimitCounter("business_burst", business.businessId, SCOPE_LIMITS.business_burst.windowSeconds),
       ),
-      // A brand-new conversation has no earlier messages to read.
-      earlyHistory ??
-        (partB && !conversationId
-          ? Promise.resolve([])
-          : timer.time("history_fetch", () => listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT))),
+      // A brand-new conversation has no earlier messages to read -- including
+      // one started because the visitor did not match (the early read was of
+      // the OTHER conversation and is discarded).
+      startedFreshForVisitor
+        ? Promise.resolve([])
+        : (earlyHistory ??
+          (partB && !conversationId
+            ? Promise.resolve([])
+            : timer.time("history_fetch", () => listRecentMessages(supabase, business.businessId, conversationRowId, HISTORY_LIMIT)))),
       // Guardrails Phase 5: abusive messages already recorded in this conversation.
       // Returns 0 without a query unless the abuse check is enforcing.
       countAbuseStrikes(supabase, business.businessId, conversationRowId),
       servingCheck,
       // A new conversation's first count (see existingConversationLimit above).
-      existingConversationLimit
+      existingConversationLimit && !startedFreshForVisitor
         ? null
         : timer.time("rate_limit_conversation", () =>
             checkAndIncrementRateLimit("conversation", conversationRowId, CONVERSATION_LIMIT, RATE_LIMIT_WINDOW_SECONDS),

@@ -8,6 +8,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversation } from "@/lib/messages";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
+import { conversationBelongsToVisitor } from "@/lib/widget-conversation-ownership";
 
 /**
  * Public, unauthenticated read endpoint (docs/security.md §4), mirroring
@@ -20,6 +21,12 @@ import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
  * /api/chat/poll's excludeRoles: ["user"] (the widget already knows its
  * own current-session messages from local state; here there is no
  * current-session state yet, this IS the state).
+ *
+ * Widget reliability item 2 (2026-11-20): scoped to the widget key's business
+ * (every query filters on business_id) AND to the visitor -- the conversation's
+ * stored visitor_id must equal the visitorId sent (lib/widget-conversation-
+ * ownership.ts); anything else is the same generic 400 as an unknown id. Also
+ * returns consentGiven so the widget's consent box stays ticked after a reload.
  */
 
 const RATE_LIMIT_WINDOW_SECONDS = 300;
@@ -28,6 +35,7 @@ const RESTORE_IP_LIMIT = 60;
 const bodySchema = z.object({
   widgetKey: z.string().uuid(),
   conversationId: z.string().uuid(),
+  visitorId: z.string().trim().min(1).max(100),
 });
 
 export async function OPTIONS() {
@@ -47,7 +55,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId } = parsed.data;
+  const { widgetKey, conversationId, visitorId } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
 
@@ -77,7 +85,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const conversation = await getConversationForBusiness(supabase, business.businessId, conversationId);
-    if (!conversation) {
+    if (!conversation || !conversationBelongsToVisitor(conversation, visitorId)) {
       return withCors(jsonError("Invalid request.", 400));
     }
 
@@ -88,6 +96,7 @@ export async function POST(request: NextRequest) {
       jsonSuccess({
         conversationId,
         control: conversation.control,
+        consentGiven: conversation.consent_given === true,
         messages: messages.map((message) => ({
           id: message.id,
           role: message.role,

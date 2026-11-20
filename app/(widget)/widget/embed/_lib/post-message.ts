@@ -166,6 +166,17 @@ export type WidgetPollResultMessage = {
 export type WidgetRestoreMessage = {
   type: "widget:restore";
   messages: { id: string; role: "user" | "assistant" | "human_agent"; content: string }[];
+  /** Widget reliability item 2: consent already recorded for this conversation -- the box stays ticked after a reload. */
+  consentGiven: boolean;
+};
+
+/**
+ * Widget reliability item 2: iframe -> loader, sent once this page's message
+ * listeners are attached. The loader holds the restore until then (posting
+ * at the iframe's "load" event raced React's hydration and was lost).
+ */
+export type WidgetReadyMessage = {
+  type: "widget:ready";
 };
 
 /**
@@ -228,6 +239,7 @@ export type FromParentMessage =
   | WidgetRestoreMessage
   | WidgetRecentChatsResultMessage;
 export type ToParentMessage =
+  | WidgetReadyMessage
   | WidgetResizeMessage
   | WidgetSendMessage
   | WidgetAbortMessage
@@ -353,7 +365,7 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
             (message.role === "user" || message.role === "assistant" || message.role === "human_agent") &&
             typeof message.content === "string",
         );
-        return { type: "widget:restore", messages };
+        return { type: "widget:restore", messages, consentGiven: data.consentGiven === true };
       }
       return null;
     case "widget:recent_chats_result":

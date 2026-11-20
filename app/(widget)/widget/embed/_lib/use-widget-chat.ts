@@ -221,6 +221,12 @@ export function useWidgetChat(
         // its own yet -- if the prospect has already sent something in
         // this session (a race between mount and the fetch resolving),
         // restoring here would clobber real in-flight state.
+        // Consent recorded for this conversation stays ticked (item 2). Only
+        // ever turns it ON: the visitor can untick it themselves.
+        if (message.consentGiven) {
+          consentGivenRef.current = true;
+          setConsentGiven(true);
+        }
         if (message.messages.length === 0) return;
         setMessages((prev) => (prev.length > 0 ? prev : message.messages.map((m) => ({ id: m.id, role: m.role, content: m.content }))));
         hasSucceededRef.current = true;
@@ -231,6 +237,9 @@ export function useWidgetChat(
     }
 
     window.addEventListener("message", handleMessage);
+    // Widget reliability item 2: tell the loader the listener above is live,
+    // so it can send the restored conversation now (and not into the void).
+    postToParent({ type: "widget:ready" });
     return () => window.removeEventListener("message", handleMessage);
   }, [strings]);
 
@@ -327,6 +336,9 @@ export function useWidgetChat(
     pendingRef.current.clear();
     hasSucceededRef.current = false;
     conversationIdRef.current = null;
+    // A new conversation asks for consent again.
+    consentGivenRef.current = false;
+    setConsentGiven(false);
     setMessages([]);
     setIsAwaitingResponse(false);
     setIsStreaming(false);

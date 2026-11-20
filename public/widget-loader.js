@@ -209,6 +209,8 @@
         widgetKey: widgetKey,
         conversationId: conversationId,
         after: lastKnownMessageAt,
+        // Widget reliability item 2: polls are scoped to this visitor too.
+        visitorId: visitorId,
       }),
     })
       .then(function (response) {
@@ -290,26 +292,29 @@
   }
 
   // Restore coordination: the /api/chat/restore fetch below and the
-  // iframe's own "load" event race independently -- either can finish
-  // first. The restore message is only postable once the iframe has
-  // actually loaded (its React tree needs to be mounted to receive it),
+  // iframe becoming READY race independently -- either can finish first,
   // so whichever finishes second is what actually sends it.
-  var iframeLoaded = false;
-  var pendingRestoreMessages = null;
+  //
+  // Widget reliability item 2 (2026-11-20): "ready" used to mean the
+  // iframe's "load" event. But React attaches its message listener only
+  // after hydration, which can finish after "load", so a restore posted at
+  // "load" was silently dropped: the visitor saw an empty chat while the AI
+  // (which reads the stored conversation id) still remembered everything.
+  // The iframe now says "widget:ready" once its listeners are attached.
+  var iframeReady = false;
+  var pendingRestore = null;
 
   function tryPostRestore() {
-    if (!iframeLoaded || !pendingRestoreMessages) return;
+    if (!iframeReady || !pendingRestore) return;
     iframe.contentWindow.postMessage(
-      { type: "widget:restore", messages: pendingRestoreMessages },
+      { type: "widget:restore", messages: pendingRestore.messages, consentGiven: pendingRestore.consentGiven },
       appOrigin,
     );
-    pendingRestoreMessages = null;
+    pendingRestore = null;
   }
 
   iframe.addEventListener("load", function () {
-    iframeLoaded = true;
     postViewport();
-    tryPostRestore();
   });
 
   // Shared by the initial page-load restore below and by
@@ -327,7 +332,7 @@
     fetch(appOrigin + "/api/chat/restore", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ widgetKey: widgetKey, conversationId: id }),
+      body: JSON.stringify({ widgetKey: widgetKey, conversationId: id, visitorId: visitorId }),
     })
       .then(function (response) {
         return response.json().then(
@@ -353,8 +358,11 @@
             knownMessageIds[data.messages[i].id] = true;
           }
         }
-        pendingRestoreMessages = data.messages;
+        pendingRestore = { messages: data.messages, consentGiven: data.consentGiven === true };
         tryPostRestore();
+        // A restored conversation a human already controls must start
+        // polling right away (the panel may already be open).
+        schedulePoll();
       })
       .catch(function () {
         // A network failure here is invisible to the prospect -- the
@@ -625,7 +633,12 @@
     var data = event.data;
     if (!data || typeof data.type !== "string") return;
 
-    if (data.type === "widget:resize" && typeof data.width === "number" && typeof data.height === "number") {
+    if (data.type === "widget:ready") {
+      // The iframe's listeners are attached (see tryPostRestore above).
+      iframeReady = true;
+      postViewport();
+      tryPostRestore();
+    } else if (data.type === "widget:resize" && typeof data.width === "number" && typeof data.height === "number") {
       applyResize(data.width, data.height);
     } else if (data.type === "widget:send" && typeof data.requestId === "string" && typeof data.text === "string") {
       handleSend(data.requestId, data.text, data.consentGiven, data.suggested, data.turnstileToken);
