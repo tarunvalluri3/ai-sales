@@ -28,6 +28,9 @@ export const chatRequestBodySchema = z.object({
   // sends. Absent (every currently-live loader) means the byte-identical
   // buffered JSON response, so this changes nothing for an old embed.
   stream: z.boolean().optional(),
+  // Widget reliability item 3: the visitor's browser time zone. Validated
+  // again with normalizeTimezone() in the route; DISPLAY ONLY (slot labels).
+  visitorTimeZone: z.string().max(64).optional(),
   // Phase 32 Stage E: ms between the widget loader starting and this send.
   // Client-supplied, so it can only ever TIGHTEN a limit (see
   // lib/abuse-limits.ts classifyClientSignal); absent from older embeds.

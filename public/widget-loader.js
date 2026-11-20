@@ -56,6 +56,16 @@
   // Phase 32 Stage E: when this script started, so each send can report how
   // long the page had been loaded. Only ever tightens a server-side limit.
   var loaderStartedAt = Date.now();
+  // Widget reliability item 3: the visitor's browser time zone, so offered
+  // times can show "(11:30 PM Fri, your time)". Display only; the server
+  // validates it and never uses it for anything else.
+  var visitorTimeZone = null;
+  try {
+    var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (typeof zone === "string" && zone.length > 0 && zone.length <= 64) visitorTimeZone = zone;
+  } catch {
+    visitorTimeZone = null;
+  }
 
   var COLLAPSED_SIZE = 84;
   var MARGIN = 20;
@@ -500,6 +510,7 @@
           pageUrl: pageUrl,
           visitorId: visitorId,
           clientElapsedMs: Math.max(0, Date.now() - loaderStartedAt),
+          visitorTimeZone: visitorTimeZone || undefined,
           stream: true,
           // Set only for a suggested-question chip click (analytics).
           suggested: suggested === true ? true : undefined,

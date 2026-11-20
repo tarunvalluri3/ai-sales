@@ -24,6 +24,8 @@ export type BusinessAiContext = {
     website: string | null;
     /** businesses.currency -- an operational setting, read from the row, not the versioned snapshot (like the time zone). */
     currency: string;
+    /** businesses.timezone (IANA): every time the AI mentions names this zone (widget reliability item 3). */
+    timezone: string;
   };
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
@@ -41,6 +43,7 @@ type BusinessIdentityRow = {
   status: "active" | "suspended";
   deleted_at: string | null;
   currency: string;
+  timezone: string;
 };
 
 /**
@@ -76,7 +79,7 @@ export async function loadBusinessAiContext(businessId: string): Promise<Busines
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
-    .select("id, clerk_org_id, live_version_id, status, deleted_at, currency")
+    .select("id, clerk_org_id, live_version_id, status, deleted_at, currency, timezone")
     .eq("id", businessId)
     .maybeSingle<BusinessIdentityRow>();
 
@@ -104,6 +107,7 @@ export async function loadBusinessAiContext(businessId: string): Promise<Busines
       contactPhone: config.contactPhone,
       website: config.website,
       currency: data.currency,
+      timezone: data.timezone,
     },
     language: config.language,
     recommendProductsEnabled: config.capabilities.recommendProducts,

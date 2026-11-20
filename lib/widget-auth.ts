@@ -83,6 +83,8 @@ export type WidgetBusinessContext = {
     website: string | null;
     /** businesses.currency -- read from the row (AUTH_COLUMNS), not the versioned snapshot. */
     currency: string;
+    /** businesses.timezone (IANA) -- read from the row like the currency; the prompt states it (widget reliability item 3). */
+    timezone: string;
   };
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
@@ -99,7 +101,7 @@ export type WidgetBusinessContext = {
 
 // Identity + lifecycle only. Everything the AI says or shows comes from the
 // live snapshot (live_version_id), not from draft columns.
-const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at, currency";
+const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at, currency, timezone";
 
 // The branding endpoint additionally keeps the draft widget columns, used only
 // as a cosmetic fallback for an agent that has never been published.
@@ -114,6 +116,7 @@ type WidgetAuthRow = {
   status: "active" | "suspended";
   deleted_at: string | null;
   currency: string;
+  timezone: string;
 };
 
 type WidgetBrandingRow = WidgetAuthRow & {
@@ -267,6 +270,7 @@ export async function resolveBusinessFromWidgetKey(
       contactPhone: config.contactPhone,
       website: config.website,
       currency: data.businesses.currency,
+      timezone: data.businesses.timezone,
     },
     language: config.language,
     recommendProductsEnabled: config.capabilities.recommendProducts,

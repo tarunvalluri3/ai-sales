@@ -39,6 +39,7 @@ import { clientWantsStream, CHAT_STREAM_CONTENT_TYPE } from "@/lib/chat-stream";
 import { createChatSseStream } from "@/lib/chat-sse-response";
 import { applyLateJudgement } from "@/lib/chat-late-judgement";
 import { conversationBelongsToVisitor } from "@/lib/widget-conversation-ownership";
+import { normalizeTimezone } from "@/lib/timezones";
 import { logEvent } from "@/lib/logger";
 import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import {
@@ -176,6 +177,11 @@ export async function POST(request: NextRequest) {
   const message = prepared.text;
   const pageUrl = parsed.data.pageUrl === undefined ? undefined : sanitizeShortField(parsed.data.pageUrl, 2048);
   const visitorId = parsed.data.visitorId === undefined ? undefined : sanitizeShortField(parsed.data.visitorId, 100) || undefined;
+  // Widget reliability item 3: the visitor's browser zone, display only (slot
+  // labels "11:30 PM Fri, your time"). Anything invalid is simply dropped; it
+  // never reaches auth, tenancy, rate limits or booking decisions.
+  const visitorTimeZoneResult = normalizeTimezone(parsed.data.visitorTimeZone);
+  const visitorTimeZone = visitorTimeZoneResult.ok ? visitorTimeZoneResult.timezone : null;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
   const ipSubnet = deriveIpv4Subnet(ip);
@@ -573,6 +579,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // The profile the model sees this turn: the business's own fields plus the
+    // display-only visitor zone (widget reliability item 3).
+    const turnProfile = { ...business.businessProfile, visitorTimeZone };
+
     // Instant-answer context for this request. `published` is true by
     // construction: resolveBusinessFromWidgetKey() refuses an unpublished business.
     const instant: InstantContext = {
@@ -833,7 +843,7 @@ export async function POST(request: NextRequest) {
             business.businessId,
             conversation.id,
             business.businessName,
-            business.businessProfile,
+            turnProfile,
             message,
             history,
             business.language,
@@ -888,7 +898,7 @@ export async function POST(request: NextRequest) {
         business.businessId,
         conversation.id,
         business.businessName,
-        business.businessProfile,
+        turnProfile,
         message,
         history,
         business.language,

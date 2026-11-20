@@ -261,5 +261,5 @@ test("wiring: no hard-coded '$' before a catalog price anywhere a price is shown
   }
   const rag = read("lib/rag.ts");
   assert.match(rag, /this business prices everything in \$\{profile\.currency\}/);
-  assert.match(rag, /executeBusinessToolCall\(supabase, businessId, conversationId, toolCall, searchedQueries, source, businessProfile\.currency\)/);
+  assert.match(rag, /executeBusinessToolCall\(supabase, businessId, conversationId, toolCall, searchedQueries, source, businessProfile\.currency[,)]/); // widget reliability item 3 appends display-only time zones
 });

@@ -100,7 +100,7 @@ for (const channel of ["whatsapp", "instagram"]) {
 
 test("loadBusinessAiContext reads status/deleted_at and decides with the shared helper", () => {
   const source = read("lib/business-ai-context.ts");
-  assert.match(source, /\.select\("id, clerk_org_id, live_version_id, status, deleted_at, currency"\)/);
+  assert.match(source, /\.select\("id, clerk_org_id, live_version_id, status, deleted_at, currency, timezone"\)/);
   assert.match(source, /evaluateChannelAccess\(data\)/);
 });
 
