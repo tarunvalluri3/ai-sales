@@ -13,7 +13,11 @@ export const LauncherButton = forwardRef<
       aria-label={label}
       title={label}
       onClick={onToggle}
-      className="relative flex h-14 w-14 items-center justify-center border border-widget-border-strong bg-widget-header-bg text-widget-primary transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+      // Widget reliability item 4: filled with the primary (neutral zinc by
+      // default, the business colour when set), icon in --widget-on-primary.
+      // A 1px white ring at 15% plus a soft shadow keep the edge visible on
+      // near-black host sites; the icon itself is ~20:1 against them.
+      className="relative flex h-14 w-14 items-center justify-center bg-widget-primary text-widget-on-primary shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_4px_14px_rgba(0,0,0,0.28)] transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
     >
       {isOpen ? (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -36,7 +40,7 @@ export const LauncherButton = forwardRef<
           </svg>
           <span
             aria-hidden="true"
-            className="widget-status-dot absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border-2 border-widget-header-bg bg-widget-primary"
+            className="widget-status-dot absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-widget-primary bg-widget-success"
           />
         </>
       )}

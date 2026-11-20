@@ -1,9 +1,10 @@
 import { MessageCircle, SendHorizontal, X } from "lucide-react";
 import type { WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
 import { getWidgetStrings } from "@/lib/widget-i18n";
+import { DEFAULT_WIDGET_PRIMARY, readableOnColor } from "@/lib/widget-colors";
 
 /** The widget's own CSS default when a business has not picked an accent. */
-const DEFAULT_ACCENT = "#dc2626";
+const DEFAULT_ACCENT = DEFAULT_WIDGET_PRIMARY;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 /**
@@ -40,12 +41,14 @@ export function WidgetPreview({
 }) {
   const strings = getWidgetStrings(language);
   const accent = accentColor && HEX_COLOR.test(accentColor) ? accentColor : DEFAULT_ACCENT;
+  // Same rule as the live widget: dark ink on a light brand colour, white otherwise.
+  const onAccent = readableOnColor(accent);
   const shownQuestions = questions.map((question) => question.trim()).filter(Boolean);
   const hasLogo = Boolean(logoUrl && /^https:\/\//.test(logoUrl));
 
   const panel = (
     <div className="flex w-full max-w-[21rem] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_12px_32px_rgba(21,23,19,0.16)]">
-      <div className="flex items-center gap-3 px-4 py-3 text-white" style={{ background: accent }}>
+      <div className="flex items-center gap-3 px-4 py-3" style={{ background: accent, color: onAccent }}>
         {hasLogo ? (
           // eslint-disable-next-line @next/next/no-img-element -- an arbitrary, business-supplied URL previewed as typed; next/image would need every possible host allow-listed.
           <img src={logoUrl} alt="" className="size-8 shrink-0 rounded-full bg-white object-contain" />
@@ -72,7 +75,7 @@ export function WidgetPreview({
       </div>
       <div className="mx-4 mb-3 flex items-center gap-2 rounded-xl border border-[#d3d7d1] py-1.5 pr-1.5 pl-3.5">
         <span className="flex-1 truncate text-sm text-[#92958f]">{strings.inputPlaceholder}</span>
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: accent }}>
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg" style={{ background: accent, color: onAccent }}>
           <SendHorizontal strokeWidth={1.75} className="size-4" aria-hidden="true" />
         </span>
       </div>
@@ -109,7 +112,7 @@ export function WidgetPreview({
           <span className="rounded-full bg-white px-4 py-2.5 text-sm font-medium text-[#151713] shadow-[0_6px_18px_rgba(21,23,19,0.12)]">
             {ctaText?.trim() || strings.defaultCta}
           </span>
-          <span className="flex size-12 items-center justify-center rounded-full text-white shadow-[0_6px_18px_rgba(21,23,19,0.18)]" style={{ background: accent }}>
+          <span className="flex size-12 items-center justify-center rounded-full shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_6px_18px_rgba(21,23,19,0.18)]" style={{ background: accent, color: onAccent }}>
             <MessageCircle strokeWidth={1.75} className="size-5" aria-hidden="true" />
           </span>
         </div>

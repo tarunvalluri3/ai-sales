@@ -68,6 +68,10 @@ export type WidgetStrings = {
   recentChatsLoading: string;
   backLabel: string;
   suggestedQuestionsLabel: string;
+  /** Widget reliability item 4: default chip for a catalog item with a price. Must contain "{name}". */
+  defaultQuestionPrice: string;
+  /** Widget reliability item 4: default chip for a catalog item without a price. Must contain "{name}". */
+  defaultQuestionAbout: string;
 };
 
 const EN: WidgetStrings = {
@@ -102,6 +106,8 @@ const EN: WidgetStrings = {
   recentChatsLoading: "Loading…",
   backLabel: "Back",
   suggestedQuestionsLabel: "Suggested questions",
+  defaultQuestionPrice: "How much is {name}?",
+  defaultQuestionAbout: "Tell me about {name}.",
 };
 
 const ES: WidgetStrings = {
@@ -136,6 +142,8 @@ const ES: WidgetStrings = {
   recentChatsLoading: "Cargando…",
   backLabel: "Atrás",
   suggestedQuestionsLabel: "Preguntas sugeridas",
+  defaultQuestionPrice: "¿Cuánto cuesta {name}?",
+  defaultQuestionAbout: "Cuéntame sobre {name}.",
 };
 
 const FR: WidgetStrings = {
@@ -170,6 +178,8 @@ const FR: WidgetStrings = {
   recentChatsLoading: "Chargement…",
   backLabel: "Retour",
   suggestedQuestionsLabel: "Questions suggérées",
+  defaultQuestionPrice: "Combien coûte {name} ?",
+  defaultQuestionAbout: "Parlez-moi de {name}.",
 };
 
 const DE: WidgetStrings = {
@@ -204,6 +214,8 @@ const DE: WidgetStrings = {
   recentChatsLoading: "Wird geladen…",
   backLabel: "Zurück",
   suggestedQuestionsLabel: "Vorgeschlagene Fragen",
+  defaultQuestionPrice: "Was kostet {name}?",
+  defaultQuestionAbout: "Erzählen Sie mir mehr über {name}.",
 };
 
 const PT: WidgetStrings = {
@@ -238,6 +250,8 @@ const PT: WidgetStrings = {
   recentChatsLoading: "A carregar…",
   backLabel: "Voltar",
   suggestedQuestionsLabel: "Perguntas sugeridas",
+  defaultQuestionPrice: "Quanto custa {name}?",
+  defaultQuestionAbout: "Fale-me sobre {name}.",
 };
 
 const HI: WidgetStrings = {
@@ -271,6 +285,8 @@ const HI: WidgetStrings = {
   recentChatsLoading: "लोड हो रहा है…",
   backLabel: "वापस",
   suggestedQuestionsLabel: "सुझाए गए प्रश्न",
+  defaultQuestionPrice: "{name} की कीमत क्या है?",
+  defaultQuestionAbout: "{name} के बारे में बताइए।",
 };
 
 const DICTIONARIES: Record<WidgetLanguage, WidgetStrings> = { en: EN, es: ES, fr: FR, de: DE, pt: PT, hi: HI };

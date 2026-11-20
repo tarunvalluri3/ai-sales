@@ -824,3 +824,132 @@ test("loader: sends the browser time zone with each message", async () => {
   await h.flush();
   assert.equal(h.requestsTo("/api/chat")[0].body.visitorTimeZone, "America/New_York");
 });
+
+// --- Item 4: default chips from the business's own content; neutral colour
+
+const { buildDefaultSuggestedQuestions, catalogItemHasPrice } = await import(
+  new URL("../lib/widget-default-questions.ts", import.meta.url).href
+);
+const colors = await import(new URL("../lib/widget-colors.ts", import.meta.url).href);
+const { getWidgetStrings } = await import(new URL("../lib/widget-i18n.ts", import.meta.url).href);
+
+const EN_TEMPLATES = { price: "How much is {name}?", about: "Tell me about {name}." };
+
+test("default chips: the owner's own suggested questions always win", () => {
+  const owner = ["Do you take insurance?"];
+  assert.deepEqual(
+    buildDefaultSuggestedQuestions(owner, { faqQuestions: ["Where are you?"], items: [] }, EN_TEMPLATES),
+    owner,
+  );
+});
+
+test("default chips: FAQ questions first, verbatim, then price questions, then 'Tell me about'", () => {
+  const chips = buildDefaultSuggestedQuestions(
+    [],
+    {
+      faqQuestions: ["Do you open on Sundays?"],
+      items: [
+        { name: "Teeth Whitening", hasPrice: true },
+        { name: "Dental Check-up", hasPrice: false },
+        { name: "Braces", hasPrice: true },
+        { name: "Root Canal", hasPrice: true },
+      ],
+    },
+    EN_TEMPLATES,
+  );
+  assert.deepEqual(chips, [
+    "Do you open on Sundays?",
+    "How much is Teeth Whitening?",
+    "Tell me about Dental Check-up.",
+    "How much is Braces?",
+  ]);
+});
+
+test("default chips: at most 4; four FAQs fill them all; duplicates and over-long text skipped", () => {
+  const faqs = ["Q1?", "Q2?", "q1?", "Q3?", "x".repeat(121), "Q4?", "Q5?"];
+  assert.deepEqual(buildDefaultSuggestedQuestions([], { faqQuestions: faqs, items: [{ name: "A", hasPrice: true }] }, EN_TEMPLATES), [
+    "Q1?",
+    "Q2?",
+    "Q3?",
+    "Q4?",
+  ]);
+});
+
+test("default chips: nothing invented -- an empty business shows no chips, unpublished shows none", () => {
+  assert.deepEqual(buildDefaultSuggestedQuestions([], { faqQuestions: [], items: [] }, EN_TEMPLATES), []);
+  assert.deepEqual(buildDefaultSuggestedQuestions([], null, EN_TEMPLATES), []);
+  assert.deepEqual(buildDefaultSuggestedQuestions(["   "], null, EN_TEMPLATES), [], "blank owner chips do not count");
+});
+
+test("default chips: every word comes from the business data or the fixed template", () => {
+  const chips = buildDefaultSuggestedQuestions([], { faqQuestions: [], items: [{ name: "Laser\n  Hair Removal", hasPrice: false }] }, EN_TEMPLATES);
+  assert.deepEqual(chips, ["Tell me about Laser Hair Removal."]);
+});
+
+test("default chips: a price is any non-empty display text (or a legacy number)", () => {
+  assert.equal(catalogItemHasPrice("₹6,500"), true);
+  assert.equal(catalogItemHasPrice("From 1200"), true);
+  assert.equal(catalogItemHasPrice(6500), true);
+  assert.equal(catalogItemHasPrice("  "), false);
+  assert.equal(catalogItemHasPrice(null), false);
+});
+
+test("default chip templates exist in every widget language and contain {name}", () => {
+  for (const language of ["en", "es", "fr", "de", "pt", "hi"]) {
+    const strings = getWidgetStrings(language);
+    assert.match(strings.defaultQuestionPrice, /\{name\}/, language);
+    assert.match(strings.defaultQuestionAbout, /\{name\}/, language);
+    assert.ok(strings.errorTimedOut.length > 0, language);
+  }
+});
+
+test("wiring: chips come from the LIVE snapshot (FAQs + catalog); the embed page uses them", () => {
+  const auth = source("lib/widget-auth.ts");
+  assert.match(auth, /faqQuestions: liveSource\.snapshot\.faqs\.map\(\(faq\) => faq\.question\)/);
+  assert.match(auth, /\[\.\.\.liveSource\.snapshot\.services, \.\.\.liveSource\.snapshot\.products\]/);
+  assert.match(auth, /defaultQuestionSource: null,/, "the unpublished draft branding offers no chips");
+  assert.match(source("app/(widget)/widget/embed/page.tsx"), /buildDefaultSuggestedQuestions\(branding\.suggestedQuestions, branding\.defaultQuestionSource/);
+});
+
+test("colour: the default is neutral zinc, never red, in the widget CSS and the dashboard preview", () => {
+  assert.equal(colors.DEFAULT_WIDGET_PRIMARY, "#3f3f46");
+  const css = source("app/(widget)/widget.css");
+  assert.match(css, /--widget-primary: #3f3f46;/);
+  assert.doesNotMatch(css, /--widget-primary: #dc2626/);
+  assert.doesNotMatch(source("app/(dashboard)/dashboard/widget-settings/widget-preview.tsx"), /#dc2626/);
+});
+
+test("colour: the business's colour is used when set, and only a 6-digit hex reaches CSS", () => {
+  assert.equal(colors.sanitizeAccentColor("#1D4ED8"), "#1d4ed8");
+  for (const bad of ["red", "#fff", "#1d4ed8; background:url(x)", "", null, undefined]) {
+    assert.equal(colors.sanitizeAccentColor(bad), null, String(bad));
+  }
+  const app = source("app/(widget)/widget/embed/_components/widget-app.tsx");
+  assert.match(app, /const accent = sanitizeAccentColor\(accentColor\);/);
+  assert.match(app, /"--widget-primary": accent, "--widget-on-primary": readableOnColor\(accent\)/);
+});
+
+test("colour: the icon on a filled button stays readable for light and dark brand colours", () => {
+  for (const brand of ["#3f3f46", "#1d4ed8", "#facc15", "#ffffff", "#000000", "#22c55e", "#dc2626"]) {
+    const on = colors.readableOnColor(brand);
+    assert.ok(colors.contrastRatio(on, brand) >= 4.5, `${brand} -> ${on}`);
+  }
+});
+
+test("launcher contrast on light and dark host pages (owner's site is near-black)", () => {
+  const primary = colors.DEFAULT_WIDGET_PRIMARY;
+  const icon = colors.readableOnColor(primary);
+  assert.equal(icon, "#ffffff");
+  assert.ok(colors.contrastRatio(icon, primary) >= 4.5, "icon on the launcher");
+  // Light host page: the launcher body itself stands out strongly.
+  assert.ok(colors.contrastRatio(primary, "#ffffff") >= 3, "launcher vs white page");
+  // Dark host page (#0a0a0a): the body is close to the page, so the white icon
+  // carries recognition (>= 3:1 non-text contrast, WCAG 1.4.11) and the 15%
+  // ring adds a visible edge.
+  assert.ok(colors.contrastRatio(icon, "#0a0a0a") >= 3, "icon vs near-black page");
+  const ringOnDark = colors.compositeOver([255, 255, 255], 0.15, "#0a0a0a");
+  // Measured: body 1.90:1, 15% ring 1.48:1, icon 19.8:1 on #0a0a0a (reported in STATE.md).
+  assert.ok(colors.contrastRatio(ringOnDark, "#0a0a0a") >= 1.4, "the ring is a visible edge on near-black");
+  const launcher = source("app/(widget)/widget/embed/_components/launcher-button.tsx");
+  assert.match(launcher, /bg-widget-primary text-widget-on-primary shadow-\[0_0_0_1px_rgba\(255,255,255,0\.15\),0_4px_14px_rgba\(0,0,0,0\.28\)\]/);
+});

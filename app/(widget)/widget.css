@@ -16,10 +16,13 @@
    * --widget-primary can be overridden per-business (Phase 25a widget
    * branding, app/(widget)/widget/embed/_components/widget-app.tsx sets
    * it as an inline style on its root wrapper from `businesses.widget_accent_color`).
-   * Default is Signal Red. --widget-primary-hover derives from it via
-   * color-mix() so a custom accent gets a correct hover shade.
+   * Default is a neutral zinc (widget reliability item 4, 2026-11-20 -- was
+   * "Signal Red", which every unbranded business inherited); keep in sync
+   * with DEFAULT_WIDGET_PRIMARY in lib/widget-colors.ts. --widget-on-primary
+   * is overridden alongside a custom accent (readableOnColor()).
+   * --widget-primary-hover derives from it via color-mix().
    */
-  --widget-primary: #dc2626;
+  --widget-primary: #3f3f46;
   --widget-primary-hover: color-mix(in srgb, var(--widget-primary) 88%, white);
   --widget-on-primary: #ffffff;
 

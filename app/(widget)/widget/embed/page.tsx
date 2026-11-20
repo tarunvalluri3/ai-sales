@@ -5,6 +5,7 @@ import { isWithinBusinessHours } from "@/lib/business-hours";
 import { getWidgetStrings } from "@/lib/widget-i18n";
 import { WidgetApp } from "./_components/widget-app";
 import { chatProtectionConfigFromEnv } from "@/lib/chat-protection";
+import { buildDefaultSuggestedQuestions } from "@/lib/widget-default-questions";
 
 /**
  * This page carries a live, per-business widget key in its query string
@@ -51,7 +52,10 @@ export default async function WidgetEmbedPage({
       accentColor={branding.accentColor}
       logoUrl={branding.logoUrl}
       ctaText={branding.ctaText ?? strings.defaultCta}
-      suggestedQuestions={branding.suggestedQuestions}
+      suggestedQuestions={buildDefaultSuggestedQuestions(branding.suggestedQuestions, branding.defaultQuestionSource, {
+        price: strings.defaultQuestionPrice,
+        about: strings.defaultQuestionAbout,
+      })}
       privacyPolicyUrl={branding.privacyPolicyUrl}
       turnstileSiteKey={turnstileSiteKey}
     />
