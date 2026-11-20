@@ -15,9 +15,9 @@ export const LauncherButton = forwardRef<
       onClick={onToggle}
       // Widget reliability item 4: filled with the primary (neutral zinc by
       // default, the business colour when set), icon in --widget-on-primary.
-      // A 1px white ring at 15% plus a soft shadow keep the edge visible on
+      // A 1px white ring at 25% (owner decision, 2026-11-20) plus a soft shadow keep the edge visible on
       // near-black host sites; the icon itself is ~20:1 against them.
-      className="relative flex h-14 w-14 items-center justify-center bg-widget-primary text-widget-on-primary shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_4px_14px_rgba(0,0,0,0.28)] transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
+      className="relative flex h-14 w-14 items-center justify-center bg-widget-primary text-widget-on-primary shadow-[0_0_0_1px_rgba(255,255,255,0.25),0_4px_14px_rgba(0,0,0,0.28)] transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-widget-primary"
     >
       {isOpen ? (
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">

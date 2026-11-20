@@ -8,7 +8,7 @@ Last updated: 2026-11-20 (**Widget reliability (8 items) on branch `fix/widget-r
 
 ## Widget reliability: stream always ends, reload restore, visitor time zones, default chips, scroll, masked contact, poll cadence — 2026-11-20 — branch `fix/widget-reliability`, PR #159 (owner merges once CI is green)
 
-**Why:** prompt 3 of the owner's fix list, a live production test (20 Nov 2026, Chrome on Windows, widget on an allowed origin). Approved with these decisions: a `conversationId` from another visitor starts a new conversation; neutral zinc `#3f3f46` with a 1px white ring at 15% plus a soft shadow on the launcher; default chips are FAQ questions first, then "How much is {name}?" (priced items) or "Tell me about {name}."; a metadata call that misses the 3 s grace finishes in the background and its escalation is still applied; keep-alives every 5 s reset the 20 s stall clock; the follow-up contact is masked; new strings listed per language in the PR. **No migration.** Verified with unit tests and mocks only. No `next dev`, no businesses created, no live Gemini calls. Local dev still points at production by the owner's choice.
+**Why:** prompt 3 of the owner's fix list, a live production test (20 Nov 2026, Chrome on Windows, widget on an allowed origin). Approved with these decisions: a `conversationId` from another visitor starts a new conversation; neutral zinc `#3f3f46` with a 1px white ring plus a soft shadow on the launcher (15% at approval, raised to 25% by the owner after seeing the contrast numbers); default chips are FAQ questions first, then "How much is {name}?" (priced items) or "Tell me about {name}."; a metadata call that misses the 3 s grace finishes in the background and its escalation is still applied; keep-alives every 5 s reset the 20 s stall clock; the follow-up contact is masked; new strings listed per language in the PR. **No migration.** Verified with unit tests and mocks only. No `next dev`, no businesses created, no live Gemini calls. Local dev still points at production by the owner's choice.
 
 **Root causes (from the code; not reproduced live):**
 1. **Frozen on "stop":** after the reply had fully streamed, the server still waited for the parallel metadata call (up to 25 s), the metrics/cache writes and the assistant-message write before sending `final`. A timed-out or interrupted turn sent no terminal event at all, and the stream closed only after notifications/workflows. The widget cleared its only timer on the first token, so nothing bounded the wait.
@@ -41,9 +41,9 @@ Last updated: 2026-11-20 (**Widget reliability (8 items) on branch `fix/widget-r
 4. `3945df2` **Default chips and colour.**
    - With no owner chips, the widget shows up to 4 defaults from the LIVE snapshot (`lib/widget-default-questions.ts`), with templates in all 6 languages.
    - The default primary is zinc `#3f3f46`, in the widget CSS and the dashboard preview. A business colour (6-digit hex only) replaces it, and the icon colour on filled surfaces is chosen for contrast (`lib/widget-colors.ts`).
-   - The launcher is filled with the primary and has a white icon, a 1px white ring at 15% and a soft shadow. **Measured contrast:**
+   - The launcher is filled with the primary and has a white icon, a 1px white ring at 25% and a soft shadow (also in the dashboard preview). **Measured contrast:**
      - on a white page: body 10.4:1;
-     - on `#0a0a0a` (near-black): body 1.90:1, ring 1.48:1, icon 19.8:1. The icon carries recognition on dark sites; a stronger ring (25% ≈ 2.1:1) is an option if the owner wants a more visible edge.
+     - on `#0a0a0a` (near-black): body 1.90:1, ring 2.13:1 (was 1.48:1 at 15%), icon 19.8:1. The icon carries recognition on dark sites; the ring gives the visible edge.
 5. `5b86478` **Overscroll.** `overscroll-behavior: contain` on the iframe's `html`/`body` and on every scroller, including the test chat.
 6. `5902b30` **Scroll.**
    - Shared `lib/stick-to-bottom.ts` and `lib/use-stick-to-bottom.ts` (with a ResizeObserver) for the widget `MessageList` and `SandboxChatPanel` (dashboard and onboarding).

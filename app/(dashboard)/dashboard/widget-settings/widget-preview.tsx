@@ -112,7 +112,7 @@ export function WidgetPreview({
           <span className="rounded-full bg-white px-4 py-2.5 text-sm font-medium text-[#151713] shadow-[0_6px_18px_rgba(21,23,19,0.12)]">
             {ctaText?.trim() || strings.defaultCta}
           </span>
-          <span className="flex size-12 items-center justify-center rounded-full shadow-[0_0_0_1px_rgba(255,255,255,0.15),0_6px_18px_rgba(21,23,19,0.18)]" style={{ background: accent, color: onAccent }}>
+          <span className="flex size-12 items-center justify-center rounded-full shadow-[0_0_0_1px_rgba(255,255,255,0.25),0_6px_18px_rgba(21,23,19,0.18)]" style={{ background: accent, color: onAccent }}>
             <MessageCircle strokeWidth={1.75} className="size-5" aria-hidden="true" />
           </span>
         </div>

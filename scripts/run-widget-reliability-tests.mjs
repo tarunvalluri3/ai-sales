@@ -944,14 +944,14 @@ test("launcher contrast on light and dark host pages (owner's site is near-black
   // Light host page: the launcher body itself stands out strongly.
   assert.ok(colors.contrastRatio(primary, "#ffffff") >= 3, "launcher vs white page");
   // Dark host page (#0a0a0a): the body is close to the page, so the white icon
-  // carries recognition (>= 3:1 non-text contrast, WCAG 1.4.11) and the 15%
+  // carries recognition (>= 3:1 non-text contrast, WCAG 1.4.11) and the 25%
   // ring adds a visible edge.
   assert.ok(colors.contrastRatio(icon, "#0a0a0a") >= 3, "icon vs near-black page");
-  const ringOnDark = colors.compositeOver([255, 255, 255], 0.15, "#0a0a0a");
-  // Measured: body 1.90:1, 15% ring 1.48:1, icon 19.8:1 on #0a0a0a (reported in STATE.md).
-  assert.ok(colors.contrastRatio(ringOnDark, "#0a0a0a") >= 1.4, "the ring is a visible edge on near-black");
+  const ringOnDark = colors.compositeOver([255, 255, 255], 0.25, "#0a0a0a");
+  // Measured: body 1.90:1, 25% ring 2.13:1, icon 19.8:1 on #0a0a0a (reported in STATE.md).
+  assert.ok(colors.contrastRatio(ringOnDark, "#0a0a0a") >= 2, "the 25% ring is a visible edge on near-black");
   const launcher = source("app/(widget)/widget/embed/_components/launcher-button.tsx");
-  assert.match(launcher, /bg-widget-primary text-widget-on-primary shadow-\[0_0_0_1px_rgba\(255,255,255,0\.15\),0_4px_14px_rgba\(0,0,0,0\.28\)\]/);
+  assert.match(launcher, /bg-widget-primary text-widget-on-primary shadow-\[0_0_0_1px_rgba\(255,255,255,0\.25\),0_4px_14px_rgba\(0,0,0,0\.28\)\]/);
 });
 
 // --- Item 5: scrolling inside the widget never scrolls the host page ---------
