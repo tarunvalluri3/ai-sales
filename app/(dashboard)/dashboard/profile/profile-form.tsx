@@ -6,6 +6,7 @@ import { Info } from "lucide-react";
 import type { ProfileFormState } from "./actions";
 import { updateBusinessProfileAction } from "./actions";
 import { BUSINESS_TYPES } from "@/lib/schemas/business";
+import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { btnPrimary } from "../_components/ui";
 
@@ -33,6 +34,7 @@ export function ProfileForm({
   initialContactEmail,
   initialContactPhone,
   initialWebsite,
+  initialCurrency,
   canEdit = true,
 }: {
   initialName: string;
@@ -41,6 +43,7 @@ export function ProfileForm({
   initialContactEmail: string;
   initialContactPhone: string;
   initialWebsite: string;
+  initialCurrency: string;
   canEdit?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updateBusinessProfileAction, initialState);
@@ -207,6 +210,35 @@ export function ProfileForm({
                   {fieldErrors.website}
                 </p>
               ) : null}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="currency" className={labelClasses}>
+                Currency
+              </label>
+              <select
+                id="currency"
+                name="currency"
+                defaultValue={initialCurrency}
+                disabled={disabled}
+                aria-invalid={fieldErrors.currency ? true : undefined}
+                aria-describedby={fieldErrors.currency ? "currency-error" : "currency-hint"}
+                className={inputClasses}
+              >
+                {SUPPORTED_CURRENCIES.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.currency ? (
+                <p id="currency-error" className={errorClasses}>
+                  {fieldErrors.currency}
+                </p>
+              ) : (
+                <p id="currency-hint" className="text-sm text-ds-text-secondary">
+                  Prices that are just a number show in this currency, in the dashboard, the widget and AI replies.
+                </p>
+              )}
             </div>
           </div>
         </div>

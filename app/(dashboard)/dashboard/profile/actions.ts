@@ -7,9 +7,11 @@ import { deleteBusinessForOrg, getBusinessForOrg, updateBusinessProfile } from "
 import { exportBusinessData } from "@/lib/data-export";
 import { businessProfileSchema } from "@/lib/schemas/business";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { normalizeTimezone, TIMEZONE_ERROR_MESSAGES } from "@/lib/timezones";
+import { updateBusinessTimezone } from "@/lib/business-hours";
 
 export type ProfileFieldErrors = Partial<
-  Record<"name" | "businessType" | "description" | "contactEmail" | "contactPhone" | "website", string>
+  Record<"name" | "businessType" | "description" | "contactEmail" | "contactPhone" | "website" | "currency" | "timezone", string>
 >;
 
 export type ProfileFormState = {
@@ -35,22 +37,31 @@ export async function updateBusinessProfileAction(
     contactEmail: formData.get("contactEmail"),
     contactPhone: formData.get("contactPhone"),
     website: formData.get("website"),
+    // Both optional: only forms that show them send them (the onboarding
+    // business step and the profile page); absent leaves the value unchanged.
+    currency: formData.get("currency") || undefined,
   });
-  if (!parsed.success) {
+  const timezoneSent = formData.has("timezone");
+  const zone = timezoneSent ? normalizeTimezone(formData.get("timezone")) : null;
+  if (!parsed.success || (zone && !zone.ok)) {
     // Surface every invalid field at once (not just the first) so a
     // multi-field mistake doesn't take a fix-and-resubmit loop to catch.
     const fieldErrors: ProfileFieldErrors = {};
-    for (const issue of parsed.error.issues) {
+    for (const issue of parsed.success ? [] : parsed.error.issues) {
       const field = issue.path[0];
       if (typeof field === "string" && !(field in fieldErrors)) {
         fieldErrors[field as keyof ProfileFieldErrors] = issue.message;
       }
     }
+    if (zone && !zone.ok) fieldErrors.timezone = TIMEZONE_ERROR_MESSAGES[zone.reason];
     return { error: "Fix the highlighted fields below.", fieldErrors };
   }
 
   try {
-    await updateBusinessProfile(context.orgId, parsed.data);
+    const business = await updateBusinessProfile(context.orgId, parsed.data);
+    if (zone?.ok && zone.timezone !== business.timezone) {
+      await updateBusinessTimezone(business.id, zone.timezone);
+    }
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }

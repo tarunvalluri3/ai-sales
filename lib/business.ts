@@ -10,6 +10,8 @@ import { track } from "@/lib/analytics-events";
 import { getEntitlementForBusiness } from "@/lib/subscription";
 import { isAgentPublished } from "@/lib/agent-published";
 import { recordCancellationForDeletion } from "@/lib/billing-cancellation";
+import { defaultWeeklyHours } from "@/lib/business-hours-defaults";
+import { logEvent } from "@/lib/logger";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -66,7 +68,10 @@ export type CreateBusinessInput = {
   contactEmail: string | null;
   contactPhone: string | null;
   website: string | null;
+  /** Already normalised by lib/timezones.ts normalizeTimezone(). */
   timezone: string;
+  /** ISO 4217, from lib/currency.ts SUPPORTED_CURRENCIES. */
+  currency: string;
 };
 
 /**
@@ -89,6 +94,7 @@ export async function createBusinessForOrg(
       contact_phone: input.contactPhone,
       website: input.website,
       timezone: input.timezone,
+      currency: input.currency,
     })
     .select()
     .single();
@@ -106,6 +112,24 @@ export async function createBusinessForOrg(
   }
 
   track(supabase, data.id, "business.signed_up", { businessType: input.businessType });
+
+  // Real saved hours, not just what the form displays (2026-11-20): booking is
+  // on by default, and with no saved hours it has no slots and publishing is
+  // blocked on the "Business hours configured" item. Best effort: the business
+  // already exists, so a failure is logged and the readiness item simply asks
+  // the owner to save their hours -- creation never fails over it.
+  const { error: hoursError } = await supabase.from("business_hours").insert(
+    defaultWeeklyHours().map((day) => ({
+      business_id: data.id,
+      day_of_week: day.dayOfWeek,
+      is_open: day.isOpen,
+      start_time: day.startTime,
+      end_time: day.endTime,
+    })),
+  );
+  if (hoursError) {
+    logEvent("default_business_hours_failed", data.id, { code: hoursError.code ?? "unknown" }, "error");
+  }
 
   return data;
 }
@@ -132,6 +156,7 @@ export async function updateBusinessProfile(
       contact_email: input.contactEmail,
       contact_phone: input.contactPhone,
       website: input.website,
+      ...(input.currency ? { currency: input.currency } : {}),
     })
     .eq("clerk_org_id", orgId)
     .select()

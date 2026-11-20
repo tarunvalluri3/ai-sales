@@ -13,6 +13,8 @@ export type BusinessContext = {
   businessName: string;
   /** Where every business-facing email goes. Null means the business receives none -- the dashboard gates on this. Free to expose: `getBusinessForOrg` already fetches the whole row. */
   contactEmail: string | null;
+  /** ISO 4217 display currency for catalog prices (lib/currency.ts). */
+  currency: string;
   /** True once the business has published its AI -- `isAgentPublished` (lib/agent-published.ts), the single "live" signal the widget API also uses. Gates the operational dashboard pages via `requireLiveBusinessContext` below. */
   published: boolean;
 };
@@ -52,6 +54,7 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
     businessId: business.id,
     businessName: business.name,
     contactEmail: business.contact_email,
+    currency: business.currency,
     published: isAgentPublished(business),
   };
 }

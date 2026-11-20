@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SUPPORTED_WIDGET_LANGUAGES } from "@/lib/widget-i18n";
+import { SUPPORTED_CURRENCIES, type CurrencyCode } from "@/lib/currency";
 
 /**
  * Shared Zod fields for the business profile (Phase 13b). `name` is
@@ -91,6 +92,12 @@ export const businessTypeSchema = z.enum(
   BUSINESS_TYPES.map((t) => t.value) as [string, ...string[]],
 );
 
+/** ISO 4217 code from lib/currency.ts SUPPORTED_CURRENCIES (2026-11-20). */
+export const businessCurrencySchema = z.enum(
+  SUPPORTED_CURRENCIES.map((currency) => currency.code) as [CurrencyCode, ...CurrencyCode[]],
+  { message: "Choose a currency from the list." },
+);
+
 export const businessProfileSchema = z.object({
   name: businessNameSchema,
   businessType: businessTypeSchema,
@@ -101,6 +108,8 @@ export const businessProfileSchema = z.object({
   contactEmail: businessContactEmailRequiredSchema,
   contactPhone: businessContactPhoneSchema,
   website: businessWebsiteSchema,
+  // Optional: a form that doesn't show the currency leaves it unchanged.
+  currency: businessCurrencySchema.optional(),
 });
 
 export type BusinessProfileInput = z.infer<typeof businessProfileSchema>;

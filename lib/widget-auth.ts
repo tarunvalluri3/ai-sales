@@ -81,6 +81,8 @@ export type WidgetBusinessContext = {
     contactEmail: string | null;
     contactPhone: string | null;
     website: string | null;
+    /** businesses.currency -- read from the row (AUTH_COLUMNS), not the versioned snapshot. */
+    currency: string;
   };
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
@@ -97,7 +99,7 @@ export type WidgetBusinessContext = {
 
 // Identity + lifecycle only. Everything the AI says or shows comes from the
 // live snapshot (live_version_id), not from draft columns.
-const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at";
+const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at, currency";
 
 // The branding endpoint additionally keeps the draft widget columns, used only
 // as a cosmetic fallback for an agent that has never been published.
@@ -111,6 +113,7 @@ type WidgetAuthRow = {
   /** Phase 33 Stop 2 (docs/phases.md): a platform admin's suspend/soft-delete action must actually stop the AI replying, not just mark a column. */
   status: "active" | "suspended";
   deleted_at: string | null;
+  currency: string;
 };
 
 type WidgetBrandingRow = WidgetAuthRow & {
@@ -263,6 +266,7 @@ export async function resolveBusinessFromWidgetKey(
       contactEmail: config.contactEmail,
       contactPhone: config.contactPhone,
       website: config.website,
+      currency: data.businesses.currency,
     },
     language: config.language,
     recommendProductsEnabled: config.capabilities.recommendProducts,

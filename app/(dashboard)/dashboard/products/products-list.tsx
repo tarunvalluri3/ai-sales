@@ -7,6 +7,7 @@ import { DataTable, TableCell, TableRow, type DataTableColumn, type SortState } 
 import { DeleteButton } from "../_components/delete-button";
 import type { deleteProductAction as DeleteProductAction } from "./actions";
 import type { Product } from "@/lib/supabase/types";
+import { formatCatalogPrice } from "@/lib/currency";
 
 const COLUMNS: DataTableColumn[] = [
   { key: "name", label: "Product", width: "minmax(14rem,2fr)", sortable: true },
@@ -25,11 +26,14 @@ const EDIT_CLASS =
  */
 export function ProductsList({
   products,
+  currency,
   canEdit,
   deleteProductAction,
   onEdit,
 }: {
   products: Product[];
+  /** The business's currency (ISO 4217): a price that is just a number is shown in it. */
+  currency: string;
   canEdit: boolean;
   deleteProductAction: typeof DeleteProductAction;
   /** When set, "Edit" calls this instead of navigating to /dashboard/products/[id]/edit -- used by the onboarding wizard to keep editing inline. */
@@ -70,7 +74,11 @@ export function ProductsList({
             </span>
           </TableCell>
           <TableCell>
-            {product.price ? <span className="text-sm font-medium text-ds-text-primary">${product.price}</span> : "—"}
+            {product.price ? (
+              <span className="min-w-0 text-sm font-medium break-words text-ds-text-primary">{formatCatalogPrice(product.price, currency)}</span>
+            ) : (
+              "—"
+            )}
           </TableCell>
           <TableCell className="gap-1">
             {canEdit ? (

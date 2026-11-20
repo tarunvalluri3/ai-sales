@@ -192,7 +192,7 @@ export default async function OnboardingPage({
           eyebrow: "Step 2 of 6 · Train your agent · 2/3",
           heading: "What do you sell?",
           description: "Add at least one product or service your agent can talk about.",
-          content: <TrainProductsStep products={products} />,
+          content: <TrainProductsStep products={products} currency={business.currency} />,
           footer: null,
         };
       case "faqs":

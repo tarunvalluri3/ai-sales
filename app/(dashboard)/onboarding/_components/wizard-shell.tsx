@@ -167,7 +167,10 @@ export function WizardShell({
           </div>
 
           {footer ? (
-            <div className="sticky bottom-0 border-t border-ds-border bg-ds-bg px-4 py-4 md:px-8">
+            // z-20: the footer (Back / Continue) must paint above anything in the
+            // step content, including another sticky element (2026-11-20 bug:
+            // a sticky card covered Continue on desktop). Below the z-30 header.
+            <div className="sticky bottom-0 z-20 border-t border-ds-border bg-ds-bg px-4 py-4 md:px-8">
               <div className="mx-auto w-full max-w-xl">{footer}</div>
             </div>
           ) : null}

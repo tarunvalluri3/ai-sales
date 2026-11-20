@@ -31,6 +31,7 @@ export default async function ProfilePage() {
           initialDescription={business.description ?? ""}
           initialContactEmail={business.contact_email ?? ""}
           initialContactPhone={business.contact_phone ?? ""}
+          initialCurrency={business.currency}
           initialWebsite={business.website ?? ""}
           canEdit={isAdmin}
         />

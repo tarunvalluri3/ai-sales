@@ -4,6 +4,7 @@ import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
 import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 import type { SnapshotCatalogItem } from "@/lib/agent-snapshot";
+import { formatCatalogPrice } from "@/lib/currency";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -61,13 +62,17 @@ const MAX_OFFERINGS_PER_TABLE = 30;
 export async function loadOfferings(
   supabase: SupabaseClient,
   businessId: string,
+  // The business's currency (ISO 4217): every price leaves here already
+  // formatted for display (lib/currency.ts), so the model, the prefetched
+  // catalog and the stored catalog answer never see a bare "6500".
+  currency: string,
   source: AgentSource = DRAFT_SOURCE,
 ): Promise<OfferingSummary[] | null> {
   if (source.kind === "live") {
     const { products, services } = source.snapshot;
     return [
-      ...products.slice(0, MAX_OFFERINGS_PER_TABLE).map((item) => toOffering("product", item)),
-      ...services.slice(0, MAX_OFFERINGS_PER_TABLE).map((item) => toOffering("service", item)),
+      ...products.slice(0, MAX_OFFERINGS_PER_TABLE).map((item) => toOffering("product", item, currency)),
+      ...services.slice(0, MAX_OFFERINGS_PER_TABLE).map((item) => toOffering("service", item, currency)),
     ];
   }
 
@@ -91,26 +96,27 @@ export async function loadOfferings(
   if (productError || serviceError || !products || !services) return null;
 
   return [
-    ...products.map((product) => ({ type: "product" as const, name: product.name, description: product.description, price: product.price })),
-    ...services.map((service) => ({ type: "service" as const, name: service.name, description: service.description, price: service.price })),
+    ...products.map((product) => ({ type: "product" as const, name: product.name, description: product.description, price: formatCatalogPrice(product.price, currency) })),
+    ...services.map((service) => ({ type: "service" as const, name: service.name, description: service.description, price: formatCatalogPrice(service.price, currency) })),
   ];
 }
 
-function toOffering(type: "product" | "service", item: SnapshotCatalogItem): OfferingSummary {
+function toOffering(type: "product" | "service", item: SnapshotCatalogItem, currency: string): OfferingSummary {
   return {
     type,
     name: item.name,
     description: item.description,
-    price: item.price === null ? null : String(item.price),
+    price: formatCatalogPrice(item.price, currency),
   };
 }
 
 export async function executeListOfferings(
   supabase: SupabaseClient,
   businessId: string,
+  currency: string,
   source: AgentSource = DRAFT_SOURCE,
 ): Promise<ListOfferingsResult> {
-  const offerings = await loadOfferings(supabase, businessId, source);
+  const offerings = await loadOfferings(supabase, businessId, currency, source);
 
   if (offerings === null) {
     logEvent("tool_invoked", businessId, { tool: "list_products_and_services", result: "lookup_failed" }, "error");

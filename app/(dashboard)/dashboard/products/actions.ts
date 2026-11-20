@@ -8,28 +8,10 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createProduct, updateProduct, deleteProduct, approveProductDraft, rejectProductDraft } from "@/lib/products";
 import { processIngestionQueue } from "@/lib/ingestion-queue";
-import {
-  catalogNameSchema,
-  catalogDescriptionSchema,
-  catalogPriceSchema,
-  catalogImageUrlSchema,
-  catalogCategorySchema,
-  catalogPriceAmountSchema,
-} from "@/lib/schemas/catalog";
+import { parseCatalogForm, readCatalogFormValues, type CatalogFieldErrors, type CatalogFormValues } from "@/lib/schemas/catalog";
 import { logAndGetUserMessage } from "@/lib/errors";
 
-const productFieldsSchema = z.object({
-  name: catalogNameSchema,
-  description: catalogDescriptionSchema,
-  price: catalogPriceSchema,
-  image_url: catalogImageUrlSchema,
-  category: catalogCategorySchema,
-  price_amount: catalogPriceAmountSchema,
-});
-
-const updateProductSchema = productFieldsSchema.extend({
-  id: z.string().uuid(),
-});
+const productIdSchema = z.string().uuid();
 
 /** Same fix as dashboard/faqs/actions.ts's triggerIngestionProcessing() -- see its doc comment (2026-10-29 bugfix, STATE.md). */
 function triggerIngestionProcessing(): void {
@@ -39,34 +21,33 @@ function triggerIngestionProcessing(): void {
 export type ProductFormState = {
   error?: string;
   success?: boolean;
+  /** Per-field validation errors, shown next to each field. */
+  fieldErrors?: CatalogFieldErrors;
+  /** What was submitted, so a rejected form keeps the owner's input. */
+  values?: CatalogFormValues;
 };
+
+const INVALID_FORM_MESSAGE = "Fix the highlighted fields.";
 
 export async function createProductAction(
   _prevState: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
   }
 
-  const parsed = productFieldsSchema.safeParse({
-    name: formData.get("name"),
-    description: formData.get("description"),
-    price: formData.get("price"),
-    image_url: formData.get("image_url"),
-    category: formData.get("category"),
-    price_amount: formData.get("price_amount"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter a valid product." };
+  const parsed = parseCatalogForm(formData);
+  if (!parsed.ok) {
+    return { error: INVALID_FORM_MESSAGE, fieldErrors: parsed.fieldErrors, values: parsed.values };
   }
 
   try {
-    await createProduct(businessId, parsed.data);
+    await createProduct(businessId, parsed.data, currency);
   } catch (error) {
-    return { error: logAndGetUserMessage(error) };
+    return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }
 
   triggerIngestionProcessing();
@@ -78,32 +59,28 @@ export async function updateProductAction(
   _prevState: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
   }
 
-  const parsed = updateProductSchema.safeParse({
-    id: formData.get("id"),
-    name: formData.get("name"),
-    description: formData.get("description"),
-    price: formData.get("price"),
-    image_url: formData.get("image_url"),
-    category: formData.get("category"),
-    price_amount: formData.get("price_amount"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter a valid product." };
+  const idParsed = productIdSchema.safeParse(formData.get("id"));
+  if (!idParsed.success) {
+    return { error: "Invalid product." };
   }
-
-  const { id, ...input } = parsed.data;
+  const parsed = parseCatalogForm(formData);
+  if (!parsed.ok) {
+    return { error: INVALID_FORM_MESSAGE, fieldErrors: parsed.fieldErrors, values: parsed.values };
+  }
+  const id = idParsed.data;
+  const input = parsed.data;
 
   let updated: boolean;
   try {
-    updated = await updateProduct(businessId, id, input);
+    updated = await updateProduct(businessId, id, input, currency);
   } catch (error) {
-    return { error: logAndGetUserMessage(error) };
+    return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }
 
   if (!updated) {
@@ -129,32 +106,28 @@ export async function updateProductInPlaceAction(
   _prevState: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
   }
 
-  const parsed = updateProductSchema.safeParse({
-    id: formData.get("id"),
-    name: formData.get("name"),
-    description: formData.get("description"),
-    price: formData.get("price"),
-    image_url: formData.get("image_url"),
-    category: formData.get("category"),
-    price_amount: formData.get("price_amount"),
-  });
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter a valid product." };
+  const idParsed = productIdSchema.safeParse(formData.get("id"));
+  if (!idParsed.success) {
+    return { error: "Invalid product." };
   }
-
-  const { id, ...input } = parsed.data;
+  const parsed = parseCatalogForm(formData);
+  if (!parsed.ok) {
+    return { error: INVALID_FORM_MESSAGE, fieldErrors: parsed.fieldErrors, values: parsed.values };
+  }
+  const id = idParsed.data;
+  const input = parsed.data;
 
   let updated: boolean;
   try {
-    updated = await updateProduct(businessId, id, input);
+    updated = await updateProduct(businessId, id, input, currency);
   } catch (error) {
-    return { error: logAndGetUserMessage(error) };
+    return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }
 
   if (!updated) {
@@ -207,7 +180,7 @@ export async function approveProductAction(
   _prevState: ReviewState,
   formData: FormData,
 ): Promise<ReviewState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
@@ -220,7 +193,7 @@ export async function approveProductAction(
 
   let approved: boolean;
   try {
-    approved = await approveProductDraft(businessId, parsed.data.id);
+    approved = await approveProductDraft(businessId, parsed.data.id, currency);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }

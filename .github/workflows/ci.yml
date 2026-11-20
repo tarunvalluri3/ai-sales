@@ -324,6 +324,14 @@ jobs:
         # no model, no database, no secrets.
         run: npm run test:ai-honesty
 
+      - name: Time zone, currency and catalog form tests
+        # 2026-11-20 onboarding fixes (STATE.md): time zone detection and
+        # validation (no silent UTC), default saved hours, business currency,
+        # display prices incl. Indian grouping, the catalog form keeping its
+        # values on rejection, and the sticky-footer overlap. Pure modules and
+        # source checks, no database, no secrets.
+        run: npm run test:locale-catalog
+
       - name: Guardrail response-path tests
         # Guardrails Phase 5 (STATE.md): the enforcing response policy (fixed safe
         # reply + handover, repeated-abuse cut-off), the owner-facing flag labels,

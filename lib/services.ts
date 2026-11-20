@@ -5,6 +5,7 @@ import { AppError } from "@/lib/errors";
 import { syncGeneratedDocument, deleteGeneratedDocument } from "@/lib/knowledge-sync";
 import { embedText } from "@/lib/embeddings";
 import { logEvent } from "@/lib/logger";
+import { formatCatalogPrice } from "@/lib/currency";
 
 export type ServiceInput = {
   name: string;
@@ -15,7 +16,12 @@ export type ServiceInput = {
   price_amount: number | null;
 };
 
-function buildKnowledgeContent(input: ServiceInput): string {
+/**
+ * The text behind this item's generated knowledge document and its embedding.
+ * The price is formatted in the business's currency (lib/currency.ts) so a
+ * retrieved chunk never shows the model a bare "6500" (2026-11-20).
+ */
+function buildKnowledgeContent(input: Pick<ServiceInput, "name" | "description" | "price" | "category">, currency: string): string {
   const parts = [input.name];
   if (input.category) {
     parts.push(`Category: ${input.category}`);
@@ -23,8 +29,9 @@ function buildKnowledgeContent(input: ServiceInput): string {
   if (input.description) {
     parts.push(input.description);
   }
-  if (input.price) {
-    parts.push(`Price: ${input.price}`);
+  const price = formatCatalogPrice(input.price, currency);
+  if (price) {
+    parts.push(`Price: ${price}`);
   }
   return parts.join("\n\n");
 }
@@ -143,9 +150,11 @@ export async function listPendingReviewServices(businessId: string): Promise<Ser
 export async function createService(
   businessId: string,
   input: ServiceInput,
+  /** businesses.currency, for the knowledge text's price (from requireBusinessContext). */
+  currency: string,
 ): Promise<Service> {
   const supabase = createServerSupabaseClient();
-  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input));
+  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input, currency));
   const { data, error } = await supabase
     .from("services")
     .insert({ business_id: businessId, ...input, embedding })
@@ -160,7 +169,7 @@ export async function createService(
     );
   }
 
-  await syncGeneratedDocument(businessId, "service", data.id, data.name, buildKnowledgeContent(input));
+  await syncGeneratedDocument(businessId, "service", data.id, data.name, buildKnowledgeContent(input, currency));
 
   return data;
 }
@@ -175,12 +184,13 @@ export async function updateService(
   businessId: string,
   id: string,
   input: ServiceInput,
+  currency: string,
 ): Promise<boolean> {
   const supabase = createServerSupabaseClient();
   // A failed embedding attempt (`null`) is omitted from the update
   // payload rather than written, so a transient failure on an edit
   // never overwrites a previously-successful embedding with null.
-  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input));
+  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input, currency));
   const { data, error } = await supabase
     .from("services")
     .update({ ...input, ...(embedding !== null ? { embedding } : {}) })
@@ -200,7 +210,7 @@ export async function updateService(
     return false;
   }
 
-  await syncGeneratedDocument(businessId, "service", id, input.name, buildKnowledgeContent(input));
+  await syncGeneratedDocument(businessId, "service", id, input.name, buildKnowledgeContent(input, currency));
 
   return true;
 }
@@ -241,7 +251,7 @@ export async function deleteService(businessId: string, id: string): Promise<boo
  * never re-sync an already-approved row. `false` for a cross-tenant,
  * nonexistent, or already-approved id.
  */
-export async function approveServiceDraft(businessId: string, id: string): Promise<boolean> {
+export async function approveServiceDraft(businessId: string, id: string, currency: string): Promise<boolean> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("services")
@@ -267,12 +277,12 @@ export async function approveServiceDraft(businessId: string, id: string): Promi
   // A draft extraction was never embedded (only createService/updateService
   // compute it) -- compute it now, on the same admin-triggered approve
   // action, so an approved item is immediately recommend_products-ready.
-  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(service));
+  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(service, currency));
   if (embedding !== null) {
     await supabase.from("services").update({ embedding }).eq("business_id", businessId).eq("id", service.id);
   }
 
-  await syncGeneratedDocument(businessId, "service", service.id, service.name, buildKnowledgeContent(service));
+  await syncGeneratedDocument(businessId, "service", service.id, service.name, buildKnowledgeContent(service, currency));
 
   return true;
 }

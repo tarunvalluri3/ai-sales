@@ -5,13 +5,14 @@ import { listServicesForBusiness, listPendingReviewServices } from "@/lib/servic
 import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
 import { ReviewActions } from "../_components/review-actions";
 import { ServiceForm } from "./service-form";
+import { formatCatalogPrice } from "@/lib/currency";
 import { ServicesList } from "./services-list";
 import { createServiceAction, deleteServiceAction, approveServiceAction, rejectServiceAction } from "./actions";
 import { PermissionNotice } from "../_components/state-views";
 import { Card, PageHeader, Pill } from "../_components/ui";
 
 export default async function ServicesPage() {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:member");
   const [services, pendingServices] = await Promise.all([
     listServicesForBusiness(businessId),
@@ -57,7 +58,7 @@ export default async function ServicesPage() {
                       </p>
                     </div>
                     {service.price ? (
-                      <span className="text-sm font-medium text-ds-text-primary">${service.price}</span>
+                      <span className="text-sm font-medium text-ds-text-primary">{formatCatalogPrice(service.price, currency)}</span>
                     ) : null}
                     <ReviewActions
                       approveAction={approveServiceAction}
@@ -83,7 +84,7 @@ export default async function ServicesPage() {
                 No services yet. Add your first service so your AI sales employee can answer questions about it.
               </p>
             ) : (
-              <ServicesList services={services} canEdit={canEdit} deleteServiceAction={deleteServiceAction} />
+              <ServicesList services={services} currency={currency} canEdit={canEdit} deleteServiceAction={deleteServiceAction} />
             )}
             <p className="border-t border-ds-border pt-3 text-sm text-ds-text-secondary">
               Your services help the AI recommend the right solution.
@@ -97,7 +98,7 @@ export default async function ServicesPage() {
             <p className="dx-subtitle">Describe what you offer and who it helps.</p>
           </div>
           {canEdit ? (
-            <ServiceForm action={createServiceAction} submitLabel="Add service" pendingLabel="Adding…" />
+            <ServiceForm action={createServiceAction} currency={currency} submitLabel="Add service" pendingLabel="Adding…" />
           ) : (
             <PermissionNotice />
           )}

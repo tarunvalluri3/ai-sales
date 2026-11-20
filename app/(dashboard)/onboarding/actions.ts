@@ -21,7 +21,10 @@ import {
   businessContactPhoneSchema,
   businessWebsiteSchema,
   businessPrivacyPolicyUrlSchema,
+  businessCurrencySchema,
 } from "@/lib/schemas/business";
+import { normalizeTimezone, TIMEZONE_ERROR_MESSAGES } from "@/lib/timezones";
+import { currencyForTimezone } from "@/lib/currency";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 const createBusinessSchema = z.object({
@@ -32,10 +35,11 @@ const createBusinessSchema = z.object({
   contactPhone: businessContactPhoneSchema,
   website: businessWebsiteSchema,
   timezone: z.string().trim().min(1),
+  currency: businessCurrencySchema,
 });
 
 export type CreateBusinessFieldErrors = Partial<
-  Record<"name" | "businessType" | "description" | "contactEmail" | "contactPhone" | "website" | "timezone", string>
+  Record<"name" | "businessType" | "description" | "contactEmail" | "contactPhone" | "website" | "timezone" | "currency", string>
 >;
 
 export type CreateBusinessState = {
@@ -53,14 +57,18 @@ export async function createBusiness(
     return { error: "Select or create an organization first." };
   }
 
-  const timezoneRaw = formData.get("timezone");
-  const timezone = typeof timezoneRaw === "string" && timezoneRaw.trim() !== "" ? timezoneRaw.trim() : "UTC";
-  try {
-    // Throws for anything that isn't a real IANA timezone name.
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-  } catch {
-    return { error: "Please choose a valid timezone." };
-  }
+  // Never a silent UTC fallback (bug, 2026-11-20: an IST sign-up got UTC
+  // hours). A missing or unknown zone is an error on the field; a legacy
+  // browser name ("Asia/Calcutta") is mapped to the current one.
+  const zone = normalizeTimezone(formData.get("timezone"));
+  // The currency defaults from the zone only when the form didn't send one.
+  const currencyRaw = formData.get("currency");
+  const currency =
+    typeof currencyRaw === "string" && currencyRaw.trim() !== ""
+      ? currencyRaw.trim()
+      : zone.ok
+        ? currencyForTimezone(zone.timezone)
+        : "";
 
   const parsed = createBusinessSchema.safeParse({
     name: formData.get("name"),
@@ -69,19 +77,21 @@ export async function createBusiness(
     contactEmail: formData.get("contactEmail"),
     contactPhone: formData.get("contactPhone"),
     website: formData.get("website"),
-    timezone,
+    timezone: zone.ok ? zone.timezone : "",
+    currency,
   });
-  if (!parsed.success) {
+  if (!parsed.success || !zone.ok) {
     // Surface every invalid field at once (not just the first) so a
     // multi-step wizard doesn't send the admin back and forth one field
     // at a time -- matches profile/actions.ts's existing pattern.
     const fieldErrors: CreateBusinessFieldErrors = {};
-    for (const issue of parsed.error.issues) {
+    for (const issue of parsed.success ? [] : parsed.error.issues) {
       const field = issue.path[0];
       if (typeof field === "string" && !(field in fieldErrors)) {
         fieldErrors[field as keyof CreateBusinessFieldErrors] = issue.message;
       }
     }
+    if (!zone.ok) fieldErrors.timezone = TIMEZONE_ERROR_MESSAGES[zone.reason];
     return { error: "Fix the highlighted fields below.", fieldErrors };
   }
 

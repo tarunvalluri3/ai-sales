@@ -85,7 +85,8 @@ export async function loadCatalogNames(
   source: AgentSource = DRAFT_SOURCE,
 ): Promise<string[]> {
   try {
-    const offerings = await loadOfferings(supabase, businessId, source);
+    // Names only, so the currency used for price formatting is irrelevant here.
+    const offerings = await loadOfferings(supabase, businessId, "INR", source);
     return (offerings ?? []).map((offering) => offering.name);
   } catch {
     return [];
