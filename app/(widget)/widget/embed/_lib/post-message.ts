@@ -115,9 +115,17 @@ export type WidgetStreamEndMessage = {
   recommendedProducts: WidgetRecommendedProduct[];
 };
 
+/** Widget reliability item 1: the server's keep-alive, relayed by the loader. Re-arms the iframe's stall clock; carries nothing else. */
+export type WidgetStreamPingMessage = {
+  type: "widget:stream_ping";
+  requestId: string;
+};
+
 export type WidgetStreamAbortedMessage = {
   type: "widget:stream_aborted";
   requestId: string;
+  /** Widget reliability item 1: true when the connection dropped (not a stop): keep the partial text but offer Retry. */
+  dropped?: boolean;
 };
 
 /** iframe -> loader: the visitor pressed stop. The loader aborts the in-flight fetch for this request and replies with widget:stream_aborted. */
@@ -215,6 +223,7 @@ export type FromParentMessage =
   | WidgetStreamRetractMessage
   | WidgetStreamEndMessage
   | WidgetStreamAbortedMessage
+  | WidgetStreamPingMessage
   | WidgetPollResultMessage
   | WidgetRestoreMessage
   | WidgetRecentChatsResultMessage;
@@ -313,9 +322,14 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
         return { type: "widget:stream_end", requestId: data.requestId, escalate: data.escalate, recommendedProducts };
       }
       return null;
+    case "widget:stream_ping":
+      if (typeof data.requestId === "string") {
+        return { type: "widget:stream_ping", requestId: data.requestId };
+      }
+      return null;
     case "widget:stream_aborted":
       if (typeof data.requestId === "string") {
-        return { type: "widget:stream_aborted", requestId: data.requestId };
+        return { type: "widget:stream_aborted", requestId: data.requestId, dropped: data.dropped === true };
       }
       return null;
     case "widget:poll_result":

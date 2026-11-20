@@ -35,7 +35,9 @@ import { createMessage, listRecentMessages } from "@/lib/messages";
 import { askSalesEmployee, streamSalesEmployee, type SalesEmployeeResponse } from "@/lib/rag";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 import { CORS_HEADERS } from "@/lib/http/widget-cors";
-import { clientWantsStream, encodeStreamEvent, CHAT_STREAM_CONTENT_TYPE, type ChatStreamEvent } from "@/lib/chat-stream";
+import { clientWantsStream, CHAT_STREAM_CONTENT_TYPE } from "@/lib/chat-stream";
+import { createChatSseStream } from "@/lib/chat-sse-response";
+import { applyLateJudgement } from "@/lib/chat-late-judgement";
 import { logEvent } from "@/lib/logger";
 import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import {
@@ -48,7 +50,11 @@ import { dispatchWorkflowTrigger } from "@/lib/workflow-engine";
 import { dispatchNotification } from "@/lib/notification-dispatch";
 import { getAppUrl } from "@/lib/app-url";
 import { after } from "next/server";
-import { CHAT_SERVER_MAX_DURATION_SECONDS } from "@/lib/chat-timeouts";
+import {
+  CHAT_SERVER_MAX_DURATION_SECONDS,
+  STREAM_KEEPALIVE_INTERVAL_MS,
+  STREAM_SERVER_WATCHDOG_MS,
+} from "@/lib/chat-timeouts";
 import { TurnTimer } from "@/lib/turn-timings";
 import { finalizeTurnMetrics, writeDeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
@@ -587,67 +593,97 @@ export async function POST(request: NextRequest) {
     // Guardrails Phase 5: a message the classifier flagged (injection / abuse) is not a
     // knowledge gap, so it must not show up in the owner's "top unanswered questions".
     const flaggedByGuardrails = hasClassifierFlag(prepared.signals);
-    const finalizeTurnSideEffects = async (response: SalesEmployeeResponse, interrupted: boolean) => {
-      // Phase 25b "top unanswered questions": only a genuine knowledge gap
-      // (ungrounded, and not already escalated). A failure here must never
-      // fail the prospect's real response.
-      if (!interrupted && !response.grounded && !response.escalate && !flaggedByGuardrails) {
-        const { error: unansweredError } = await timer.time("unanswered_question_write", async () =>
-          await supabase
-            .from("unanswered_questions")
-            .insert({ business_id: business.businessId, conversation_id: conversationRowId, question: message }),
+    // Phase 25b "top unanswered questions": only a genuine knowledge gap
+    // (ungrounded, and not already escalated). A failure here must never
+    // fail the prospect's real response.
+    const recordUnansweredQuestion = async () => {
+      const { error: unansweredError } = await timer.time("unanswered_question_write", async () =>
+        await supabase
+          .from("unanswered_questions")
+          .insert({ business_id: business.businessId, conversation_id: conversationRowId, question: message }),
+      );
+      if (unansweredError) {
+        logEvent("unanswered_question_log_failed", business.businessId, { conversationId: conversation.id }, "error");
+      }
+    };
+
+    // Flags the conversation for dashboard attention -- deliberately does not
+    // change `control` (prompts/phase-15a-handoff-state-and-ai-pause.md's
+    // "Decisions and assumptions" #1) -- plus the handover notification and
+    // the workflow trigger. Shared by the immediate side effects and a late
+    // metadata judgement (widget reliability item 1).
+    const escalateConversation = async () => {
+      const flagResult = await timer.time("escalation_flag", () =>
+        flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
+      );
+      logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
+
+      // Gated on the transition into needing attention, not on every
+      // escalated turn. after() so the prospect never waits on an email.
+      if (!flagResult.wasAlreadyFlagged) {
+        const conversationLink = `/dashboard/conversations/${conversation.id}`;
+        after(() =>
+          dispatchNotification({
+            businessId: business.businessId,
+            category: "human_handover",
+            message: `A conversation needs a human: "${message}"`,
+            link: conversationLink,
+            supabase,
+            email: {
+              subject: `A conversation needs a human — ${business.businessName}`,
+              heading: "Your AI handed a conversation to a human",
+              paragraphs: ["The AI couldn't answer this one and flagged it for someone on your team."],
+              facts: [{ label: "What they asked", value: message.slice(0, 200) }],
+              cta: { label: "Take over the conversation", url: `${getAppUrl()}${conversationLink}` },
+            },
+          }),
         );
-        if (unansweredError) {
-          logEvent("unanswered_question_log_failed", business.businessId, { conversationId: conversation.id }, "error");
-        }
+      }
+
+      await timer.time("workflow_trigger", () =>
+        dispatchWorkflowTrigger(
+          supabase,
+          business.businessId,
+          "conversation_needs_attention",
+          {
+            type: "conversation",
+            id: conversationRowId,
+            customerId: conversation.customer_id,
+            leadId: null,
+            conversationId: conversationRowId,
+          },
+          {},
+          "widget",
+        ),
+      );
+    };
+
+    const finalizeTurnSideEffects = async (response: SalesEmployeeResponse, interrupted: boolean) => {
+      // With a pending (late) judgement, "grounded" is not known yet: the
+      // unanswered-question decision is made when the judgement arrives.
+      if (!interrupted && !response.pendingJudgement && !response.grounded && !response.escalate && !flaggedByGuardrails) {
+        await recordUnansweredQuestion();
       }
 
       if (response.escalate) {
-        // Flags the conversation for dashboard attention -- deliberately
-        // does not change `control`. See prompts/phase-15a-handoff-state-and-ai-pause.md's
-        // "Decisions and assumptions" #1.
-        const flagResult = await timer.time("escalation_flag", () =>
-          flagConversationNeedsAttention(supabase, business.businessId, conversationRowId, business.clerkOrgId),
-        );
-        logEvent("chat_escalation_triggered", business.businessId, { conversationId: conversation.id });
+        await escalateConversation();
+      }
 
-        // Gated on the transition into needing attention, not on every
-        // escalated turn. after() so the prospect never waits on an email.
-        if (!flagResult.wasAlreadyFlagged) {
-          const conversationLink = `/dashboard/conversations/${conversation.id}`;
-          after(() =>
-            dispatchNotification({
-              businessId: business.businessId,
-              category: "human_handover",
-              message: `A conversation needs a human: "${message}"`,
-              link: conversationLink,
-              supabase,
-              email: {
-                subject: `A conversation needs a human — ${business.businessName}`,
-                heading: "Your AI handed a conversation to a human",
-                paragraphs: ["The AI couldn't answer this one and flagged it for someone on your team."],
-                facts: [{ label: "What they asked", value: message.slice(0, 200) }],
-                cta: { label: "Take over the conversation", url: `${getAppUrl()}${conversationLink}` },
-              },
-            }),
-          );
-        }
-
-        await timer.time("workflow_trigger", () =>
-          dispatchWorkflowTrigger(
-            supabase,
-            business.businessId,
-            "conversation_needs_attention",
-            {
-              type: "conversation",
-              id: conversationRowId,
-              customerId: conversation.customer_id,
-              leadId: null,
-              conversationId: conversationRowId,
-            },
-            {},
-            "widget",
-          ),
+      // Widget reliability item 1: the metadata call missed the grace period.
+      // Finish it in the background and still apply its escalation, so a
+      // "talk to a person" turn is always flagged however slow the call was.
+      const pendingJudgement = response.pendingJudgement;
+      if (pendingJudgement && !interrupted) {
+        after(() =>
+          applyLateJudgement(pendingJudgement, {
+            alreadyEscalated: response.escalate,
+            flaggedByGuardrails,
+            hadDocuments: response.sourceChunkIds.length > 0,
+            escalate: async () => escalateConversation(),
+            recordUnanswered: recordUnansweredQuestion,
+            log: (event, fields) =>
+              logEvent(event, business.businessId, { conversationId: conversation.id, ...fields }, event === "ai_stream_metadata_failed" ? "error" : "info"),
+          }).then(() => undefined, (error) => void logAndGetUserMessage(error)),
         );
       }
 
@@ -752,96 +788,54 @@ export async function POST(request: NextRequest) {
     // returned JSON regardless -- a streaming loader detects a non-stream
     // content type and handles that JSON response as it always has.
     if (clientWantsStream(request.headers.get("accept"), parsed.data.stream)) {
-      const abortController = new AbortController();
-      const onClientAbort = () => abortController.abort();
-      request.signal.addEventListener("abort", onClientAbort);
-      const encoder = new TextEncoder();
-
-      const sseStream = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          const emit = (event: ChatStreamEvent) => {
-            try {
-              controller.enqueue(encoder.encode(encodeStreamEvent(event)));
-            } catch {
-              // The connection is gone -- nothing more can be written, but
-              // persistence below still runs so the turn is recorded.
-            }
-          };
-          // First, always: lets the loader store the conversation id and the
-          // polling cursor even if the stream then dies mid-answer.
-          emit({ type: "meta", conversationId: conversation.id, asOf: userMessageRow.created_at });
-
-          let finalResponse: SalesEmployeeResponse | null = null;
-          let interrupted = false;
-          try {
-            for await (const chunk of streamSalesEmployee(
-              supabase,
-              business.businessId,
-              conversation.id,
-              business.businessName,
-              business.businessProfile,
-              message,
-              history,
-              business.language,
-              { recommendProductsEnabled: business.recommendProductsEnabled, appointmentsEnabled: business.appointmentsEnabled },
-              timer,
-              quota,
-              abortController.signal,
-              queryEmbedding,
-              instant,
-              partB,
-              "widget",
-              business.liveSource,
-            )) {
-              if (chunk.kind === "delta") {
-                emit({ type: "delta", text: chunk.text });
-              } else if (chunk.kind === "retract") {
-                emit({ type: "retract", text: chunk.text });
-              } else {
-                finalResponse = chunk.response;
-                interrupted = chunk.interrupted;
-              }
-            }
-          } catch (error) {
-            logAndGetUserMessage(error);
-            interrupted = true;
-            emit({ type: "error", kind: "failure" });
-          }
-
-          // Persist first (so the final event can carry the assistant
-          // message's own timestamp as the poll cursor, exactly like the
-          // JSON path -- otherwise a later poll would re-surface the
-          // just-streamed reply as a duplicate). The prospect has already
-          // received every delta, so this is off their critical path.
-          try {
-            if (finalResponse) {
-              const assistantMessageRow = await writeAssistantMessage(finalResponse, interrupted);
-              if (!interrupted) {
-                emit({
-                  type: "final",
-                  escalate: finalResponse.escalate,
-                  recommendedProducts: finalResponse.recommendedProducts,
-                  asOf: assistantMessageRow.created_at,
-                });
-              }
-              await finalizeTurnSideEffects(finalResponse, interrupted);
-            }
-          } catch (error) {
+      // Widget reliability item 1: lib/chat-sse-response.ts guarantees exactly
+      // one terminal event and a close on every path (success, tool error,
+      // guard rewrite, server timeout, persistence failure, a hung generator),
+      // keep-alive pings while the turn works, and side effects only AFTER the
+      // terminal event -- the visitor never waits on notifications/workflows.
+      const sseStream = createChatSseStream<SalesEmployeeResponse>({
+        // First, always: lets the loader store the conversation id and the
+        // polling cursor even if the stream then dies mid-answer.
+        meta: { conversationId: conversation.id, asOf: userMessageRow.created_at },
+        generate: (signal) =>
+          streamSalesEmployee(
+            supabase,
+            business.businessId,
+            conversation.id,
+            business.businessName,
+            business.businessProfile,
+            message,
+            history,
+            business.language,
+            { recommendProductsEnabled: business.recommendProductsEnabled, appointmentsEnabled: business.appointmentsEnabled },
+            timer,
+            quota,
+            signal,
+            queryEmbedding,
+            instant,
+            partB,
+            "widget",
+            business.liveSource,
+          ),
+        // Persist first so the final event carries the assistant message's own
+        // timestamp as the poll cursor (otherwise a later poll would re-surface
+        // the just-streamed reply as a duplicate).
+        persist: async (response, interrupted) => {
+          const row = await writeAssistantMessage(response, interrupted);
+          return { asOf: row.created_at };
+        },
+        sideEffects: finalizeTurnSideEffects,
+        logError: (stage, error) => {
+          if (stage === "watchdog") {
+            logEvent("chat_stream_watchdog_fired", business.businessId, { conversationId: conversation.id }, "error");
+          } else {
             logAndGetUserMessage(error);
           }
-
-          request.signal.removeEventListener("abort", onClientAbort);
-          try {
-            controller.close();
-          } catch {
-            // Already closed/cancelled -- nothing to do.
-          }
         },
-        cancel() {
-          // The client went away; unwind the generator promptly.
-          request.signal.removeEventListener("abort", onClientAbort);
-          abortController.abort();
-        },
+        clientSignal: request.signal,
+        keepAliveMs: STREAM_KEEPALIVE_INTERVAL_MS,
+        // Measured from the start of the turn, like the AI deadline itself.
+        watchdogMs: Math.max(5_000, STREAM_SERVER_WATCHDOG_MS - timer.elapsedMs()),
       });
 
       return new Response(sseStream, {

@@ -42,7 +42,11 @@ export type ChatStreamErrorKind = "failure" | "unauthorized" | "rate_limited";
  *   2. zero or more `delta`, the answer text in order;
  *   3. exactly one terminal event -- `final` on success (carrying the
  *      model-judged escalate and the captured recommendedProducts), or
- *      `error` on a mid-stream failure.
+ *      `error` on a mid-stream failure. Guaranteed on every path (success,
+ *      tool error, guard rewrite, timeout, persistence failure, watchdog)
+ *      by lib/chat-sse-response.ts.
+ *   `ping` (keep-alive, no payload) may appear any number of times before
+ *   the terminal event while the turn is still working.
  * `grounded` is never on the wire: it never left the server on the
  * non-streaming path either.
  */
@@ -51,8 +55,17 @@ export type ChatStreamEvent =
   | { type: "delta"; text: string }
   /** Guardrails Phase 4: replace everything shown so far with `text` (the safe reply). */
   | { type: "retract"; text: string }
-  | { type: "final"; escalate: boolean; recommendedProducts: StreamRecommendedProduct[]; asOf: string | null }
-  | { type: "error"; kind: ChatStreamErrorKind };
+  | {
+      type: "final";
+      escalate: boolean;
+      recommendedProducts: StreamRecommendedProduct[];
+      asOf: string | null;
+      /** Widget reliability item 7: the prospect's own contact on file for this conversation, already MASKED (lib/contact-mask.ts). Null when none / not escalated. */
+      followUpContact?: string | null;
+    }
+  | { type: "error"; kind: ChatStreamErrorKind }
+  /** Widget reliability item 1: keep-alive while the turn is still working; proves the connection is alive. */
+  | { type: "ping" };
 
 /** The SSE media type, in one place so the route and any test agree. */
 export const CHAT_STREAM_CONTENT_TYPE = "text/event-stream";
@@ -143,12 +156,21 @@ export function asChatStreamEvent(value: unknown): ChatStreamEvent | null {
         return { type: "delta", text: record.text };
       }
       return null;
+    case "retract":
+      if (typeof record.text === "string") {
+        return { type: "retract", text: record.text };
+      }
+      return null;
+    case "ping":
+      return { type: "ping" };
     case "final":
       if (typeof record.escalate === "boolean" && (record.asOf === null || typeof record.asOf === "string")) {
         const recommendedProducts = Array.isArray(record.recommendedProducts)
           ? (record.recommendedProducts.filter(isStreamRecommendedProduct) as StreamRecommendedProduct[])
           : [];
-        return { type: "final", escalate: record.escalate, recommendedProducts, asOf: record.asOf };
+        const followUpContact =
+          typeof record.followUpContact === "string" && record.followUpContact.length <= 120 ? record.followUpContact : null;
+        return { type: "final", escalate: record.escalate, recommendedProducts, asOf: record.asOf, followUpContact };
       }
       return null;
     case "error":

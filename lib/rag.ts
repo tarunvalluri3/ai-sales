@@ -59,7 +59,9 @@ import {
   CHAT_MODEL_CALL_TIMEOUT_MS,
   CHAT_MODEL_MAX_RETRIES,
   CHAT_TOOL_TIMEOUT_MS,
+  STREAM_METADATA_GRACE_MS,
 } from "@/lib/chat-timeouts";
+import { settleWithinGrace, type TurnJudgement } from "@/lib/chat-late-judgement";
 
 /**
  * Caps the tool-calling loop in askSalesEmployee(). Tools and
@@ -370,6 +372,13 @@ export type SalesEmployeeResponse = {
    * `after()` without running a second count (lib/usage-reminders.ts).
    */
   quotaSnapshot: ReplyQuotaStatus;
+  /**
+   * Widget reliability item 1 (streamed path only): set when the model's
+   * judgement (escalate / usedContext) missed STREAM_METADATA_GRACE_MS. The
+   * response then carries conservative defaults, and the route applies this
+   * late judgement in the background (lib/chat-late-judgement.ts).
+   */
+  pendingJudgement?: Promise<TurnJudgement | null>;
 };
 
 type KnowledgeChunkMetadata = {
@@ -2053,6 +2062,9 @@ export async function* streamSalesEmployee(
     const finishClean = async (
       result: z.infer<typeof SalesEmployeeResponseSchema>,
       streamed: boolean,
+      // False while the model's judgement is still pending (see the grace
+      // wait below): an unjudged reply must never become a cached answer.
+      cacheable = true,
     ): Promise<SalesEmployeeResponse> => {
       const latencyMs = Date.now() - startedAt;
       const { metricsRowId, metricsDraft } = await recordTurnMetrics(supabase, timer, deferMetrics, {
@@ -2091,7 +2103,7 @@ export async function* streamSalesEmployee(
         instantMissReason,
         metricsDraft,
       };
-      if (source.kind === "live" && shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
+      if (cacheable && source.kind === "live" && shouldCacheResponse(response, isFirstTurn(history), calledSideEffectingTool)) {
         await setCachedResponse(supabase, businessId, question, language, source.versionId, response);
       }
       return response;
@@ -2112,8 +2124,19 @@ export async function* streamSalesEmployee(
         answerText += done.emit;
         yield { kind: "delta", text: done.emit };
       }
-      const metadata: TurnMetadata | null = metadataPromise ? await metadataPromise : null;
-      if (!metadata) logEvent("ai_stream_metadata_failed", businessId, { conversationId }, "error");
+      // Widget reliability item 1: wait at most STREAM_METADATA_GRACE_MS for the
+      // judgement once the visible answer is complete. A slower call is NOT
+      // dropped: it rides on the response as `pendingJudgement` and the route
+      // applies it in the background (lib/chat-late-judgement.ts), so an
+      // escalation is never lost. A failed call maps to null (conservative
+      // defaults) instead of failing a turn whose answer is already shown.
+      const metadataOrNull: Promise<TurnMetadata | null> = metadataPromise
+        ? (metadataPromise as Promise<TurnMetadata | null>).catch(() => null)
+        : Promise.resolve(null);
+      const graced = await settleWithinGrace(metadataOrNull, STREAM_METADATA_GRACE_MS);
+      const metadata: TurnMetadata | null = graced.settled ? graced.value : null;
+      if (graced.settled && !metadata) logEvent("ai_stream_metadata_failed", businessId, { conversationId }, "error");
+      if (!graced.settled) logEvent("ai_stream_metadata_late", businessId, { conversationId, graceMs: STREAM_METADATA_GRACE_MS });
       const response = await finishClean(
         {
           answer: done.finalText,
@@ -2122,7 +2145,13 @@ export async function* streamSalesEmployee(
           escalationReason: done.replaced ? done.reason : (metadata?.escalationReason ?? null),
         },
         true,
+        graced.settled,
       );
+      if (!graced.settled) {
+        response.pendingJudgement = graced.pending.then((late) =>
+          late ? { usedContext: late.usedContext, escalate: late.escalate, escalationReason: late.escalationReason } : null,
+        );
+      }
       yield { kind: "final", response, interrupted: false };
       return;
     }

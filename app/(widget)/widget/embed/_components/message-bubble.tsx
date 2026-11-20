@@ -10,6 +10,7 @@ import { ProductRecommendationCards } from "./product-recommendation-cards";
 function errorCopy(strings: WidgetStrings, kind: NonNullable<ChatMessage["errorKind"]>): string {
   if (kind === "unauthorized") return strings.errorUnauthorized;
   if (kind === "rate_limited") return strings.errorRateLimited;
+  if (kind === "timeout") return strings.errorTimedOut;
   return strings.errorFailure;
 }
 

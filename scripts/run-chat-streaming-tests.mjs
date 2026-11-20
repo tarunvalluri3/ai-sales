@@ -31,8 +31,12 @@ test("encode -> parseFrame round-trips every event type", () => {
   const events = [
     { type: "meta", conversationId: "c1", asOf: "2026-10-22T00:00:00Z" },
     { type: "delta", text: "Hello" },
-    { type: "final", escalate: true, recommendedProducts: [], asOf: null },
+    { type: "retract", text: "Safe reply" },
+    // followUpContact is always present on a parsed final (null when absent), widget reliability item 7
+    { type: "final", escalate: true, recommendedProducts: [], asOf: null, followUpContact: null },
+    { type: "final", escalate: true, recommendedProducts: [], asOf: null, followUpContact: "+91 98•••••210" },
     { type: "error", kind: "rate_limited" },
+    { type: "ping" },
   ];
   for (const event of events) {
     const frame = encodeStreamEvent(event).replace(/\n\n$/, "");
@@ -172,7 +176,10 @@ test("parseFromParentMessage accepts the three streaming messages", () => {
   assert.deepEqual(parseFromParentMessage({ type: "widget:stream_aborted", requestId: "r1" }), {
     type: "widget:stream_aborted",
     requestId: "r1",
+    dropped: false,
   });
+  assert.equal(parseFromParentMessage({ type: "widget:stream_aborted", requestId: "r1", dropped: true }).dropped, true);
+  assert.deepEqual(parseFromParentMessage({ type: "widget:stream_ping", requestId: "r1" }), { type: "widget:stream_ping", requestId: "r1" });
 });
 
 test("parseFromParentMessage rejects malformed streaming messages", () => {

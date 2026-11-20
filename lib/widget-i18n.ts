@@ -55,6 +55,8 @@ export type WidgetStrings = {
   errorUnauthorized: string;
   errorRateLimited: string;
   errorFailure: string;
+  /** Widget reliability item 1: the widget's own turn deadline fired. */
+  errorTimedOut: string;
   defaultCta: string;
   dismissCtaLabel: string;
   menuLabel: string;
@@ -88,6 +90,7 @@ const EN: WidgetStrings = {
   errorUnauthorized: "This chat isn't available right now.",
   errorRateLimited: "Too many messages — please wait a moment and try again.",
   errorFailure: "Something went wrong. Check your connection and try again.",
+  errorTimedOut: "Something went wrong, please try again.",
   defaultCta: "Chat with us",
   dismissCtaLabel: "Dismiss",
   menuLabel: "More options",
@@ -121,6 +124,7 @@ const ES: WidgetStrings = {
   errorUnauthorized: "Este chat no está disponible en este momento.",
   errorRateLimited: "Demasiados mensajes — espera un momento e inténtalo de nuevo.",
   errorFailure: "Algo salió mal. Revisa tu conexión e inténtalo de nuevo.",
+  errorTimedOut: "Algo salió mal, inténtalo de nuevo.",
   defaultCta: "Chatea con nosotros",
   dismissCtaLabel: "Descartar",
   menuLabel: "Más opciones",
@@ -154,6 +158,7 @@ const FR: WidgetStrings = {
   errorUnauthorized: "Ce chat n'est pas disponible pour le moment.",
   errorRateLimited: "Trop de messages — veuillez patienter un instant et réessayer.",
   errorFailure: "Une erreur s'est produite. Vérifiez votre connexion et réessayez.",
+  errorTimedOut: "Une erreur s'est produite, veuillez réessayer.",
   defaultCta: "Discutez avec nous",
   dismissCtaLabel: "Ignorer",
   menuLabel: "Plus d'options",
@@ -187,6 +192,7 @@ const DE: WidgetStrings = {
   errorUnauthorized: "Dieser Chat ist gerade nicht verfügbar.",
   errorRateLimited: "Zu viele Nachrichten — bitte warten Sie einen Moment und versuchen Sie es erneut.",
   errorFailure: "Etwas ist schiefgelaufen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  errorTimedOut: "Etwas ist schiefgelaufen, bitte versuchen Sie es erneut.",
   defaultCta: "Chatten Sie mit uns",
   dismissCtaLabel: "Schließen",
   menuLabel: "Weitere Optionen",
@@ -220,6 +226,7 @@ const PT: WidgetStrings = {
   errorUnauthorized: "Este chat não está disponível neste momento.",
   errorRateLimited: "Demasiadas mensagens — aguarde um momento e tente novamente.",
   errorFailure: "Algo correu mal. Verifique a sua ligação e tente novamente.",
+  errorTimedOut: "Algo correu mal, tente novamente.",
   defaultCta: "Converse connosco",
   dismissCtaLabel: "Dispensar",
   menuLabel: "Mais opções",
@@ -252,6 +259,7 @@ const HI: WidgetStrings = {
   errorUnauthorized: "यह चैट अभी उपलब्ध नहीं है।",
   errorRateLimited: "बहुत सारे संदेश — कृपया थोड़ी देर रुकें और फिर से प्रयास करें।",
   errorFailure: "कुछ गलत हो गया। अपना कनेक्शन जांचें और फिर से प्रयास करें।",
+  errorTimedOut: "कुछ गलत हो गया, कृपया फिर से कोशिश करें।",
   defaultCta: "हमसे चैट करें",
   dismissCtaLabel: "खारिज करें",
   menuLabel: "अधिक विकल्प",

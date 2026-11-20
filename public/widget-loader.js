@@ -555,6 +555,13 @@
               { type: "widget:stream_delta", requestId: requestId, text: event.text || "" },
               appOrigin,
             );
+          } else if (event.type === "ping") {
+            // Widget reliability item 1: the server's keep-alive while the
+            // turn is still working. Relayed so the iframe's stall clock
+            // (lib/widget-turn-watch.ts) only ever catches a dead connection.
+            if (!sawTerminal) {
+              iframe.contentWindow.postMessage({ type: "widget:stream_ping", requestId: requestId }, appOrigin);
+            }
           } else if (event.type === "retract") {
             iframe.contentWindow.postMessage(
               { type: "widget:stream_retract", requestId: requestId, text: event.text || "" },
@@ -585,16 +592,24 @@
       // only a stream that produced nothing at all is a failure.
       if (!sawTerminal) {
         if (sawDelta) {
-          iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId }, appOrigin);
+          iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId, dropped: true }, appOrigin);
         } else {
           postError(requestId, "failure");
         }
       }
     } catch {
-      // An abort (the visitor pressed stop, or the page is unloading) is not
-      // an error: finalize whatever streamed. Anything else is a failure.
-      if (controller.signal.aborted) {
+      // An abort (the visitor pressed stop, the iframe's own timeout, or the
+      // page unloading) is not an error: finalize whatever streamed.
+      // Widget reliability item 1: a connection that DROPS mid-read used to
+      // land here as a bare failure, which deleted the partial answer already
+      // on screen. Now a drop after some text keeps it (marked dropped, so the
+      // iframe offers Retry); only a drop before any text is a plain failure.
+      if (sawTerminal) {
+        // The turn already ended cleanly; a late read error changes nothing.
+      } else if (controller.signal.aborted) {
         iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId }, appOrigin);
+      } else if (sawDelta) {
+        iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId, dropped: true }, appOrigin);
       } else {
         postError(requestId, "failure");
       }

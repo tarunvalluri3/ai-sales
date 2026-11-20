@@ -23,6 +23,11 @@ export function Composer({
   onStop: () => void;
   /** True while a reply is streaming -- the send button becomes a stop button. */
   isStreaming: boolean;
+  /**
+   * Sending is blocked (a turn is in flight or cooling down). The textarea
+   * itself stays typeable (widget reliability item 1): the visitor can draft
+   * the next message while a reply finishes; Enter/Send just waits.
+   */
   disabled: boolean;
   autoFocus: boolean;
   consentGiven: boolean;
@@ -95,7 +100,6 @@ export function Composer({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          disabled={disabled}
           autoFocus={autoFocus}
           rows={1}
           aria-label={strings.inputPlaceholder}

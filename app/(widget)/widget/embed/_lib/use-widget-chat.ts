@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseFromParentMessage, postToParent, type WidgetErrorKind, type WidgetRecommendedProduct } from "./post-message";
 import type { WidgetStrings } from "@/lib/widget-i18n";
-import { CHAT_CLIENT_TIMEOUT_MS } from "@/lib/chat-timeouts";
+import { CHAT_CLIENT_TIMEOUT_MS, STREAM_CLIENT_STALL_TIMEOUT_MS } from "@/lib/chat-timeouts";
+import { WidgetTurnWatch } from "@/lib/widget-turn-watch";
 import { appendStreamDelta, finalizeStreamMessage, finalizeAbortedStream, retractStreamMessage } from "@/lib/widget-stream-reducer";
 
 export type ChatMessage = {
@@ -11,7 +12,8 @@ export type ChatMessage = {
   role: "user" | "assistant" | "human_agent";
   content: string;
   status?: "sending" | "error";
-  errorKind?: WidgetErrorKind;
+  /** "timeout": the widget's own deadline fired (widget reliability item 1). */
+  errorKind?: WidgetErrorKind | "timeout";
   escalate?: boolean;
   recommendedProducts?: WidgetRecommendedProduct[];
 };
@@ -24,16 +26,18 @@ export type RecentChatSummary = {
 
 const MAX_MESSAGE_LENGTH = 2000;
 /**
- * Derived from the server's own deadline, never written independently --
+ * The absolute per-turn ceiling; see lib/widget-turn-watch.ts for the second
+ * (stall) clock that catches a dead stream. Derived from the server's own
+ * deadline, never written independently --
  * see `lib/chat-timeouts.ts` for the ordering and why it matters. This was
  * a hardcoded 30s while the server allowed 60s, so a slow-but-successful
  * turn showed the prospect an error for an answer that did arrive: 5 of
  * 220 production turns on 2026-10-21.
  *
- * This timer is the *only* client-side deadline on a chat turn. The
- * loader's own fetch (public/widget-loader.js handleSend) deliberately
- * passes no AbortSignal and sets no timeout of its own, so there is no
- * second, shorter clock hiding there -- checked 2026-10-21.
+ * Widget reliability item 1 (2026-11-20): this clock is no longer cleared
+ * by the first token -- that left the stop button stuck when a stream
+ * stalled after its text. The loader still sets no deadline of its own; on
+ * a timeout the iframe asks it to abort the fetch (widget:abort).
  */
 const RESPONSE_TIMEOUT_MS = CHAT_CLIENT_TIMEOUT_MS;
 const RATE_LIMIT_COOLDOWN_MS = 5_000;
@@ -78,7 +82,7 @@ export function useWidgetChat(
   const pendingRef = useRef(
     new Map<
       string,
-      { userMessageId: string; assistantPlaceholderId: string; text: string; timeoutId?: ReturnType<typeof setTimeout>; sawDelta?: boolean }
+      { userMessageId: string; assistantPlaceholderId: string; text: string; watch: WidgetTurnWatch; sawDelta?: boolean }
     >(),
   );
 
@@ -92,7 +96,7 @@ export function useWidgetChat(
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
         pendingRef.current.delete(message.requestId);
-        if (pending.timeoutId) clearTimeout(pending.timeoutId);
+        pending.watch.stop();
         hasSucceededRef.current = true;
         conversationIdRef.current = message.conversationId;
         setIsAwaitingResponse(false);
@@ -113,28 +117,32 @@ export function useWidgetChat(
       } else if (message.type === "widget:stream_start") {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
+        pending.watch.activity();
         conversationIdRef.current = message.conversationId;
+      } else if (message.type === "widget:stream_ping") {
+        // Keep-alive from the server: the turn is still working (tool calls,
+        // a held-back sentence, persistence). Only re-arms the stall clock.
+        pendingRef.current.get(message.requestId)?.watch.activity();
       } else if (message.type === "widget:stream_delta") {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
+        pending.watch.activity();
         if (!pending.sawDelta) {
           pending.sawDelta = true;
-          // The first token proves the turn is live: drop the whole-turn
-          // client timeout and swap the typing indicator for the streaming
-          // text. A stalled stream is still bounded by the server's own AI
-          // deadline, which ends the turn with a terminal event.
-          if (pending.timeoutId) clearTimeout(pending.timeoutId);
+          // The first token swaps the typing indicator for the streaming
+          // text. The absolute clock keeps running and the stall clock is
+          // re-armed by every event (lib/widget-turn-watch.ts).
           setIsAwaitingResponse(false);
         }
         setMessages((prev) => appendStreamDelta(prev, pending.assistantPlaceholderId, message.text));
       } else if (message.type === "widget:stream_retract") {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
+        pending.watch.activity();
         // The retract may be the first visible text of the turn (nothing had been
         // released yet), so it also ends the typing indicator like a first delta.
         if (!pending.sawDelta) {
           pending.sawDelta = true;
-          if (pending.timeoutId) clearTimeout(pending.timeoutId);
           setIsAwaitingResponse(false);
         }
         setMessages((prev) => retractStreamMessage(prev, pending.assistantPlaceholderId, message.text));
@@ -142,7 +150,7 @@ export function useWidgetChat(
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
         pendingRef.current.delete(message.requestId);
-        if (pending.timeoutId) clearTimeout(pending.timeoutId);
+        pending.watch.stop();
         hasSucceededRef.current = true;
         setIsAwaitingResponse(false);
         setIsStreaming(false);
@@ -156,18 +164,23 @@ export function useWidgetChat(
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
         pendingRef.current.delete(message.requestId);
-        if (pending.timeoutId) clearTimeout(pending.timeoutId);
+        pending.watch.stop();
         setIsAwaitingResponse(false);
         setIsStreaming(false);
         // Keep whatever streamed so far; drop the bubble only if nothing
-        // ever arrived. Never surfaced as an error -- the visitor chose to
-        // stop, or the connection dropped after a partial answer.
-        setMessages((prev) => finalizeAbortedStream(prev, pending.assistantPlaceholderId));
+        // ever arrived. A visitor's own stop is never an error; a dropped
+        // connection keeps the partial answer and offers Retry.
+        setMessages((prev) => {
+          const kept = finalizeAbortedStream(prev, pending.assistantPlaceholderId);
+          return message.dropped
+            ? kept.map((m) => (m.id === pending.userMessageId ? { ...m, status: "error" as const, errorKind: "timeout" as const } : m))
+            : kept;
+        });
       } else if (message.type === "widget:error") {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;
         pendingRef.current.delete(message.requestId);
-        if (pending.timeoutId) clearTimeout(pending.timeoutId);
+        pending.watch.stop();
         setIsAwaitingResponse(false);
         setIsStreaming(false);
 
@@ -225,24 +238,29 @@ export function useWidgetChat(
     const requestId = newId();
     const assistantPlaceholderId = newId();
 
-    // The whole-turn client deadline. On a streamed turn the first token
-    // clears it (see the stream_delta handler); on a non-streaming turn
-    // (human-control JSON) or a stream that never produces a token, it
-    // fires and surfaces the error exactly as before. The id is stored so
-    // the stream handlers can clear it.
-    const timeoutId = setTimeout(() => {
-      if (!pendingRef.current.has(requestId)) return;
-      pendingRef.current.delete(requestId);
-      setIsAwaitingResponse(false);
-      setIsStreaming(false);
-      setMessages((prev) =>
-        prev
-          .filter((m) => m.id !== assistantPlaceholderId)
-          .map((m) => (m.id === userMessageId ? { ...m, status: "error", errorKind: "failure" } : m)),
-      );
-    }, RESPONSE_TIMEOUT_MS);
+    // The turn's two client deadlines (lib/widget-turn-watch.ts). On either,
+    // the turn ends HERE, whatever the network does: the loader is asked to
+    // abort the fetch, any partial answer stays, the visitor sees "Something
+    // went wrong, please try again" with Retry, and the composer is usable.
+    const watch = new WidgetTurnWatch({
+      absoluteMs: RESPONSE_TIMEOUT_MS,
+      stallMs: STREAM_CLIENT_STALL_TIMEOUT_MS,
+      onTimeout: () => {
+        if (!pendingRef.current.has(requestId)) return;
+        pendingRef.current.delete(requestId);
+        postToParent({ type: "widget:abort", requestId });
+        setIsAwaitingResponse(false);
+        setIsStreaming(false);
+        setMessages((prev) =>
+          finalizeAbortedStream(prev, assistantPlaceholderId).map((m) =>
+            m.id === userMessageId ? { ...m, status: "error" as const, errorKind: "timeout" as const } : m,
+          ),
+        );
+      },
+    });
+    watch.start();
 
-    pendingRef.current.set(requestId, { userMessageId, assistantPlaceholderId, text, timeoutId });
+    pendingRef.current.set(requestId, { userMessageId, assistantPlaceholderId, text, watch });
 
     setMessages((prev) => [...prev, { id: assistantPlaceholderId, role: "assistant", content: "" }]);
     setIsAwaitingResponse(true);
@@ -304,7 +322,7 @@ export function useWidgetChat(
   /** Phase 25d "start new chat": resets this widget instance's own state and tells the loader to clear its stored/in-memory conversation id. */
   const startNewChat = useCallback(() => {
     for (const pending of pendingRef.current.values()) {
-      if (pending.timeoutId) clearTimeout(pending.timeoutId);
+      pending.watch.stop();
     }
     pendingRef.current.clear();
     hasSucceededRef.current = false;
@@ -333,7 +351,7 @@ export function useWidgetChat(
    */
   const switchConversation = useCallback((conversationId: string) => {
     for (const pending of pendingRef.current.values()) {
-      if (pending.timeoutId) clearTimeout(pending.timeoutId);
+      pending.watch.stop();
     }
     pendingRef.current.clear();
     hasSucceededRef.current = false;

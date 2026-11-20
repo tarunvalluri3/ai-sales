@@ -332,6 +332,15 @@ jobs:
         # source checks, no database, no secrets.
         run: npm run test:locale-catalog
 
+      - name: Widget reliability tests
+        # 2026-11-20 widget fixes (STATE.md): the streamed turn always ends
+        # (one terminal event on every path, keep-alives, watchdog, client
+        # stall/absolute clocks), slow metadata never loses an escalation,
+        # restore/poll scoped to visitor + widget key, visitor time zones,
+        # default chips, scroll, masked follow-up contact, poll cadence. Pure
+        # modules + the real widget-loader.js in a vm. No database, no secrets.
+        run: npm run test:widget-reliability
+
       - name: Guardrail response-path tests
         # Guardrails Phase 5 (STATE.md): the enforcing response policy (fixed safe
         # reply + handover, repeated-abuse cut-off), the owner-facing flag labels,
