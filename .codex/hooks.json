@@ -20,7 +20,7 @@
           {
             "type": "command",
             "command": "[ ! -f \".agents/skills/impeccable/scripts/impeccable\" ] || \".agents/skills/impeccable/scripts/impeccable\" hook",
-            "commandWindows": "if exist \".agents/skills/impeccable/scripts/impeccable.cmd\" (\".agents/skills/impeccable/scripts/impeccable.cmd\" hook & exit /b)",
+            "commandWindows": "if (Test-Path '.agents/skills/impeccable/scripts/impeccable.cmd') { & '.agents/skills/impeccable/scripts/impeccable.cmd' hook }",
             "timeout": 30,
             "statusMessage": "Design deep pass"
           }

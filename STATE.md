@@ -6790,3 +6790,7 @@ At the end of every implementation, the agent must:
 6. Update the "Last updated" date at the top.
 
 If the agent implemented something but did not update this file, the work is not finished.
+
+## Codex Stop hook on Windows (2026-11-20)
+
+The Impeccable Design deep pass uses a PowerShell-compatible Windows command. Windows PowerShell ran the Stop hook with exit code 0. Lint passed.
