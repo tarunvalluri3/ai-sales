@@ -39,16 +39,21 @@ const updateFaqSchema = faqFieldsSchema.extend({
 export type FaqFormState = {
   error?: string;
   success?: boolean;
+  values?: { question: string; answer: string };
 };
 
 export async function createFaqAction(
   _prevState: FaqFormState,
   formData: FormData,
 ): Promise<FaqFormState> {
+  const values = {
+    question: String(formData.get("question") ?? ""),
+    answer: String(formData.get("answer") ?? ""),
+  };
   const { businessId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
-    return { error: authError };
+    return { values, error: authError };
   }
 
   const parsed = faqFieldsSchema.safeParse({
@@ -56,17 +61,18 @@ export async function createFaqAction(
     answer: formData.get("answer"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter a valid FAQ." };
+    return { values, error: parsed.error.issues[0]?.message ?? "Enter a valid FAQ." };
   }
 
   try {
     await createFaq(businessId, parsed.data);
   } catch (error) {
-    return { error: logAndGetUserMessage(error) };
+    return { values, error: logAndGetUserMessage(error) };
   }
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/faqs");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -74,10 +80,14 @@ export async function updateFaqAction(
   _prevState: FaqFormState,
   formData: FormData,
 ): Promise<FaqFormState> {
+  const values = {
+    question: String(formData.get("question") ?? ""),
+    answer: String(formData.get("answer") ?? ""),
+  };
   const { businessId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
-    return { error: authError };
+    return { values, error: authError };
   }
 
   const parsed = updateFaqSchema.safeParse({
@@ -86,7 +96,7 @@ export async function updateFaqAction(
     answer: formData.get("answer"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter a valid FAQ." };
+    return { values, error: parsed.error.issues[0]?.message ?? "Enter a valid FAQ." };
   }
 
   const { id, ...input } = parsed.data;
@@ -95,15 +105,16 @@ export async function updateFaqAction(
   try {
     updated = await updateFaq(businessId, id, input);
   } catch (error) {
-    return { error: logAndGetUserMessage(error) };
+    return { values, error: logAndGetUserMessage(error) };
   }
 
   if (!updated) {
-    return { error: "This FAQ no longer exists." };
+    return { values, error: "This FAQ no longer exists." };
   }
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/faqs");
+  revalidatePath("/onboarding");
   redirect("/dashboard/faqs");
 }
 
@@ -121,10 +132,14 @@ export async function updateFaqInPlaceAction(
   _prevState: FaqFormState,
   formData: FormData,
 ): Promise<FaqFormState> {
+  const values = {
+    question: String(formData.get("question") ?? ""),
+    answer: String(formData.get("answer") ?? ""),
+  };
   const { businessId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
-    return { error: authError };
+    return { values, error: authError };
   }
 
   const parsed = updateFaqSchema.safeParse({
@@ -133,7 +148,7 @@ export async function updateFaqInPlaceAction(
     answer: formData.get("answer"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Enter a valid FAQ." };
+    return { values, error: parsed.error.issues[0]?.message ?? "Enter a valid FAQ." };
   }
 
   const { id, ...input } = parsed.data;
@@ -142,11 +157,11 @@ export async function updateFaqInPlaceAction(
   try {
     updated = await updateFaq(businessId, id, input);
   } catch (error) {
-    return { error: logAndGetUserMessage(error) };
+    return { values, error: logAndGetUserMessage(error) };
   }
 
   if (!updated) {
-    return { error: "This FAQ no longer exists." };
+    return { values, error: "This FAQ no longer exists." };
   }
 
   triggerIngestionProcessing();
@@ -182,6 +197,7 @@ export async function deleteFaqAction(
   }
 
   revalidatePath("/dashboard/faqs");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -219,6 +235,7 @@ export async function approveFaqAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/faqs");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -250,5 +267,6 @@ export async function rejectFaqAction(
   }
 
   revalidatePath("/dashboard/faqs");
+  revalidatePath("/onboarding");
   return { success: true };
 }

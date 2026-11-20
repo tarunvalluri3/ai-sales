@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { Faq, IngestionStatus } from "@/lib/supabase/types";
 import { FAQ_QUESTION_MIN_LENGTH, FAQ_ANSWER_MIN_LENGTH } from "@/lib/onboarding-readiness";
 import { FaqForm } from "../../../dashboard/faqs/faq-form";
@@ -59,7 +59,7 @@ export function TrainFaqsStep({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [draftQuestion, setDraftQuestion] = useState("");
+  const [suggestedQuestion, setSuggestedQuestion] = useState<{ text: string }>();
   const [editingId, setEditingId] = useState<string | null>(null);
   const { update } = useOnboardingPreview();
 
@@ -73,18 +73,6 @@ export function TrainFaqsStep({
   // FAQ will never flip to "ready" on its own, so it must never keep this
   // loop alive.
   const stillProcessing = faqs.some((f) => statusByFaqId[f.id] === "processing");
-
-  // Clear the question field once the FAQ it was prefilled from has
-  // actually been added -- `FaqForm`'s own reset-on-success restores
-  // `defaultValue`, which is the chip's text, not empty, when a chip was
-  // used (2026-10-29 bugfix, STATE.md).
-  const prevFaqCount = useRef(faqs.length);
-  useEffect(() => {
-    if (faqs.length > prevFaqCount.current) {
-      setDraftQuestion("");
-    }
-    prevFaqCount.current = faqs.length;
-  }, [faqs.length]);
 
   // While at least MIN_FAQS exist but aren't all retrieval-ready yet,
   // poll for the async embedding pipeline to finish so Continue enables
@@ -166,17 +154,16 @@ export function TrainFaqsStep({
                 <button
                   key={question}
                   type="button"
-                  onClick={() => setDraftQuestion(question)}
+                  onClick={() => setSuggestedQuestion({ text: question })}
                   className="border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary"
                 >
-                  {question}
+                  {faqs.some((faq) => faq.question.trim().toLowerCase() === question.toLowerCase()) ? <span aria-label="Added">✓ </span> : null}{question}
                 </button>
               ))}
             </div>
             <FaqForm
-              key={draftQuestion}
               action={createFaqAction}
-              initialQuestion={draftQuestion}
+              suggestedQuestion={suggestedQuestion}
               submitLabel="Add FAQ"
               pendingLabel="Adding…"
             />

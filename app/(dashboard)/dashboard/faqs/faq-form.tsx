@@ -15,6 +15,7 @@ export function FaqForm({
   id,
   initialQuestion = "",
   initialAnswer = "",
+  suggestedQuestion,
   submitLabel,
   pendingLabel,
   onSuccess,
@@ -23,20 +24,38 @@ export function FaqForm({
   id?: string;
   initialQuestion?: string;
   initialAnswer?: string;
+  suggestedQuestion?: { text: string };
   submitLabel: string;
   pendingLabel: string;
   /** Called once after a successful submit, in addition to the existing reset-on-add behavior -- lets a caller editing in place (no navigation to a dedicated edit page) know when to exit edit mode. */
   onSuccess?: () => void;
 }) {
   const [state, formAction, isPending] = useActionState(action, initialState);
+  const questionRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
+  const successHandler = useRef(onSuccess);
+  useEffect(() => { successHandler.current = onSuccess; }, [onSuccess]);
+
   useEffect(() => {
+    if (suggestedQuestion && questionRef.current && !questionRef.current.disabled) {
+      questionRef.current.value = suggestedQuestion.text;
+      questionRef.current.focus();
+    }
+  }, [suggestedQuestion]);
+
+  useEffect(() => {
+    if (state.values && formRef.current) {
+      const question = questionRef.current;
+      const answer = formRef.current.elements.namedItem("answer");
+      if (question) question.value = state.values.question;
+      if (answer instanceof HTMLTextAreaElement) answer.value = state.values.answer;
+    }
     if (state.success) {
       if (!id) formRef.current?.reset();
-      onSuccess?.();
+      successHandler.current?.();
     }
-  }, [state.success, id, onSuccess]);
+  }, [state, id]);
 
   return (
     <form ref={formRef} action={formAction} className="flex w-full flex-col gap-3.5">
@@ -46,6 +65,7 @@ export function FaqForm({
           Question <span className="text-ds-danger">*</span>
         </label>
         <input
+          ref={questionRef}
           id="question"
           name="question"
           type="text"
