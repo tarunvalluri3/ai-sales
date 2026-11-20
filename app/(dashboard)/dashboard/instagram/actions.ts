@@ -46,6 +46,7 @@ export async function disconnectInstagramAction(
   await recordAuditLogEntry(businessId, userId, "instagram_connection.deleted", "instagram_connection", deletedConnectionId);
 
   revalidatePath("/dashboard/instagram");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -78,8 +79,9 @@ export async function chooseInstagramAccountAction(
     return { error: "Please choose an Instagram account." };
   }
 
+  const resultPath = formData.get("from") === "onboarding" ? "/onboarding?step=channels&" : "/dashboard/instagram?";
   if (!(await isChannelEntitled(businessId, "instagram"))) {
-    redirect("/dashboard/instagram?error=not_entitled");
+    redirect(resultPath + "error=not_entitled");
   }
 
   let target: string;
@@ -91,5 +93,6 @@ export async function chooseInstagramAccountAction(
   }
 
   revalidatePath("/dashboard/instagram");
-  redirect(`/dashboard/instagram?${target}`);
+  revalidatePath("/onboarding");
+  redirect(resultPath + target);
 }

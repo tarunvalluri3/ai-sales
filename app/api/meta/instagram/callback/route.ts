@@ -22,20 +22,21 @@ import { isInstagramAllowed } from "@/lib/subscription";
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
+  const state = params.get("state");
+  const resultPath = state?.startsWith("onboarding:") ? "/onboarding?step=channels&" : "/dashboard/instagram?";
   let businessId = "unknown";
 
   const back = async (query: string) => {
     // Error-level events also go to Sentry; send them before the function
     // can be frozen after the response. console output is synchronous.
     await Sentry.flush(2000).catch(() => false);
-    return NextResponse.redirect(new URL(`/dashboard/instagram?${query}`, request.nextUrl.origin));
+    return NextResponse.redirect(new URL(resultPath + query, request.nextUrl.origin));
   };
   const fail = (step: string, error: string, metadata: LogMetadata = {}) => {
     logEvent("ig_connect_failed", businessId, { step, reason: error, ...metadata }, "error");
     return back(`error=${error}`);
   };
 
-  const state = params.get("state");
   const code = params.get("code");
   const metaError = params.get("error");
   const metaErrorReason = params.get("error_reason");

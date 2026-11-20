@@ -1,5 +1,5 @@
 import { Camera, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
-import { INSTAGRAM_CONNECT_PATH } from "./connect-path";
+import { INSTAGRAM_CONNECT_PATH, ONBOARDING_INSTAGRAM_CONNECT_PATH } from "./connect-path";
 
 const BENEFITS = [
   {
@@ -24,7 +24,7 @@ const BENEFITS = [
  * <a>: it must be a top-level navigation to the connect route, which
  * redirects to Meta (a Server Action cannot redirect cross-origin).
  */
-export function ConnectInstagramButton() {
+export function ConnectInstagramButton({ onboarding = false }: { onboarding?: boolean }) {
   return (
     <section className="dx-card flex h-full flex-col gap-6 dx-card-pad">
       <div className="flex items-start gap-4">
@@ -57,7 +57,7 @@ export function ConnectInstagramButton() {
           We need access to read and reply to Instagram DMs for this business.
         </p>
         <a
-          href={INSTAGRAM_CONNECT_PATH}
+          href={onboarding ? ONBOARDING_INSTAGRAM_CONNECT_PATH : INSTAGRAM_CONNECT_PATH}
           className="ds-btn-label inline-flex h-9 w-fit items-center gap-2 rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
           <Camera strokeWidth={1.75} className="size-4" aria-hidden="true" />

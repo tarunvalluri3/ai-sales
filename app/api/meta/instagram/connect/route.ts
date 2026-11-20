@@ -14,7 +14,9 @@ import { logAndGetUserMessage } from "@/lib/errors";
  */
 export async function GET(request: NextRequest) {
   const { businessId, userId, orgRole } = await requireBusinessContext();
-  const back = (query: string) => NextResponse.redirect(new URL(`/dashboard/instagram?${query}`, request.nextUrl.origin));
+  const onboarding = request.nextUrl.searchParams.get("from") === "onboarding";
+  const resultPath = onboarding ? "/onboarding?step=channels&" : "/dashboard/instagram?";
+  const back = (query: string) => NextResponse.redirect(new URL(resultPath + query, request.nextUrl.origin));
 
   if (requireMinRole(orgRole, "org:admin")) {
     return back("error=forbidden");
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { url } = await buildInstagramConnectUrl(businessId, userId);
+    const { url } = await buildInstagramConnectUrl(businessId, userId, onboarding);
     return NextResponse.redirect(url);
   } catch (error) {
     logAndGetUserMessage(error);
