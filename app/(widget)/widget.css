@@ -108,6 +108,12 @@ html,
 body {
   height: 100%;
   margin: 0;
+  /*
+   * Widget reliability item 5: scrolling inside the widget must never scroll
+   * the host page behind it (no scroll chaining out of the iframe). Each
+   * scroller also has overscroll-contain; this covers the iframe's own root.
+   */
+  overscroll-behavior: contain;
   background: transparent;
   color: var(--widget-foreground);
   font-family: var(--widget-font-sans), system-ui, sans-serif;

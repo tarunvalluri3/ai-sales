@@ -953,3 +953,23 @@ test("launcher contrast on light and dark host pages (owner's site is near-black
   const launcher = source("app/(widget)/widget/embed/_components/launcher-button.tsx");
   assert.match(launcher, /bg-widget-primary text-widget-on-primary shadow-\[0_0_0_1px_rgba\(255,255,255,0\.15\),0_4px_14px_rgba\(0,0,0,0\.28\)\]/);
 });
+
+// --- Item 5: scrolling inside the widget never scrolls the host page ---------
+// Source checks only: there is no browser runner in this repo, so the real
+// behaviour is verified on the live site (STATE.md manual steps).
+
+test("overscroll: the iframe root and every scroller contain their scroll", () => {
+  assert.match(source("app/(widget)/widget.css"), /html,\s*body \{[\s\S]*?overscroll-behavior: contain;/);
+  for (const path of [
+    "app/(widget)/widget/embed/_components/message-list.tsx",
+    "app/(widget)/widget/embed/_components/recent-chats-list.tsx",
+    "app/(widget)/widget/embed/_components/composer.tsx",
+    "app/(dashboard)/dashboard/_components/sandbox-chat/sandbox-chat-panel.tsx",
+  ]) {
+    const file = source(path);
+    for (const scroller of file.match(/className="[^"]*overflow-y-auto[^"]*"/g) ?? []) {
+      assert.match(scroller, /overscroll-contain/, `${path}: ${scroller}`);
+    }
+  }
+  assert.match(source("app/(widget)/widget/embed/_components/composer.tsx"), /resize-none overscroll-contain/);
+});

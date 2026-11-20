@@ -50,7 +50,7 @@ export function MessageList({
       ref={containerRef}
       onScroll={handleScroll}
       aria-live="polite"
-      className="flex flex-1 flex-col gap-3 overflow-y-auto bg-widget-surface px-4 py-4"
+      className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain bg-widget-surface px-4 py-4"
     >
       {messages.length === 0 ? (
         <div className="w-fit max-w-[85%] bg-widget-assistant-bubble px-3.5 py-2.5 text-[15px] leading-relaxed text-widget-foreground">

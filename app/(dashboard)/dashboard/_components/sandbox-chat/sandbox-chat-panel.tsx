@@ -115,7 +115,7 @@ export function SandboxChatPanel() {
         role="log"
         aria-live="polite"
         aria-label="Test conversation"
-        className="flex max-h-80 min-h-32 flex-col gap-3 overflow-y-auto border border-ds-border bg-ds-surface-elevated p-3"
+        className="flex max-h-80 min-h-32 flex-col gap-3 overflow-y-auto overscroll-contain border border-ds-border bg-ds-surface-elevated p-3"
       >
         {messages.length === 0 ? (
           <p className="text-sm text-ds-text-muted">

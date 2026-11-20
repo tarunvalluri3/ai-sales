@@ -37,7 +37,7 @@ export function RecentChatsList({
         </button>
         <span className="text-sm font-medium text-widget-foreground">{strings.recentChatsTitle}</span>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-2 py-2">
         {isLoading ? (
           <p className="px-2 py-3 text-sm text-widget-muted">{strings.recentChatsLoading}</p>
         ) : !conversations || conversations.length === 0 ? (

@@ -104,7 +104,7 @@ export function Composer({
           rows={1}
           aria-label={strings.inputPlaceholder}
           placeholder={strings.inputPlaceholder}
-          className="max-h-[120px] flex-1 resize-none border border-widget-border bg-widget-surface-elevated px-3 py-2 text-[15px] text-widget-foreground outline-none placeholder:text-widget-muted focus-visible:border-widget-border-strong focus-visible:ring-2 focus-visible:ring-widget-primary disabled:opacity-60"
+          className="max-h-[120px] flex-1 resize-none overscroll-contain border border-widget-border bg-widget-surface-elevated px-3 py-2 text-[15px] text-widget-foreground outline-none placeholder:text-widget-muted focus-visible:border-widget-border-strong focus-visible:ring-2 focus-visible:ring-widget-primary disabled:opacity-60"
         />
         {isStreaming ? (
           <button
