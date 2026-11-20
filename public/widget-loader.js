@@ -169,12 +169,20 @@
 
   // Phase 15b polling state -- all owned by this loader, since it's the
   // only script that can make an authorized (real-Origin-header) request.
-  // Polling is a one-way latch, not gated on control alone: it starts the
-  // first time a response shows escalate:true OR control:"human" (see
-  // prompts/phase-15b-staff-reply-and-live-polling.md's Decision 2), and
-  // then stays on for the rest of this session rather than toggling on
-  // and off with control changes.
+  //
+  // Widget reliability item 8 (2026-11-20): human replies took 10-20 s to
+  // appear, because polling only started after an escalation or a "human"
+  // control seen in a reply -- a staff takeover of a conversation that never
+  // escalated went unseen until the visitor sent again. The cadence is now:
+  //   off   -- panel closed, tab hidden, no conversation yet, or a send in
+  //            flight (no load for a closed widget or a background tab);
+  //   FAST  -- a human controls the conversation (restore/poll/reply said
+  //            control:"human") or it escalated (staff likely about to reply);
+  //   SLOW  -- otherwise, so a takeover is still noticed.
+  // hasHandoffSignal (escalated) stays a one-way latch per conversation;
+  // isHumanControl follows the server's latest answer both ways.
   var hasHandoffSignal = false;
+  var isHumanControl = false;
   var isPanelOpen = false;
   var isSendInFlight = false;
   // feat/chat-streaming: AbortController per in-flight send (keyed by its
@@ -184,20 +192,33 @@
   var lastKnownMessageAt = null;
   var knownMessageIds = {};
   var pollTimeoutId = null;
-  var POLL_INTERVAL_MS = 3000;
+  // 2.5 s fast = 120 polls / 5 min, inside /api/chat/poll's per-conversation
+  // limit of 150 (the rest covers pollNow() on refocus/reopen).
+  var FAST_POLL_INTERVAL_MS = 2500;
+  var SLOW_POLL_INTERVAL_MS = 15000;
+
+  /** The poll interval right now, or null when the widget must not poll at all. */
+  function currentPollInterval() {
+    if (!isPanelOpen || isSendInFlight || !conversationId || document.visibilityState !== "visible") {
+      return null;
+    }
+    return isHumanControl || hasHandoffSignal ? FAST_POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
+  }
 
   function schedulePoll() {
     if (pollTimeoutId) return;
-    if (
-      !hasHandoffSignal ||
-      !isPanelOpen ||
-      isSendInFlight ||
-      !conversationId ||
-      document.visibilityState !== "visible"
-    ) {
-      return;
+    var interval = currentPollInterval();
+    if (interval === null) return;
+    pollTimeoutId = setTimeout(doPoll, interval);
+  }
+
+  /** Drops an armed timer and schedules again -- used when the cadence may have changed. */
+  function reschedulePoll() {
+    if (pollTimeoutId) {
+      clearTimeout(pollTimeoutId);
+      pollTimeoutId = null;
     }
-    pollTimeoutId = setTimeout(doPoll, POLL_INTERVAL_MS);
+    schedulePoll();
   }
 
   function doPoll() {
@@ -239,6 +260,9 @@
             }
           }
           lastKnownMessageAt = body.data.asOf;
+          // The server's current control decides FAST vs SLOW (both ways).
+          if (body.data.control === "human") isHumanControl = true;
+          else if (body.data.control === "ai") isHumanControl = false;
           if (fresh.length > 0) {
             iframe.contentWindow.postMessage(
               { type: "widget:poll_result", messages: fresh },
@@ -267,7 +291,9 @@
 
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") {
-      if (hasHandoffSignal && isPanelOpen) pollNow();
+      // Back on the tab with the panel open: catch up at once, then resume
+      // the cadence (doPoll reschedules itself).
+      if (isPanelOpen && conversationId) pollNow();
     } else if (pollTimeoutId) {
       clearTimeout(pollTimeoutId);
       pollTimeoutId = null;
@@ -362,7 +388,7 @@
 
         var data = result.body.data;
         if (data.asOf) lastKnownMessageAt = data.asOf;
-        if (data.control === "human") hasHandoffSignal = true;
+        isHumanControl = data.control === "human";
         for (var i = 0; i < data.messages.length; i++) {
           if (data.messages[i].role !== "user") {
             knownMessageIds[data.messages[i].id] = true;
@@ -370,9 +396,10 @@
         }
         pendingRestore = { messages: data.messages, consentGiven: data.consentGiven === true };
         tryPostRestore();
-        // A restored conversation a human already controls must start
-        // polling right away (the panel may already be open).
-        schedulePoll();
+        // A restored conversation a human already controls must poll at the
+        // fast cadence right away -- the panel may already be open with a
+        // slow timer armed, so reschedule rather than schedule.
+        reschedulePoll();
       })
       .catch(function () {
         // A network failure here is invisible to the prospect -- the
@@ -435,9 +462,9 @@
       conversationId = body.data.conversationId;
       storeConversationId(conversationId);
       if (body.data.asOf) lastKnownMessageAt = body.data.asOf;
-      if (body.data.escalate || body.data.control === "human") {
-        hasHandoffSignal = true;
-      }
+      if (body.data.escalate) hasHandoffSignal = true;
+      if (body.data.control === "human") isHumanControl = true;
+      else if (body.data.control === "ai") isHumanControl = false;
       iframe.contentWindow.postMessage(
         {
           type: "widget:response",
@@ -638,7 +665,8 @@
     } finally {
       delete inflightControllers[requestId];
       isSendInFlight = false;
-      schedulePoll();
+      // The reply may have changed the cadence (escalated / human control).
+      reschedulePoll();
     }
   }
 
@@ -670,6 +698,7 @@
       conversationId = null;
       clearStoredConversationId();
       hasHandoffSignal = false;
+      isHumanControl = false;
       lastKnownMessageAt = null;
       knownMessageIds = {};
       if (pollTimeoutId) {
@@ -709,6 +738,7 @@
       conversationId = data.conversationId;
       storeConversationId(conversationId);
       hasHandoffSignal = false;
+      isHumanControl = false;
       restoreConversation(conversationId, function () {
         conversationId = null;
         clearStoredConversationId();
@@ -717,7 +747,7 @@
       var wasOpen = isPanelOpen;
       isPanelOpen = data.open;
       if (isPanelOpen && !wasOpen) warmUp();
-      if (isPanelOpen && !wasOpen && hasHandoffSignal) {
+      if (isPanelOpen && !wasOpen && (hasHandoffSignal || isHumanControl)) {
         pollNow();
       } else if (!isPanelOpen && pollTimeoutId) {
         // schedulePoll()'s own guard only prevents double-scheduling --

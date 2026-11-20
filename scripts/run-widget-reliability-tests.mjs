@@ -1092,3 +1092,135 @@ test("loader: relays the masked contact from the final event to the iframe", asy
   assert.equal(end.escalate, true);
   assert.equal(end.followUpContact, "+91 98•••••210");
 });
+
+// --- Item 8: human replies appear fast; no extra load when closed/hidden -----
+
+function pollHarness({ restoreControl = "ai", pollControl = () => restoreControl, visibilityState = "visible" } = {}) {
+  const h = createLoaderHarness({
+    storage: storedVisitorSession(),
+    visibilityState,
+    fetchHandler: (r) => {
+      if (r.path === "/api/chat/restore") {
+        return jsonResponse({ ...restoreBody, data: { ...restoreBody.data, control: restoreControl } });
+      }
+      if (r.path === "/api/chat/poll") {
+        return jsonResponse({ ok: true, data: { conversationId: CONV, control: pollControl(), messages: [], asOf: "2026-11-20T10:00:00.000Z" } });
+      }
+      return undefined;
+    },
+  });
+  return h;
+}
+
+const polls = (h) => h.requestsTo("/api/chat/poll").length;
+
+test("poll: human in control -> every 2.5 s while the panel is open", async () => {
+  const h = pollHarness({ restoreControl: "human" });
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  h.fromIframe({ type: "widget:panel_open", open: true }); // reopening a human conversation polls at once
+  await h.flush();
+  const afterOpen = polls(h);
+  assert.equal(afterOpen, 1, "immediate catch-up poll on open");
+  await h.advance(10_000);
+  assert.equal(polls(h) - afterOpen, 4, "2.5 s cadence: 4 polls in 10 s");
+});
+
+test("poll: AI in control -> the normal slow cadence (15 s), which still notices a takeover", async () => {
+  let control = "ai";
+  const h = pollHarness({ restoreControl: "ai", pollControl: () => control });
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  h.fromIframe({ type: "widget:panel_open", open: true });
+  await h.flush();
+  assert.equal(polls(h), 0);
+  await h.advance(14_999);
+  assert.equal(polls(h), 0);
+  await h.advance(1);
+  assert.equal(polls(h), 1, "first slow poll at 15 s");
+  // Staff take over in the inbox: the next slow poll sees control "human" ...
+  control = "human";
+  await h.advance(15_000);
+  assert.equal(polls(h), 2);
+  // ... and from then on the widget polls every 2.5 s.
+  await h.advance(5_000);
+  assert.equal(polls(h), 4);
+  // Staff hand back to the AI: back to the slow cadence.
+  control = "ai";
+  await h.advance(2_500);
+  const atHandBack = polls(h);
+  await h.advance(14_000);
+  assert.equal(polls(h), atHandBack, "no fast polling after hand-back");
+});
+
+test("poll: an escalated reply switches to the fast cadence", async () => {
+  const sse = sseResponse();
+  const h = createLoaderHarness({
+    fetchHandler: (r) =>
+      r.path === "/api/chat"
+        ? sse.response
+        : r.path === "/api/chat/poll"
+          ? jsonResponse({ ok: true, data: { conversationId: CONV, control: "ai", messages: [], asOf: "2026-11-20T10:00:00.000Z" } })
+          : undefined,
+  });
+  h.fromIframe({ type: "widget:ready" });
+  h.fromIframe({ type: "widget:panel_open", open: true });
+  h.fromIframe({ type: "widget:send", requestId: "r1", text: "Can I talk to a person?", consentGiven: true });
+  await h.flush();
+  sse.push({ type: "meta", conversationId: CONV, asOf: null });
+  sse.push({ type: "delta", text: "I'll pass this to our team." });
+  sse.push({ type: "final", escalate: true, recommendedProducts: [], asOf: "2026-11-20T10:00:00.000Z" });
+  sse.end();
+  await h.flush();
+  await h.advance(5_000);
+  assert.equal(polls(h), 2, "2.5 s cadence after an escalation");
+});
+
+test("poll: no polling at all while the panel is closed", async () => {
+  const h = pollHarness({ restoreControl: "human" });
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  await h.advance(60_000);
+  assert.equal(polls(h), 0, "closed panel");
+  h.fromIframe({ type: "widget:panel_open", open: true });
+  await h.flush();
+  await h.advance(5_000);
+  const whileOpen = polls(h);
+  assert.ok(whileOpen >= 2);
+  h.fromIframe({ type: "widget:panel_open", open: false });
+  await h.flush();
+  await h.advance(60_000);
+  assert.equal(polls(h), whileOpen, "closing stops polling");
+});
+
+test("poll: no polling while the tab is hidden; one catch-up poll on return", async () => {
+  const h = pollHarness({ restoreControl: "human" });
+  h.fromIframe({ type: "widget:ready" });
+  await h.flush();
+  h.fromIframe({ type: "widget:panel_open", open: true });
+  await h.flush();
+  const before = polls(h);
+  h.setVisibility("hidden");
+  await h.advance(60_000);
+  assert.equal(polls(h), before, "hidden tab: no requests");
+  h.setVisibility("visible");
+  await h.flush();
+  assert.equal(polls(h), before + 1, "catch-up on return");
+});
+
+test("poll: nothing to poll before a conversation exists", async () => {
+  const h = createLoaderHarness({ fetchHandler: () => undefined });
+  h.fromIframe({ type: "widget:ready" });
+  h.fromIframe({ type: "widget:panel_open", open: true });
+  await h.flush();
+  await h.advance(120_000);
+  assert.equal(polls(h), 0);
+});
+
+test("poll: the fast cadence stays inside the per-conversation poll limit", () => {
+  const route = source("app/api/chat/poll/route.ts");
+  const limit = Number(/const POLL_CONVERSATION_LIMIT = (\d+);/.exec(route)[1]);
+  const windowSeconds = Number(/const RATE_LIMIT_WINDOW_SECONDS = (\d+);/.exec(route)[1]);
+  const fastMs = Number(/var FAST_POLL_INTERVAL_MS = (\d+);/.exec(source("public/widget-loader.js"))[1]);
+  assert.ok((windowSeconds * 1000) / fastMs <= limit * 0.85, "headroom left for refocus/reopen catch-up polls");
+});
