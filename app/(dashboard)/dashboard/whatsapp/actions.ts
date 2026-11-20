@@ -92,6 +92,7 @@ export async function connectWhatsappAction(
   );
 
   revalidatePath("/dashboard/whatsapp");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -121,6 +122,7 @@ export async function disconnectWhatsappAction(
   await recordAuditLogEntry(businessId, userId, "whatsapp_connection.deleted", "whatsapp_connection", deletedConnectionId);
 
   revalidatePath("/dashboard/whatsapp");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -179,6 +181,7 @@ export async function completeWhatsappEmbeddedSignupAction(input: {
     });
   }
   revalidatePath("/dashboard/whatsapp");
+  revalidatePath("/onboarding");
   return { ok: true, complete: outcome.complete, message: outcome.message };
 }
 
@@ -193,6 +196,7 @@ export async function retryWhatsappSetupAction(): Promise<EmbeddedSignupActionRe
   }
   if (!outcome.ok) return { ok: false, error: outcome.error };
   revalidatePath("/dashboard/whatsapp");
+  revalidatePath("/onboarding");
   return { ok: true, complete: outcome.complete, message: outcome.message };
 }
 
@@ -204,6 +208,7 @@ export async function submitWhatsappTemplatesAction(): Promise<TemplateActionRes
   try {
     const result = await submitWhatsappTemplates(createServiceSupabaseClient(), context.businessId);
     revalidatePath("/dashboard/whatsapp");
+    revalidatePath("/onboarding");
     if (!result.ok) {
       return {
         ok: false,
@@ -233,6 +238,7 @@ export async function refreshWhatsappTemplatesAction(): Promise<TemplateActionRe
   try {
     const result = await syncWhatsappTemplateStatuses(createServiceSupabaseClient(), businessId);
     revalidatePath("/dashboard/whatsapp");
+  revalidatePath("/onboarding");
     if (!result.ok) {
       return {
         ok: false,

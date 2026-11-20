@@ -59,7 +59,7 @@ export async function createKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, userId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
@@ -74,13 +74,15 @@ export async function createKnowledgeDocumentAction(
   }
 
   try {
-    await createKnowledgeDocument(businessId, parsed.data);
+    const document = await createKnowledgeDocument(businessId, parsed.data);
+    await approveDocument(businessId, userId, document.id);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -88,7 +90,7 @@ export async function updateKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, userId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
@@ -105,9 +107,10 @@ export async function updateKnowledgeDocumentAction(
 
   const { id, ...input } = parsed.data;
 
-  let updated: boolean;
+  let updated: Awaited<ReturnType<typeof updateKnowledgeDocument>>;
   try {
     updated = await updateKnowledgeDocument(businessId, id, input);
+    if (updated === "manual") await approveDocument(businessId, userId, id);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
@@ -118,6 +121,7 @@ export async function updateKnowledgeDocumentAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   redirect("/dashboard/knowledge");
 }
 
@@ -135,7 +139,7 @@ export async function updateKnowledgeDocumentInPlaceAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, userId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
@@ -152,9 +156,10 @@ export async function updateKnowledgeDocumentInPlaceAction(
 
   const { id, ...input } = parsed.data;
 
-  let updated: boolean;
+  let updated: Awaited<ReturnType<typeof updateKnowledgeDocument>>;
   try {
     updated = await updateKnowledgeDocument(businessId, id, input);
+    if (updated === "manual") await approveDocument(businessId, userId, id);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
@@ -196,6 +201,7 @@ export async function deleteKnowledgeDocumentAction(
   }
 
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -222,6 +228,7 @@ export async function createFileKnowledgeDocumentAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -271,6 +278,7 @@ export async function createUrlKnowledgeDocumentAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -302,6 +310,7 @@ export async function refreshUrlKnowledgeDocumentAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -319,13 +328,15 @@ export type PublishState = {
  * not-found contract every mutation on this page already uses); throws
  * on a real failure, same as `publishKnowledgeDocument` itself.
  */
-async function publishOne(businessId: string, userId: string, id: string): Promise<boolean> {
+async function approveDocument(businessId: string, userId: string, id: string) {
   const result = await publishKnowledgeDocument(businessId, id, userId);
-  if (!result.found) {
-    return false;
-  }
+  if (result.found) await recordAuditLogEntry(businessId, userId, "knowledge.published", "knowledge_document", id);
+  return result;
+}
 
-  await recordAuditLogEntry(businessId, userId, "knowledge.published", "knowledge_document", id);
+async function publishOne(businessId: string, userId: string, id: string): Promise<boolean> {
+  const result = await approveDocument(businessId, userId, id);
+  if (!result.found) return false;
 
   // Stage 2 (STATE.md): only a document's first-ever publish triggers
   // catalog extraction -- a republish (e.g. after an edit) does not
@@ -383,6 +394,7 @@ export async function publishKnowledgeDocumentAction(
   }
 
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -432,6 +444,7 @@ export async function bulkPublishKnowledgeDocumentsAction(
   }
 
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return count > 0 ? { success: true, count } : { error: "Nothing was published." };
 }
 
@@ -463,6 +476,7 @@ export async function bulkDeleteKnowledgeDocumentsAction(
   }
 
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return count > 0 ? { success: true, count } : { error: "Nothing was deleted." };
 }
 
@@ -545,6 +559,7 @@ export async function unpublishKnowledgeDocumentAction(
   await recordAuditLogEntry(businessId, userId, "knowledge.unpublished", "knowledge_document", parsed.data.id);
 
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -589,5 +604,6 @@ export async function retryIngestionAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/knowledge");
+  revalidatePath("/onboarding");
   return { success: true };
 }

@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { saveOptionalDetailsAction, type OptionalDetailsState } from "../../actions";
-import { BusinessHoursForm } from "../../../dashboard/business-hours/business-hours-form";
+import { HoursSummary } from "../hours-summary";
 import type { BusinessHours } from "@/lib/supabase/types";
 
 const inputClasses =
@@ -16,14 +16,12 @@ const initialState: OptionalDetailsState = {};
  * dashboard pages that normally hold them aren't reachable before publishing.
  */
 export function RecommendedDetails({
-  contactPhone,
   website,
   privacyPolicyUrl,
   hours,
   slaMinutes,
   timezone,
 }: {
-  contactPhone: string | null;
   website: string | null;
   privacyPolicyUrl: string | null;
   hours: BusinessHours[];
@@ -43,26 +41,6 @@ export function RecommendedDetails({
       </div>
 
       <form action={formAction} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="rd-phone" className="text-sm font-medium text-ds-text-primary">
-            Contact phone
-          </label>
-          <input
-            id="rd-phone"
-            name="contactPhone"
-            type="tel"
-            autoComplete="tel"
-            defaultValue={contactPhone ?? ""}
-            placeholder="e.g. +91 98765 43210"
-            disabled={isPending}
-            aria-invalid={fieldErrors.contactPhone ? true : undefined}
-            className={inputClasses}
-          />
-          {fieldErrors.contactPhone ? (
-            <p role="alert" className="text-xs text-ds-danger">{fieldErrors.contactPhone}</p>
-          ) : null}
-        </div>
-
         <div className="flex flex-col gap-1.5">
           <label htmlFor="rd-website" className="text-sm font-medium text-ds-text-primary">
             Website
@@ -119,12 +97,7 @@ export function RecommendedDetails({
         </button>
       </form>
 
-      <details className="flex flex-col gap-4 border-t border-ds-border pt-4" open={hours.length === 0}>
-        <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">Business hours</summary>
-        <div className="pt-4">
-          <BusinessHoursForm hours={hours} slaMinutes={slaMinutes} timezone={timezone} embedded />
-        </div>
-      </details>
+      <HoursSummary hours={hours} slaMinutes={slaMinutes} timezone={timezone} />
     </section>
   );
 }

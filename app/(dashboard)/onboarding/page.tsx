@@ -1,16 +1,22 @@
+import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
-import { computeOnboardingProgress, ROUTE_FOR_STEP } from "@/lib/onboarding-steps";
+import { computeOnboardingProgress, ONBOARDING_READINESS_TOTAL, ONBOARDING_STEPS, ROUTE_FOR_STEP } from "@/lib/onboarding-steps";
 import type { OnboardingStep } from "@/lib/supabase/types";
+import { listServicesForBusiness } from "@/lib/services";
 import { listProductsForBusiness } from "@/lib/products";
 import { listFaqsForBusiness } from "@/lib/faqs";
 import { listKnowledgeDocumentsForBusiness } from "@/lib/knowledge";
+import { summarizeSavedHours } from "@/lib/business-hours-summary";
+import { sanitizeAccentColor } from "@/lib/widget-colors";
 import { listBusinessHours } from "@/lib/business-hours";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
-import { getInstagramConnectionForBusiness } from "@/lib/instagram";
+import { getEmbeddedSignupClientConfig } from "@/lib/whatsapp-embedded-signup";
+import { websiteOrigin } from "@/lib/schemas/onboarding-website";
+import { getInstagramConnectionForBusiness, getInstagramPendingSelection } from "@/lib/instagram";
 import { getEntitlementForBusiness, getBillingIdentityForBusiness, channelNotEntitledMessage, channelAllowed } from "@/lib/subscription";
 import { checkReplyQuota } from "@/lib/usage-limit";
 import { isRazorpayConfigured } from "@/lib/razorpay";
@@ -44,7 +50,7 @@ import { isAgentPublished } from "@/lib/agent-published";
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ step?: string }>;
+  searchParams: Promise<{ step?: string; select?: string }>;
 }) {
   const context = await requireAuthContext();
   if (!context.orgId) {
@@ -52,7 +58,7 @@ export default async function OnboardingPage({
   }
 
   const business = await getBusinessForOrg(context.orgId);
-  const { step: stepParam } = await searchParams;
+  const { step: stepParam, select } = await searchParams;
 
   // A published agent belongs on the dashboard -- except on the review step,
   // which shows the "Your agent is live" confirmation right after Publish
@@ -73,17 +79,26 @@ export default async function OnboardingPage({
   }
 
   if (!business) {
+    const organizationId = context.orgId;
+    const [organization, user] = await Promise.all([
+      clerkClient().then((clerk) => clerk.organizations.getOrganization({ organizationId })),
+      currentUser(),
+    ]);
     return (
       <OnboardingPreviewProvider
         seed={{
-          businessName: "",
+          businessName: organization.name,
           description: null,
           greeting: null,
           firstProductName: null,
           firstFaqQuestion: null,
           firstFaqAnswer: null,
-          essentialsDone: 0,
-          essentialsTotal: 9,
+          requiredDone: 0,
+          requiredTotal: 7,
+          recommendedDone: 0,
+          readinessTotal: ONBOARDING_READINESS_TOTAL,
+          published: false,
+          accent: null,
         }}
       >
         <WizardShell
@@ -97,10 +112,10 @@ export default async function OnboardingPage({
           >}
           eyebrow="Step 1 of 6 · Your business"
           heading="Let's set up your AI sales employee"
-          description="Tell us who you are -- this becomes your agent's identity."
+          description="Tell us who you are — this becomes your agent's identity."
           footer={null}
         >
-          <BusinessStep business={null} />
+          <BusinessStep business={null} initialName={organization.name} initialEmail={user?.primaryEmailAddress?.emailAddress ?? ""} />
         </WizardShell>
       </OnboardingPreviewProvider>
     );
@@ -111,10 +126,16 @@ export default async function OnboardingPage({
 
   const requested = isOnboardingStep(stepParam) ? stepParam : null;
   const activeStep: OnboardingStep =
-    requested && stepIndexAllowed(requested, progress.currentStep) ? requested : progress.currentStep;
+    requested && stepIndexAllowed(requested, progress.currentStep)
+      ? requested
+      : stepIndexAllowed(business.onboarding_step, progress.currentStep) &&
+          ONBOARDING_STEPS.indexOf(business.onboarding_step) >= ONBOARDING_STEPS.indexOf("business")
+        ? business.onboarding_step
+        : progress.currentStep;
 
   const [
     products,
+    services,
     faqs,
     knowledgeDocuments,
     faqDocStatuses,
@@ -126,6 +147,7 @@ export default async function OnboardingPage({
     requestHeaders,
   ] = await Promise.all([
     listProductsForBusiness(businessId),
+    listServicesForBusiness(businessId),
     listFaqsForBusiness(businessId),
     listKnowledgeDocumentsForBusiness(businessId),
     getFaqGeneratedDocStatuses(businessId),
@@ -138,17 +160,24 @@ export default async function OnboardingPage({
   ]);
 
   const appOrigin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
-  const metCount = readiness.items.filter((i) => i.status === "met").length;
+  const required = readiness.items.filter((item) => item.tier === "required");
+  const counts = {
+    requiredDone: required.filter((item) => item.status !== "unmet").length,
+    requiredTotal: required.length,
+    recommendedDone: readiness.items.filter((item) => item.tier === "recommended" && item.status !== "unmet").length,
+    readinessTotal: ONBOARDING_READINESS_TOTAL,
+  };
 
   const previewSeed = {
     businessName: business.name,
     description: business.description,
     greeting: business.widget_welcome_text,
-    firstProductName: products[0]?.name ?? null,
+    firstProductName: products[0]?.name ?? services[0]?.name ?? null,
     firstFaqQuestion: faqs[0]?.question ?? null,
     firstFaqAnswer: faqs[0]?.answer ?? null,
-    essentialsDone: metCount,
-    essentialsTotal: readiness.items.length,
+    ...counts,
+    published: isAgentPublished(business),
+    accent: sanitizeAccentColor(business.widget_accent_color),
   };
 
   const activeStage = stageForStep(activeStep);
@@ -156,7 +185,9 @@ export default async function OnboardingPage({
     WIZARD_STAGES.map((s) => {
       if (s.key === activeStage) return [s.key, "current"];
       const stepsForStage = ONBOARDING_STEP_FOR_STAGE[s.key];
-      const done = stepsForStage.every((step) => progress.completion[step]);
+      const done = stepsForStage.every((step) =>
+        progress.completion[step] && stepIndexAllowed(step, business.onboarding_step),
+      );
       return [s.key, done ? "done" : "upcoming"];
     }),
   ) as Record<WizardStageKey, StageStatus>;
@@ -176,7 +207,7 @@ export default async function OnboardingPage({
           eyebrow: "Step 1 of 6 · Your business",
           heading: "Let's set up your AI sales employee",
           description: "This becomes your agent's identity.",
-          content: <BusinessStep business={business} />,
+          content: <BusinessStep business={business} hours={await listBusinessHours(businessId)} />,
           footer: null,
         };
       case "knowledge":
@@ -184,7 +215,7 @@ export default async function OnboardingPage({
           eyebrow: "Step 2 of 6 · Train your agent · 1/3",
           heading: "Add what your agent should know",
           description: "Import your website, upload documents, or write it yourself.",
-          content: <TrainKnowledgeStep documents={knowledgeDocuments} />,
+          content: <TrainKnowledgeStep documents={knowledgeDocuments} agentPublished={isAgentPublished(business)} />,
           footer: null,
         };
       case "products":
@@ -192,7 +223,7 @@ export default async function OnboardingPage({
           eyebrow: "Step 2 of 6 · Train your agent · 2/3",
           heading: "What do you sell?",
           description: "Add at least one product or service your agent can talk about.",
-          content: <TrainProductsStep products={products} currency={business.currency} />,
+          content: <TrainProductsStep products={products} services={services} industry={business.business_type} currency={business.currency} />,
           footer: null,
         };
       case "faqs":
@@ -208,34 +239,39 @@ export default async function OnboardingPage({
           eyebrow: "Step 3 of 6 · Personality",
           heading: "How should your agent sound?",
           description: "Pick a tone and write the greeting prospects see first.",
-          content: <PersonaStep business={business} />,
+          content: <PersonaStep business={business} hoursSummary={summarizeSavedHours(await listBusinessHours(businessId), business.timezone ?? "UTC")} />,
           footer: null,
         };
-      case "channels":
+      case "channels": {
+        const instagramEntitled = channelAllowed(entitlement, "instagram");
+        const accounts = typeof select === "string" && instagramEntitled ? await getInstagramPendingSelection(businessId, select) : null;
         return {
           eyebrow: "Step 4 of 6 · Channels",
           heading: "Where can prospects chat with you?",
-          description: "Connect at least one channel -- your website widget is always included.",
+          description: "Set up your website widget. You can also connect WhatsApp or Instagram if your plan includes them.",
           content: (
             <ChannelsStep
               widgetKeys={widgetKeys}
               appOrigin={appOrigin}
-              widgetLanguage={business.widget_language}
+              website={websiteOrigin(business.website)}
+              embeddedSignup={channelAllowed(entitlement, "whatsapp") ? getEmbeddedSignupClientConfig() : null}
+              instagramSelection={typeof select === "string" ? { selectionId: select, accounts } : undefined}
               isPublished={isAgentPublished(business)}
               whatsapp={whatsapp}
               instagram={instagram}
               whatsappEntitled={channelAllowed(entitlement, "whatsapp")}
-              instagramEntitled={channelAllowed(entitlement, "instagram")}
+              instagramEntitled={instagramEntitled}
               whatsappUpgradeMessage={channelNotEntitledMessage("whatsapp", entitlement)}
               instagramUpgradeMessage={channelNotEntitledMessage("instagram", entitlement)}
             />
           ),
           footer: null,
         };
+      }
       case "plan":
         return {
           eyebrow: "Step 5 of 6 · Plan & billing",
-          heading: entitlement.isTrial && entitlement.serving ? "Start free -- no card needed" : "Choose a plan",
+          heading: entitlement.isTrial && entitlement.serving ? "Start free — no card needed" : "Choose a plan",
           description:
             entitlement.isTrial && entitlement.serving
               ? "Your free trial is already active. Choose a paid plan now or any time before it ends."
@@ -252,6 +288,14 @@ export default async function OnboardingPage({
           instagram ? "Instagram" : null,
         ].filter((v): v is string => v != null);
         const live = isAgentPublished(business);
+        const quota = entitlement.isTrial ? await checkReplyQuota(createServerSupabaseClient(), businessId) : null;
+        const trialEnd = entitlement.trialEndsAt
+          ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: business.timezone ?? "UTC" }).format(new Date(entitlement.trialEndsAt))
+          : null;
+        const catalogCount = products.length + services.length;
+        const planSummary = quota && trialEnd
+          ? `Free trial · ends ${trialEnd} · ${quota.repliesUsed} of ${quota.replyQuota} replies used`
+          : entitlement.planName;
         return {
           eyebrow: "Step 6 of 6 · Test & go live",
           heading: live ? "You're live" : "Ready to go live?",
@@ -259,6 +303,7 @@ export default async function OnboardingPage({
           content: (
             <ReviewStep
               report={readiness}
+              counts={counts}
               isPublished={live}
               hasActiveKey={widgetKeys.some((k) => k.status !== "revoked")}
               hasPrivacyPolicyUrl={Boolean(business.privacy_policy_url)}
@@ -267,16 +312,15 @@ export default async function OnboardingPage({
               checklistRows={[
                 { label: "Business profile", href: "/onboarding", done: progress.completion.business, summary: business.description ? "Set up" : "Incomplete" },
                 { label: "Knowledge", href: "/onboarding?step=knowledge", done: progress.completion.knowledge, summary: `${knowledgeDocuments.length} source${knowledgeDocuments.length === 1 ? "" : "s"}` },
-                { label: "Products & services", href: "/onboarding?step=products", done: progress.completion.products, summary: `${products.length} item${products.length === 1 ? "" : "s"}` },
+                { label: "Products & services", href: "/onboarding?step=products", done: progress.completion.products, summary: `${catalogCount} item${catalogCount === 1 ? "" : "s"}` },
                 { label: "FAQs", href: "/onboarding?step=faqs", done: progress.completion.faqs, summary: `${faqs.length} FAQ${faqs.length === 1 ? "" : "s"}` },
                 { label: "Personality", href: "/onboarding?step=persona", done: progress.completion.persona, summary: business.widget_welcome_text ? "Set up" : "Incomplete" },
                 { label: "Channels", href: "/onboarding?step=channels", done: progress.completion.channels, summary: channelNames.length > 0 ? channelNames.join(", ") : "None yet" },
-                { label: "Plan & billing", href: "/onboarding?step=plan", done: progress.completion.plan, summary: entitlement.planName },
+                { label: "Plan & billing", href: "/onboarding?step=plan", done: progress.completion.plan, summary: planSummary },
               ]}
               activeWidgetKey={activeWidgetKey}
               appOrigin={appOrigin}
               recommendedDetails={{
-                contactPhone: business.contact_phone,
                 website: business.website,
                 privacyPolicyUrl: business.privacy_policy_url,
                 hours: await listBusinessHours(businessId),
@@ -319,20 +363,7 @@ const ONBOARDING_STEP_FOR_STAGE: Record<WizardStageKey, OnboardingStep[]> = {
 
 /** A step can only be requested if it's already reached (completed stages + the current one) -- matches the rail's "upcoming stages aren't clickable" rule. */
 function stepIndexAllowed(requested: OnboardingStep, currentStep: OnboardingStep): boolean {
-  const order: OnboardingStep[] = [
-    "account",
-    "verify",
-    "business",
-    "knowledge",
-    "products",
-    "faqs",
-    "persona",
-    "channels",
-    "plan",
-    "review",
-    "live",
-  ];
-  return order.indexOf(requested) <= order.indexOf(currentStep);
+  return ONBOARDING_STEPS.indexOf(requested) <= ONBOARDING_STEPS.indexOf(currentStep);
 }
 
 async function buildPlanStep(

@@ -18,8 +18,12 @@ export type OnboardingPreviewData = {
   firstProductName: string | null;
   firstFaqQuestion: string | null;
   firstFaqAnswer: string | null;
-  essentialsDone: number;
-  essentialsTotal: number;
+  requiredDone: number;
+  requiredTotal: number;
+  recommendedDone: number;
+  readinessTotal: number;
+  published: boolean;
+  accent: string | null;
 };
 
 type PreviewContextValue = {
@@ -36,13 +40,15 @@ export function OnboardingPreviewProvider({
   seed: OnboardingPreviewData;
   children: ReactNode;
 }) {
-  const [preview, setPreview] = useState(seed);
+  const seedKey = JSON.stringify(seed);
+  const [local, setLocal] = useState({ seedKey, patch: {} as Partial<OnboardingPreviewData> });
+  if (local.seedKey !== seedKey) setLocal({ seedKey, patch: {} });
   const value = useMemo<PreviewContextValue>(
     () => ({
-      preview,
-      update: (patch) => setPreview((prev) => ({ ...prev, ...patch })),
+      preview: { ...seed, ...local.patch },
+      update: (patch) => setLocal((prev) => ({ seedKey, patch: { ...prev.patch, ...patch } })),
     }),
-    [preview],
+    [seed, seedKey, local.patch],
   );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }

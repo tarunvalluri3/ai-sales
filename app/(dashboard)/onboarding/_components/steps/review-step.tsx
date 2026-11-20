@@ -2,6 +2,7 @@
 
 import { useEffect, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
+import { ReadinessCounts, type ReadinessCountsData } from "../readiness-counts";
 import { RecommendedDetails } from "./recommended-details";
 import Link from "next/link";
 import { ReadinessChecklist } from "../../../dashboard/widget-settings/readiness-checklist";
@@ -21,6 +22,7 @@ type Channel = { label: string; href: string; done: boolean; summary: string };
  */
 export function ReviewStep({
   report,
+  counts,
   isPublished,
   hasActiveKey,
   hasPrivacyPolicyUrl,
@@ -32,6 +34,7 @@ export function ReviewStep({
   recommendedDetails,
 }: {
   report: ReadinessReport;
+  counts: ReadinessCountsData;
   isPublished: boolean;
   hasActiveKey: boolean;
   hasPrivacyPolicyUrl: boolean;
@@ -119,6 +122,7 @@ export function ReviewStep({
         </ul>
       </section>
 
+      <ReadinessCounts counts={counts} />
       <ReadinessChecklist report={report} hideActionHints />
 
       <RecommendedDetails {...recommendedDetails} />
@@ -135,6 +139,7 @@ export function ReviewStep({
         isPublished={published}
         hasActiveKey={hasActiveKey}
         hasPrivacyPolicyUrl={hasPrivacyPolicyUrl}
+        privacyPolicyFieldHref="#rd-privacy"
         readinessBlocked={report.gateApplies && !report.canPublish}
         blockingCount={report.blockingItems.length}
         redirectOnSuccess="/dashboard?welcome=1"

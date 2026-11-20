@@ -99,7 +99,7 @@ export function AddKnowledgeTabs({
       ))}
 
       <ol className="grid grid-cols-3 gap-3 border-t border-ds-border pt-4">
-        {["Upload and process", "Review and approve", "Publish to go live"].map((label, index) => (
+        {(method === "manual" ? ["Write and save", "Process", "Publish to go live"] : ["Upload and process", "Review and approve", "Publish to go live"]).map((label, index) => (
           <li key={label} className="flex items-center gap-2.5 text-sm text-ds-text-primary">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ds-surface-soft text-sm font-medium text-ds-text-primary">
               {index + 1}
@@ -108,7 +108,7 @@ export function AddKnowledgeTabs({
           </li>
         ))}
       </ol>
-      <p className="border-t border-ds-border pt-3 text-center text-sm text-ds-text-secondary">New documents start as drafts.</p>
+      <p className="border-t border-ds-border pt-3 text-center text-sm text-ds-text-secondary">{method === "manual" ? "Written notes are approved on save." : "Imported documents start as drafts."}</p>
     </section>
   );
 }

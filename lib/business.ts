@@ -10,6 +10,7 @@ import { track } from "@/lib/analytics-events";
 import { getEntitlementForBusiness } from "@/lib/subscription";
 import { isAgentPublished } from "@/lib/agent-published";
 import { recordCancellationForDeletion } from "@/lib/billing-cancellation";
+import type { DayHoursInput } from "@/lib/business-hours";
 import { defaultWeeklyHours } from "@/lib/business-hours-defaults";
 import { logEvent } from "@/lib/logger";
 
@@ -72,6 +73,7 @@ export type CreateBusinessInput = {
   timezone: string;
   /** ISO 4217, from lib/currency.ts SUPPORTED_CURRENCIES. */
   currency: string;
+  hours?: DayHoursInput[];
 };
 
 /**
@@ -119,7 +121,7 @@ export async function createBusinessForOrg(
   // already exists, so a failure is logged and the readiness item simply asks
   // the owner to save their hours -- creation never fails over it.
   const { error: hoursError } = await supabase.from("business_hours").insert(
-    defaultWeeklyHours().map((day) => ({
+    (input.hours ?? defaultWeeklyHours()).map((day) => ({
       business_id: data.id,
       day_of_week: day.dayOfWeek,
       is_open: day.isOpen,
@@ -208,21 +210,20 @@ export async function updateWidgetBranding(orgId: string, input: WidgetBrandingI
 }
 
 /**
- * Saves only the three optional "recommended" details the onboarding review
- * step collects (phone, website, privacy policy URL) -- a narrow update so it
+ * Saves the website and privacy policy URL from the onboarding review
+ * step. This narrow update
  * can never overwrite the other profile or branding columns.
  */
 export async function updateBusinessOptionalDetails(
   orgId: string,
-  input: { contactPhone: string | null; website: string | null; privacyPolicyUrl: string | null },
+  input: { website?: string | null; privacyPolicyUrl?: string | null },
 ): Promise<void> {
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("businesses")
     .update({
-      contact_phone: input.contactPhone,
-      website: input.website,
-      privacy_policy_url: input.privacyPolicyUrl,
+      ...(input.website !== undefined ? { website: input.website } : {}),
+      ...(input.privacyPolicyUrl !== undefined ? { privacy_policy_url: input.privacyPolicyUrl } : {}),
     })
     .eq("clerk_org_id", orgId);
 
@@ -441,12 +442,17 @@ export async function publishBusinessForOrg(orgId: string): Promise<PublishAgent
  * ever happens inside `publishBusinessForOrg`, atomically with
  * `published_at`, so the two can never disagree.
  */
-export async function saveOnboardingStep(orgId: string, step: Exclude<OnboardingStep, "live">): Promise<void> {
+export async function saveOnboardingStep(
+  orgId: string,
+  step: Exclude<OnboardingStep, "live">,
+  earlierSteps: readonly OnboardingStep[],
+): Promise<void> {
   const supabase = createServerSupabaseClient();
   const { error } = await supabase
     .from("businesses")
     .update({ onboarding_step: step })
-    .eq("clerk_org_id", orgId);
+    .eq("clerk_org_id", orgId)
+    .in("onboarding_step", earlierSteps);
 
   if (error) {
     throw new AppError(

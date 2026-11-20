@@ -95,6 +95,7 @@ export function WidgetInstallGuide({
   appOrigin,
   isPublished,
   activeKeyCount,
+  onboarding = false,
 }: {
   widgetKeys: WidgetKey[];
   appOrigin: string;
@@ -102,6 +103,7 @@ export function WidgetInstallGuide({
   isPublished: boolean;
   /** Defaults to the number of non-revoked keys in `widgetKeys`. */
   activeKeyCount?: number;
+  onboarding?: boolean;
 }) {
   const [platformId, setPlatformId] = useState(PLATFORMS[0].id);
   const activeKeys = widgetKeys.filter((key) => key.status !== "revoked");
@@ -185,7 +187,7 @@ export function WidgetInstallGuide({
 
         <Step
           number={3}
-          title="Allow your site’s address"
+          title={onboarding ? "Your website address" : "Allow your site’s address"}
           done={step3Done}
           aside={step3Done ? <Pill tone="lime">Allowed</Pill> : null}
         >
@@ -193,8 +195,8 @@ export function WidgetInstallGuide({
             <p className="text-sm break-all text-ds-text-secondary">{allowedOrigins.join(", ")}</p>
           ) : (
             <p className="text-sm text-ds-text-secondary">
-              Under Widget keys, add your website&rsquo;s address (e.g. https://yourbusiness.com) to &ldquo;Allowed origins&rdquo;.
-              This tells us it&rsquo;s really your site asking for chat.
+              {onboarding ? "Add your website address above when you’re ready." : <>Under Widget keys, add your website&rsquo;s address (e.g. https://yourbusiness.com) to &ldquo;Allowed origins&rdquo;.
+              This tells us it&rsquo;s really your site asking for chat.</>}
             </p>
           )}
         </Step>

@@ -67,6 +67,7 @@ export async function updateBusinessProfileAction(
   }
 
   revalidatePath("/dashboard/profile");
+  revalidatePath("/onboarding");
   revalidatePath("/dashboard");
   return { success: true };
 }

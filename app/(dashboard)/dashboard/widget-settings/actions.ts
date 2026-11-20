@@ -60,6 +60,7 @@ export async function createWidgetKeyAction(
   await recordAuditLogEntry(businessId, userId, "widget_key.created", "widget_key", created.id);
 
   revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -104,6 +105,7 @@ export async function updateWidgetKeyOriginsAction(
   await recordAuditLogEntry(businessId, userId, "widget_key.origins_updated", "widget_key", parsedId.data.id);
 
   revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -138,6 +140,7 @@ export async function revokeWidgetKeyAction(
   await recordAuditLogEntry(businessId, userId, "widget_key.revoked", "widget_key", parsed.data.id);
 
   revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -179,6 +182,7 @@ export async function updateWidgetBrandingAction(
   await recordAuditLogEntry(businessId, userId, "widget_branding.updated", "business", businessId);
 
   revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -222,6 +226,7 @@ export async function updateAiCapabilitiesAction(
   await recordAuditLogEntry(businessId, userId, "ai_capabilities.updated", "business", businessId);
 
   revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -393,5 +398,6 @@ export async function saveSuggestedQuestionsAction(questions: string[]): Promise
   after(() => kickAnswerBankRefresh(businessId));
 
   revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding");
   return { success: true };
 }

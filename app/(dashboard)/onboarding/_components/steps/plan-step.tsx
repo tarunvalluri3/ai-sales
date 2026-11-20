@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { BillingPanel } from "../../../dashboard/billing/billing-panel";
@@ -53,7 +54,7 @@ function notServingMessage(reason: string | null): string {
     case "trial_expired":
       return "Your free trial has ended. Choose a plan to go live.";
     case "subscription_unavailable":
-      return "We could not load your plan just now. Refresh in a minute -- if it keeps happening, contact support.";
+      return "We could not load your plan just now. Refresh in a minute — if it keeps happening, contact support.";
     default:
       return "Choose a plan to go live.";
   }
@@ -125,7 +126,7 @@ export function PlanStep({
 
   const gstNote = (
     <p className="text-xs text-ds-text-muted">
-      Every price includes {gstRatePercent}% GST -- the split is shown under each amount, and nothing is added at checkout.
+      Every price includes {gstRatePercent}% GST — the split is shown under each amount, and nothing is added at checkout.
     </p>
   );
 
@@ -152,7 +153,7 @@ export function PlanStep({
           className="flex flex-col gap-3 border border-ds-text-primary bg-ds-surface-elevated p-5"
         >
           <h2 id="trial-heading" className="text-base font-medium text-ds-text-primary">
-            Your free trial is on -- no card needed
+            Your free trial is on — no card needed
           </h2>
           <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm text-ds-text-secondary">
             <li>
@@ -222,7 +223,12 @@ export function PlanStep({
             disabled={isPending || confirming || !valid}
             className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
           >
-            {isPending ? "Saving…" : onTrial ? "Continue with the free trial" : "Continue"}
+            {isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                {onTrial ? "Setting up your trial…" : "Saving…"}
+              </span>
+            ) : onTrial ? "Continue with the free trial" : "Continue"}
           </button>
         </div>
       </div>

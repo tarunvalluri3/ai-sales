@@ -52,6 +52,7 @@ export async function createProductAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/products");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -89,6 +90,7 @@ export async function updateProductAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/products");
+  revalidatePath("/onboarding");
   redirect("/dashboard/products");
 }
 
@@ -167,6 +169,7 @@ export async function deleteProductAction(
   }
 
   revalidatePath("/dashboard/products");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -204,6 +207,7 @@ export async function approveProductAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/products");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -235,5 +239,6 @@ export async function rejectProductAction(
   }
 
   revalidatePath("/dashboard/products");
+  revalidatePath("/onboarding");
   return { success: true };
 }

@@ -1,11 +1,16 @@
 "use client";
 
+import { defaultWeeklyHours } from "@/lib/business-hours-defaults";
+import { summarizeWeeklyHours } from "@/lib/business-hours-summary";
+import { WeeklyHoursFields } from "../../../dashboard/business-hours/weekly-hours-fields";
+import { HoursSummary } from "../hours-summary";
+import { Check } from "lucide-react";
 import { useActionState, useEffect, useState, useSyncExternalStore } from "react";
 import { BUSINESS_TYPES } from "@/lib/schemas/business";
 import { detectBrowserTimezone } from "@/lib/timezones";
 import { SUPPORTED_CURRENCIES, currencyForTimezone } from "@/lib/currency";
 import { TimezonePicker } from "../../../dashboard/_components/timezone-picker";
-import type { Business } from "@/lib/supabase/types";
+import type { Business, BusinessHours } from "@/lib/supabase/types";
 import { useRouter } from "next/navigation";
 import { createBusiness, type CreateBusinessState } from "../../actions";
 import { updateBusinessProfileAction, type ProfileFormState } from "../../../dashboard/profile/actions";
@@ -34,16 +39,7 @@ function getServerTimezone(): string {
 const createInitialState: CreateBusinessState = {};
 const updateInitialState: ProfileFormState = {};
 
-/**
- * Stage 1: "Your business". Reuses the real `createBusiness` (new
- * business) / `updateBusinessProfileAction` (revisiting an existing one)
- * Server Actions and their Zod schemas unchanged -- this only arranges
- * the fields. `contactEmail` is asked for here even though the pasted
- * spec didn't list it: every lead/appointment/handoff alert this app
- * sends goes to it (lib/schemas/business.ts), so collecting it up front
- * is a real requirement, not an invented one.
- */
-export function BusinessStep({ business }: { business: Business | null }) {
+export function BusinessStep({ business, initialName = "", initialEmail = "", hours = [] }: { business: Business | null; initialName?: string; initialEmail?: string; hours?: BusinessHours[] }) {
   const router = useRouter();
   const isNew = business == null;
   const [createState, createFormAction, createPending] = useActionState(createBusiness, createInitialState);
@@ -56,11 +52,13 @@ export function BusinessStep({ business }: { business: Business | null }) {
 
   const { update } = useOnboardingPreview();
 
-  const [name, setName] = useState(business?.name ?? "");
+  const [name, setName] = useState(business?.name ?? initialName);
   const [businessType, setBusinessType] = useState(business?.business_type ?? "");
   const [website, setWebsite] = useState(business?.website ?? "");
+  const [week, setWeek] = useState(defaultWeeklyHours);
   const [description, setDescription] = useState(business?.description ?? "");
-  const [contactEmail, setContactEmail] = useState(business?.contact_email ?? "");
+  const [contactEmail, setContactEmail] = useState(business?.contact_email ?? initialEmail);
+  const [contactPhone, setContactPhone] = useState(business?.contact_phone ?? "");
 
   const detectedTimezone = useSyncExternalStore(noopSubscribe, getDetectedTimezone, getServerTimezone);
   const [chosenTimezone, setChosenTimezone] = useState<string | null>(null);
@@ -94,6 +92,7 @@ export function BusinessStep({ business }: { business: Business | null }) {
   }, [isNew, updateState.success, router]);
 
   return (
+    <>
     <form id="business-step-form" action={formAction} className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <label htmlFor="name" className="text-sm font-medium text-ds-text-primary">
@@ -133,11 +132,11 @@ export function BusinessStep({ business }: { business: Business | null }) {
               disabled={isPending}
               className={`border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
                 businessType === type.value
-                  ? "border-ds-text-primary bg-ds-surface-raised text-ds-text-primary"
+                  ? "border-ds-primary bg-ds-primary text-ds-primary-on"
                   : "border-ds-border text-ds-text-secondary hover:border-ds-border-strong"
               }`}
             >
-              {type.label}
+              {businessType === type.value ? <Check className="mr-1 inline size-3" aria-hidden /> : null}{type.label}
             </button>
           ))}
         </div>
@@ -189,7 +188,7 @@ export function BusinessStep({ business }: { business: Business | null }) {
           <p id="description-help" className="text-xs text-ds-text-muted">
             What you sell, where you are based, and who you serve.
           </p>
-          <span className="text-xs text-ds-text-muted">{description.trim().length}/{DESCRIPTION_MIN}+</span>
+          <span className="text-xs text-ds-text-muted">{descriptionOk ? `${description.trim().length} characters` : `Minimum ${DESCRIPTION_MIN} characters`}</span>
         </div>
         {fieldErrors.description ? (
           <p role="alert" className="text-xs text-ds-danger">{fieldErrors.description}</p>
@@ -268,7 +267,26 @@ export function BusinessStep({ business }: { business: Business | null }) {
         </div>
       </div>
 
-      <input type="hidden" name="contactPhone" value={business?.contact_phone ?? ""} />
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="contactPhone" className="text-sm font-medium text-ds-text-primary">
+          Contact phone <span className="text-ds-text-muted">Optional</span>
+        </label>
+        <input id="contactPhone" name="contactPhone" type="tel" autoComplete="tel"
+          placeholder="e.g. +91 98765 43210" className={inputClasses}
+          value={contactPhone} onChange={(event) => setContactPhone(event.target.value)}
+          disabled={isPending} aria-invalid={Boolean(fieldErrors.contactPhone)} />
+        {fieldErrors.contactPhone ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.contactPhone}</p> : null}
+      </div>
+
+      {isNew ? (
+        <details className="border-t border-ds-border pt-4">
+          <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">
+            {summarizeWeeklyHours(week, timezone)} · Edit
+          </summary>
+          <input type="hidden" name="editedHours" value="true" />
+          <div className="pt-4"><WeeklyHoursFields week={week} onChange={setWeek} disabled={isPending} /></div>
+        </details>
+      ) : null}
 
       {state.error ? (
         <p role="alert" className="text-sm text-ds-danger">
@@ -280,34 +298,14 @@ export function BusinessStep({ business }: { business: Business | null }) {
         <span />
         <div className="flex items-center gap-3">
           {!valid ? <span className="text-xs text-ds-text-muted">Add {missing[0]} to continue</span> : null}
-          {isNew ? (
-            // createBusiness redirects itself (Server Action `redirect()`)
-            // straight to the knowledge step on success -- a plain submit,
-            // not StepFooter's client-side router.push, so a server-side
-            // validation failure can never be raced past.
-            <button
-              type="submit"
-              disabled={isPending || !valid}
-              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-            >
-              {isPending ? "Saving…" : "Continue"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={isPending || !valid}
-              onClick={() => {
-                const formEl = document.getElementById("business-step-form") as HTMLFormElement;
-                const data = new FormData(formEl);
-                updateFormAction(data);
-              }}
-              className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-            >
-              {isPending ? "Saving…" : "Continue"}
-            </button>
-          )}
+          <button type="submit" disabled={isPending || !valid}
+            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
+            {isPending ? "Saving…" : "Continue"}
+          </button>
         </div>
       </div>
     </form>
+      {business ? <HoursSummary hours={hours} timezone={business.timezone ?? "UTC"} slaMinutes={business.sla_minutes} /> : null}
+    </>
   );
 }

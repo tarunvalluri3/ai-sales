@@ -1,3 +1,5 @@
+import type { BusinessHours } from "@/lib/supabase/types";
+
 /**
  * The week every NEW business starts with (2026-11-20): Monday to Friday
  * 09:00-18:00 open, Saturday and Sunday closed, read in the business's own
@@ -22,6 +24,19 @@ export function defaultWeeklyHours(): DefaultDayHours[] {
       isOpen,
       startTime: isOpen ? DEFAULT_OPEN_TIME : null,
       endTime: isOpen ? DEFAULT_CLOSE_TIME : null,
+    };
+  });
+}
+
+export function weekFromBusinessHours(hours: BusinessHours[]): DefaultDayHours[] {
+  if (!hours.length) return defaultWeeklyHours();
+  return defaultWeeklyHours().map((day) => {
+    const saved = hours.find((row) => row.day_of_week === day.dayOfWeek);
+    return {
+      dayOfWeek: day.dayOfWeek,
+      isOpen: saved?.is_open ?? false,
+      startTime: saved?.start_time?.slice(0, 5) ?? null,
+      endTime: saved?.end_time?.slice(0, 5) ?? null,
     };
   });
 }

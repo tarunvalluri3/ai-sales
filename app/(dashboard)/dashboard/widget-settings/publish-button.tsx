@@ -14,6 +14,7 @@ export function PublishButton({
   isPublished,
   hasActiveKey,
   hasPrivacyPolicyUrl,
+  privacyPolicyFieldHref,
   readinessBlocked = false,
   blockingCount = 0,
   canEdit = true,
@@ -22,6 +23,7 @@ export function PublishButton({
   isPublished: boolean;
   hasActiveKey: boolean;
   hasPrivacyPolicyUrl: boolean;
+  privacyPolicyFieldHref?: string;
   /** True when this is a first publish that the readiness gate is currently refusing. */
   readinessBlocked?: boolean;
   blockingCount?: number;
@@ -57,7 +59,7 @@ export function PublishButton({
           <p className="max-w-xl text-sm text-ds-text-secondary">
             {published
               ? "Your widget keys will serve real chat to visitors. Later edits save as a draft and go live when you use Publish changes in the dashboard header."
-              : "Prospects can't chat with this business yet -- your widget keys won't respond until you publish. Test it above first."}
+              : "Prospects can't chat with this business yet — your widget keys won't respond until you publish. Test it above first."}
           </p>
         </div>
         <span
@@ -82,8 +84,11 @@ export function PublishButton({
          missing-widget-key notice above. */}
       {!hasPrivacyPolicyUrl ? (
         <p role="status" className="bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
-          You haven&rsquo;t set your own privacy policy URL yet (Customize &rarr; Branding &amp; language,
-          below). Until you do, the consent checkbox in your widget links to Waves AI Pilot&rsquo;s privacy
+          {privacyPolicyFieldHref ? (
+            <a href={privacyPolicyFieldHref} className="underline underline-offset-2">Add your privacy policy URL</a>
+          ) : (
+            <>You haven&rsquo;t set your own privacy policy URL yet (Customize &rarr; Branding &amp; language, below)</>
+          )}. Until you do, the consent checkbox in your widget links to Waves AI Pilot&rsquo;s privacy
           policy instead of yours. Publishing still works.
         </p>
       ) : null}
