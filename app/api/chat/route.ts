@@ -40,6 +40,7 @@ import { createChatSseStream } from "@/lib/chat-sse-response";
 import { applyLateJudgement } from "@/lib/chat-late-judgement";
 import { conversationBelongsToVisitor } from "@/lib/widget-conversation-ownership";
 import { normalizeTimezone } from "@/lib/timezones";
+import { getMaskedFollowUpContact } from "@/lib/leads";
 import { logEvent } from "@/lib/logger";
 import { checkDailyReplyLimit } from "@/lib/daily-reply-limit";
 import {
@@ -864,6 +865,13 @@ export async function POST(request: NextRequest) {
           const row = await writeAssistantMessage(response, interrupted);
           return { asOf: row.created_at };
         },
+        // Widget reliability item 7: an escalated turn tells the prospect which
+        // contact the team will use (masked) instead of asking for it again.
+        finalExtras: async (response) => ({
+          followUpContact: response.escalate
+            ? await getMaskedFollowUpContact(supabase, business.businessId, conversation.id)
+            : null,
+        }),
         sideEffects: finalizeTurnSideEffects,
         logError: (stage, error) => {
           if (stage === "watchdog") {
@@ -918,6 +926,9 @@ export async function POST(request: NextRequest) {
 
     const assistantMessageRow = await writeAssistantMessage(response, false);
     await finalizeTurnSideEffects(response, false);
+    const followUpContact = response.escalate
+      ? await getMaskedFollowUpContact(supabase, business.businessId, conversation.id)
+      : null;
 
     return withCors(
       jsonSuccess({
@@ -927,6 +938,7 @@ export async function POST(request: NextRequest) {
         control: conversation.control,
         asOf: assistantMessageRow.created_at,
         recommendedProducts: response.recommendedProducts,
+        followUpContact,
       }),
     );
   } catch (error) {

@@ -15,6 +15,8 @@ export type ChatMessage = {
   /** "timeout": the widget's own deadline fired (widget reliability item 1). */
   errorKind?: WidgetErrorKind | "timeout";
   escalate?: boolean;
+  /** Widget reliability item 7: masked contact the team will use (escalated turns only). */
+  followUpContact?: string | null;
   recommendedProducts?: WidgetRecommendedProduct[];
 };
 
@@ -109,6 +111,7 @@ export function useWidgetChat(
                   role: "assistant",
                   content: message.answer,
                   escalate: message.escalate,
+                  followUpContact: message.followUpContact,
                   recommendedProducts: message.recommendedProducts,
                 }
               : m,
@@ -157,6 +160,7 @@ export function useWidgetChat(
         setMessages((prev) =>
           finalizeStreamMessage(prev, pending.assistantPlaceholderId, {
             escalate: message.escalate,
+            followUpContact: message.followUpContact,
             recommendedProducts: message.recommendedProducts,
           }),
         );

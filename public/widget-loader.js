@@ -446,6 +446,7 @@
           answer: body.data.answer,
           escalate: body.data.escalate,
           recommendedProducts: body.data.recommendedProducts || [],
+          followUpContact: typeof body.data.followUpContact === "string" ? body.data.followUpContact : null,
         },
         appOrigin,
       );
@@ -596,6 +597,8 @@
                 requestId: requestId,
                 escalate: !!event.escalate,
                 recommendedProducts: event.recommendedProducts || [],
+                // Widget reliability item 7: the masked contact on file, or null.
+                followUpContact: typeof event.followUpContact === "string" ? event.followUpContact : null,
               },
               appOrigin,
             );

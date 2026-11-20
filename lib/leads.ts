@@ -7,6 +7,7 @@ import { scoreLead } from "@/lib/lead-scoring";
 import { emailMatchKey, phoneMatchKey } from "@/lib/identity-keys";
 import { resolveOrCreateCustomer, linkConversationToCustomer } from "@/lib/customers";
 import { recordLeadScoreChange } from "@/lib/lead-score-history";
+import { maskFollowUpContact } from "@/lib/contact-mask";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
@@ -390,4 +391,32 @@ export async function upsertLeadForConversation(
     newScore: score,
     customerId,
   };
+}
+
+/**
+ * Widget reliability item 7: the contact the prospect already gave in THIS
+ * conversation, masked for display ("+91 98•••••210" / "r•••@gmail.com"), or
+ * null. Scoped by business_id AND conversation_id; `businessId` comes from the
+ * resolved widget key. Only called for an escalated widget turn. Never throws:
+ * a failed lookup just means the generic banner is shown.
+ */
+export async function getMaskedFollowUpContact(
+  supabase: SupabaseClient,
+  businessId: string,
+  conversationId: string,
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("contact_phone, contact_email")
+      .eq("business_id", businessId)
+      .eq("conversation_id", conversationId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return maskFollowUpContact(data.contact_phone, data.contact_email);
+  } catch {
+    return null;
+  }
 }

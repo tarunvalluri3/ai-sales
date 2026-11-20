@@ -1022,3 +1022,73 @@ test("New message label exists in every widget language", () => {
     assert.ok(getWidgetStrings(language).newMessageLabel.length > 0, language);
   }
 });
+
+// --- Item 7: don't ask for contact details we already have; show them masked -
+
+const mask = await import(new URL("../lib/contact-mask.ts", import.meta.url).href);
+const { escalationBannerCopy } = await import(new URL("../lib/widget-i18n.ts", import.meta.url).href);
+
+test("masking: phone numbers keep the country code, first 2 and last 3 digits", () => {
+  assert.equal(mask.maskPhone("+91 98765 43210"), "+91 98•••••210");
+  assert.equal(mask.maskPhone("+919876543210"), "+91 98•••••210");
+  assert.equal(mask.maskPhone("9876543210"), "98•••••210");
+  assert.equal(mask.maskPhone("+1 (415) 555-0134"), "+1 41•••••134");
+  assert.equal(mask.maskPhone("12345"), null, "too short to be a phone");
+  assert.equal(mask.maskPhone("call me"), null);
+});
+
+test("masking: emails keep the first letter and the domain", () => {
+  assert.equal(mask.maskEmail("rahul@gmail.com"), "r•••@gmail.com");
+  assert.equal(mask.maskEmail("  priya.k@clinic.co.in "), "p•••@clinic.co.in");
+  assert.equal(mask.maskEmail("not-an-email"), null);
+  assert.equal(mask.maskEmail("@gmail.com"), null);
+});
+
+test("masking: the full number/email never survives", () => {
+  const phone = mask.maskFollowUpContact("+91 98765 43210", "rahul@gmail.com");
+  assert.equal(phone, "+91 98•••••210", "phone first");
+  assert.doesNotMatch(phone, /98765|43210|9876543210/);
+  const email = mask.maskFollowUpContact(null, "rahul@gmail.com");
+  assert.doesNotMatch(email, /rahul/);
+  assert.equal(mask.maskFollowUpContact(null, null), null);
+});
+
+test("banner: contact on file -> 'Our team will contact you at ...'; none -> the old ask", () => {
+  const en = getWidgetStrings("en");
+  assert.equal(escalationBannerCopy(en, "+91 98•••••210"), "Our team will contact you at +91 98•••••210.");
+  assert.equal(escalationBannerCopy(en, null), en.escalationBannerText);
+  assert.match(en.escalationBannerText, /Leave your best contact info/);
+  for (const language of ["en", "es", "fr", "de", "pt", "hi"]) {
+    const strings = getWidgetStrings(language);
+    assert.match(strings.escalationBannerKnownContact, /\{contact\}/, language);
+    assert.ok(escalationBannerCopy(strings, "r•••@gmail.com").includes("r•••@gmail.com"), language);
+  }
+});
+
+test("wiring: the lookup is tenant + conversation scoped and only runs for an escalated turn", () => {
+  const leads = source("lib/leads.ts");
+  assert.match(
+    leads,
+    /\.select\("contact_phone, contact_email"\)\s*\.eq\("business_id", businessId\)\s*\.eq\("conversation_id", conversationId\)/,
+  );
+  assert.match(leads, /return maskFollowUpContact\(data\.contact_phone, data\.contact_email\);/);
+  const route = source("app/api/chat/route.ts");
+  assert.match(route, /followUpContact: response\.escalate\s*\? await getMaskedFollowUpContact\(supabase, business\.businessId, conversation\.id\)\s*: null/);
+  assert.match(route, /const followUpContact = response\.escalate\s*\? await getMaskedFollowUpContact\(supabase, business\.businessId, conversation\.id\)\s*: null;/);
+  assert.match(source("app/(widget)/widget/embed/_components/message-bubble.tsx"), /escalationBannerCopy\(strings, message\.followUpContact \?\? null\)/);
+});
+
+test("loader: relays the masked contact from the final event to the iframe", async () => {
+  const sse = sseResponse();
+  const h = createLoaderHarness({ fetchHandler: (r) => (r.path === "/api/chat" ? sse.response : undefined) });
+  h.fromIframe({ type: "widget:send", requestId: "r1", text: "I want to talk to a person", consentGiven: true });
+  await h.flush();
+  sse.push({ type: "meta", conversationId: "22222222-2222-4222-8222-222222222222", asOf: null });
+  sse.push({ type: "delta", text: "I'll pass this to our team." });
+  sse.push({ type: "final", escalate: true, recommendedProducts: [], asOf: null, followUpContact: "+91 98•••••210" });
+  sse.end();
+  await h.flush();
+  const [end] = h.postedOfType("widget:stream_end");
+  assert.equal(end.escalate, true);
+  assert.equal(end.followUpContact, "+91 98•••••210");
+});

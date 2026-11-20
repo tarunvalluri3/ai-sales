@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import type { ChatMessage } from "../_lib/use-widget-chat";
-import type { WidgetStrings } from "@/lib/widget-i18n";
+import { escalationBannerCopy, type WidgetStrings } from "@/lib/widget-i18n";
 import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { EscalationBanner } from "./escalation-banner";
 import { ProductRecommendationCards } from "./product-recommendation-cards";
@@ -75,7 +75,7 @@ export function MessageBubble({
         </div>
       ) : null}
       {message.role === "assistant" && message.escalate ? (
-        <EscalationBanner text={strings.escalationBannerText} />
+        <EscalationBanner text={escalationBannerCopy(strings, message.followUpContact ?? null)} />
       ) : null}
     </motion.div>
   );

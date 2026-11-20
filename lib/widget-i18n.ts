@@ -49,6 +49,8 @@ export type WidgetStrings = {
   teamMemberLabel: string;
   retryLabel: string;
   escalationBannerText: string;
+  /** Widget reliability item 7: shown instead when a contact is already on file. Must contain "{contact}" (already masked). */
+  escalationBannerKnownContact: string;
   defaultGreetingOpen: string;
   defaultGreetingClosed: string;
   panelUnavailable: string;
@@ -89,6 +91,7 @@ const EN: WidgetStrings = {
   retryLabel: "Retry",
   escalationBannerText:
     "Want to talk to a person? Leave your best contact info in the chat and our team will follow up.",
+  escalationBannerKnownContact: "Our team will contact you at {contact}.",
   defaultGreetingOpen: "Hi! Ask me anything and I'll do my best to help.",
   defaultGreetingClosed:
     "Hi! We're outside our usual hours right now, but ask away — I'll do my best to help, and our team will follow up if needed.",
@@ -126,6 +129,7 @@ const ES: WidgetStrings = {
   retryLabel: "Reintentar",
   escalationBannerText:
     "¿Quieres hablar con una persona? Deja tus datos de contacto en el chat y nuestro equipo se pondrá en contacto.",
+  escalationBannerKnownContact: "Nuestro equipo te contactará en {contact}.",
   defaultGreetingOpen: "¡Hola! Pregúntame lo que quieras y haré lo posible por ayudarte.",
   defaultGreetingClosed:
     "¡Hola! Estamos fuera de nuestro horario habitual, pero pregunta igualmente — haré lo posible por ayudarte y nuestro equipo dará seguimiento si es necesario.",
@@ -163,6 +167,7 @@ const FR: WidgetStrings = {
   retryLabel: "Réessayer",
   escalationBannerText:
     "Vous voulez parler à quelqu'un ? Laissez vos coordonnées dans le chat et notre équipe vous recontactera.",
+  escalationBannerKnownContact: "Notre équipe vous contactera via {contact}.",
   defaultGreetingOpen: "Bonjour ! Posez-moi vos questions, je ferai de mon mieux pour vous aider.",
   defaultGreetingClosed:
     "Bonjour ! Nous sommes en dehors de nos horaires habituels, mais posez votre question — je ferai de mon mieux et notre équipe vous recontactera si besoin.",
@@ -200,6 +205,7 @@ const DE: WidgetStrings = {
   retryLabel: "Erneut versuchen",
   escalationBannerText:
     "Möchten Sie mit einer Person sprechen? Hinterlassen Sie Ihre Kontaktdaten im Chat, unser Team meldet sich.",
+  escalationBannerKnownContact: "Unser Team meldet sich unter {contact} bei Ihnen.",
   defaultGreetingOpen: "Hallo! Fragen Sie mich alles — ich helfe Ihnen gerne weiter.",
   defaultGreetingClosed:
     "Hallo! Wir sind gerade außerhalb unserer üblichen Zeiten, aber fragen Sie ruhig — ich helfe so gut ich kann, unser Team meldet sich bei Bedarf.",
@@ -237,6 +243,7 @@ const PT: WidgetStrings = {
   retryLabel: "Tentar novamente",
   escalationBannerText:
     "Quer falar com uma pessoa? Deixe os seus dados de contacto no chat e a nossa equipa dará seguimento.",
+  escalationBannerKnownContact: "A nossa equipa irá contactá-lo através de {contact}.",
   defaultGreetingOpen: "Olá! Pergunte-me o que quiser, farei o meu melhor para ajudar.",
   defaultGreetingClosed:
     "Olá! Estamos fora do nosso horário habitual, mas pode perguntar à vontade — farei o meu melhor e a nossa equipa dará seguimento se necessário.",
@@ -273,6 +280,7 @@ const HI: WidgetStrings = {
   teamMemberLabel: "टीम सदस्य",
   retryLabel: "पुनः प्रयास करें",
   escalationBannerText: "किसी व्यक्ति से बात करना चाहते हैं? चैट में अपनी संपर्क जानकारी छोड़ें, हमारी टीम संपर्क करेगी।",
+  escalationBannerKnownContact: "हमारी टीम आपसे {contact} पर संपर्क करेगी।",
   defaultGreetingOpen: "नमस्ते! मुझसे कुछ भी पूछें, मैं मदद करने की पूरी कोशिश करूंगा।",
   defaultGreetingClosed:
     "नमस्ते! अभी हमारे सामान्य समय के बाहर है, लेकिन बेझिझक पूछें — मैं मदद करने की पूरी कोशिश करूंगा और ज़रूरत पड़ने पर हमारी टीम संपर्क करेगी।",
@@ -305,4 +313,14 @@ export function getWidgetStrings(language: WidgetLanguage): WidgetStrings {
 
 export function isSupportedWidgetLanguage(value: string): value is WidgetLanguage {
   return (SUPPORTED_WIDGET_LANGUAGES as readonly string[]).includes(value);
+}
+
+/**
+ * Widget reliability item 7: never ask for contact details the prospect
+ * already gave -- name the (masked) contact the team will use instead.
+ */
+export function escalationBannerCopy(strings: WidgetStrings, followUpContact: string | null): string {
+  return followUpContact
+    ? strings.escalationBannerKnownContact.replace("{contact}", followUpContact)
+    : strings.escalationBannerText;
 }

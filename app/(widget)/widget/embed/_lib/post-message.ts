@@ -62,6 +62,8 @@ export type WidgetResponseMessage = {
   answer: string;
   escalate: boolean;
   recommendedProducts: WidgetRecommendedProduct[];
+  /** Widget reliability item 7: the prospect's own contact on file, already masked server-side. */
+  followUpContact: string | null;
 };
 
 export type WidgetErrorKind = "unauthorized" | "rate_limited" | "failure";
@@ -113,6 +115,8 @@ export type WidgetStreamEndMessage = {
   requestId: string;
   escalate: boolean;
   recommendedProducts: WidgetRecommendedProduct[];
+  /** Widget reliability item 7: the prospect's own contact on file, already masked server-side. */
+  followUpContact: string | null;
 };
 
 /** Widget reliability item 1: the server's keep-alive, relayed by the loader. Re-arms the iframe's stall clock; carries nothing else. */
@@ -248,6 +252,10 @@ export type ToParentMessage =
   | WidgetRecentChatsRequestMessage
   | WidgetSwitchConversationMessage;
 
+function parseFollowUpContact(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 && value.length <= 120 ? value : null;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -289,6 +297,7 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
           answer: data.answer,
           escalate: data.escalate,
           recommendedProducts,
+          followUpContact: parseFollowUpContact(data.followUpContact),
         };
       }
       return null;
@@ -331,7 +340,13 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
                 (item.imageUrl === null || typeof item.imageUrl === "string"),
             )
           : [];
-        return { type: "widget:stream_end", requestId: data.requestId, escalate: data.escalate, recommendedProducts };
+        return {
+          type: "widget:stream_end",
+          requestId: data.requestId,
+          escalate: data.escalate,
+          recommendedProducts,
+          followUpContact: parseFollowUpContact(data.followUpContact),
+        };
       }
       return null;
     case "widget:stream_ping":
