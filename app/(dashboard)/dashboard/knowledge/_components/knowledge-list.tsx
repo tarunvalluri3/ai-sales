@@ -59,9 +59,13 @@ const bulkInitialState: BulkActionState = {};
 export function KnowledgeList({
   documents,
   canEdit,
+  agentPublished,
+  stacked = false,
   onEdit,
 }: {
   documents: KnowledgeDocument[];
+  agentPublished: boolean;
+  stacked?: boolean;
   canEdit: boolean;
   /** When set, "Edit" calls this instead of navigating to /dashboard/knowledge/[id]/edit -- used by the onboarding wizard to keep editing inline. */
   onEdit?: (id: string) => void;
@@ -148,7 +152,7 @@ export function KnowledgeList({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-ds-text-primary">
-        {liveCount} live and answering prospects · {documents.length - liveCount} not live
+        {liveCount} documents ready · {documents.filter((document) => document.status === "draft").length} waiting for review
         {attentionCount > 0 ? ` · ${attentionCount} need${attentionCount === 1 ? "s" : ""} attention` : ""}
       </p>
 
@@ -291,6 +295,14 @@ export function KnowledgeList({
                 title="No documents match"
                 description="Try a different search term or clear the status filter."
               />
+            ) : stacked ? (
+              <ul className="flex min-w-0 flex-col gap-3">
+                {filtered.map((document) => (
+                  <KnowledgeRow key={document.id} document={document} canEdit={canEdit}
+                    agentPublished={agentPublished} stacked selected={selectedIds.has(document.id)}
+                    onToggleSelected={() => toggleSelected(document.id)} onEdit={onEdit} />
+                ))}
+              </ul>
             ) : (
               <DataTable
                 items={filtered}
@@ -301,6 +313,7 @@ export function KnowledgeList({
                   <KnowledgeRow
                     document={document}
                     canEdit={canEdit}
+                    agentPublished={agentPublished}
                     selected={selectedIds.has(document.id)}
                     onToggleSelected={() => toggleSelected(document.id)}
                     onEdit={onEdit}
@@ -318,11 +331,15 @@ export function KnowledgeList({
 function KnowledgeRow({
   document,
   canEdit,
+  agentPublished,
+  stacked = false,
   selected,
   onToggleSelected,
   onEdit,
 }: {
   document: KnowledgeDocument;
+  agentPublished: boolean;
+  stacked?: boolean;
   canEdit: boolean;
   selected: boolean;
   onToggleSelected: () => void;
@@ -341,10 +358,12 @@ function KnowledgeRow({
   const primaryIsPublish = !isFailed && isDraft;
   const primaryIsEdit = !isFailed && isPublished;
 
+  const Row = stacked ? "li" : TableRow;
+  const Cell = stacked ? "div" : TableCell;
   return (
-    <TableRow>
+    <Row className={stacked ? "flex min-w-0 flex-wrap items-start gap-2 border border-ds-border p-3" : undefined}>
       {canEdit ? (
-        <TableCell>
+        <Cell>
           <input
             type="checkbox"
             checked={selected}
@@ -352,9 +371,9 @@ function KnowledgeRow({
             aria-label={`Select ${document.title}`}
             className="size-5 shrink-0 rounded accent-ds-accent"
           />
-        </TableCell>
+        </Cell>
       ) : null}
-      <TableCell className={`min-w-0 items-start gap-3.5 ${selected ? "bg-ds-lime-soft/60" : ""}`}>
+      <Cell className={`min-w-0 items-start gap-3.5 ${stacked ? "flex flex-1 basis-36" : ""} ${selected ? "bg-ds-lime-soft/60" : ""}`}>
         <FileText className="mt-0.5 size-5 shrink-0 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -365,7 +384,7 @@ function KnowledgeRow({
               className="flex items-center gap-1.5 text-sm font-medium text-ds-success"
             >
               <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-ds-success-bright" />
-              Live
+              {agentPublished ? "Live" : "Ready"}
             </span>
           ) : null}
         </div>
@@ -375,21 +394,21 @@ function KnowledgeRow({
             {isPublished ? "Approved" : "Draft"}
           </span>
         </div>
-        <span className="line-clamp-2 text-sm text-ds-text-secondary">{document.content}</span>
+        <span className={`${stacked ? "line-clamp-1 break-words" : "line-clamp-2"} text-sm text-ds-text-secondary`}>{document.content}</span>
         {isFailed ? <IngestionErrorMessage lastError={document.ingestion_last_error} /> : null}
-        {document.source_type === "url" && document.source_url ? (
+        {!stacked && document.source_type === "url" && document.source_url ? (
           <span className="truncate text-sm text-ds-text-secondary">
             {document.source_url}
             {document.refresh_interval_hours ? ` · Auto-refreshes every ${document.refresh_interval_hours}h` : ""}
           </span>
         ) : null}
         </div>
-      </TableCell>
-      <TableCell>
+      </Cell>
+      {!stacked ? <Cell>
         <span className="text-sm text-ds-text-primary">{SOURCE_LABEL[document.source_type] ?? document.source_type}</span>
-      </TableCell>
-      <TableCell>
-        <div className="flex shrink-0 items-center gap-2">
+      </Cell> : null}
+      <Cell>
+        <div className={`flex items-center gap-2 ${stacked ? "flex-wrap" : "shrink-0"}`}>
         {primaryIsRetry ? (
           <RetryIngestionButton action={retryIngestionAction} id={document.id} canEdit={canEdit} />
         ) : primaryIsPublish ? (
@@ -476,7 +495,7 @@ function KnowledgeRow({
           />
         </RowActionsMenu>
         </div>
-      </TableCell>
-    </TableRow>
+      </Cell>
+    </Row>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { DEFAULT_WIDGET_PRIMARY, sanitizeAccentColor } from "@/lib/widget-colors";
+import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Business } from "@/lib/supabase/types";
 import { SUPPORTED_WIDGET_LANGUAGES, WIDGET_LANGUAGE_LABELS } from "@/lib/widget-i18n";
-import { updateWidgetBrandingAction, type WidgetBrandingActionState } from "../../../dashboard/widget-settings/actions";
+import { updateAiCapabilitiesAction, updateWidgetBrandingAction, type WidgetBrandingActionState } from "../../../dashboard/widget-settings/actions";
 import { advanceOnboarding } from "../../actions";
 import { useOnboardingPreview } from "../preview-context";
 
@@ -17,21 +18,14 @@ const TONES: { key: "friendly" | "professional" | "concise"; label: string; exam
   { key: "concise", label: "Concise", example: "Hi — how can I help?" },
 ];
 
+const SWATCHES = [DEFAULT_WIDGET_PRIMARY, "#dc2626", "#c2410c", "#a16207", "#15803d", "#0f766e", "#2563eb", "#7e22ce"];
+
 const initialState: WidgetBrandingActionState = {};
 
-/**
- * Stage 3: "Personality". There is no persisted `tone` column on
- * `businesses` -- adding one would be a schema change out of this UI
- * task's scope. Picking a tone card instead reshapes the greeting text
- * it prefills; the only field actually saved is the greeting itself
- * (`widget_welcome_text`) plus the widget's language, both via the real
- * `updateWidgetBrandingAction` (every other branding field is passed
- * through unchanged via hidden inputs, so this never clobbers settings
- * configured elsewhere).
- */
-export function PersonaStep({ business }: { business: Business }) {
+/** Tone presets seed the greeting. Branding and capabilities use the dashboard save actions. */
+export function PersonaStep({ business, hoursSummary }: { business: Business; hoursSummary: string }) {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(updateWidgetBrandingAction, initialState);
+  const [state, formAction, isPending] = useActionState(savePersona, initialState);
   const { update } = useOnboardingPreview();
 
   const [tone, setTone] = useState<"friendly" | "professional" | "concise">("friendly");
@@ -44,20 +38,32 @@ export function PersonaStep({ business }: { business: Business }) {
   const [greeting, setGreeting] = useState(business.widget_welcome_text || defaultGreeting("friendly"));
   const [language, setLanguage] = useState(business.widget_language);
 
-  const valid = greeting.trim().length > 0;
+  const [accent, setAccent] = useState(business.widget_accent_color ?? DEFAULT_WIDGET_PRIMARY);
+  const [appointments, setAppointments] = useState(business.appointments_enabled);
+  const [recommendations, setRecommendations] = useState(business.recommend_products_enabled);
+  const accentError = !sanitizeAccentColor(accent) ? "Enter a six-digit hex colour, like #3f3f46." : null;
+  const valid = greeting.trim().length > 0 && !accentError;
 
-  useEffect(() => {
-    if (!state.success) return;
-    void advanceOnboarding("channels").then((result) => {
-      if (result.ok) router.push("/onboarding?step=channels");
-    });
-    // Only react to a fresh success from the branding save itself.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.success]);
+  function changeAccent(value: string) {
+    setAccent(value);
+    update({ accent: sanitizeAccentColor(value) });
+  }
+
+  async function savePersona(previous: WidgetBrandingActionState, form: FormData): Promise<WidgetBrandingActionState> {
+    const branding = await updateWidgetBrandingAction(previous, form);
+    if (!branding.success) return branding;
+    const capabilities = await updateAiCapabilitiesAction({}, form);
+    if (!capabilities.success) return capabilities;
+    const next = await advanceOnboarding("channels");
+    if (!next.ok) return { error: next.error };
+    router.push("/onboarding?step=channels");
+    return { success: true };
+  }
+
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
-      <input type="hidden" name="accentColor" value={business.widget_accent_color ?? ""} />
+      <input type="hidden" name="appointmentSlotMinutes" value={business.appointment_slot_minutes} />
       <input type="hidden" name="logoUrl" value={business.widget_logo_url ?? ""} />
       <input type="hidden" name="welcomeTextClosed" value={business.widget_welcome_text_closed ?? ""} />
       <input type="hidden" name="ctaText" value={business.widget_cta_text ?? ""} />
@@ -138,6 +144,38 @@ export function PersonaStep({ business }: { business: Business }) {
           ))}
         </select>
       </div>
+
+      <fieldset disabled={isPending} className="flex flex-col gap-2">
+        <legend className="text-sm font-medium text-ds-text-primary">Brand colour</legend>
+        <div className="flex flex-wrap gap-2">
+          {SWATCHES.map((colour) => (
+            <button key={colour} type="button" aria-label={colour} aria-pressed={accent.toLowerCase() === colour}
+              onClick={() => changeAccent(colour)} style={{ backgroundColor: colour }}
+              className="size-8 rounded-full border border-ds-border aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ds-text-primary" />
+          ))}
+        </div>
+        <label htmlFor="accentColor" className="text-xs text-ds-text-muted">Hex colour</label>
+        <input id="accentColor" name="accentColor" className={inputClasses} value={accent}
+          onChange={(event) => changeAccent(event.target.value)} aria-invalid={Boolean(accentError)} maxLength={7} />
+        {accentError ? <p role="alert" className="text-xs text-ds-danger">{accentError}</p> : null}
+      </fieldset>
+
+      <fieldset disabled={isPending} className="flex flex-col gap-3">
+        <legend className="text-sm font-medium text-ds-text-primary">Capabilities</legend>
+        <label className="flex items-start gap-2 text-sm text-ds-text-primary">
+          <input type="checkbox" name="appointmentsEnabled" checked={appointments} onChange={(event) => setAppointments(event.target.checked)} className="mt-1 accent-ds-accent" />
+          <span>Book appointments
+            <span className="block text-xs text-ds-text-muted">Offer available times and take appointment requests.</span>
+            <span className="block text-xs text-ds-text-muted">Uses your business hours: {hoursSummary}</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm text-ds-text-primary">
+          <input type="checkbox" name="recommendProductsEnabled" checked={recommendations} onChange={(event) => setRecommendations(event.target.checked)} className="mt-1 accent-ds-accent" />
+          <span>Recommend products &amp; services
+            <span className="block text-xs text-ds-text-muted">Suggest matching offerings from your catalog.</span>
+          </span>
+        </label>
+      </fieldset>
 
       {state.error ? (
         <p role="alert" className="text-sm text-ds-danger">

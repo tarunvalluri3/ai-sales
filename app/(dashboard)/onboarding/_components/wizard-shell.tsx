@@ -140,7 +140,7 @@ export function WizardShell({
           })}
         </nav>
 
-        <main className="flex min-h-[calc(100vh-57px)] flex-1 flex-col">
+        <main className="flex min-h-[calc(100vh-57px)] min-w-0 flex-1 flex-col">
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 px-4 py-8 md:px-8">
             <AnimatePresence mode="wait">
               <motion.div

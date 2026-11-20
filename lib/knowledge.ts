@@ -89,7 +89,7 @@ export async function createKnowledgeDocument(
 /**
  * Updates a manual knowledge document and regenerates its chunks, scoped
  * to the given business. `id`s belonging to another business (or
- * nonexistent) affect zero rows -- returns `false` rather than throwing,
+ * nonexistent) affect zero rows -- returns `null` rather than throwing,
  * so the caller can show a safe "not found" message without
  * distinguishing that from a cross-tenant attempt.
  */
@@ -97,7 +97,7 @@ export async function updateKnowledgeDocument(
   businessId: string,
   id: string,
   input: KnowledgeDocumentInput,
-): Promise<boolean> {
+): Promise<KnowledgeSourceType | null> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("knowledge_documents")
@@ -105,7 +105,7 @@ export async function updateKnowledgeDocument(
     .eq("business_id", businessId)
     .eq("id", id)
     .in("source_type", ["manual", "file", "url"])
-    .select("id");
+    .select("source_type");
 
   if (error) {
     throw new AppError(
@@ -116,12 +116,12 @@ export async function updateKnowledgeDocument(
   }
 
   if (data.length === 0) {
-    return false;
+    return null;
   }
 
   await enqueueIngestion(supabase, businessId, id);
 
-  return true;
+  return data[0].source_type;
 }
 
 /** Deletes a manual knowledge document (and its chunks, via cascade), scoped to the given business. See `updateKnowledgeDocument` for the not-found contract. */

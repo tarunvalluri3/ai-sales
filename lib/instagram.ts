@@ -119,7 +119,7 @@ export async function getInstagramConnectionForBusiness(businessId: string): Pro
  * already-authenticated caller's business and returns Meta's login dialog
  * URL. `businessId`/`userId` must come from `requireBusinessContext()`.
  */
-export async function buildInstagramConnectUrl(businessId: string, userId: string): Promise<{ url: string }> {
+export async function buildInstagramConnectUrl(businessId: string, userId: string, onboarding = false): Promise<{ url: string }> {
   const config = getMetaConfig();
   if (!config || !hasTokenEncryptionKey()) {
     throw new AppError(
@@ -128,7 +128,7 @@ export async function buildInstagramConnectUrl(businessId: string, userId: strin
     );
   }
 
-  const state = crypto.randomBytes(32).toString("base64url");
+  const state = (onboarding ? "onboarding:" : "") + crypto.randomBytes(32).toString("base64url");
   const supabase = createServiceSupabaseClient();
 
   // Housekeeping: expired states for this business are useless; drop them.

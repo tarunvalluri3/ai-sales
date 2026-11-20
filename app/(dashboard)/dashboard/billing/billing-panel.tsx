@@ -643,7 +643,7 @@ function CurrentPlanCard({
       {entitlement.noSubscription ? (
         <p className="rounded-xl bg-ds-surface-soft px-4 py-2.5 text-sm text-ds-text-primary">
           {entitlement.notServingReason === "subscription_unavailable"
-            ? "We could not load your plan just now, so AI replies are paused. Please refresh in a minute -- if this continues, contact support."
+            ? "We could not load your plan just now, so AI replies are paused. Please refresh in a minute — if this continues, contact support."
             : "There is no plan on this account, so your AI is not replying to prospects. Choose a plan below to switch it on."}
         </p>
       ) : null}
@@ -658,7 +658,7 @@ function describeStatus(entitlement: EntitlementSummary): string {
     }
     return entitlement.hasPaymentMethod
       ? `Free trial. Your plan starts automatically when it ends on ${formatDate(entitlement.periodEnd)}.`
-      : `Free trial -- no card needed. It stops on ${formatDate(entitlement.periodEnd)}, or sooner if you use all your trial replies, unless you choose a plan.`;
+      : `Free trial — no card needed. It stops on ${formatDate(entitlement.periodEnd)}, or sooner if you use all your trial replies, unless you choose a plan.`;
   }
   if (entitlement.status === "past_due") {
     const failed = entitlement.pastDueSince ? ` on ${formatDate(entitlement.pastDueSince)}` : "";

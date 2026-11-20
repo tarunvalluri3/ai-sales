@@ -52,10 +52,20 @@ export async function createServiceAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/services");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
 export async function updateServiceAction(
+  _prevState: ServiceFormState,
+  formData: FormData,
+): Promise<ServiceFormState> {
+  const result = await updateServiceInPlaceAction(_prevState, formData);
+  if (result.success) redirect("/dashboard/services");
+  return result;
+}
+
+export async function updateServiceInPlaceAction(
   _prevState: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
@@ -89,7 +99,8 @@ export async function updateServiceAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/services");
-  redirect("/dashboard/services");
+  revalidatePath("/onboarding");
+  return { success: true };
 }
 
 export async function deleteServiceAction(
@@ -119,6 +130,7 @@ export async function deleteServiceAction(
   }
 
   revalidatePath("/dashboard/services");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -156,6 +168,7 @@ export async function approveServiceAction(
 
   triggerIngestionProcessing();
   revalidatePath("/dashboard/services");
+  revalidatePath("/onboarding");
   return { success: true };
 }
 
@@ -187,5 +200,6 @@ export async function rejectServiceAction(
   }
 
   revalidatePath("/dashboard/services");
+  revalidatePath("/onboarding");
   return { success: true };
 }

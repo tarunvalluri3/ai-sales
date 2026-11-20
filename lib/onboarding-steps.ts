@@ -7,6 +7,8 @@ import { getInstagramConnectionForBusiness } from "@/lib/instagram";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { isAgentPublished } from "@/lib/agent-published";
 
+export const ONBOARDING_READINESS_TOTAL = 11;
+
 /**
  * Onboarding route guard + resume. `ONBOARDING_STEPS` is the sequence a
  * business moves through; each step's completion is DERIVED from real

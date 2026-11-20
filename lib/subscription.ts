@@ -246,7 +246,7 @@ export function channelNotEntitledMessage(channel: ChannelKey, entitlement: Enti
     channel === "whatsapp" ? "WhatsApp messaging" : channel === "instagram" ? "Instagram messaging" : "This channel";
   const switches = channelLaunchSwitchesFromEnv();
   if ((channel === "whatsapp" && !switches.whatsapp) || (channel === "instagram" && !switches.instagram)) {
-    return `${channelName} isn't available yet -- we're waiting for Meta's approval. Your website widget works in the meantime.`;
+    return `${channelName} isn't available yet — we're waiting for Meta's approval. Your website widget works in the meantime.`;
   }
   if (!entitlement.serving) {
     return entitlement.notServingReason === "trial_already_used"

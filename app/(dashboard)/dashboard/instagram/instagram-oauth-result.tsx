@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { INSTAGRAM_CONNECT_PATH } from "./connect-path";
+import { INSTAGRAM_CONNECT_PATH, ONBOARDING_INSTAGRAM_CONNECT_PATH } from "./connect-path";
 
 const ERROR_MESSAGES: Record<string, string> = {
   denied: "You cancelled the Instagram connection, so nothing was connected.",
@@ -36,7 +36,7 @@ const NO_RETRY = new Set(["forbidden", "not_entitled", "config", "subscribe_perm
  * the callback leaves behind. Only known codes are shown (never text from
  * the URL). Stays on screen until dismissed, with a "Try again" link.
  */
-export function InstagramOAuthResult({ username }: { username: string | null }) {
+export function InstagramOAuthResult({ username, onboarding = false }: { username: string | null; onboarding?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const connected = searchParams.get("connected");
@@ -44,7 +44,7 @@ export function InstagramOAuthResult({ username }: { username: string | null }) 
 
   if (!connected && !error) return null;
 
-  const dismiss = () => router.replace("/dashboard/instagram");
+  const dismiss = () => router.replace(onboarding ? "/onboarding?step=channels" : "/dashboard/instagram");
 
   if (connected) {
     return (
@@ -72,7 +72,7 @@ export function InstagramOAuthResult({ username }: { username: string | null }) 
       <span className="flex items-center gap-2">
         {NO_RETRY.has(error ?? "") ? null : (
           <a
-            href={INSTAGRAM_CONNECT_PATH}
+            href={onboarding ? ONBOARDING_INSTAGRAM_CONNECT_PATH : INSTAGRAM_CONNECT_PATH}
             className="ds-btn-label inline-flex h-9 items-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
           >
             Try again

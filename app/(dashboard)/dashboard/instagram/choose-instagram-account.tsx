@@ -10,8 +10,10 @@ const initialState: InstagramActionState = {};
 export function ChooseInstagramAccount({
   selectionId,
   accounts,
+  onboarding = false,
 }: {
   selectionId: string;
+  onboarding?: boolean;
   accounts: { id: string; username: string | null; pageName?: string | null }[];
 }) {
   const [state, formAction, isPending] = useActionState(chooseInstagramAccountAction, initialState);
@@ -27,6 +29,7 @@ export function ChooseInstagramAccount({
       </div>
 
       <form action={formAction} className="flex flex-col gap-3">
+        {onboarding ? <input type="hidden" name="from" value="onboarding" /> : null}
         <input type="hidden" name="selectionId" value={selectionId} />
         <fieldset className="flex flex-col gap-2">
           <legend className="sr-only">Instagram account</legend>

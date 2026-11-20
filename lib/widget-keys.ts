@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { WidgetKey } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
@@ -101,4 +102,27 @@ export async function revokeWidgetKey(businessId: string, id: string): Promise<b
   }
 
   return data.length > 0;
+}
+
+export async function ensureWidgetKey(businessId: string, origin: string | null) {
+  const keys = await listWidgetKeysForBusiness(businessId);
+  const active = keys.find((key) => key.status === "active" && origin && key.allowed_origins.includes(origin))
+    ?? keys.find((key) => key.status === "active");
+  if (active) return { key: active, created: false };
+
+  // Concurrent onboarding submits for the same business and key generation
+  // share a primary key. The public embed key still uses its random DB default.
+  const hex = createHash("sha256").update("onboarding-widget:" + businessId + ":" + (keys[0]?.id ?? "")).digest("hex");
+  const id = [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20, 32)].join("-");
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.from("widget_keys")
+    .upsert({ id, business_id: businessId, name: "Website widget", allowed_origins: origin ? [origin] : [] }, { onConflict: "id", ignoreDuplicates: true })
+    .select()
+    .maybeSingle();
+  if (error) throw new AppError("Could not set up your website widget. Try again.", "ensureWidgetKey failed", error);
+  if (data) return { key: data, created: true };
+
+  const raced = (await listWidgetKeysForBusiness(businessId)).find((key) => key.id === id && key.status === "active");
+  if (!raced) throw new AppError("Could not set up your website widget. Try again.", "ensureWidgetKey conflict");
+  return { key: raced, created: false };
 }

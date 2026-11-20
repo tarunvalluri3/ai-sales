@@ -31,6 +31,7 @@ export function ProductForm({
   initialImageUrl = "",
   initialCategory = "",
   initialPriceAmount = "",
+  onboardingPlaceholders,
   submitLabel,
   pendingLabel,
   onSuccess,
@@ -45,6 +46,7 @@ export function ProductForm({
   initialImageUrl?: string;
   initialCategory?: string;
   initialPriceAmount?: string;
+  onboardingPlaceholders?: { name: string; price: string };
   submitLabel: string;
   pendingLabel: string;
   /** Called once after a successful submit, in addition to the existing reset-on-add behavior -- lets a caller editing in place (no navigation to a dedicated edit page) know when to exit edit mode. */
@@ -92,6 +94,30 @@ export function ProductForm({
   const describedBy = (field: CatalogFormField, hintId?: string) =>
     [errors[field] ? `${field}-error` : null, hintId ?? null].filter(Boolean).join(" ") || undefined;
 
+  const budgetField = (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="price_amount" className={labelClasses}>
+            Budget-matching price <span className="font-normal text-ds-text-secondary">(number, optional)</span>
+          </label>
+          <input
+            id="price_amount"
+            name="price_amount"
+            type="text"
+            inputMode="decimal"
+            placeholder="e.g. 6500"
+            defaultValue={values?.price_amount ?? initialPriceAmount}
+            disabled={isPending}
+            aria-invalid={errors.price_amount ? true : undefined}
+            aria-describedby={describedBy("price_amount", "price_amount-hint")}
+            className={inputClasses}
+          />
+          <p id="price_amount-hint" className={hintClasses}>
+            Lets the AI match a prospect&rsquo;s budget. Left blank, it&rsquo;s taken from the price when that&rsquo;s a single number.
+          </p>
+          {fieldError("price_amount")}
+        </div>
+  );
+
   return (
     <form ref={formRef} action={formAction} className="flex w-full flex-col gap-3.5">
       {id ? <input type="hidden" name="id" value={id} /> : null}
@@ -107,7 +133,7 @@ export function ProductForm({
             required
             minLength={1}
             maxLength={120}
-            placeholder="e.g. Website Starter Kit"
+            placeholder={onboardingPlaceholders?.name ?? "e.g. Website Starter Kit"}
             defaultValue={values?.name ?? initialName}
             disabled={isPending}
             aria-invalid={errors.name ? true : undefined}
@@ -143,7 +169,7 @@ export function ProductForm({
               name="price"
               type="text"
               maxLength={60}
-              placeholder={pricePlaceholder(currency)}
+              placeholder={onboardingPlaceholders?.price ?? pricePlaceholder(currency)}
               defaultValue={values?.price ?? initialPrice}
               disabled={isPending}
               aria-invalid={errors.price ? true : undefined}
@@ -174,27 +200,12 @@ export function ProductForm({
             {fieldError("category")}
           </div>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="price_amount" className={labelClasses}>
-            Budget-matching price <span className="font-normal text-ds-text-secondary">(number, optional)</span>
-          </label>
-          <input
-            id="price_amount"
-            name="price_amount"
-            type="text"
-            inputMode="decimal"
-            placeholder="e.g. 6500"
-            defaultValue={values?.price_amount ?? initialPriceAmount}
-            disabled={isPending}
-            aria-invalid={errors.price_amount ? true : undefined}
-            aria-describedby={describedBy("price_amount", "price_amount-hint")}
-            className={inputClasses}
-          />
-          <p id="price_amount-hint" className={hintClasses}>
-            Lets the AI match a prospect&rsquo;s budget. Left blank, it&rsquo;s taken from the price when that&rsquo;s a single number.
-          </p>
-          {fieldError("price_amount")}
-        </div>
+        {onboardingPlaceholders ? (
+          <details open={errors.price_amount ? true : undefined}>
+            <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">Advanced</summary>
+            <div className="pt-2">{budgetField}</div>
+          </details>
+        ) : budgetField}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="image_url" className={labelClasses}>
             Image URL

@@ -1,5 +1,7 @@
 "use client";
 
+import { DEFAULT_WIDGET_PRIMARY, readableOnColor } from "@/lib/widget-colors";
+import { ReadinessCounts } from "./readiness-counts";
 import { MessageCircle } from "lucide-react";
 import { Badge } from "../../dashboard/_components/badge";
 import { useOnboardingPreview } from "./preview-context";
@@ -12,8 +14,8 @@ import { useOnboardingPreview } from "./preview-context";
  */
 export function OnboardingPreviewPanel() {
   const { preview } = useOnboardingPreview();
-  const percent =
-    preview.essentialsTotal > 0 ? Math.round((preview.essentialsDone / preview.essentialsTotal) * 100) : 0;
+  const accent = preview.accent ?? DEFAULT_WIDGET_PRIMARY;
+  const percent = Math.round(((preview.requiredDone + preview.recommendedDone) / preview.readinessTotal) * 100);
   const greeting =
     preview.greeting?.trim() ||
     `Hi! Welcome to ${preview.businessName || "your business"}. How can I help today?`;
@@ -23,9 +25,7 @@ export function OnboardingPreviewPanel() {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-medium text-ds-text-primary">Readiness</p>
-          <span className="text-xs text-ds-text-muted">
-            {preview.essentialsDone} of {preview.essentialsTotal} essentials done
-          </span>
+          <ReadinessCounts counts={preview} />
         </div>
         <div
           role="progressbar"
@@ -42,15 +42,15 @@ export function OnboardingPreviewPanel() {
       <div className="flex flex-1 flex-col overflow-hidden border border-ds-border bg-ds-surface">
         <div className="flex items-center justify-between gap-2 border-b border-ds-border bg-ds-surface-elevated px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-full bg-ds-primary text-ds-primary-on">
+            <span className="flex size-7 items-center justify-center rounded-full" style={{ backgroundColor: accent, color: readableOnColor(accent) }}>
               <MessageCircle aria-hidden className="size-3.5" />
             </span>
             <span className="text-sm font-medium text-ds-text-primary">
               {preview.businessName || "Your AI sales employee"}
             </span>
           </div>
-          <Badge tone="muted" size="sm">
-            Draft
+          <Badge tone={preview.published ? "success" : "muted"} size="sm">
+            {preview.published ? "Live" : "Draft"}
           </Badge>
         </div>
 

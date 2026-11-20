@@ -1,5 +1,11 @@
 "use server";
 
+import { parseWeeklyHours } from "@/lib/schemas/weekly-hours";
+import { ensureWidgetKey, updateWidgetKeyOrigins } from "@/lib/widget-keys";
+import { requireBusinessContext } from "@/lib/business-context";
+import { requireMinRole } from "@/lib/auth";
+import { recordAuditLogEntry } from "@/lib/audit-log";
+import { onboardingWebsiteSchema, websiteOrigin } from "@/lib/schemas/onboarding-website";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -75,8 +81,8 @@ export async function createBusiness(
     businessType: formData.get("businessType"),
     description: formData.get("description"),
     contactEmail: formData.get("contactEmail"),
-    contactPhone: formData.get("contactPhone"),
-    website: formData.get("website"),
+    contactPhone: formData.get("contactPhone") ?? undefined,
+    website: formData.get("website") ?? undefined,
     timezone: zone.ok ? zone.timezone : "",
     currency,
   });
@@ -95,11 +101,14 @@ export async function createBusiness(
     return { error: "Fix the highlighted fields below.", fieldErrors };
   }
 
+  const week = formData.has("editedHours") ? parseWeeklyHours(formData) : undefined;
+  if (week && "error" in week) return { error: week.error };
+
   let createFailed = false;
   let errorMessage = "";
 
   try {
-    await createBusinessForOrg(context.orgId, parsed.data);
+    await createBusinessForOrg(context.orgId, { ...parsed.data, hours: week?.days });
   } catch (error) {
     if (!(error instanceof BusinessAlreadyExistsError)) {
       createFailed = true;
@@ -115,24 +124,23 @@ export async function createBusiness(
   // moment the row exists with these fields, so advance the cached step
   // past it. Best-effort -- a failure here must never block the redirect
   // that already created the business.
-  await saveOnboardingStep(context.orgId, "knowledge").catch(() => {});
+  await saveOnboardingStep(context.orgId, "knowledge", ONBOARDING_STEPS.slice(0, ONBOARDING_STEPS.indexOf("knowledge"))).catch(() => {});
 
   redirect("/onboarding?step=knowledge");
 }
 
 const optionalDetailsSchema = z.object({
-  contactPhone: businessContactPhoneSchema,
   website: businessWebsiteSchema,
   privacyPolicyUrl: businessPrivacyPolicyUrlSchema,
 });
 
 export type OptionalDetailsState = {
   error?: string;
-  fieldErrors?: Partial<Record<"contactPhone" | "website" | "privacyPolicyUrl", string>>;
+  fieldErrors?: Partial<Record<"website" | "privacyPolicyUrl", string>>;
   success?: boolean;
 };
 
-/** Review step: saves the recommended phone / website / privacy policy URL. Blank clears a value. */
+/** Review step: saves the recommended website / privacy policy URL. Blank clears a value. */
 export async function saveOptionalDetailsAction(
   _prevState: OptionalDetailsState,
   formData: FormData,
@@ -143,7 +151,6 @@ export async function saveOptionalDetailsAction(
   }
 
   const parsed = optionalDetailsSchema.safeParse({
-    contactPhone: formData.get("contactPhone"),
     website: formData.get("website"),
     privacyPolicyUrl: formData.get("privacyPolicyUrl"),
   });
@@ -172,14 +179,24 @@ export type AdvanceOnboardingResult = { ok: true } | { ok: false; error: string 
 
 /**
  * Onboarding route guard + resume. Moves the cached `onboarding_step`
- * forward (or back) to `nextStep`, but only after re-checking server-side
+ * forward to `nextStep`, but only after re-checking server-side
  * that every step up to it is genuinely complete -- a caller can never
  * jump the business past a step it hasn't actually finished. "live" is
  * reachable only through `publishBusinessForOrg` (the Publish button),
  * never through this action.
  */
 export async function advanceOnboarding(nextStep: OnboardingStep): Promise<AdvanceOnboardingResult> {
-  const context = await requireAuthContext({ role: "org:admin" });
+  async function timed<T>(step: string, call: () => Promise<T>): Promise<T> {
+    if (nextStep !== "review") return call();
+    const start = performance.now();
+    try {
+      return await call();
+    } finally {
+      console.info("onboarding_trial_timing", { step, durationMs: Math.round(performance.now() - start) });
+    }
+  }
+
+  const context = await timed("authorize", () => requireAuthContext({ role: "org:admin" }));
   if (!context.orgId) {
     return { ok: false, error: "Select or create an organization first." };
   }
@@ -188,12 +205,13 @@ export async function advanceOnboarding(nextStep: OnboardingStep): Promise<Advan
     return { ok: false, error: "Publish your AI to go live." };
   }
 
-  const business = await getBusinessForOrg(context.orgId);
+  const orgId = context.orgId;
+  const business = await timed("load_business", () => getBusinessForOrg(orgId));
   if (!business) {
     return { ok: false, error: "Set up your business first." };
   }
 
-  const { currentStep } = await computeOnboardingProgress(business);
+  const { currentStep } = await timed("check_progress", () => computeOnboardingProgress(business));
   const nextIndex = ONBOARDING_STEPS.indexOf(nextStep);
   const currentIndex = ONBOARDING_STEPS.indexOf(currentStep);
 
@@ -201,6 +219,48 @@ export async function advanceOnboarding(nextStep: OnboardingStep): Promise<Advan
     return { ok: false, error: `Finish the "${currentStep}" step first.` };
   }
 
-  await saveOnboardingStep(context.orgId, nextStep);
+  if (nextIndex < 0) return { ok: false, error: "Invalid onboarding step." };
+  if (nextIndex > ONBOARDING_STEPS.indexOf(business.onboarding_step)) {
+    await timed("save_step", () => saveOnboardingStep(orgId, nextStep, ONBOARDING_STEPS.slice(0, nextIndex)));
+    revalidatePath("/onboarding");
+  }
   return { ok: true };
+}
+
+export type OnboardingWebsiteState = { error?: string; saved?: boolean };
+
+export async function saveOnboardingWebsiteAction(
+  _state: OnboardingWebsiteState,
+  form: FormData,
+): Promise<OnboardingWebsiteState> {
+  const { businessId, userId, orgId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) return { error: authError };
+
+  const parsed = form.get("websiteIntent") === "skip" ? null : onboardingWebsiteSchema.safeParse(form.get("website"));
+  if (parsed && !parsed.success) return { error: parsed.error.issues[0].message };
+  const origin = parsed?.data ?? null;
+
+  try {
+    const { key, created } = await ensureWidgetKey(businessId, origin);
+    if (created) {
+      await recordAuditLogEntry(businessId, userId, "widget_key.created", "widget_key", key.id);
+    } else if (origin && !key.allowed_origins.includes(origin)) {
+      const updated = await updateWidgetKeyOrigins(businessId, key.id, [...key.allowed_origins, origin], key.name);
+      if (!updated) return { error: "The widget key changed. Reload and try again." };
+      await recordAuditLogEntry(businessId, userId, "widget_key.origins_updated", "widget_key", key.id);
+    }
+    if (origin) {
+      const business = await getBusinessForOrg(orgId);
+      if (business && websiteOrigin(business.website) !== origin) {
+        await updateBusinessOptionalDetails(orgId, { website: origin });
+      }
+    }
+  } catch (error) {
+    return { error: logAndGetUserMessage(error) };
+  }
+
+  revalidatePath("/dashboard/widget-settings");
+  revalidatePath("/onboarding");
+  return { saved: true };
 }

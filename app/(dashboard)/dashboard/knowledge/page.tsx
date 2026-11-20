@@ -1,4 +1,6 @@
 import { requireBusinessContext } from "@/lib/business-context";
+import { isAgentPublished } from "@/lib/agent-published";
+import { getBusinessForOrg } from "@/lib/business";
 import { hasMinRole } from "@/lib/auth";
 import { listKnowledgeDocumentsForBusiness } from "@/lib/knowledge";
 import { KnowledgeForm } from "./knowledge-form";
@@ -24,21 +26,21 @@ import { Card, PageHeader } from "../_components/ui";
 export const maxDuration = 60;
 
 export default async function KnowledgePage() {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgId, orgRole } = await requireBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:member");
-  const documents = await listKnowledgeDocumentsForBusiness(businessId);
+  const [documents, business] = await Promise.all([listKnowledgeDocumentsForBusiness(businessId), getBusinessForOrg(orgId)]);
 
   return (
     <div className="flex flex-1 flex-col gap-8">
       <PageHeader
         icon={BookOpen}
         title="Knowledge"
-        description="This is what your AI sales employee is allowed to know. New documents start as drafts: approve one, then publish changes to make it live."
+        description="This is what your AI sales employee is allowed to know. Written notes are approved on save. Approve uploaded files and imported pages, then publish changes to make them live."
       />
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card className="min-w-0 p-5">
-          <KnowledgeList documents={documents} canEdit={canEdit} />
+          <KnowledgeList documents={documents} canEdit={canEdit} agentPublished={business != null && isAgentPublished(business)} />
         </Card>
 
         {canEdit ? (

@@ -19,7 +19,7 @@ function isSourceReady(document: KnowledgeDocument): boolean {
   return document.status === "published" && document.ingestion_status === "complete";
 }
 
-export function TrainKnowledgeStep({ documents }: { documents: KnowledgeDocument[] }) {
+export function TrainKnowledgeStep({ documents, agentPublished }: { documents: KnowledgeDocument[]; agentPublished: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +55,7 @@ export function TrainKnowledgeStep({ documents }: { documents: KnowledgeDocument
 
   return (
     <div className="flex flex-col gap-6">
-      <KnowledgeList documents={documents} canEdit onEdit={(id) => setEditingId(id)} />
+      <KnowledgeList documents={documents} agentPublished={agentPublished} stacked canEdit onEdit={(id) => setEditingId(id)} />
 
       {editingDocument ? (
         <div className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
@@ -103,7 +103,7 @@ export function TrainKnowledgeStep({ documents }: { documents: KnowledgeDocument
           {!valid ? (
             <span className="text-xs text-ds-text-muted">
               {stillSettling
-                ? "Publish it and wait for processing to finish — this usually takes a few seconds"
+                ? "Approve any drafts and wait for processing to finish — this usually takes a few seconds"
                 : "Add at least one knowledge source to continue"}
             </span>
           ) : null}

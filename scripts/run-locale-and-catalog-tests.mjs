@@ -204,7 +204,7 @@ test("default hours: Mon-Fri 09:00-18:00 open, Sat and Sun closed, all seven day
 
 test("wiring: a new business saves real default hours; onboarding never falls back to UTC; the detected zone is shown", () => {
   const business = read("lib/business.ts");
-  assert.match(business, /from\("business_hours"\)\.insert\(\n\s+defaultWeeklyHours\(\)\.map/);
+  assert.match(business, /from\("business_hours"\)\.insert\(\n\s+\(input\.hours \?\? defaultWeeklyHours\(\)\)\.map/);
   assert.match(business, /currency: input\.currency/);
   const actions = read("app/(dashboard)/onboarding/actions.ts");
   assert.match(actions, /normalizeTimezone\(formData\.get\("timezone"\)\)/);
@@ -225,7 +225,8 @@ test("wiring: the hours form copy says one consistent thing about an unsaved sch
   assert.doesNotMatch(formSource, /An unconfigured schedule is treated as always open/);
   assert.doesNotMatch(formSource, /even though this form displays default hours/);
   assert.match(formSource, /appointment booking offers prospects no times, and widget\n\s+greetings and SLA alerts treat you as always open/);
-  assert.match(formSource, /defaultWeeklyHours\(\)/);
+  assert.match(formSource, /weekFromBusinessHours\(hours\)/);
+  assert.match(read("lib/business-hours-defaults.ts"), /if \(!hours\.length\) return defaultWeeklyHours\(\)/);
 });
 
 // --------------------------------------------------------- sticky footer
