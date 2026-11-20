@@ -139,3 +139,66 @@ export function timezoneOffsetLabel(zone: string, at: Date = new Date()): string
     return "";
   }
 }
+
+/**
+ * Widget reliability item 3 (2026-11-20): every time shown to a prospect names
+ * its zone ("10:00 AM IST"). `en-US` alone gives "GMT+5:30" for India, so a
+ * few English locales are tried for a real abbreviation (IST, EST, GST, SGT,
+ * AEDT, CET, GMT...); otherwise the offset ("UTC+5:30"). Never throws.
+ */
+const ABBREVIATION_LOCALES = ["en-US", "en-IN", "en-GB", "en-AU", "en-SG"];
+
+export function timeZoneAbbreviation(zone: string, at: Date = new Date()): string {
+  for (const locale of ABBREVIATION_LOCALES) {
+    try {
+      const name = new Intl.DateTimeFormat(locale, { timeZone: zone, timeZoneName: "short" })
+        .formatToParts(at)
+        .find((part) => part.type === "timeZoneName")?.value;
+      if (name && /^[A-Z]{2,5}$/.test(name)) return name;
+    } catch {
+      return zone;
+    }
+  }
+  return timezoneOffsetLabel(zone, at) || zone;
+}
+
+/** Minutes east of UTC for `zone` at `at`; null when the runtime can't tell. */
+function utcOffsetMinutes(zone: string, at: Date): number | null {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).formatToParts(at);
+    const get = (type: string) => Number(parts.find((part) => part.type === type)?.value);
+    const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+    const atMinute = Math.floor(at.getTime() / 60_000) * 60_000;
+    return Math.round((asUtc - atMinute) / 60_000);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The same instant in the VISITOR's zone, for display next to the business
+ * time: "11:30 PM Fri, your time". Null when the visitor's zone is unknown or
+ * shows the same wall-clock time as the business's (no second time needed).
+ * Display only -- never used for a security or business decision.
+ */
+export function visitorLocalTimeLabel(at: Date, visitorZone: string | null | undefined, businessZone: string): string | null {
+  if (!visitorZone || visitorZone === businessZone) return null;
+  const visitorOffset = utcOffsetMinutes(visitorZone, at);
+  const businessOffset = utcOffsetMinutes(businessZone, at);
+  if (visitorOffset === null || businessOffset === null || visitorOffset === businessOffset) return null;
+  try {
+    const time = new Intl.DateTimeFormat("en-US", { timeZone: visitorZone, hour: "numeric", minute: "2-digit" }).format(at);
+    const weekday = new Intl.DateTimeFormat("en-US", { timeZone: visitorZone, weekday: "short" }).format(at);
+    return `${time} ${weekday}, your time`;
+  } catch {
+    return null;
+  }
+}

@@ -56,6 +56,16 @@
   // Phase 32 Stage E: when this script started, so each send can report how
   // long the page had been loaded. Only ever tightens a server-side limit.
   var loaderStartedAt = Date.now();
+  // Widget reliability item 3: the visitor's browser time zone, so offered
+  // times can show "(11:30 PM Fri, your time)". Display only; the server
+  // validates it and never uses it for anything else.
+  var visitorTimeZone = null;
+  try {
+    var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (typeof zone === "string" && zone.length > 0 && zone.length <= 64) visitorTimeZone = zone;
+  } catch {
+    visitorTimeZone = null;
+  }
 
   var COLLAPSED_SIZE = 84;
   var MARGIN = 20;
@@ -159,12 +169,20 @@
 
   // Phase 15b polling state -- all owned by this loader, since it's the
   // only script that can make an authorized (real-Origin-header) request.
-  // Polling is a one-way latch, not gated on control alone: it starts the
-  // first time a response shows escalate:true OR control:"human" (see
-  // prompts/phase-15b-staff-reply-and-live-polling.md's Decision 2), and
-  // then stays on for the rest of this session rather than toggling on
-  // and off with control changes.
+  //
+  // Widget reliability item 8 (2026-11-20): human replies took 10-20 s to
+  // appear, because polling only started after an escalation or a "human"
+  // control seen in a reply -- a staff takeover of a conversation that never
+  // escalated went unseen until the visitor sent again. The cadence is now:
+  //   off   -- panel closed, tab hidden, no conversation yet, or a send in
+  //            flight (no load for a closed widget or a background tab);
+  //   FAST  -- a human controls the conversation (restore/poll/reply said
+  //            control:"human") or it escalated (staff likely about to reply);
+  //   SLOW  -- otherwise, so a takeover is still noticed.
+  // hasHandoffSignal (escalated) stays a one-way latch per conversation;
+  // isHumanControl follows the server's latest answer both ways.
   var hasHandoffSignal = false;
+  var isHumanControl = false;
   var isPanelOpen = false;
   var isSendInFlight = false;
   // feat/chat-streaming: AbortController per in-flight send (keyed by its
@@ -174,20 +192,33 @@
   var lastKnownMessageAt = null;
   var knownMessageIds = {};
   var pollTimeoutId = null;
-  var POLL_INTERVAL_MS = 3000;
+  // 2.5 s fast = 120 polls / 5 min, inside /api/chat/poll's per-conversation
+  // limit of 150 (the rest covers pollNow() on refocus/reopen).
+  var FAST_POLL_INTERVAL_MS = 2500;
+  var SLOW_POLL_INTERVAL_MS = 15000;
+
+  /** The poll interval right now, or null when the widget must not poll at all. */
+  function currentPollInterval() {
+    if (!isPanelOpen || isSendInFlight || !conversationId || document.visibilityState !== "visible") {
+      return null;
+    }
+    return isHumanControl || hasHandoffSignal ? FAST_POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
+  }
 
   function schedulePoll() {
     if (pollTimeoutId) return;
-    if (
-      !hasHandoffSignal ||
-      !isPanelOpen ||
-      isSendInFlight ||
-      !conversationId ||
-      document.visibilityState !== "visible"
-    ) {
-      return;
+    var interval = currentPollInterval();
+    if (interval === null) return;
+    pollTimeoutId = setTimeout(doPoll, interval);
+  }
+
+  /** Drops an armed timer and schedules again -- used when the cadence may have changed. */
+  function reschedulePoll() {
+    if (pollTimeoutId) {
+      clearTimeout(pollTimeoutId);
+      pollTimeoutId = null;
     }
-    pollTimeoutId = setTimeout(doPoll, POLL_INTERVAL_MS);
+    schedulePoll();
   }
 
   function doPoll() {
@@ -209,6 +240,8 @@
         widgetKey: widgetKey,
         conversationId: conversationId,
         after: lastKnownMessageAt,
+        // Widget reliability item 2: polls are scoped to this visitor too.
+        visitorId: visitorId,
       }),
     })
       .then(function (response) {
@@ -227,6 +260,9 @@
             }
           }
           lastKnownMessageAt = body.data.asOf;
+          // The server's current control decides FAST vs SLOW (both ways).
+          if (body.data.control === "human") isHumanControl = true;
+          else if (body.data.control === "ai") isHumanControl = false;
           if (fresh.length > 0) {
             iframe.contentWindow.postMessage(
               { type: "widget:poll_result", messages: fresh },
@@ -255,7 +291,9 @@
 
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") {
-      if (hasHandoffSignal && isPanelOpen) pollNow();
+      // Back on the tab with the panel open: catch up at once, then resume
+      // the cadence (doPoll reschedules itself).
+      if (isPanelOpen && conversationId) pollNow();
     } else if (pollTimeoutId) {
       clearTimeout(pollTimeoutId);
       pollTimeoutId = null;
@@ -290,26 +328,29 @@
   }
 
   // Restore coordination: the /api/chat/restore fetch below and the
-  // iframe's own "load" event race independently -- either can finish
-  // first. The restore message is only postable once the iframe has
-  // actually loaded (its React tree needs to be mounted to receive it),
+  // iframe becoming READY race independently -- either can finish first,
   // so whichever finishes second is what actually sends it.
-  var iframeLoaded = false;
-  var pendingRestoreMessages = null;
+  //
+  // Widget reliability item 2 (2026-11-20): "ready" used to mean the
+  // iframe's "load" event. But React attaches its message listener only
+  // after hydration, which can finish after "load", so a restore posted at
+  // "load" was silently dropped: the visitor saw an empty chat while the AI
+  // (which reads the stored conversation id) still remembered everything.
+  // The iframe now says "widget:ready" once its listeners are attached.
+  var iframeReady = false;
+  var pendingRestore = null;
 
   function tryPostRestore() {
-    if (!iframeLoaded || !pendingRestoreMessages) return;
+    if (!iframeReady || !pendingRestore) return;
     iframe.contentWindow.postMessage(
-      { type: "widget:restore", messages: pendingRestoreMessages },
+      { type: "widget:restore", messages: pendingRestore.messages, consentGiven: pendingRestore.consentGiven },
       appOrigin,
     );
-    pendingRestoreMessages = null;
+    pendingRestore = null;
   }
 
   iframe.addEventListener("load", function () {
-    iframeLoaded = true;
     postViewport();
-    tryPostRestore();
   });
 
   // Shared by the initial page-load restore below and by
@@ -327,7 +368,7 @@
     fetch(appOrigin + "/api/chat/restore", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ widgetKey: widgetKey, conversationId: id }),
+      body: JSON.stringify({ widgetKey: widgetKey, conversationId: id, visitorId: visitorId }),
     })
       .then(function (response) {
         return response.json().then(
@@ -347,14 +388,18 @@
 
         var data = result.body.data;
         if (data.asOf) lastKnownMessageAt = data.asOf;
-        if (data.control === "human") hasHandoffSignal = true;
+        isHumanControl = data.control === "human";
         for (var i = 0; i < data.messages.length; i++) {
           if (data.messages[i].role !== "user") {
             knownMessageIds[data.messages[i].id] = true;
           }
         }
-        pendingRestoreMessages = data.messages;
+        pendingRestore = { messages: data.messages, consentGiven: data.consentGiven === true };
         tryPostRestore();
+        // A restored conversation a human already controls must poll at the
+        // fast cadence right away -- the panel may already be open with a
+        // slow timer armed, so reschedule rather than schedule.
+        reschedulePoll();
       })
       .catch(function () {
         // A network failure here is invisible to the prospect -- the
@@ -417,9 +462,9 @@
       conversationId = body.data.conversationId;
       storeConversationId(conversationId);
       if (body.data.asOf) lastKnownMessageAt = body.data.asOf;
-      if (body.data.escalate || body.data.control === "human") {
-        hasHandoffSignal = true;
-      }
+      if (body.data.escalate) hasHandoffSignal = true;
+      if (body.data.control === "human") isHumanControl = true;
+      else if (body.data.control === "ai") isHumanControl = false;
       iframe.contentWindow.postMessage(
         {
           type: "widget:response",
@@ -428,6 +473,7 @@
           answer: body.data.answer,
           escalate: body.data.escalate,
           recommendedProducts: body.data.recommendedProducts || [],
+          followUpContact: typeof body.data.followUpContact === "string" ? body.data.followUpContact : null,
         },
         appOrigin,
       );
@@ -492,6 +538,7 @@
           pageUrl: pageUrl,
           visitorId: visitorId,
           clientElapsedMs: Math.max(0, Date.now() - loaderStartedAt),
+          visitorTimeZone: visitorTimeZone || undefined,
           stream: true,
           // Set only for a suggested-question chip click (analytics).
           suggested: suggested === true ? true : undefined,
@@ -555,6 +602,13 @@
               { type: "widget:stream_delta", requestId: requestId, text: event.text || "" },
               appOrigin,
             );
+          } else if (event.type === "ping") {
+            // Widget reliability item 1: the server's keep-alive while the
+            // turn is still working. Relayed so the iframe's stall clock
+            // (lib/widget-turn-watch.ts) only ever catches a dead connection.
+            if (!sawTerminal) {
+              iframe.contentWindow.postMessage({ type: "widget:stream_ping", requestId: requestId }, appOrigin);
+            }
           } else if (event.type === "retract") {
             iframe.contentWindow.postMessage(
               { type: "widget:stream_retract", requestId: requestId, text: event.text || "" },
@@ -570,6 +624,8 @@
                 requestId: requestId,
                 escalate: !!event.escalate,
                 recommendedProducts: event.recommendedProducts || [],
+                // Widget reliability item 7: the masked contact on file, or null.
+                followUpContact: typeof event.followUpContact === "string" ? event.followUpContact : null,
               },
               appOrigin,
             );
@@ -585,23 +641,32 @@
       // only a stream that produced nothing at all is a failure.
       if (!sawTerminal) {
         if (sawDelta) {
-          iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId }, appOrigin);
+          iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId, dropped: true }, appOrigin);
         } else {
           postError(requestId, "failure");
         }
       }
     } catch {
-      // An abort (the visitor pressed stop, or the page is unloading) is not
-      // an error: finalize whatever streamed. Anything else is a failure.
-      if (controller.signal.aborted) {
+      // An abort (the visitor pressed stop, the iframe's own timeout, or the
+      // page unloading) is not an error: finalize whatever streamed.
+      // Widget reliability item 1: a connection that DROPS mid-read used to
+      // land here as a bare failure, which deleted the partial answer already
+      // on screen. Now a drop after some text keeps it (marked dropped, so the
+      // iframe offers Retry); only a drop before any text is a plain failure.
+      if (sawTerminal) {
+        // The turn already ended cleanly; a late read error changes nothing.
+      } else if (controller.signal.aborted) {
         iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId }, appOrigin);
+      } else if (sawDelta) {
+        iframe.contentWindow.postMessage({ type: "widget:stream_aborted", requestId: requestId, dropped: true }, appOrigin);
       } else {
         postError(requestId, "failure");
       }
     } finally {
       delete inflightControllers[requestId];
       isSendInFlight = false;
-      schedulePoll();
+      // The reply may have changed the cadence (escalated / human control).
+      reschedulePoll();
     }
   }
 
@@ -610,7 +675,12 @@
     var data = event.data;
     if (!data || typeof data.type !== "string") return;
 
-    if (data.type === "widget:resize" && typeof data.width === "number" && typeof data.height === "number") {
+    if (data.type === "widget:ready") {
+      // The iframe's listeners are attached (see tryPostRestore above).
+      iframeReady = true;
+      postViewport();
+      tryPostRestore();
+    } else if (data.type === "widget:resize" && typeof data.width === "number" && typeof data.height === "number") {
       applyResize(data.width, data.height);
     } else if (data.type === "widget:send" && typeof data.requestId === "string" && typeof data.text === "string") {
       handleSend(data.requestId, data.text, data.consentGiven, data.suggested, data.turnstileToken);
@@ -628,6 +698,7 @@
       conversationId = null;
       clearStoredConversationId();
       hasHandoffSignal = false;
+      isHumanControl = false;
       lastKnownMessageAt = null;
       knownMessageIds = {};
       if (pollTimeoutId) {
@@ -667,6 +738,7 @@
       conversationId = data.conversationId;
       storeConversationId(conversationId);
       hasHandoffSignal = false;
+      isHumanControl = false;
       restoreConversation(conversationId, function () {
         conversationId = null;
         clearStoredConversationId();
@@ -675,7 +747,7 @@
       var wasOpen = isPanelOpen;
       isPanelOpen = data.open;
       if (isPanelOpen && !wasOpen) warmUp();
-      if (isPanelOpen && !wasOpen && hasHandoffSignal) {
+      if (isPanelOpen && !wasOpen && (hasHandoffSignal || isHumanControl)) {
         pollNow();
       } else if (!isPanelOpen && pollTimeoutId) {
         // schedulePoll()'s own guard only prevents double-scheduling --

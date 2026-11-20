@@ -8,6 +8,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversationAfter } from "@/lib/messages";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
+import { conversationBelongsToVisitor } from "@/lib/widget-conversation-ownership";
 
 /**
  * Public, unauthenticated read endpoint (docs/security.md §4), mirroring
@@ -26,10 +27,10 @@ import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 const RATE_LIMIT_WINDOW_SECONDS = 300;
 const POLL_IP_LIMIT = 300;
 // Phase 25e: widget poll interval tightened 6s -> 3s to reduce staff-reply
-// latency, so this budget was raised in step (100 -> 150) to keep the same
-// safety margin above continuous-polling cadence (300s / 3s = 100 requests
-// from scheduled polling alone; the extra room covers pollNow()'s
-// out-of-schedule triggers on tab refocus/panel reopen).
+// latency, so this budget was raised in step (100 -> 150). Widget reliability
+// item 8 (2026-11-20): the fast cadence is now 2.5 s while a human controls or
+// the conversation escalated (300s / 2.5s = 120 scheduled polls), 15 s
+// otherwise; the remaining room covers pollNow() on tab refocus/panel reopen.
 const POLL_CONVERSATION_LIMIT = 150;
 const POLL_RESULT_LIMIT = 50;
 
@@ -37,6 +38,9 @@ const bodySchema = z.object({
   widgetKey: z.string().uuid(),
   conversationId: z.string().uuid(),
   after: z.iso.datetime({ offset: true }),
+  // Widget reliability item 2: polls are scoped to the visitor as well as the
+  // widget key's business (lib/widget-conversation-ownership.ts).
+  visitorId: z.string().trim().min(1).max(100),
 });
 
 export async function OPTIONS() {
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
     return withCors(jsonError("Invalid request.", 400));
   }
 
-  const { widgetKey, conversationId, after } = parsed.data;
+  const { widgetKey, conversationId, after, visitorId } = parsed.data;
   const origin = extractOrigin(request);
   const ip = extractIp(request);
 
@@ -91,7 +95,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const conversation = await getConversationForBusiness(supabase, business.businessId, conversationId);
-    if (!conversation) {
+    if (!conversation || !conversationBelongsToVisitor(conversation, visitorId)) {
       return withCors(jsonError("Invalid request.", 400));
     }
 

@@ -127,3 +127,30 @@ export function boundedRetries(raw: string | undefined, fallback: number): numbe
 }
 
 export const CHAT_MODEL_MAX_RETRIES = boundedRetries(process.env.CHAT_MODEL_MAX_RETRIES, 1);
+
+/**
+ * Widget reliability (2026-11-20, STATE.md). The streamed turn's own timing
+ * contract, shortest to longest:
+ *
+ *   STREAM_METADATA_GRACE_MS  -- after the visible answer is complete, how long
+ *     the server waits for the parallel metadata call before sending the
+ *     terminal event. A slower call is not lost: it finishes in the background
+ *     and its escalation is still applied (lib/chat-late-judgement.ts).
+ *   STREAM_KEEPALIVE_INTERVAL_MS -- while a turn is still working (tool calls,
+ *     a held-back sentence, the grace wait, persistence) the server sends a
+ *     `ping` event this often, so a slow but live turn never looks dead.
+ *   STREAM_CLIENT_STALL_TIMEOUT_MS -- the widget gives up on a stream that has
+ *     sent NOTHING (not even a ping) for this long: only a dead connection can
+ *     go this quiet. Must stay well above the keep-alive interval.
+ *   STREAM_SERVER_WATCHDOG_MS -- the server ends the stream itself (error
+ *     event + close) if the generation has not finished by then, measured from
+ *     the start of the turn. Below the platform's hard kill.
+ *   CHAT_CLIENT_TIMEOUT_MS (above) -- the widget's absolute ceiling per turn.
+ */
+export const STREAM_METADATA_GRACE_MS = 3_000;
+export const STREAM_KEEPALIVE_INTERVAL_MS = 5_000;
+export const STREAM_CLIENT_STALL_TIMEOUT_MS = 20_000;
+export const STREAM_SERVER_WATCHDOG_MS = Math.min(
+  CHAT_AI_DEADLINE_MS + 5_000,
+  CHAT_SERVER_MAX_DURATION_SECONDS * 1_000 - 2_000,
+);

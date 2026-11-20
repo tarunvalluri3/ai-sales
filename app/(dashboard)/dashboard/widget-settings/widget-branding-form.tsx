@@ -11,6 +11,7 @@ import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 import { Card, Pill, btnPrimary, helpClass, labelClass, linkAccent } from "../_components/ui";
 import { inputClasses } from "./input-classes";
 import { WidgetPreview, WidgetStatusStrip } from "./widget-preview";
+import { DEFAULT_WIDGET_PRIMARY } from "@/lib/widget-colors";
 
 const initialState: WidgetBrandingActionState = {};
 
@@ -83,7 +84,7 @@ export function WidgetBrandingForm({
                 <input
                   type="color"
                   aria-label="Pick accent color"
-                  value={/^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : "#dc2626"}
+                  value={/^#[0-9a-fA-F]{6}$/.test(accentColor) ? accentColor : DEFAULT_WIDGET_PRIMARY}
                   onChange={(event) => setAccentColor(event.target.value)}
                   disabled={disabled}
                   className="size-7 shrink-0 cursor-pointer rounded-md border-0 bg-transparent p-0 disabled:opacity-60"
@@ -92,7 +93,7 @@ export function WidgetBrandingForm({
                   id="accentColor"
                   name="accentColor"
                   type="text"
-                  placeholder="#dc2626"
+                  placeholder={DEFAULT_WIDGET_PRIMARY}
                   pattern="^#[0-9a-fA-F]{6}$"
                   value={accentColor}
                   onChange={(event) => setAccentColor(event.target.value)}

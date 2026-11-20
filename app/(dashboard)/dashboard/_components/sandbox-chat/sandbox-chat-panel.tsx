@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import type { ConversationMessage } from "@/lib/rag";
 import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { renderWidgetMarkdown } from "@/lib/widget-markdown";
+import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 import { Badge } from "../badge";
 import { sendSandboxMessage } from "./actions";
 
@@ -36,6 +37,13 @@ export function SandboxChatPanel() {
   const [error, setError] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
   const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Widget reliability item 6: same scroll rules as the widget -- follow the
+  // newest message at the bottom, a "New message" pill when scrolled up.
+  const lastOwnMessageId = [...messages].reverse().find((m) => m.role === "user")?.id ?? null;
+  const { containerRef, contentRef, onScroll, showNewMessagePill, scrollToBottom } = useStickToBottom(
+    messages.length,
+    lastOwnMessageId,
+  );
 
   function handleStartNewChat() {
     if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
@@ -111,12 +119,16 @@ export function SandboxChatPanel() {
         ) : null}
       </div>
 
+      <div className="relative">
       <div
+        ref={containerRef}
+        onScroll={onScroll}
         role="log"
         aria-live="polite"
         aria-label="Test conversation"
-        className="flex max-h-80 min-h-32 flex-col gap-3 overflow-y-auto border border-ds-border bg-ds-surface-elevated p-3"
+        className="flex max-h-80 min-h-32 flex-col overflow-y-auto overscroll-contain border border-ds-border bg-ds-surface-elevated p-3"
       >
+        <div ref={contentRef} className="flex flex-col gap-3">
         {messages.length === 0 ? (
           <p className="text-sm text-ds-text-muted">
             Send a message below to see how your AI responds right now.
@@ -165,6 +177,17 @@ export function SandboxChatPanel() {
             {isSlow ? "Still thinking, this can take up to 30 seconds…" : "Thinking…"}
           </p>
         ) : null}
+        </div>
+      </div>
+      {showNewMessagePill ? (
+        <button
+          type="button"
+          onClick={() => scrollToBottom(true)}
+          className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 bg-ds-primary px-3 py-1.5 text-xs font-medium text-ds-primary-on shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+        >
+          ↓ New message
+        </button>
+      ) : null}
       </div>
 
       {error ? (

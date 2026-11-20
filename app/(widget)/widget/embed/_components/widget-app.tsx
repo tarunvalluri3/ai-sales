@@ -10,6 +10,7 @@ import { LauncherButton } from "./launcher-button";
 import { Panel } from "./panel";
 import type { WidgetStrings } from "@/lib/widget-i18n";
 import type { WidgetLanguage } from "@/lib/supabase/types";
+import { readableOnColor, sanitizeAccentColor } from "@/lib/widget-colors";
 
 const NARROW_BREAKPOINT_PX = 480;
 const COLLAPSED_SIZE_PX = 84;
@@ -48,6 +49,8 @@ export function WidgetApp({
   const { attachContainer: attachTurnstile, takeToken: takeTurnstileToken, enabled: turnstileEnabled } = useTurnstile(turnstileSiteKey);
   const chat = useWidgetChat(strings, { takeTurnstileToken });
   const visualViewportHeight = useViewportHeight();
+  // Only a 6-digit hex ever reaches a CSS variable (the DB checks it too).
+  const accent = sanitizeAccentColor(accentColor);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -104,7 +107,9 @@ export function WidgetApp({
     <div
       className="h-full w-full"
       style={{
-        ...(accentColor ? ({ "--widget-primary": accentColor } as React.CSSProperties) : undefined),
+        ...(accent
+          ? ({ "--widget-primary": accent, "--widget-on-primary": readableOnColor(accent) } as React.CSSProperties)
+          : undefined),
         // Overrides the h-full/100% above with the iframe's own visible
         // (post-keyboard, post-address-bar) height, once known -- see
         // use-viewport-height.ts. Falls back to 100% until then.

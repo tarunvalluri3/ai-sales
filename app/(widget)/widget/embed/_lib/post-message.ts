@@ -62,6 +62,8 @@ export type WidgetResponseMessage = {
   answer: string;
   escalate: boolean;
   recommendedProducts: WidgetRecommendedProduct[];
+  /** Widget reliability item 7: the prospect's own contact on file, already masked server-side. */
+  followUpContact: string | null;
 };
 
 export type WidgetErrorKind = "unauthorized" | "rate_limited" | "failure";
@@ -113,11 +115,21 @@ export type WidgetStreamEndMessage = {
   requestId: string;
   escalate: boolean;
   recommendedProducts: WidgetRecommendedProduct[];
+  /** Widget reliability item 7: the prospect's own contact on file, already masked server-side. */
+  followUpContact: string | null;
+};
+
+/** Widget reliability item 1: the server's keep-alive, relayed by the loader. Re-arms the iframe's stall clock; carries nothing else. */
+export type WidgetStreamPingMessage = {
+  type: "widget:stream_ping";
+  requestId: string;
 };
 
 export type WidgetStreamAbortedMessage = {
   type: "widget:stream_aborted";
   requestId: string;
+  /** Widget reliability item 1: true when the connection dropped (not a stop): keep the partial text but offer Retry. */
+  dropped?: boolean;
 };
 
 /** iframe -> loader: the visitor pressed stop. The loader aborts the in-flight fetch for this request and replies with widget:stream_aborted. */
@@ -158,6 +170,17 @@ export type WidgetPollResultMessage = {
 export type WidgetRestoreMessage = {
   type: "widget:restore";
   messages: { id: string; role: "user" | "assistant" | "human_agent"; content: string }[];
+  /** Widget reliability item 2: consent already recorded for this conversation -- the box stays ticked after a reload. */
+  consentGiven: boolean;
+};
+
+/**
+ * Widget reliability item 2: iframe -> loader, sent once this page's message
+ * listeners are attached. The loader holds the restore until then (posting
+ * at the iframe's "load" event raced React's hydration and was lost).
+ */
+export type WidgetReadyMessage = {
+  type: "widget:ready";
 };
 
 /**
@@ -215,10 +238,12 @@ export type FromParentMessage =
   | WidgetStreamRetractMessage
   | WidgetStreamEndMessage
   | WidgetStreamAbortedMessage
+  | WidgetStreamPingMessage
   | WidgetPollResultMessage
   | WidgetRestoreMessage
   | WidgetRecentChatsResultMessage;
 export type ToParentMessage =
+  | WidgetReadyMessage
   | WidgetResizeMessage
   | WidgetSendMessage
   | WidgetAbortMessage
@@ -226,6 +251,10 @@ export type ToParentMessage =
   | WidgetNewChatMessage
   | WidgetRecentChatsRequestMessage
   | WidgetSwitchConversationMessage;
+
+function parseFollowUpContact(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 && value.length <= 120 ? value : null;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -268,6 +297,7 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
           answer: data.answer,
           escalate: data.escalate,
           recommendedProducts,
+          followUpContact: parseFollowUpContact(data.followUpContact),
         };
       }
       return null;
@@ -310,12 +340,23 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
                 (item.imageUrl === null || typeof item.imageUrl === "string"),
             )
           : [];
-        return { type: "widget:stream_end", requestId: data.requestId, escalate: data.escalate, recommendedProducts };
+        return {
+          type: "widget:stream_end",
+          requestId: data.requestId,
+          escalate: data.escalate,
+          recommendedProducts,
+          followUpContact: parseFollowUpContact(data.followUpContact),
+        };
+      }
+      return null;
+    case "widget:stream_ping":
+      if (typeof data.requestId === "string") {
+        return { type: "widget:stream_ping", requestId: data.requestId };
       }
       return null;
     case "widget:stream_aborted":
       if (typeof data.requestId === "string") {
-        return { type: "widget:stream_aborted", requestId: data.requestId };
+        return { type: "widget:stream_aborted", requestId: data.requestId, dropped: data.dropped === true };
       }
       return null;
     case "widget:poll_result":
@@ -339,7 +380,7 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
             (message.role === "user" || message.role === "assistant" || message.role === "human_agent") &&
             typeof message.content === "string",
         );
-        return { type: "widget:restore", messages };
+        return { type: "widget:restore", messages, consentGiven: data.consentGiven === true };
       }
       return null;
     case "widget:recent_chats_result":

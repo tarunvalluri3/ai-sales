@@ -24,6 +24,7 @@
     "test:guardrails": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-guardrail-tests.mjs",
     "test:tool-scope": "node --conditions=react-server --import ./scripts/lib/test-env-guard.mjs --test scripts/run-tool-scope-tests.mjs",
     "test:output-guard": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-output-guard-tests.mjs",
+    "test:widget-reliability": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-widget-reliability-tests.mjs",
     "test:locale-catalog": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-locale-and-catalog-tests.mjs",
     "test:ai-honesty": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-ai-honesty-tests.mjs",
     "test:guardrail-response": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-guardrail-response-tests.mjs",

@@ -49,12 +49,16 @@ export type WidgetStrings = {
   teamMemberLabel: string;
   retryLabel: string;
   escalationBannerText: string;
+  /** Widget reliability item 7: shown instead when a contact is already on file. Must contain "{contact}" (already masked). */
+  escalationBannerKnownContact: string;
   defaultGreetingOpen: string;
   defaultGreetingClosed: string;
   panelUnavailable: string;
   errorUnauthorized: string;
   errorRateLimited: string;
   errorFailure: string;
+  /** Widget reliability item 1: the widget's own turn deadline fired. */
+  errorTimedOut: string;
   defaultCta: string;
   dismissCtaLabel: string;
   menuLabel: string;
@@ -66,6 +70,12 @@ export type WidgetStrings = {
   recentChatsLoading: string;
   backLabel: string;
   suggestedQuestionsLabel: string;
+  /** Widget reliability item 4: default chip for a catalog item with a price. Must contain "{name}". */
+  defaultQuestionPrice: string;
+  /** Widget reliability item 4: default chip for a catalog item without a price. Must contain "{name}". */
+  defaultQuestionAbout: string;
+  /** Widget reliability item 6: pill shown when a message arrives while the visitor has scrolled up. */
+  newMessageLabel: string;
 };
 
 const EN: WidgetStrings = {
@@ -81,6 +91,7 @@ const EN: WidgetStrings = {
   retryLabel: "Retry",
   escalationBannerText:
     "Want to talk to a person? Leave your best contact info in the chat and our team will follow up.",
+  escalationBannerKnownContact: "Our team will contact you at {contact}.",
   defaultGreetingOpen: "Hi! Ask me anything and I'll do my best to help.",
   defaultGreetingClosed:
     "Hi! We're outside our usual hours right now, but ask away — I'll do my best to help, and our team will follow up if needed.",
@@ -88,6 +99,7 @@ const EN: WidgetStrings = {
   errorUnauthorized: "This chat isn't available right now.",
   errorRateLimited: "Too many messages — please wait a moment and try again.",
   errorFailure: "Something went wrong. Check your connection and try again.",
+  errorTimedOut: "Something went wrong, please try again.",
   defaultCta: "Chat with us",
   dismissCtaLabel: "Dismiss",
   menuLabel: "More options",
@@ -99,6 +111,9 @@ const EN: WidgetStrings = {
   recentChatsLoading: "Loading…",
   backLabel: "Back",
   suggestedQuestionsLabel: "Suggested questions",
+  defaultQuestionPrice: "How much is {name}?",
+  defaultQuestionAbout: "Tell me about {name}.",
+  newMessageLabel: "New message",
 };
 
 const ES: WidgetStrings = {
@@ -114,6 +129,7 @@ const ES: WidgetStrings = {
   retryLabel: "Reintentar",
   escalationBannerText:
     "¿Quieres hablar con una persona? Deja tus datos de contacto en el chat y nuestro equipo se pondrá en contacto.",
+  escalationBannerKnownContact: "Nuestro equipo te contactará en {contact}.",
   defaultGreetingOpen: "¡Hola! Pregúntame lo que quieras y haré lo posible por ayudarte.",
   defaultGreetingClosed:
     "¡Hola! Estamos fuera de nuestro horario habitual, pero pregunta igualmente — haré lo posible por ayudarte y nuestro equipo dará seguimiento si es necesario.",
@@ -121,6 +137,7 @@ const ES: WidgetStrings = {
   errorUnauthorized: "Este chat no está disponible en este momento.",
   errorRateLimited: "Demasiados mensajes — espera un momento e inténtalo de nuevo.",
   errorFailure: "Algo salió mal. Revisa tu conexión e inténtalo de nuevo.",
+  errorTimedOut: "Algo salió mal, inténtalo de nuevo.",
   defaultCta: "Chatea con nosotros",
   dismissCtaLabel: "Descartar",
   menuLabel: "Más opciones",
@@ -132,6 +149,9 @@ const ES: WidgetStrings = {
   recentChatsLoading: "Cargando…",
   backLabel: "Atrás",
   suggestedQuestionsLabel: "Preguntas sugeridas",
+  defaultQuestionPrice: "¿Cuánto cuesta {name}?",
+  defaultQuestionAbout: "Cuéntame sobre {name}.",
+  newMessageLabel: "Nuevo mensaje",
 };
 
 const FR: WidgetStrings = {
@@ -147,6 +167,7 @@ const FR: WidgetStrings = {
   retryLabel: "Réessayer",
   escalationBannerText:
     "Vous voulez parler à quelqu'un ? Laissez vos coordonnées dans le chat et notre équipe vous recontactera.",
+  escalationBannerKnownContact: "Notre équipe vous contactera via {contact}.",
   defaultGreetingOpen: "Bonjour ! Posez-moi vos questions, je ferai de mon mieux pour vous aider.",
   defaultGreetingClosed:
     "Bonjour ! Nous sommes en dehors de nos horaires habituels, mais posez votre question — je ferai de mon mieux et notre équipe vous recontactera si besoin.",
@@ -154,6 +175,7 @@ const FR: WidgetStrings = {
   errorUnauthorized: "Ce chat n'est pas disponible pour le moment.",
   errorRateLimited: "Trop de messages — veuillez patienter un instant et réessayer.",
   errorFailure: "Une erreur s'est produite. Vérifiez votre connexion et réessayez.",
+  errorTimedOut: "Une erreur s'est produite, veuillez réessayer.",
   defaultCta: "Discutez avec nous",
   dismissCtaLabel: "Ignorer",
   menuLabel: "Plus d'options",
@@ -165,6 +187,9 @@ const FR: WidgetStrings = {
   recentChatsLoading: "Chargement…",
   backLabel: "Retour",
   suggestedQuestionsLabel: "Questions suggérées",
+  defaultQuestionPrice: "Combien coûte {name} ?",
+  defaultQuestionAbout: "Parlez-moi de {name}.",
+  newMessageLabel: "Nouveau message",
 };
 
 const DE: WidgetStrings = {
@@ -180,6 +205,7 @@ const DE: WidgetStrings = {
   retryLabel: "Erneut versuchen",
   escalationBannerText:
     "Möchten Sie mit einer Person sprechen? Hinterlassen Sie Ihre Kontaktdaten im Chat, unser Team meldet sich.",
+  escalationBannerKnownContact: "Unser Team meldet sich unter {contact} bei Ihnen.",
   defaultGreetingOpen: "Hallo! Fragen Sie mich alles — ich helfe Ihnen gerne weiter.",
   defaultGreetingClosed:
     "Hallo! Wir sind gerade außerhalb unserer üblichen Zeiten, aber fragen Sie ruhig — ich helfe so gut ich kann, unser Team meldet sich bei Bedarf.",
@@ -187,6 +213,7 @@ const DE: WidgetStrings = {
   errorUnauthorized: "Dieser Chat ist gerade nicht verfügbar.",
   errorRateLimited: "Zu viele Nachrichten — bitte warten Sie einen Moment und versuchen Sie es erneut.",
   errorFailure: "Etwas ist schiefgelaufen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  errorTimedOut: "Etwas ist schiefgelaufen, bitte versuchen Sie es erneut.",
   defaultCta: "Chatten Sie mit uns",
   dismissCtaLabel: "Schließen",
   menuLabel: "Weitere Optionen",
@@ -198,6 +225,9 @@ const DE: WidgetStrings = {
   recentChatsLoading: "Wird geladen…",
   backLabel: "Zurück",
   suggestedQuestionsLabel: "Vorgeschlagene Fragen",
+  defaultQuestionPrice: "Was kostet {name}?",
+  defaultQuestionAbout: "Erzählen Sie mir mehr über {name}.",
+  newMessageLabel: "Neue Nachricht",
 };
 
 const PT: WidgetStrings = {
@@ -213,6 +243,7 @@ const PT: WidgetStrings = {
   retryLabel: "Tentar novamente",
   escalationBannerText:
     "Quer falar com uma pessoa? Deixe os seus dados de contacto no chat e a nossa equipa dará seguimento.",
+  escalationBannerKnownContact: "A nossa equipa irá contactá-lo através de {contact}.",
   defaultGreetingOpen: "Olá! Pergunte-me o que quiser, farei o meu melhor para ajudar.",
   defaultGreetingClosed:
     "Olá! Estamos fora do nosso horário habitual, mas pode perguntar à vontade — farei o meu melhor e a nossa equipa dará seguimento se necessário.",
@@ -220,6 +251,7 @@ const PT: WidgetStrings = {
   errorUnauthorized: "Este chat não está disponível neste momento.",
   errorRateLimited: "Demasiadas mensagens — aguarde um momento e tente novamente.",
   errorFailure: "Algo correu mal. Verifique a sua ligação e tente novamente.",
+  errorTimedOut: "Algo correu mal, tente novamente.",
   defaultCta: "Converse connosco",
   dismissCtaLabel: "Dispensar",
   menuLabel: "Mais opções",
@@ -231,6 +263,9 @@ const PT: WidgetStrings = {
   recentChatsLoading: "A carregar…",
   backLabel: "Voltar",
   suggestedQuestionsLabel: "Perguntas sugeridas",
+  defaultQuestionPrice: "Quanto custa {name}?",
+  defaultQuestionAbout: "Fale-me sobre {name}.",
+  newMessageLabel: "Nova mensagem",
 };
 
 const HI: WidgetStrings = {
@@ -245,6 +280,7 @@ const HI: WidgetStrings = {
   teamMemberLabel: "टीम सदस्य",
   retryLabel: "पुनः प्रयास करें",
   escalationBannerText: "किसी व्यक्ति से बात करना चाहते हैं? चैट में अपनी संपर्क जानकारी छोड़ें, हमारी टीम संपर्क करेगी।",
+  escalationBannerKnownContact: "हमारी टीम आपसे {contact} पर संपर्क करेगी।",
   defaultGreetingOpen: "नमस्ते! मुझसे कुछ भी पूछें, मैं मदद करने की पूरी कोशिश करूंगा।",
   defaultGreetingClosed:
     "नमस्ते! अभी हमारे सामान्य समय के बाहर है, लेकिन बेझिझक पूछें — मैं मदद करने की पूरी कोशिश करूंगा और ज़रूरत पड़ने पर हमारी टीम संपर्क करेगी।",
@@ -252,6 +288,7 @@ const HI: WidgetStrings = {
   errorUnauthorized: "यह चैट अभी उपलब्ध नहीं है।",
   errorRateLimited: "बहुत सारे संदेश — कृपया थोड़ी देर रुकें और फिर से प्रयास करें।",
   errorFailure: "कुछ गलत हो गया। अपना कनेक्शन जांचें और फिर से प्रयास करें।",
+  errorTimedOut: "कुछ गलत हो गया, कृपया फिर से कोशिश करें।",
   defaultCta: "हमसे चैट करें",
   dismissCtaLabel: "खारिज करें",
   menuLabel: "अधिक विकल्प",
@@ -263,6 +300,9 @@ const HI: WidgetStrings = {
   recentChatsLoading: "लोड हो रहा है…",
   backLabel: "वापस",
   suggestedQuestionsLabel: "सुझाए गए प्रश्न",
+  defaultQuestionPrice: "{name} की कीमत क्या है?",
+  defaultQuestionAbout: "{name} के बारे में बताइए।",
+  newMessageLabel: "नया संदेश",
 };
 
 const DICTIONARIES: Record<WidgetLanguage, WidgetStrings> = { en: EN, es: ES, fr: FR, de: DE, pt: PT, hi: HI };
@@ -273,4 +313,14 @@ export function getWidgetStrings(language: WidgetLanguage): WidgetStrings {
 
 export function isSupportedWidgetLanguage(value: string): value is WidgetLanguage {
   return (SUPPORTED_WIDGET_LANGUAGES as readonly string[]).includes(value);
+}
+
+/**
+ * Widget reliability item 7: never ask for contact details the prospect
+ * already gave -- name the (masked) contact the team will use instead.
+ */
+export function escalationBannerCopy(strings: WidgetStrings, followUpContact: string | null): string {
+  return followUpContact
+    ? strings.escalationBannerKnownContact.replace("{contact}", followUpContact)
+    : strings.escalationBannerText;
 }

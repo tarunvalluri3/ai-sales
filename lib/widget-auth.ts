@@ -1,4 +1,5 @@
 import "server-only";
+import { catalogItemHasPrice, type DefaultQuestionSource } from "@/lib/widget-default-questions";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { WidgetLanguage, WidgetPosition } from "@/lib/supabase/types";
 import { loadLiveAgentSourceByVersion, type LiveAgentSource } from "@/lib/agent-runtime";
@@ -83,6 +84,8 @@ export type WidgetBusinessContext = {
     website: string | null;
     /** businesses.currency -- read from the row (AUTH_COLUMNS), not the versioned snapshot. */
     currency: string;
+    /** businesses.timezone (IANA) -- read from the row like the currency; the prompt states it (widget reliability item 3). */
+    timezone: string;
   };
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
@@ -99,7 +102,7 @@ export type WidgetBusinessContext = {
 
 // Identity + lifecycle only. Everything the AI says or shows comes from the
 // live snapshot (live_version_id), not from draft columns.
-const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at, currency";
+const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at, currency, timezone";
 
 // The branding endpoint additionally keeps the draft widget columns, used only
 // as a cosmetic fallback for an agent that has never been published.
@@ -114,6 +117,7 @@ type WidgetAuthRow = {
   status: "active" | "suspended";
   deleted_at: string | null;
   currency: string;
+  timezone: string;
 };
 
 type WidgetBrandingRow = WidgetAuthRow & {
@@ -267,6 +271,7 @@ export async function resolveBusinessFromWidgetKey(
       contactPhone: config.contactPhone,
       website: config.website,
       currency: data.businesses.currency,
+      timezone: data.businesses.timezone,
     },
     language: config.language,
     recommendProductsEnabled: config.capabilities.recommendProducts,
@@ -289,6 +294,12 @@ export type WidgetBranding = {
   ctaText: string | null;
   position: WidgetPosition;
   suggestedQuestions: string[];
+  /**
+   * Widget reliability item 4: the published FAQ questions and catalog item
+   * names the widget builds default chips from when the owner set none.
+   * Null before the first publish (chat itself is closed then).
+   */
+  defaultQuestionSource: DefaultQuestionSource | null;
   /** The business's own privacy policy, linked from the widget's consent checkbox. Null means the widget falls back to this app's own /privacy -- see the 20261019000000 migration. */
   privacyPolicyUrl: string | null;
 };
@@ -337,6 +348,13 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
         ctaText: config.persona.ctaText,
         position: config.channels.position,
         suggestedQuestions: config.persona.suggestedQuestions,
+        defaultQuestionSource: {
+          faqQuestions: liveSource.snapshot.faqs.map((faq) => faq.question),
+          items: [...liveSource.snapshot.services, ...liveSource.snapshot.products].map((item) => ({
+            name: item.name,
+            hasPrice: catalogItemHasPrice(item.price),
+          })),
+        },
         privacyPolicyUrl: config.channels.privacyPolicyUrl,
       };
     }
@@ -353,6 +371,7 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
     ctaText: data.businesses.widget_cta_text,
     position: data.businesses.widget_position,
     suggestedQuestions: data.businesses.widget_suggested_questions ?? [],
+    defaultQuestionSource: null,
     privacyPolicyUrl: data.businesses.privacy_policy_url,
   };
 }

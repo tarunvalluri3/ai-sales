@@ -127,7 +127,11 @@ test("wiring: the widget route runs the policy after the human-control check and
   const finalizeFn = route.indexOf("const finalizeTurnSideEffects");
   const policyCall = route.indexOf("resolveInputGuardrailAction(prepared.signals, abuseStrikes)");
   const streamBranch = route.indexOf("if (clientWantsStream(");
-  const firstModelCall = Math.min(route.indexOf("for await (const chunk of streamSalesEmployee("), route.indexOf("response = await askSalesEmployee("));
+  // Widget reliability item 1: the streamed call now sits in createChatSseStream's `generate`.
+  const streamedCall = route.indexOf("streamSalesEmployee(");
+  const bufferedCall = route.indexOf("response = await askSalesEmployee(");
+  assert.ok(streamedCall > 0 && bufferedCall > 0, "both model call sites found");
+  const firstModelCall = Math.min(streamedCall, bufferedCall);
   assert.ok(human > 0 && human < policyCall);
   assert.ok(writeFn < policyCall && finalizeFn < policyCall, "it reuses the shared persistence and escalation closures");
   assert.ok(policyCall < streamBranch && policyCall < firstModelCall, "no model call can precede it");

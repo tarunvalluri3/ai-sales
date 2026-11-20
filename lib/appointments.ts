@@ -4,6 +4,7 @@ import type { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Appointment, AppointmentBlockedSlot, BusinessHours, BusinessHoursException } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { logEvent } from "@/lib/logger";
+import { timeZoneAbbreviation } from "@/lib/timezones";
 import { linkConversationToCustomer, resolveOrCreateCustomer } from "@/lib/customers";
 
 type ServerSupabaseClient = ReturnType<typeof createServerSupabaseClient>;
@@ -87,9 +88,13 @@ function dateKey(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Shared date/time label formatter -- used both when offering a slot (this file) and when notifying a prospect of a status change (lib/appointment-notifications.ts). */
+/**
+ * Shared date/time label formatter -- used both when offering a slot (this file) and when notifying a prospect of a status change (lib/appointment-notifications.ts).
+ * Widget reliability item 3: always ends with the business's zone ("Sat, Nov 22, 10:00 AM IST"), so a
+ * visitor on a US page never reads an Indian time as their own.
+ */
 export function formatSlotLabel(startsAt: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
+  const local = new Intl.DateTimeFormat("en-US", {
     timeZone,
     weekday: "short",
     month: "short",
@@ -97,6 +102,7 @@ export function formatSlotLabel(startsAt: Date, timeZone: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(startsAt);
+  return `${local} ${timeZoneAbbreviation(timeZone, startsAt)}`;
 }
 
 /** Subtracts `block` from every range in `windows`, splitting a range in two if the block falls in its middle (e.g. a lunch break inside a full-day window). */

@@ -322,7 +322,9 @@ test("widget: the retract message is parsed, and a malformed one is dropped", ()
 
 test("wiring: the loader forwards retract, the route emits it, and the hook applies it", () => {
   assert.match(read("public/widget-loader.js"), /event\.type === "retract"[\s\S]*widget:stream_retract/);
-  assert.match(read("app/api/chat/route.ts"), /chunk\.kind === "retract"[\s\S]*type: "retract"/);
+  // Widget reliability item 1: the route delegates its SSE body to lib/chat-sse-response.ts.
+  assert.match(read("app/api/chat/route.ts"), /createChatSseStream<SalesEmployeeResponse>\(/);
+  assert.match(read("lib/chat-sse-response.ts"), /chunk\.kind === "retract"\) emit\(\{ type: "retract", text: chunk\.text \}\)/);
   assert.match(read("app/(widget)/widget/embed/_lib/use-widget-chat.ts"), /widget:stream_retract[\s\S]*retractStreamMessage/);
   assert.match(read("lib/chat-stream.ts"), /type: "retract"; text: string/);
 });
