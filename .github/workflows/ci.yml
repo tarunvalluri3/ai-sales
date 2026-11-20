@@ -316,6 +316,14 @@ jobs:
         # retract wiring. Pure modules, no network and no secrets.
         run: npm run test:output-guard
 
+      - name: AI honesty tests
+        # AI honesty fix (STATE.md 2026-11-20): false booking claims rewritten
+        # before the prospect sees them (buffered and streamed), the log-only
+        # service-claim check, the 0-11 lead score and the prompt/tool wiring
+        # for mixed questions and booking-off. Pure modules and source checks,
+        # no model, no database, no secrets.
+        run: npm run test:ai-honesty
+
       - name: Guardrail response-path tests
         # Guardrails Phase 5 (STATE.md): the enforcing response policy (fixed safe
         # reply + handover, repeated-abuse cut-off), the owner-facing flag labels,

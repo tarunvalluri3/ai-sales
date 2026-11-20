@@ -87,6 +87,7 @@ export const FLAG_SIGNALS = [
   "output_unlisted_email",
   "output_unlisted_phone",
   "output_unbacked_promise",
+  "output_booking_claim",
   "write_tool_cap",
 ] as const;
 
@@ -103,6 +104,7 @@ const FLAG_LABELS: Record<string, [string, string]> = {
   output_unlisted_email: ["email not in your business data", "emails not in your business data"],
   output_unlisted_phone: ["phone number not in your business data", "phone numbers not in your business data"],
   output_unbacked_promise: ["unbacked discount/refund/guarantee promise", "unbacked discount/refund/guarantee promises"],
+  output_booking_claim: ["false booking claim corrected", "false booking claims corrected"],
   write_tool_cap: ["repeated booking/callback request stopped", "repeated booking/callback requests stopped"],
 };
 

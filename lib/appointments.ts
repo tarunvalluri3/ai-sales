@@ -3,6 +3,7 @@ import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { createServiceSupabaseClient } from "@/lib/supabase/service";
 import type { Appointment, AppointmentBlockedSlot, BusinessHours, BusinessHoursException } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
+import { logEvent } from "@/lib/logger";
 import { linkConversationToCustomer, resolveOrCreateCustomer } from "@/lib/customers";
 
 type ServerSupabaseClient = ReturnType<typeof createServerSupabaseClient>;
@@ -160,6 +161,45 @@ async function getAvailabilitySettings(supabase: AnySupabaseClient, businessId: 
 async function getWeeklyHours(supabase: AnySupabaseClient, businessId: string): Promise<Map<number, BusinessHours>> {
   const { data } = await supabase.from("business_hours").select("*").eq("business_id", businessId);
   return new Map((data ?? []).map((row) => [row.day_of_week, row]));
+}
+
+export type BookingTurnState = {
+  /** Appointment booking is on AND at least one weekday is open, so check_available_slots can return real times. */
+  bookingAvailable: boolean;
+  /** This conversation already has an appointment (any status) -- a later reply may truthfully refer to it. */
+  conversationHasAppointment: boolean;
+};
+
+/**
+ * Per-turn booking facts for the AI (AI honesty fix, 2026-11-20). With booking
+ * switched on but no open business hours, generateAvailableSlots() returns []
+ * and the model has nothing real to offer, so the booking tools are only bound
+ * when `bookingAvailable`; otherwise the prompt falls back to the callback
+ * wording. `conversationHasAppointment` lets the output guard leave a truthful
+ * reference to an earlier booking alone. Both reads are tenant-scoped by the
+ * trusted `businessId`; with booking off nothing is queried at all.
+ */
+export async function loadBookingTurnState(
+  supabase: AnySupabaseClient,
+  businessId: string,
+  conversationId: string,
+  appointmentsEnabled: boolean,
+): Promise<BookingTurnState> {
+  if (!appointmentsEnabled) return { bookingAvailable: false, conversationHasAppointment: false };
+  const [hours, existing] = await Promise.all([
+    supabase.from("business_hours").select("day_of_week").eq("business_id", businessId).eq("is_open", true).limit(1),
+    supabase.from("appointments").select("id").eq("business_id", businessId).eq("conversation_id", conversationId).limit(1),
+  ]);
+  if (hours.error) logEvent("booking_state_hours_lookup_failed", businessId, { code: hours.error.code ?? "unknown" }, "error");
+  if (existing.error) logEvent("booking_state_appointment_lookup_failed", businessId, { code: existing.error.code ?? "unknown" }, "error");
+  return {
+    // A failed hours read keeps the tools bound (the pre-fix behaviour); the
+    // slot tool itself still returns [] for a business with no open hours.
+    bookingAvailable: hours.error ? true : (hours.data ?? []).length > 0,
+    // A failed read is treated as "no earlier booking": the stricter choice,
+    // so an unsupported booking claim is still rewritten.
+    conversationHasAppointment: existing.error ? false : (existing.data ?? []).length > 0,
+  };
 }
 
 async function getExceptionsInRange(

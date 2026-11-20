@@ -31,7 +31,7 @@ export type NavEntry = { label: string; href: string; description: string; icon:
 export const PRODUCT_FEATURES: NavEntry[] = [
   { label: "AI Sales Agent", href: "/product#agent", description: "Answers, recommends and moves every chat forward", icon: Sparkles },
   { label: "Omnichannel Inbox", href: "/product#inbox", description: "Website, WhatsApp and Instagram in one place", icon: Inbox },
-  { label: "Lead Qualification", href: "/product#leads", description: "Hot, warm or cold, with a 0–9 score and reasons", icon: Target },
+  { label: "Lead Qualification", href: "/product#leads", description: "Hot, warm or cold, with a 0–11 score and reasons", icon: Target },
   { label: "Appointment Booking", href: "/product#appointments", description: "Real slots from your hours, confirmed by you", icon: CalendarDays },
   { label: "Knowledge Base", href: "/product#knowledge", description: "Products, services, FAQs, files and web pages", icon: BookOpen },
   { label: "Human Handoff", href: "/product#handoff", description: "Take over any chat; the AI pauses for you", icon: Hand },

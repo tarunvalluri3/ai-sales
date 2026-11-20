@@ -57,8 +57,17 @@ export type OutputGuardContext = {
   businessEvidence: string;
   /** Lowercased text the visitor typed in this conversation (links/contacts only, never promises). */
   visitorEvidence: string;
-  /** Test seam: overrides GUARDRAIL_MODES for the two log-only-first checks. Production leaves it unset. */
-  modes?: { contacts?: GuardrailMode; promise?: GuardrailMode };
+  /** Test seam: overrides GUARDRAIL_MODES for the log-only-first checks. Production leaves it unset. */
+  modes?: { contacts?: GuardrailMode; promise?: GuardrailMode; serviceClaim?: GuardrailMode };
+  /**
+   * True when a book_appointment call succeeded in THIS turn, or this
+   * conversation already has an appointment. Only then may the reply say a
+   * time was booked/requested; otherwise such a claim is rewritten.
+   * Absent = false (the strict default).
+   */
+  appointmentBooked?: boolean;
+  /** True when request_callback succeeded this turn: picks the honest wording that replaces a false booking claim. */
+  callbackRequested?: boolean;
 };
 
 export type CheckResult = {
@@ -237,6 +246,202 @@ export function detectUnbackedPromise(text: string, ctx: OutputGuardContext): Gu
   return null;
 }
 
+// --------------------------------------------------------------- sentences
+
+/** Words that end in a full stop without ending the sentence ("Dr. Priya", "6 p.m. on Monday", "Rs. 500"). */
+const ABBREVIATIONS = new Set(["dr", "mr", "mrs", "ms", "st", "vs", "etc", "eg", "ie", "am", "pm", "no", "approx", "rs", "inc", "ltd", "jr", "sr"]);
+
+function isSentenceEnd(text: string, index: number): boolean {
+  const char = text[index];
+  if (char === "\n") return true;
+  if (char !== "." && char !== "!" && char !== "?") return false;
+  const next = text[index + 1];
+  if (next === undefined || !/\s/.test(next)) return false;
+  if (char !== ".") return true;
+  const word = /([A-Za-z.]+)$/.exec(text.slice(0, index))?.[1] ?? "";
+  const bare = word.replace(/\./g, "").toLowerCase();
+  // "6 PM. A member of our team..." ends a sentence; "7 p.m. on weekdays" does not.
+  if (bare === "am" || bare === "pm") return /^\s+[A-Z]/.test(text.slice(index + 1));
+  return !(bare.length === 1 || ABBREVIATIONS.has(bare));
+}
+
+/**
+ * Index just after the last sentence end in `text` at or before `limit`, or
+ * 0 when no sentence has ended yet. Used by the stream guard to release only
+ * complete sentences.
+ */
+export function lastSentenceEnd(text: string, limit: number = text.length): number {
+  for (let i = Math.min(limit, text.length) - 1; i >= 0; i--) {
+    if (isSentenceEnd(text, i)) return i + 1;
+  }
+  return 0;
+}
+
+/** Splits text into sentences without losing a character: `splitSentences(t).join("") === t`. */
+export function splitSentences(text: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (isSentenceEnd(text, i)) {
+      const piece = text.slice(start, i + 1);
+      // Whitespace between two ends ("!\n") belongs to the sentence before it.
+      if (parts.length > 0 && piece.trim() === "") parts[parts.length - 1] += piece;
+      else parts.push(piece);
+      start = i + 1;
+    }
+  }
+  if (start < text.length) parts.push(text.slice(start));
+  return parts;
+}
+
+// ---------------------------------------------------------- booking claims
+
+/**
+ * A reply that says a specific appointment or time was booked, submitted,
+ * reserved or scheduled when no booking exists (AI honesty fix,
+ * 2026-11-20: a live reply said "I have submitted your request for the teeth
+ * whitening session this Monday at 6 PM" with appointment booking switched
+ * off). ENFORCED from day one, by the owner's decision: the sentence is
+ * rewritten before the prospect sees it.
+ *
+ * Deliberately narrow. A sentence counts only when it has
+ *  - a first-person claim ("I've booked", "we have reserved", "I went ahead
+ *    and scheduled") AND names an appointment-like thing or a day/time, or
+ *  - a passive claim about the appointment/slot/session ("your appointment is
+ *    confirmed", "your slot has been booked"), or
+ *  - "you're booked/scheduled/confirmed for ...".
+ * Never: "I've passed your details to our team", "our team will call you",
+ * anything about a callback, negated or conditional sentences ("I can't book
+ * that", "once the team confirms, ...").
+ */
+const BOOKING_VERB = String.raw`(?:booked|scheduled|reserved|submitted|confirmed|requested|locked\s+in|blocked|set\s+up|put\s+(?:you|that)\s+down)`;
+const FIRST_PERSON_CLAIM_RE = new RegExp(
+  String.raw`\b(?:i|we)(?:'ve|’ve|\s+have|\s+had)?(?:\s+(?:now|just|already|successfully|also|gone\s+ahead\s+and|went\s+ahead\s+and))*\s+${BOOKING_VERB}\b`,
+  "i",
+);
+const PASSIVE_CLAIM_RE = new RegExp(
+  String.raw`\b(?:your|the)\s+(?:[a-z-]+\s+){0,3}(?:appointment|booking|slot|session|consultation|visit|demo|reservation|time)(?:\s+request)?\b[^.!?\n]{0,60}?\b(?:is|was|has\s+been|have\s+been|'s|’s)\s+(?:now\s+|all\s+|successfully\s+|been\s+)*(?:booked|scheduled|reserved|submitted|confirmed|locked\s+in|requested)\b`,
+  "i",
+);
+const YOU_ARE_BOOKED_RE = /\byou(?:'re|’re|\s+are)\s+(?:now\s+|all\s+)?(?:booked|scheduled|confirmed)\b/i;
+const APPOINTMENT_THING_RE = /\b(?:appointment|booking|slot|session|consultation|visit|demo|reservation|treatment)s?\b/i;
+const DAY_OR_TIME_RE =
+  /\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\b|\b(?:today|tomorrow|tonight)\b|\b\d{1,2}(?::\d{2})?\s?(?:am|pm|a\.m\.|p\.m\.)/i;
+const CALLBACK_RE = /\bcall\s?-?backs?\b|\bcall\s+you\b|\bget\s+in\s+touch\b|\breach\s+out\b/i;
+const CLAIM_NEGATION_RE = /\b(?:not|never|cannot|unable|can't|cant|won't|haven't|hasn't|isn't|wasn't|don't|didn't)\b|n['’]t\b/i;
+const CONDITIONAL_RE = /\b(?:if|once|when|after|until|would|could|can|will|shall|should)\b/i;
+
+/** The honest sentence that replaces a false booking claim. */
+export const BOOKING_CLAIM_REWRITE_WITH_CALLBACK = "I've passed your details to our team, and they'll call you to arrange a time.";
+export const BOOKING_CLAIM_REWRITE_NO_CALLBACK = "I can't book a time for you here, but our team can arrange one with you directly.";
+
+export function isBookingClaim(sentence: string): boolean {
+  if (CLAIM_NEGATION_RE.test(sentence) || CONDITIONAL_RE.test(sentence)) return false;
+  if (YOU_ARE_BOOKED_RE.test(sentence)) return true;
+  if (PASSIVE_CLAIM_RE.test(sentence)) return true;
+  if (FIRST_PERSON_CLAIM_RE.test(sentence)) {
+    if (CALLBACK_RE.test(sentence)) return false;
+    return APPOINTMENT_THING_RE.test(sentence) || DAY_OR_TIME_RE.test(sentence);
+  }
+  return false;
+}
+
+/**
+ * Rewrites every booking-claim sentence in `text` (no-op when a booking
+ * exists). The first claim becomes the honest replacement; later ones are
+ * dropped so the replacement is never repeated. `alreadyRewritten` carries
+ * that across the chunks of a streamed reply.
+ */
+export function rewriteBookingClaims(
+  text: string,
+  ctx: OutputGuardContext,
+  alreadyRewritten = false,
+): { text: string; signals: GuardrailSignal[]; rewritten: boolean } {
+  if (ctx.appointmentBooked) return { text, signals: [], rewritten: alreadyRewritten };
+  const replacement = ctx.callbackRequested ? BOOKING_CLAIM_REWRITE_WITH_CALLBACK : BOOKING_CLAIM_REWRITE_NO_CALLBACK;
+  let rewritten = alreadyRewritten;
+  let changed = false;
+  const out = splitSentences(text).map((sentence) => {
+    if (!isBookingClaim(sentence)) return sentence;
+    changed = true;
+    const lead = /^\s*/.exec(sentence)?.[0] ?? "";
+    const trail = /\s*$/.exec(sentence)?.[0] ?? "";
+    const result = rewritten ? lead.replace(/\n/g, "") : `${lead}${replacement}${trail}`;
+    rewritten = true;
+    return result;
+  });
+  if (!changed) return { text, signals: [], rewritten };
+  return {
+    text: out.join(""),
+    signals: [{ type: "output_booking_claim", rule: "no_booking_made", action: "replaced", mode: "enforce" }],
+    rewritten,
+  };
+}
+
+// ---------------------------------------------------------- service claims
+
+/**
+ * LOG-ONLY (owner's decision, 2026-11-20; review after ~2 weeks of real
+ * traffic, see STATE.md). A sentence that says the business does -- or does
+ * NOT do -- a named thing ("we do perform extractions", "we don't offer
+ * general anaesthesia") where that thing's words appear nowhere in this
+ * turn's business evidence. Keyword matching on services will have false
+ * positives (synonyms, plurals the stem misses), which is why it only
+ * records. The `rule` carries the polarity and the unmatched term (letters
+ * only, capped) so a reviewer can judge each hit with its conversation.
+ */
+const SERVICE_VERB = String.raw`(?:offer|offers|provide|provides|perform|performs|do|does|carry\s+out|handle|treat|specialise\s+in|specialize\s+in|have|stock|sell)`;
+const POSITIVE_SERVICE_RE = new RegExp(
+  String.raw`\b(?:we|our\s+(?:clinic|team|doctors?|staff|store|shop|studio|company))\s+(?:do\s+|also\s+|can\s+|certainly\s+|definitely\s+)*${SERVICE_VERB}\s+([a-z][a-z\s'-]{2,60}?)(?=\s*(?:[,.;:!?\n]|\band\b|\bbut\b|\bunder\b|\bat\b|\bfor\b|\bwith\b|\bin\b|\bhere\b|$))`,
+  "gi",
+);
+const NEGATIVE_SERVICE_RE = new RegExp(
+  String.raw`\b(?:we|our\s+(?:clinic|team|doctors?|staff|store|shop|studio|company))\s+(?:do\s+not|don't|don’t|dont|does\s+not|doesn't|cannot|can't|currently\s+(?:do\s+not|don't))\s+(?:currently\s+)?${SERVICE_VERB}\s+([a-z][a-z\s'-]{2,60}?)(?=\s*(?:[,.;:!?\n]|\band\b|\bbut\b|\bunder\b|\bat\b|\bfor\b|\bwith\b|\bin\b|\bhere\b|$))`,
+  "gi",
+);
+const GENERIC_WORDS = new Set([
+  "a", "an", "the", "any", "some", "all", "this", "that", "these", "those", "it", "them", "you", "your", "our", "that's",
+  "information", "info", "details", "detail", "answer", "answers", "help", "anything", "everything", "something", "more",
+  "options", "option", "services", "service", "products", "product", "appointments", "appointment", "bookings", "booking",
+  "times", "time", "slots", "slot", "free", "same", "other", "such", "both", "many", "much", "great", "good", "best",
+  "range", "variety", "lot", "lots", "of", "and", "or", "to", "on", "kind", "kinds", "type", "types", "available", "so",
+  "not", "currently", "have", "record", "access", "callback", "callbacks", "call", "calls", "contact", "number", "here",
+]);
+
+const stemOf = (word: string): string => word.replace(/(?:ies|es|s|ing|ed|ion|ions|al)$/, "").slice(0, 6);
+
+function unmatchedTerm(phrase: string, evidence: string): string | null {
+  const words = phrase
+    .toLowerCase()
+    .replace(/[^a-z\s-]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length >= 4 && !GENERIC_WORDS.has(word));
+  if (words.length === 0) return null;
+  const missing = words.filter((word) => !evidence.includes(stemOf(word)));
+  return missing.length > 0 ? missing.join(" ").slice(0, 40) : null;
+}
+
+export function detectServiceClaims(text: string, ctx: OutputGuardContext): GuardrailSignal[] {
+  const mode: GuardrailMode = ctx.modes?.serviceClaim ?? GUARDRAIL_MODES.output_service_claim;
+  const signals: GuardrailSignal[] = [];
+  const seen = new Set<string>();
+  const scan = (re: RegExp, polarity: "positive" | "negative") => {
+    for (const match of text.matchAll(re)) {
+      const phrase = match[1] ?? "";
+      if (/^(?:not|never|no)\b/i.test(phrase)) continue; // a negation the positive pattern swallowed
+      const term = unmatchedTerm(phrase, ctx.businessEvidence);
+      if (!term) continue;
+      const rule = `${polarity}:${term}`;
+      if (seen.has(rule)) continue;
+      seen.add(rule);
+      signals.push({ type: "output_service_claim", rule, action: "logged", mode });
+    }
+  };
+  scan(NEGATIVE_SERVICE_RE, "negative");
+  scan(POSITIVE_SERVICE_RE, "positive");
+  return signals;
+}
+
 // ------------------------------------------------------------ whole reply
 
 const blocked = (signal: GuardrailSignal): CheckResult => ({
@@ -253,12 +458,14 @@ export function checkReply(reply: string, ctx: OutputGuardContext): CheckResult 
 
   const filtered = filterUnlistedContacts(reply, ctx);
   const promise = detectUnbackedPromise(reply, ctx);
-  const signals = [...filtered.signals];
+  const signals = [...filtered.signals, ...detectServiceClaims(reply, ctx)];
   if (promise) {
     signals.push(promise);
     if (promise.action === "replaced") return { text: GUARDRAIL_SAFE_REPLY, signals, replaced: true, reason: `guardrail:${promise.type}` };
   }
-  return { text: filtered.text, signals, replaced: false, reason: null };
+  const booking = rewriteBookingClaims(filtered.text, ctx);
+  signals.push(...booking.signals);
+  return { text: booking.text, signals, replaced: false, reason: null };
 }
 
 // ---------------------------------------------------------------- streaming
@@ -287,11 +494,15 @@ export type StreamFinish = StreamStep & {
  * end) cannot un-show what was already emitted, so it produces a `retract`:
  * the widget replaces the partial text with the safe reply.
  */
+/** Longest unfinished sentence the stream guard holds back before releasing it by word anyway. */
+export const MAX_HELD_SENTENCE_CHARS = 400;
+
 export class StreamOutputGuard {
   private full = "";
   private releasedTo = 0;
   private emitted = "";
   private retracted = false;
+  private bookingRewritten = false;
   private readonly signals: GuardrailSignal[] = [];
 
   private readonly ctx: OutputGuardContext;
@@ -337,13 +548,30 @@ export class StreamOutputGuard {
     if (limit <= this.releasedTo) return { emit: "", signals: [] };
     let cut = limit;
     while (cut > this.releasedTo && !/\s/.test(this.full[cut - 1])) cut--;
+    // Booking claims are judged a whole sentence at a time, so unless a
+    // booking exists the unfinished sentence is held back: the prospect must
+    // never see "I've booked you for Monday 6 PM" and then have it rewritten.
+    // A run-on with no sentence end is released by word after
+    // MAX_HELD_SENTENCE_CHARS so a missing full stop cannot stall the reply.
+    if (!this.ctx.appointmentBooked && this.full.length - this.releasedTo <= MAX_HELD_SENTENCE_CHARS) {
+      cut = Math.min(cut, lastSentenceEnd(this.full, limit));
+    }
     if (cut <= this.releasedTo) return { emit: "", signals: [] };
 
-    const chunk = filterUnlistedContacts(this.full.slice(this.releasedTo, cut), this.ctx);
+    const chunk = this.release(this.full.slice(this.releasedTo, cut));
     this.releasedTo = cut;
-    this.emitted += chunk.text;
-    this.signals.push(...chunk.signals);
-    return { emit: chunk.text, signals: chunk.signals };
+    return chunk;
+  }
+
+  /** Runs the per-chunk checks (contacts, booking claims) on text about to be shown, and records it as shown. */
+  private release(raw: string): StreamStep {
+    const filtered = filterUnlistedContacts(raw, this.ctx);
+    const booking = rewriteBookingClaims(filtered.text, this.ctx, this.bookingRewritten);
+    this.bookingRewritten = booking.rewritten;
+    const signals = [...filtered.signals, ...booking.signals];
+    this.emitted += booking.text;
+    this.signals.push(...signals);
+    return { emit: booking.text, signals };
   }
 
   finish(): StreamFinish {
@@ -358,11 +586,10 @@ export class StreamOutputGuard {
       return { emit: "", retract: GUARDRAIL_SAFE_REPLY, signals: [swap], finalText: GUARDRAIL_SAFE_REPLY, replaced: true, reason: `guardrail:${swap.type}` };
     }
 
-    const rest = filterUnlistedContacts(this.full.slice(this.releasedTo), this.ctx);
+    const rest = this.release(this.full.slice(this.releasedTo));
     this.releasedTo = this.full.length;
-    this.emitted += rest.text;
-    const signals = [...rest.signals];
+    const signals = [...rest.signals, ...detectServiceClaims(this.full, this.ctx)];
     if (promise) signals.push(promise);
-    return { emit: rest.text, signals, finalText: this.emitted, replaced: false, reason: null };
+    return { emit: rest.emit, signals, finalText: this.emitted, replaced: false, reason: null };
   }
 }

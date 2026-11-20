@@ -13,7 +13,9 @@ export type GuardrailSignalType =
   | "output_unlisted_url"
   | "output_unlisted_email"
   | "output_unlisted_phone"
-  | "output_unbacked_promise";
+  | "output_unbacked_promise"
+  | "output_booking_claim"
+  | "output_service_claim";
 
 /** What was done about a signal: only recorded (`logged`), or the text was actually changed. */
 export type GuardrailAction = "logged" | "masked" | "sanitized" | "truncated" | "blocked" | "replaced" | "removed";

@@ -52,7 +52,23 @@ export const RequestCallbackInputSchema = z.object({
     .describe(
       "The prospect's phone number, ONLY if they literally typed it earlier in this conversation. If they never gave one, you MUST pass null -- do not invent one, do not reuse a number from an example, and do not fill it with a placeholder like all the same digit.",
     ),
-  notes: z.string().trim().max(500).nullable().optional().describe("Any preferred callback time or additional context the prospect mentioned, in their own words. Null if nothing extra was said."),
+  notes: z.string().trim().max(500).nullable().optional().describe("Any additional context the prospect mentioned, in their own words. Null if nothing extra was said."),
+  // Untrusted prospect text (via the model): Zod-validated, sanitised in the
+  // executor, shown to staff only, never used to create an appointment.
+  preferredTime: z
+    .string()
+    .trim()
+    .max(100)
+    .nullable()
+    .optional()
+    .describe("The specific day and/or time the prospect asked for (e.g. 'Monday 6 PM'), in their own words. Null if they did not ask for a specific time -- never invent one."),
+  interest: z
+    .string()
+    .trim()
+    .max(100)
+    .nullable()
+    .optional()
+    .describe("The specific product or service the prospect asked about (e.g. 'teeth whitening'), in their own words. Null if they did not name one."),
 });
 
 /**
@@ -124,6 +140,8 @@ export async function executeRequestCallback(
   parsed.data.contactEmail = verified.contactEmail;
   parsed.data.contactPhone = verified.contactPhone;
   parsed.data.notes = parsed.data.notes ? sanitizeShortField(parsed.data.notes, 500) : parsed.data.notes;
+  const preferredTime = parsed.data.preferredTime ? sanitizeShortField(parsed.data.preferredTime, 100).trim() || null : null;
+  const interestNote = parsed.data.interest ? sanitizeShortField(parsed.data.interest, 100).trim() || null : null;
 
   const contactEmail = normalizeEmail(parsed.data.contactEmail ?? null);
   // A WhatsApp conversation's visitor_id IS the prospect's real phone
@@ -168,10 +186,12 @@ export async function executeRequestCallback(
     contactEmail,
     contactPhone,
     notes,
+    preferredTime,
+    interestNote,
     requestedCallback: true,
     appointmentBooked: false,
     needsAttention: conversation.needs_attention,
-    interestSpecified: false,
+    interestSpecified: interestNote !== null,
     source: SOURCE,
   });
 

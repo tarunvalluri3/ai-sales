@@ -254,6 +254,10 @@ export type Lead = {
   interest_type: LeadInterestType | null;
   interest_id: string | null;
   notes: string | null;
+  /** The day/time the prospect asked for via request_callback, in their own words (20261124000400). Untrusted prospect text, staff display only -- never used to create an appointment. */
+  preferred_time: string | null;
+  /** The product/service the prospect asked about via request_callback, in their own words (20261124000400). Untrusted, staff display only. */
+  interest_note: string | null;
   qualification: LeadQualification;
   qualification_reason: string;
   score: number;

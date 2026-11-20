@@ -268,7 +268,7 @@ export default function HomePage() {
           lead="Qualification, follow-up, automation and reporting are built in, so a lead never goes cold because someone was busy."
         />
         <div className="mt-16 grid gap-5 md:grid-cols-6">
-          <BentoCard className="md:col-span-3 lg:col-span-2" title="Lead scoring you can read" body="A 0–9 score from real signals, itemised point by point." href="/product#leads">
+          <BentoCard className="md:col-span-3 lg:col-span-2" title="Lead scoring you can read" body="A 0–11 score from real signals, itemised point by point." href="/product#leads">
             <LeadScoreIllustration />
           </BentoCard>
           <BentoCard className="md:col-span-3 lg:col-span-2" title="Workflows that follow up" body="Trigger, conditions, waits and actions, running reliably in the background." href="/product#workflows">

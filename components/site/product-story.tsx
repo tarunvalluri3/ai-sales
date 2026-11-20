@@ -27,10 +27,10 @@ const STEPS: Step[] = [
   },
   {
     title: "Qualifies every lead, and shows its reasoning",
-    body: "Hot, warm or cold, with a 0–9 score built from real signals: a booked appointment, a callback request, contact details given. A signal for your team to confirm, never a verdict.",
+    body: "Hot, warm or cold, with a 0–11 score built from real signals: a booked appointment, a callback request, a specific time asked for, contact details given. A signal for your team to confirm, never a verdict.",
     shot: SCREENS.leads.shot,
     rects: SCREENS.leads.rects,
-    chip: "Hot · 7/9 · asked for a callback",
+    chip: "Hot · 7/11 · asked for a callback",
   },
   {
     title: "Books the meeting inside the chat",

@@ -6,6 +6,7 @@ import { Card, StepBubble, btnOutlineSm, btnPrimary, btnText } from "../_compone
 import { createWorkflowAction, updateWorkflowAction, type ActionState } from "./actions";
 import { FIELD_LABEL, OPERATOR_LABEL, OPERATORS_FOR_FIELD, EXISTENCE_ONLY_FIELDS, SEGMENT_CONDITION_FIELDS } from "../customers/segment-condition-fields";
 import { WORKFLOW_TRIGGER_TYPES } from "@/lib/schemas/workflow";
+import { MAX_LEAD_SCORE } from "@/lib/lead-scoring";
 import { LEAD_STATUS_LABEL } from "../leads/lead-status";
 import type {
   LeadTag,
@@ -86,7 +87,7 @@ function TriggerConfigFields({
         <input
           type="number"
           min={0}
-          max={9}
+          max={MAX_LEAD_SCORE}
           value={config.threshold ?? 4}
           onChange={(event) => onChange({ ...config, threshold: Number(event.target.value) })}
           className={`${INPUT_CLASS} w-16`}
