@@ -27,13 +27,14 @@ const MAX_BLOCK_CHARS = 2400;
 export async function prefetchSmallCatalog(
   supabase: SupabaseClient,
   businessId: string,
+  currency: string,
   source: AgentSource = DRAFT_SOURCE,
 ): Promise<OfferingSummary[] | null> {
   // Kill switch (and the "before" arm of the latency measurement): set
   // CATALOG_PREFETCH=off to restore the tool-only behaviour without a revert.
   if (process.env.CATALOG_PREFETCH === "off") return null;
   try {
-    const offerings = await loadOfferings(supabase, businessId, source);
+    const offerings = await loadOfferings(supabase, businessId, currency, source);
     if (!offerings || offerings.length === 0 || offerings.length > CATALOG_PREFETCH_MAX_OFFERINGS) return null;
     return offerings;
   } catch {

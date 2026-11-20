@@ -15,7 +15,7 @@ export default async function EditServicePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const service = await getService(businessId, id);
 
   if (!service) {
@@ -36,6 +36,7 @@ export default async function EditServicePage({
         {hasMinRole(orgRole, "org:member") ? (
           <ServiceForm
             action={updateServiceAction}
+            currency={currency}
             id={service.id}
             initialName={service.name}
             initialDescription={service.description ?? ""}

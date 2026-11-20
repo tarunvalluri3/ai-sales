@@ -15,7 +15,7 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const product = await getProduct(businessId, id);
 
   if (!product) {
@@ -36,6 +36,7 @@ export default async function EditProductPage({
         {hasMinRole(orgRole, "org:member") ? (
           <ProductForm
             action={updateProductAction}
+            currency={currency}
             id={product.id}
             initialName={product.name}
             initialDescription={product.description ?? ""}

@@ -4,6 +4,7 @@ import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { logEvent } from "@/lib/logger";
 import { escapeLikePattern } from "@/lib/sql-escape";
 import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
+import { formatCatalogPrice } from "@/lib/currency";
 import type { SnapshotCatalogItem } from "@/lib/agent-snapshot";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
@@ -50,6 +51,8 @@ export async function executeCheckProductDetails(
   supabase: SupabaseClient,
   businessId: string,
   rawArgs: unknown,
+  /** The business's currency: the price is returned already formatted (lib/currency.ts). */
+  currency: string,
   source: AgentSource = DRAFT_SOURCE,
 ): Promise<CheckProductDetailsResult> {
   const parsed = CheckProductDetailsInputSchema.safeParse(rawArgs);
@@ -82,7 +85,7 @@ export async function executeCheckProductDetails(
       type: product ? "product" : "service",
       name: found.name,
       description: found.description,
-      price: found.price === null ? null : String(found.price),
+      price: formatCatalogPrice(found.price, currency),
     };
   }
 
@@ -101,7 +104,7 @@ export async function executeCheckProductDetails(
 
   if (product) {
     logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "found_product" });
-    return { found: true, type: "product", name: product.name, description: product.description, price: product.price };
+    return { found: true, type: "product", name: product.name, description: product.description, price: formatCatalogPrice(product.price, currency) };
   }
 
   const { data: service, error: serviceError } = await supabase
@@ -119,7 +122,7 @@ export async function executeCheckProductDetails(
 
   if (service) {
     logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "found_service" });
-    return { found: true, type: "service", name: service.name, description: service.description, price: service.price };
+    return { found: true, type: "service", name: service.name, description: service.description, price: formatCatalogPrice(service.price, currency) };
   }
 
   logEvent("tool_invoked", businessId, { tool: "check_product_details", result: "not_found" });

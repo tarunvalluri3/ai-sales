@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ArrowUpRight, CalendarDays, Clock, Info, Lock } from "lucide-react";
 import { updateBusinessHoursAction, type BusinessHoursState } from "./actions";
 import type { BusinessHours } from "@/lib/supabase/types";
-import { TIMEZONE_OPTIONS } from "@/lib/timezones";
+import { defaultWeeklyHours } from "@/lib/business-hours-defaults";
+import { TimezonePicker } from "../_components/timezone-picker";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
 
 const initialState: BusinessHoursState = {};
@@ -47,12 +48,15 @@ export function BusinessHoursForm({
   const [state, formAction, isPending] = useActionState(updateBusinessHoursAction, initialState);
 
   const byDay = new Map(hours.map((row) => [row.day_of_week, row]));
+  // With nothing saved, the form shows the same week a new business is
+  // created with (lib/business-hours-defaults.ts): Mon-Fri 09:00-18:00.
+  const fallback = defaultWeeklyHours();
   const [openDays, setOpenDays] = useState<boolean[]>(
-    Array.from({ length: 7 }, (_, day) => byDay.get(day)?.is_open ?? hours.length === 0),
+    Array.from({ length: 7 }, (_, day) => byDay.get(day)?.is_open ?? (hours.length === 0 && fallback[day].isOpen)),
   );
+  const [zone, setZone] = useState(timezone);
   const [sla, setSla] = useState(slaMinutes === null ? "" : String(slaMinutes));
   const hasSavedHours = hours.length > 0;
-  const timezoneOptions = TIMEZONE_OPTIONS.includes(timezone) ? TIMEZONE_OPTIONS : [timezone, ...TIMEZONE_OPTIONS];
   const disabled = isPending || !canEdit;
   const slaNumber = Number(sla);
 
@@ -60,8 +64,8 @@ export function BusinessHoursForm({
     <form action={formAction} className="@container flex flex-col gap-4">
       {!hasSavedHours ? (
         <p role="alert" className="rounded-2xl bg-ds-warning-bg px-4 py-3 text-sm text-ds-warning">
-          You haven&rsquo;t saved your business hours yet. Until you save, appointment booking will show no available times
-          to prospects, even though this form displays default hours below.
+          No business hours are saved yet. Until you save: appointment booking offers prospects no times, and widget
+          greetings and SLA alerts treat you as always open. The hours below are a suggestion until you save them.
         </p>
       ) : null}
 
@@ -102,7 +106,7 @@ export function BusinessHoursForm({
                       type="time"
                       name={`day-${day}-start`}
                       aria-label={`${label} opening time`}
-                      defaultValue={existing?.start_time?.slice(0, 5) ?? "09:00"}
+                      defaultValue={existing?.start_time?.slice(0, 5) ?? fallback[day].startTime ?? "09:00"}
                       disabled={disabled || !isOpen}
                       className={`${inputClasses} min-w-0 flex-1`}
                     />
@@ -111,7 +115,7 @@ export function BusinessHoursForm({
                       type="time"
                       name={`day-${day}-end`}
                       aria-label={`${label} closing time`}
-                      defaultValue={existing?.end_time?.slice(0, 5) ?? "17:00"}
+                      defaultValue={existing?.end_time?.slice(0, 5) ?? fallback[day].endTime ?? "18:00"}
                       disabled={disabled || !isOpen}
                       className={`${inputClasses} min-w-0 flex-1`}
                     />
@@ -123,7 +127,7 @@ export function BusinessHoursForm({
 
           <p className="flex items-center gap-3 border-t border-ds-border pt-3 text-sm text-ds-text-secondary">
             <Info className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-            A day switched off is closed. An unconfigured schedule is treated as always open.
+            A day switched off is closed all day.
           </p>
         </section>
 
@@ -132,13 +136,14 @@ export function BusinessHoursForm({
             <label htmlFor="timezone" className="dx-title">
               Business timezone
             </label>
-            <select id="timezone" name="timezone" defaultValue={timezone} disabled={disabled} className={`${inputClasses} w-full`}>
-              {timezoneOptions.map((zone) => (
-                <option key={zone} value={zone}>
-                  {zone}
-                </option>
-              ))}
-            </select>
+            <TimezonePicker
+              id="timezone"
+              name="timezone"
+              value={zone}
+              onChange={setZone}
+              disabled={disabled}
+              triggerClassName={`${inputClasses} w-full`}
+            />
             <p className="text-sm text-ds-text-secondary">All times in this schedule use this timezone.</p>
           </section>
 

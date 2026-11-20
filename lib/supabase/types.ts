@@ -9,6 +9,8 @@ export type Business = {
   website: string | null;
   privacy_policy_url: string | null;
   timezone: string;
+  /** ISO 4217 (20261124000500). Display currency for catalog prices; not versioned with the agent. */
+  currency: string;
   sla_minutes: number | null;
   next_assignment_cursor: number;
   widget_accent_color: string | null;

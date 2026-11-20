@@ -82,6 +82,7 @@ export function TrainKnowledgeStep({ documents }: { documents: KnowledgeDocument
         </div>
       ) : (
         <AddKnowledgeTabs
+          sticky={false}
           manualForm={
             <KnowledgeForm action={createKnowledgeDocumentAction} submitLabel="Add knowledge" pendingLabel="Adding…" />
           }

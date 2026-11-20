@@ -5,13 +5,14 @@ import { listProductsForBusiness, listPendingReviewProducts } from "@/lib/produc
 import { getKnowledgeDocumentTitles } from "@/lib/knowledge";
 import { ReviewActions } from "../_components/review-actions";
 import { ProductForm } from "./product-form";
+import { formatCatalogPrice } from "@/lib/currency";
 import { ProductsList } from "./products-list";
 import { createProductAction, deleteProductAction, approveProductAction, rejectProductAction } from "./actions";
 import { PermissionNotice } from "../_components/state-views";
 import { Card, PageHeader, Pill } from "../_components/ui";
 
 export default async function ProductsPage() {
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await requireBusinessContext();
   const canEdit = hasMinRole(orgRole, "org:member");
   const [products, pendingProducts] = await Promise.all([
     listProductsForBusiness(businessId),
@@ -57,7 +58,7 @@ export default async function ProductsPage() {
                       </p>
                     </div>
                     {product.price ? (
-                      <span className="text-sm font-medium text-ds-text-primary">${product.price}</span>
+                      <span className="text-sm font-medium text-ds-text-primary">{formatCatalogPrice(product.price, currency)}</span>
                     ) : null}
                     <ReviewActions
                       approveAction={approveProductAction}
@@ -83,7 +84,7 @@ export default async function ProductsPage() {
                 No products yet. Add your first product so your AI sales employee can answer questions about it.
               </p>
             ) : (
-              <ProductsList products={products} canEdit={canEdit} deleteProductAction={deleteProductAction} />
+              <ProductsList products={products} currency={currency} canEdit={canEdit} deleteProductAction={deleteProductAction} />
             )}
             <p className="border-t border-ds-border pt-3 text-sm text-ds-text-secondary">
               Your catalog helps the AI recommend relevant products.
@@ -97,7 +98,7 @@ export default async function ProductsPage() {
             <p className="dx-subtitle">Give your AI the details it needs.</p>
           </div>
           {canEdit ? (
-            <ProductForm action={createProductAction} submitLabel="Add product" pendingLabel="Adding…" />
+            <ProductForm action={createProductAction} currency={currency} submitLabel="Add product" pendingLabel="Adding…" />
           ) : (
             <PermissionNotice />
           )}

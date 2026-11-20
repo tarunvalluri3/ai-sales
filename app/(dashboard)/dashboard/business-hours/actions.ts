@@ -7,6 +7,7 @@ import { requireMinRole } from "@/lib/auth";
 import { setBusinessHours, updateBusinessSla, updateBusinessTimezone, type DayHoursInput } from "@/lib/business-hours";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { normalizeTimezone, TIMEZONE_ERROR_MESSAGES } from "@/lib/timezones";
 
 export type BusinessHoursState = {
   error?: string;
@@ -51,14 +52,12 @@ export async function updateBusinessHoursAction(
     return { error: "SLA minutes must be a positive whole number." };
   }
 
-  const timezoneRaw = formData.get("timezone");
-  const timezone = typeof timezoneRaw === "string" && timezoneRaw.trim() !== "" ? timezoneRaw.trim() : "UTC";
-  try {
-    // Throws for anything that isn't a real IANA timezone name.
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-  } catch {
-    return { error: "Please choose a valid timezone." };
+  // Same rule as onboarding: never a silent UTC fallback.
+  const zone = normalizeTimezone(formData.get("timezone"));
+  if (!zone.ok) {
+    return { error: TIMEZONE_ERROR_MESSAGES[zone.reason] };
   }
+  const timezone = zone.timezone;
 
   try {
     await setBusinessHours(businessId, days);

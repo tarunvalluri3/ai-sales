@@ -80,6 +80,7 @@ export async function sendSandboxMessage(
         contactEmail: business.contact_email,
         contactPhone: business.contact_phone,
         website: business.website,
+        currency: business.currency,
       },
       trimmed,
       [...history, { role: "user", content: trimmed }],

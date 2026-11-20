@@ -2,7 +2,9 @@
 
 import { useActionState, useEffect, useState, useSyncExternalStore } from "react";
 import { BUSINESS_TYPES } from "@/lib/schemas/business";
-import { TIMEZONE_OPTIONS } from "@/lib/timezones";
+import { detectBrowserTimezone } from "@/lib/timezones";
+import { SUPPORTED_CURRENCIES, currencyForTimezone } from "@/lib/currency";
+import { TimezonePicker } from "../../../dashboard/_components/timezone-picker";
 import type { Business } from "@/lib/supabase/types";
 import { useRouter } from "next/navigation";
 import { createBusiness, type CreateBusinessState } from "../../actions";
@@ -18,17 +20,15 @@ function noopSubscribe() {
   return () => {};
 }
 
+// The browser's zone, normalised ("Asia/Calcutta" -> "Asia/Kolkata"). The
+// server snapshot is "" (unknown), never "UTC": a form submitted before the
+// browser value is read gets a "choose your time zone" error, not UTC hours.
 function getDetectedTimezone(): string {
-  try {
-    const guess = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return TIMEZONE_OPTIONS.includes(guess) ? guess : "UTC";
-  } catch {
-    return "UTC";
-  }
+  return detectBrowserTimezone() ?? "";
 }
 
 function getServerTimezone(): string {
-  return "UTC";
+  return "";
 }
 
 const createInitialState: CreateBusinessState = {};
@@ -63,17 +63,23 @@ export function BusinessStep({ business }: { business: Business | null }) {
   const [contactEmail, setContactEmail] = useState(business?.contact_email ?? "");
 
   const detectedTimezone = useSyncExternalStore(noopSubscribe, getDetectedTimezone, getServerTimezone);
-  const timezone = business?.timezone ?? detectedTimezone;
+  const [chosenTimezone, setChosenTimezone] = useState<string | null>(null);
+  const timezone = chosenTimezone ?? business?.timezone ?? detectedTimezone;
+  const timezoneIsDetected = chosenTimezone === null && !business && detectedTimezone !== "";
+  // Follows the time zone until the owner picks one explicitly.
+  const [chosenCurrency, setChosenCurrency] = useState<string | null>(null);
+  const currency = chosenCurrency ?? business?.currency ?? (timezone ? currencyForTimezone(timezone) : "INR");
 
   const descriptionOk = description.trim().length >= DESCRIPTION_MIN;
   const emailOk = /\S+@\S+\.\S+/.test(contactEmail);
-  const valid = name.trim().length >= 2 && businessType !== "" && descriptionOk && emailOk;
+  const valid = name.trim().length >= 2 && businessType !== "" && descriptionOk && emailOk && timezone !== "";
 
   const missing: string[] = [];
   if (name.trim().length < 2) missing.push("a business name");
   if (businessType === "") missing.push("an industry");
   if (!descriptionOk) missing.push(`${DESCRIPTION_MIN - description.trim().length} more characters in your description`);
   if (!emailOk) missing.push("a valid contact email");
+  if (!timezone) missing.push("your time zone");
 
   const formAction = isNew ? createFormAction : updateFormAction;
   const fieldErrors = state.fieldErrors ?? {};
@@ -89,8 +95,6 @@ export function BusinessStep({ business }: { business: Business | null }) {
 
   return (
     <form id="business-step-form" action={formAction} className="flex flex-col gap-5">
-      <input type="hidden" name="timezone" value={timezone} />
-
       <div className="flex flex-col gap-1.5">
         <label htmlFor="name" className="text-sm font-medium text-ds-text-primary">
           Business name
@@ -215,6 +219,53 @@ export function BusinessStep({ business }: { business: Business | null }) {
         {fieldErrors.contactEmail ? (
           <p role="alert" className="text-xs text-ds-danger">{fieldErrors.contactEmail}</p>
         ) : null}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="timezone" className="text-sm font-medium text-ds-text-primary">
+            Time zone
+          </label>
+          <TimezonePicker
+            id="timezone"
+            name="timezone"
+            value={timezone}
+            onChange={setChosenTimezone}
+            disabled={isPending}
+            invalid={Boolean(fieldErrors.timezone)}
+            describedBy="timezone-help"
+            triggerClassName={inputClasses}
+          />
+          <p id="timezone-help" className="text-xs text-ds-text-muted">
+            {timezoneIsDetected ? "Detected from your browser. " : ""}Your opening hours and appointment times use this.
+          </p>
+          {fieldErrors.timezone ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.timezone}</p> : null}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="currency" className="text-sm font-medium text-ds-text-primary">
+            Currency
+          </label>
+          <select
+            id="currency"
+            name="currency"
+            value={currency}
+            onChange={(e) => setChosenCurrency(e.target.value)}
+            disabled={isPending}
+            aria-describedby="currency-help"
+            aria-invalid={fieldErrors.currency ? true : undefined}
+            className={inputClasses}
+          >
+            {SUPPORTED_CURRENCIES.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p id="currency-help" className="text-xs text-ds-text-muted">
+            Prices you add are shown in this currency.
+          </p>
+          {fieldErrors.currency ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.currency}</p> : null}
+        </div>
       </div>
 
       <input type="hidden" name="contactPhone" value={business?.contact_phone ?? ""} />

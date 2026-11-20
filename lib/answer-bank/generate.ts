@@ -33,6 +33,7 @@ type BusinessRow = {
   contact_email: string | null;
   contact_phone: string | null;
   website: string | null;
+  currency: string;
   widget_language: WidgetLanguage;
   widget_suggested_questions: string[] | null;
   live_version_id: string | null;
@@ -54,7 +55,7 @@ type EntryRow = {
 };
 
 const BUSINESS_COLUMNS =
-  "id, name, description, contact_email, contact_phone, website, widget_language, widget_suggested_questions, live_version_id, status, deleted_at, answer_bank_version";
+  "id, name, description, contact_email, contact_phone, website, currency, widget_language, widget_suggested_questions, live_version_id, status, deleted_at, answer_bank_version";
 
 async function loadBusiness(supabase: SupabaseClient, businessId: string): Promise<BusinessRow | null> {
   const { data } = await supabase.from("businesses").select(BUSINESS_COLUMNS).eq("id", businessId).maybeSingle();
@@ -67,6 +68,7 @@ function profileOf(business: BusinessRow): BusinessProfileContext {
     contactEmail: business.contact_email,
     contactPhone: business.contact_phone,
     website: business.website,
+    currency: business.currency,
   };
 }
 
@@ -233,7 +235,7 @@ export async function refreshAnswerBank(supabase: SupabaseClient, businessId: st
   let needsReview = 0;
 
   // Catalog answer: deterministic from the rows, so no model and no price to get wrong.
-  const offerings = (await loadOfferings(supabase, businessId)) ?? [];
+  const offerings = (await loadOfferings(supabase, businessId, business.currency)) ?? [];
   const catalogAnswer = buildCatalogAnswer(language, business.name, offerings);
   const catalogExisting = existing.get(`catalog|${CATALOG_ENTRY_KEY}|${language}`);
   if (!catalogAnswer) {
@@ -319,7 +321,7 @@ export async function regenerateEntry(
   const version = Number(business.answer_bank_version);
 
   if (row.kind === "catalog") {
-    const offerings = (await loadOfferings(supabase, businessId)) ?? [];
+    const offerings = (await loadOfferings(supabase, businessId, business.currency)) ?? [];
     const answer = buildCatalogAnswer(row.language, business.name, offerings);
     if (!answer) return "unsupported";
     await upsertEntry(supabase, businessId, {
@@ -328,7 +330,7 @@ export async function regenerateEntry(
     });
     return "ready";
   }
-  const offerings = (await loadOfferings(supabase, businessId)) ?? [];
+  const offerings = (await loadOfferings(supabase, businessId, business.currency)) ?? [];
   return generateSuggestedEntry(supabase, business, row.question_text, version, offerings.map((o) => o.name));
 }
 

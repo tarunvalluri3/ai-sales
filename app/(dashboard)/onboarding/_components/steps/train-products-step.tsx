@@ -17,7 +17,7 @@ function isProductComplete(product: Product): boolean {
   return product.name.trim().length > 0 && (product.description ?? "").trim().length >= CATALOG_DESCRIPTION_MIN_LENGTH;
 }
 
-export function TrainProductsStep({ products }: { products: Product[] }) {
+export function TrainProductsStep({ products, currency }: { products: Product[]; currency: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +51,7 @@ export function TrainProductsStep({ products }: { products: Product[] }) {
       {products.length > 0 ? (
         <ProductsList
           products={products}
+          currency={currency}
           canEdit
           deleteProductAction={deleteProductAction}
           onEdit={(id) => setEditingId(id)}
@@ -77,6 +78,7 @@ export function TrainProductsStep({ products }: { products: Product[] }) {
             <ProductForm
               key={editingProduct.id}
               action={updateProductInPlaceAction}
+              currency={currency}
               id={editingProduct.id}
               initialName={editingProduct.name}
               initialDescription={editingProduct.description ?? ""}
@@ -92,7 +94,7 @@ export function TrainProductsStep({ products }: { products: Product[] }) {
         ) : (
           <>
             <h2 className="text-sm font-medium text-ds-text-primary">Add a product or service</h2>
-            <ProductForm action={createProductAction} submitLabel="Add" pendingLabel="Adding…" />
+            <ProductForm action={createProductAction} currency={currency} submitLabel="Add" pendingLabel="Adding…" />
           </>
         )}
       </section>

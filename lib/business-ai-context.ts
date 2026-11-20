@@ -22,6 +22,8 @@ export type BusinessAiContext = {
     contactEmail: string | null;
     contactPhone: string | null;
     website: string | null;
+    /** businesses.currency -- an operational setting, read from the row, not the versioned snapshot (like the time zone). */
+    currency: string;
   };
   language: WidgetLanguage;
   recommendProductsEnabled: boolean;
@@ -38,6 +40,7 @@ type BusinessIdentityRow = {
   live_version_id: string | null;
   status: "active" | "suspended";
   deleted_at: string | null;
+  currency: string;
 };
 
 /**
@@ -73,7 +76,7 @@ export async function loadBusinessAiContext(businessId: string): Promise<Busines
   const supabase = createServiceSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
-    .select("id, clerk_org_id, live_version_id, status, deleted_at")
+    .select("id, clerk_org_id, live_version_id, status, deleted_at, currency")
     .eq("id", businessId)
     .maybeSingle<BusinessIdentityRow>();
 
@@ -100,6 +103,7 @@ export async function loadBusinessAiContext(businessId: string): Promise<Busines
       contactEmail: config.contactEmail,
       contactPhone: config.contactPhone,
       website: config.website,
+      currency: data.currency,
     },
     language: config.language,
     recommendProductsEnabled: config.capabilities.recommendProducts,

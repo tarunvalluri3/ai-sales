@@ -5,6 +5,7 @@ import { escapeLikePattern } from "@/lib/sql-escape";
 import { logEvent } from "@/lib/logger";
 import { embedText } from "@/lib/embeddings";
 import { DRAFT_SOURCE, type AgentSource, type LiveAgentSource } from "@/lib/agent-runtime";
+import { formatCatalogPrice } from "@/lib/currency";
 import { searchLiveKnowledgeChunks } from "@/lib/retrieval";
 import type { SnapshotCatalogItem } from "@/lib/agent-snapshot";
 
@@ -90,13 +91,9 @@ type CatalogRow = {
   name: string;
   description: string | null;
   category: string | null;
-  // `price` is a Postgres `numeric(12,2)` column (products/services migrations)
-  // despite lib/supabase/types.ts's pre-existing `string | null` Product/Service
-  // type -- supabase-js returns it as a JS number at runtime, confirmed live
-  // (a request against this exact column returned an unquoted number, not a
-  // string). Typed loosely here and coerced to a real string in the mapper
-  // below, so RecommendedItem.priceDisplay's own `string | null` contract
-  // actually holds at runtime, not just at the type level.
+  // Display text since 20261124000500 (was numeric(12,2)). A published
+  // snapshot from before that migration may still hold a number, so this stays
+  // loose and the mapper below formats either form (lib/currency.ts).
   price: string | number | null;
   price_amount: number | null;
   image_url: string | null;
@@ -218,6 +215,8 @@ export async function executeRecommendProducts(
   supabase: SupabaseClient,
   businessId: string,
   rawArgs: unknown,
+  /** The business's currency: priceDisplay leaves here already formatted (lib/currency.ts). */
+  currency: string,
   source: AgentSource = DRAFT_SOURCE,
 ): Promise<RecommendProductsResult> {
   const parsed = RecommendProductsInputSchema.safeParse(rawArgs);
@@ -298,7 +297,7 @@ export async function executeRecommendProducts(
     name: row.name,
     description: row.description,
     category: row.category,
-    priceDisplay: row.price != null ? String(row.price) : null,
+    priceDisplay: formatCatalogPrice(row.price, currency),
     priceAmount: row.price_amount,
     imageUrl: row.image_url,
   }));

@@ -32,10 +32,17 @@ export function AddKnowledgeTabs({
   manualForm,
   fileForm,
   urlForm,
+  sticky = true,
 }: {
   manualForm: ReactNode;
   fileForm: ReactNode;
   urlForm: ReactNode;
+  /**
+   * Sticks beside the long knowledge list on wide dashboard screens. Off in
+   * the onboarding wizard (2026-11-20 bug): there it sat on top of the wizard's
+   * sticky footer at 1280px+ and swallowed every click on Continue.
+   */
+  sticky?: boolean;
 }) {
   const [method, setMethod] = useState<AddKnowledgeMethod>("manual");
 
@@ -52,7 +59,7 @@ export function AddKnowledgeTabs({
   const panels: Record<AddKnowledgeMethod, ReactNode> = { manual: manualForm, file: fileForm, url: urlForm };
 
   return (
-    <section className="dx-card flex flex-col gap-4 dx-card-pad xl:sticky xl:top-4">
+    <section className={`dx-card flex flex-col gap-4 dx-card-pad ${sticky ? "xl:sticky xl:top-4" : ""}`}>
       <div className="flex flex-col gap-0.5">
         <h2 className="dx-title">Add knowledge</h2>
         <p className="dx-subtitle">Give your AI a trusted source.</p>
