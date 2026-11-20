@@ -137,7 +137,7 @@ export async function executeBookAppointment(
     return { success: false, reason: "missing_contact_info" };
   }
 
-  if (!conversation.consent_given) {
+  if (!conversation.consent_given && conversation.source !== SANDBOX_CONVERSATION_SOURCE) {
     logEvent("tool_invoked", businessId, { tool: "book_appointment", conversationId, result: "consent_required" });
     return { success: false, reason: "consent_required" };
   }

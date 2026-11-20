@@ -334,6 +334,7 @@ function formatBusinessProfileContext(profile: BusinessProfileContext, tags: Unt
 
 
 export type SalesEmployeeResponse = {
+  sandboxBooking?: boolean;
   answer: string;
   /**
    * Set only when the answer was served by the instant-answer path
@@ -572,14 +573,17 @@ function buildOutputGuardContext(
 }
 
 /** What a turn really did, for the booking-claim check: never what the model says it did. */
-type BookingTurnOutcome = { appointmentBooked: boolean; callbackRequested: boolean };
+type BookingTurnOutcome = { appointmentBooked: boolean; callbackRequested: boolean; sandboxBooking?: boolean };
 
 /** Records a successful book_appointment / request_callback from its executor's own result. */
 function noteBookingOutcome(outcome: BookingTurnOutcome, toolName: string, toolResult: unknown): void {
   const succeeded =
     typeof toolResult === "object" && toolResult !== null && (toolResult as { success?: unknown }).success === true;
   if (!succeeded) return;
-  if (toolName === "book_appointment") outcome.appointmentBooked = true;
+  if (toolName === "book_appointment") {
+    outcome.appointmentBooked = true;
+    outcome.sandboxBooking ||= (toolResult as { appointmentId?: unknown }).appointmentId === "sandbox";
+  }
   if (toolName === "request_callback") outcome.callbackRequested = true;
 }
 
@@ -1676,6 +1680,7 @@ export async function askSalesEmployee(
     noteGuardrailSignals(businessId, conversationId, checked.signals);
     const response: SalesEmployeeResponse = {
       answer: checked.text,
+      sandboxBooking: turnOutcome.sandboxBooking,
       grounded: documents.length > 0 && result.usedContext && !checked.replaced,
       usedContext: result.usedContext && !checked.replaced,
       sourceChunkIds: [...new Set([...documents.map((document) => document.metadata.chunkId), ...additionalSourceChunkIds])],

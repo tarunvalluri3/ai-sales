@@ -107,7 +107,9 @@ export async function sendSandboxMessage(
     return {
       ok: true,
       conversationId: conversation.id,
-      answer: response.answer,
+      answer: response.sandboxBooking
+        ? `${response.answer}\n\nTest booking — nothing was saved and no one was notified.`
+        : response.answer,
       recommendedProducts: response.recommendedProducts,
     };
   } catch (error) {
