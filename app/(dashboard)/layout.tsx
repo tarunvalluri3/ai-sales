@@ -38,6 +38,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <ClerkProvider
+      localization={{
+        taskChooseOrganization: {
+          title: "What's your business called?",
+          createOrganization: { title: "What's your business called?" },
+        },
+      }}
       taskUrls={{ "choose-organization": "/session-tasks/choose-organization" }}
     >
       <html
