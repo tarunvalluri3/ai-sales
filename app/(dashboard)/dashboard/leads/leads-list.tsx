@@ -514,6 +514,27 @@ function LeadDetails({
         </div>
       </section>
 
+      {lead.preferred_time || lead.interest_note ? (
+        <section className="flex flex-col gap-1">
+          <h3 className="text-sm font-medium text-ds-text-primary">Asked for</h3>
+          {/* The prospect's own words, via the AI: shown as a request to arrange, never as a booking. */}
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+            {lead.interest_note ? (
+              <>
+                <dt className="text-ds-text-secondary">Service</dt>
+                <dd className="min-w-0 break-words text-ds-text-primary">{lead.interest_note}</dd>
+              </>
+            ) : null}
+            {lead.preferred_time ? (
+              <>
+                <dt className="text-ds-text-secondary">Preferred time</dt>
+                <dd className="min-w-0 break-words text-ds-text-primary">{lead.preferred_time} (not booked; call to arrange)</dd>
+              </>
+            ) : null}
+          </dl>
+        </section>
+      ) : null}
+
       {lead.notes ? (
         <section className="flex flex-col gap-1">
           <h3 className="text-sm font-medium text-ds-text-primary">Notes</h3>

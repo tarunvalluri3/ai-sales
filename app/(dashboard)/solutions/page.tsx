@@ -23,7 +23,7 @@ const GOALS = [
     icon: Target,
     title: "Lead generation",
     body: "Turn anonymous website visitors and DMs into named, scored leads with contact details, a summary and a next step.",
-    points: ["Captures name, email and phone in conversation", "Hot / warm / cold with a 0–9 score", "Instant alerts for hot leads"],
+    points: ["Captures name, email and phone in conversation", "Hot / warm / cold with a 0–11 score", "Instant alerts for hot leads"],
   },
   {
     id: "appointment-setting",

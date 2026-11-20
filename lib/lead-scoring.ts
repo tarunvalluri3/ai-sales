@@ -6,7 +6,10 @@
  *
  * Point rubric (see prompts/plan for the full rationale): booking a real
  * appointment is the strongest buying-intent signal a prospect can give,
- * so it outweighs everything else on its own. A bare `request_callback`
+ * so it outweighs everything else on its own. Asking for a specific day/time
+ * (2026-11-20) is nearly as strong: a callback with a specific time scores
+ * 2 + 2 = 4, the same "hot" a booking gets on its own -- because when booking
+ * is off, a callback with a time IS the prospect's booking attempt. A bare `request_callback`
  * (one contact channel, nothing else) scores exactly 2 -> "warm",
  * identical to the prior hardcoded value, so the common case is
  * unchanged. This rubric is a reasonable default, not a business-
@@ -19,14 +22,14 @@ export type LeadScoringSignals = {
   appointmentBooked: boolean;
   needsAttention: boolean;
   /**
-   * True if this lead is tied to a specific named product/service
-   * (`interest_type`/`interest_id`). Always false today -- no caller
-   * populates those columns yet (they're set only by the separate,
-   * currently-unused `lib/schemas/lead.ts` extraction path) -- kept in
-   * the rubric so a future caller that does populate interest gets
-   * credit for it without a second scoring change.
+   * True if this lead names a specific product/service: request_callback's
+   * `interest` (persisted as `leads.interest_note`, 2026-11-20). The
+   * structured `interest_type`/`interest_id` columns are still unset by
+   * every caller.
    */
   interestSpecified: boolean;
+  /** True when the prospect asked for a specific day/time (request_callback's preferredTime, persisted as leads.preferred_time). */
+  requestedSpecificTime: boolean;
 };
 
 /** One itemized point in the deterministic breakdown below -- e.g. `{ label: "booked an appointment", points: 4 }`. Never an AI-invented reason: every entry maps directly to one of this rubric's own `if` branches. */
@@ -44,8 +47,15 @@ export type LeadScore = {
 const HOT_THRESHOLD = 4;
 const WARM_THRESHOLD = 2;
 
-/** The highest `score` this rubric can ever produce (4+2+1+1+1) -- the single source of truth for any "N out of MAX" display, so it can never drift from the point values above. */
-export const MAX_LEAD_SCORE = 9;
+/**
+ * The highest `score` this rubric can ever produce (4+2+2+1+1+1) -- the single
+ * source of truth for any "N out of MAX" display, so it can never drift from
+ * the point values above. Was 9 before the specific-time item (2026-11-20).
+ * Stored scores are never rewritten: an older lead keeps its number, which is
+ * simply read against the current scale, and the hot/warm/cold thresholds
+ * did not move, so its bucket means the same thing.
+ */
+export const MAX_LEAD_SCORE = 11;
 
 export function scoreLead(signals: LeadScoringSignals): LeadScore {
   const sentenceFragments: string[] = [];
@@ -61,6 +71,11 @@ export function scoreLead(signals: LeadScoringSignals): LeadScore {
     points += 2;
     sentenceFragments.push("requested a callback");
     reasonItems.push({ label: "Requested a callback", points: 2 });
+  }
+  if (signals.requestedSpecificTime) {
+    points += 2;
+    sentenceFragments.push("asked for a specific time");
+    reasonItems.push({ label: "Asked for a specific time", points: 2 });
   }
   if (signals.hasEmail && signals.hasPhone) {
     points += 1;

@@ -18,7 +18,7 @@
  */
 export type GuardrailMode = "log_only" | "enforce";
 
-export type GuardrailCheck = "injection" | "abuse" | "output_contacts" | "output_promise";
+export type GuardrailCheck = "injection" | "abuse" | "output_contacts" | "output_promise" | "output_service_claim";
 
 // Typed as Record<..., GuardrailMode> (not `as const`) on purpose: flipping a value
 // to "enforce" must type-check at every `=== "enforce"` branch, not be narrowed away.
@@ -33,5 +33,10 @@ export const GUARDRAIL_MODES: Record<GuardrailCheck, GuardrailMode> = {
   // verbatim-prompt-leak block (lib/guardrails/output-check.ts detectLeak).
   output_contacts: "log_only",
   output_promise: "log_only",
+  // AI honesty fix (2026-11-20): "we do / don't do X" where X is not in the
+  // business data. Log-only; decide on enforcing after ~2 weeks of real
+  // traffic (STATE.md). NOT listed here because it enforces from day one: the
+  // false booking-claim rewrite (output-check.ts rewriteBookingClaims).
+  output_service_claim: "log_only",
 };
 

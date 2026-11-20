@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { segmentConditionSchema } from "@/lib/schemas/segment";
+import { MAX_LEAD_SCORE } from "@/lib/lead-scoring";
 
 /** The validation boundary for a workflow definition (Phase 29). `conditions`/`matchType` reuse `segmentConditionSchema` verbatim -- one condition language for both segments and workflows, not two. */
 
@@ -18,7 +19,7 @@ export const WORKFLOW_TRIGGER_TYPES = [
 
 export const triggerConfigSchema = z.object({
   status: z.string().trim().max(40).nullable().optional(),
-  threshold: z.number().int().min(0).max(9).nullable().optional(),
+  threshold: z.number().int().min(0).max(MAX_LEAD_SCORE).nullable().optional(),
   tagId: z.string().uuid().nullable().optional(),
   hours: z.number().int().min(1).max(24 * 30).nullable().optional(),
 });

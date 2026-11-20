@@ -151,7 +151,7 @@ export default function ProductPage() {
         title="Know who's ready to buy, and why."
         body="When a prospect shares contact details, a lead is created automatically and scored from real signals in the conversation. Every point is itemised, so the score is never a black box."
         points={[
-          "Hot, warm or cold, plus a 0–9 score and a plain-language reason.",
+          "Hot, warm or cold, plus a 0–11 score and a plain-language reason.",
           "Score history shows exactly how and when a lead's score changed.",
           "Track status from new to contacted, converted or lost.",
           "Spots when two leads look like the same person across channels.",

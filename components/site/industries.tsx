@@ -109,7 +109,7 @@ export const INDUSTRY_PAGES: Industry[] = [
       "Answers on configurations, prices, locations, amenities and possession dates from your listings.",
       "Asks about budget, timeline and purpose before recommending a project.",
       "Requests site visits from your real availability, pending your team's confirmation.",
-      "Scores every buyer 0–9 so your sales team calls the serious ones first.",
+      "Scores every buyer 0–11 so your sales team calls the serious ones first.",
     ],
     questions: ["Is it ready to move?", "What's the price per sq ft?", "Do you have 2BHK under ₹90L?", "Can I visit this weekend?", "Is there a home-loan tie-up?", "What's the possession date?"],
     features: [

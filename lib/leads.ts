@@ -208,6 +208,10 @@ export type LeadUpsertInput = {
   contactEmail: string | null;
   contactPhone: string | null;
   notes: string | null;
+  /** request_callback only: the day/time the prospect asked for (untrusted, already validated and capped). Kept from an earlier write when absent. */
+  preferredTime?: string | null;
+  /** request_callback only: the product/service the prospect asked about (untrusted, already validated and capped). */
+  interestNote?: string | null;
   requestedCallback: boolean;
   appointmentBooked: boolean;
   needsAttention: boolean;
@@ -260,7 +264,7 @@ export async function upsertLeadForConversation(
 ): Promise<LeadUpsertResult> {
   const { data: existing, error: lookupError } = await supabase
     .from("leads")
-    .select("id, contact_name, contact_email, contact_phone, notes, requested_callback, appointment_booked, score")
+    .select("id, contact_name, contact_email, contact_phone, notes, requested_callback, appointment_booked, score, preferred_time, interest_note")
     .eq("business_id", businessId)
     .eq("conversation_id", conversationId)
     .maybeSingle();
@@ -274,6 +278,10 @@ export async function upsertLeadForConversation(
   const contactName = existing?.contact_name ?? input.contactName;
   const contactEmail = existing?.contact_email ?? input.contactEmail;
   const contactPhone = existing?.contact_phone ?? input.contactPhone;
+  // The newest specific time wins (a prospect may change their mind); an
+  // update without one keeps the earlier request, so the score never drops.
+  const preferredTime = input.preferredTime ?? existing?.preferred_time ?? null;
+  const interestNote = input.interestNote ?? existing?.interest_note ?? null;
 
   const { qualification, reason: qualificationReason, score, reasons } = scoreLead({
     hasEmail: contactEmail !== null,
@@ -281,7 +289,8 @@ export async function upsertLeadForConversation(
     requestedCallback,
     appointmentBooked,
     needsAttention: input.needsAttention,
-    interestSpecified: input.interestSpecified,
+    interestSpecified: input.interestSpecified || interestNote !== null,
+    requestedSpecificTime: preferredTime !== null,
   });
 
   // Phase 28: link this lead (and its conversation) to a conservatively
@@ -304,6 +313,8 @@ export async function upsertLeadForConversation(
         contact_email: contactEmail,
         contact_phone: contactPhone,
         notes: appendNotes(existing.notes, input.notes),
+        preferred_time: preferredTime,
+        interest_note: interestNote,
         qualification,
         qualification_reason: qualificationReason,
         score,
@@ -347,6 +358,8 @@ export async function upsertLeadForConversation(
       interest_type: null,
       interest_id: null,
       notes: input.notes,
+      preferred_time: preferredTime,
+      interest_note: interestNote,
       qualification,
       qualification_reason: qualificationReason,
       score,

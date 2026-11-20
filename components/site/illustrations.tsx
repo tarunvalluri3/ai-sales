@@ -30,7 +30,7 @@ import { InstagramIcon, PilotTile, WebsiteIcon, WhatsAppIcon } from "./brand-ico
 /*
  * Coded product illustrations. Each mirrors a real screen or behaviour of
  * the dashboard (same labels, same rules -- e.g. bookings are "requested"
- * until the business confirms, lead scores use the real 0-9 rubric), drawn
+ * until the business confirms, lead scores use the real 0-11 rubric), drawn
  * as light UI so it stays razor sharp at every size.
  *
  * Every one runs only while on screen and shows its finished state under
@@ -279,7 +279,7 @@ export function ConvertIllustration() {
 }
 
 /* ======================================================================
- * Lead score: the real 0-9 rubric, point by point.
+ * Lead score: the real 0-11 rubric (lib/lead-scoring.ts), point by point.
  * ==================================================================== */
 const SIGNALS = [
   { label: "Appointment booked", pts: 4 },
@@ -309,13 +309,13 @@ export function LeadScoreIllustration() {
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={C}
-                strokeDashoffset={C * (1 - score / 9)}
+                strokeDashoffset={C * (1 - score / 11)}
                 style={{ transition: "stroke-dashoffset 0.9s cubic-bezier(0.22,1,0.36,1), stroke 0.4s" }}
               />
             </svg>
             <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
               <span className="text-[22px] font-medium tabular-nums">{score}</span>
-              <span className="mt-0.5 text-[10px] text-[#61665d]">of 9</span>
+              <span className="mt-0.5 text-[10px] text-[#61665d]">of 11</span>
             </span>
           </div>
           <div className="min-w-0">
@@ -497,7 +497,7 @@ export function CopilotIllustration() {
                   <span className="font-medium">{p.who}</span>
                   <span className="text-[10.5px] text-[#61665d]">· {p.why}</span>
                   <span className="ml-auto">
-                    <Pill tone={p.tone === "red" ? "red" : p.tone === "amber" ? "amber" : "ink"}>{p.score}/9</Pill>
+                    <Pill tone={p.tone === "red" ? "red" : p.tone === "amber" ? "amber" : "ink"}>{p.score}/11</Pill>
                   </span>
                 </div>
                 <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-[#203509]">
@@ -589,7 +589,7 @@ export function CustomerIllustration() {
               <Phone className="size-3" /> +91 98•• •••• 21 <Mail className="ml-1 size-3" /> a•••@gmail.com
             </span>
           </span>
-          <Pill tone="ink">7/9</Pill>
+          <Pill tone="ink">7/11</Pill>
         </div>
         <ol className="flex flex-col gap-0 p-4">
           {events.map((e, i) => (

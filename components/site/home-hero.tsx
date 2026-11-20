@@ -18,7 +18,7 @@ import { BuiltOn } from "./built-on";
  */
 
 const CHIPS = [
-  { icon: <Flame className="size-4 text-[#b23a26]" />, bg: "#fdebe8", text: "New lead · Hot 7/9", sub: "Asked for a callback", pos: "left-[-3%] top-[26%]", fd: "0s" },
+  { icon: <Flame className="size-4 text-[#b23a26]" />, bg: "#fdebe8", text: "New lead · Hot 7/11", sub: "Asked for a callback", pos: "left-[-3%] top-[26%]", fd: "0s" },
   { icon: <CalendarCheck className="size-4 text-[#1f7a4c]" />, bg: "#e3f6ec", text: "Appointment requested", sub: "Wed · 10:30 AM", pos: "right-[-3%] top-[20%]", fd: "1.4s" },
   { icon: <ShieldCheck className="size-4 text-[#203509]" />, bg: "#ecffd2", text: "Answered from 5 approved sources", sub: "Website · just now", pos: "right-[8%] bottom-[-5%]", fd: "0.7s" },
 ];
