@@ -246,7 +246,7 @@ test("checkout without a row creates a non-serving placeholder, never free Scale
 test("UI: onboarding Continue needs the server's serving verdict; pricing shows the configured trial", () => {
   const step = read("app/(dashboard)/onboarding/_components/steps/plan-step.tsx");
   assert.match(step, /disabled=\{isPending \|\| confirming \|\| !valid\}/);
-  assert.match(step, /Your free trial is on -- no card needed/);
+  assert.match(step, /Your free trial is on — no card needed/);
   assert.match(read("lib/onboarding-steps.ts"), /plan: entitlement\.serving,/);
   const pricing = read("app/(dashboard)/pricing/page.tsx");
   assert.match(pricing, /const \{ trialReplyQuota \} = entitlementConfigFromEnv\(\);/);
@@ -277,7 +277,7 @@ test("launch copy lists only launched channels; server gates and pricing read th
   assert.equal(rules.describeLaunchedTrialChannels({ whatsapp: false, instagram: false }), "your website widget");
   const subscription = read("lib/subscription.ts");
   assert.match(subscription, /applyChannelOverrides\(applyLaunchSwitches\(planEntitlement\.channels, channelLaunchSwitchesFromEnv\(\)\)/);
-  assert.match(subscription, /isn't available yet -- we're waiting for Meta's approval/);
+  assert.match(subscription, /isn't available yet — we're waiting for Meta's approval/);
   const pricing = read("app/(dashboard)/pricing/page.tsx");
   assert.match(pricing, /const launch = channelLaunchSwitchesFromEnv\(\);/);
   assert.match(pricing, /\(coming soon\)/);
