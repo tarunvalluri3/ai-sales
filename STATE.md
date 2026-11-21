@@ -2,7 +2,91 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-11-21 (**Hotfix: test chat 500, on `fix/sandbox-chat-500`; see the first section. Then dashboard polish, 13 items.**)
+Last updated: 2026-11-21 (**Reply and save speed, on `perf/reply-and-save-speed`, PR open, NOT merged; see the first section. Production moves to a Google Cloud VM in Mumbai (PM2) with a new Supabase project in `ap-south-1`.**)
+
+## Reply and save speed — 2026-11-21 — `perf/reply-and-save-speed` (PR open, not merged by the agent)
+
+**Why.** Owner's hand measurements on production (20–21 Nov, from Hyderabad): widget/test-chat replies 8–10 s (15 s with a tool), onboarding step saves 10–20 s, adding a product/service/FAQ 5–8 s. Targets at p50: first words < 1.5 s, simple reply < 4 s, step saves < 1.5 s, adds < 2 s.
+
+**Phase 1 findings (read-only).**
+- Region: Vercel functions ran in `icn1` and Supabase in `ap-northeast-2`, both in Seoul. Gemini is a global endpoint. From India, each browser request costs about 0.25 s of distance (trivial `/api/health` TTFB 0.29–0.33 s warm).
+- The production SQL was approved by the owner and run read-only, as the exact SELECTs, on 20–21 Nov (IST):
+  - **Widget server time:** p50 2.9 s, p90 5.7 s, max 7.8 s from the visitor's message to the reply being saved. The no-tool turn total was p50 3.5 s.
+  - **Test chat:** p50 2.8 s. So most of the 8–10 s was outside the server's turn timer (cold starts, client queueing).
+  - **Model:** `gemini-3.1-flash-lite`, about 1.0 s per call and 0.43 s per embedding.
+  - **Database:** stages took 120–370 ms each (they were 58–77 ms in October), while queries execute in 2–35 ms. The difference is connection and transport cost on fresh instances.
+  - **Prompt size:** grew from about 2.2K to 5–7K input tokens.
+  - **Instant answers:** almost never hit.
+- Advisors: no missing index on any user-facing path (see "Post-launch work").
+- The dashboard polled a Server Action every second. Next.js runs a tab's Server Actions one at a time, so every save and test-chat send queued behind a poll.
+- Personality Continue made 3 actions plus a navigation, re-rendering the whole wizard 4 times. One onboarding render made about 29 database calls.
+- Production runs on a Clerk **development** instance (`pk_test_`, logged on every new instance). That is the runbook §8 checklist, not this PR.
+
+**What changed (one commit per item; no migration, no package, no env var):**
+- **Fonts** (`a288fab`, fixed in `349a423`)
+  - Hanken Grotesk and Space Grotesk are self-hosted with `next/font/local`: the exact subset files and unicode ranges Google served, with their OFL licences, under `app/fonts/`.
+  - Under Turbopack a call's CSS variable is named after the call, not the declared family, so `app/fonts/fonts.css` sets the four font variables to the family names, with Google's metric-adjusted Arial fallbacks.
+  - Builds and CI no longer fetch from Google.
+- **Timing logs** (`6c7d5a4`, `a4dccc5`, `5cf2c95`, permanent)
+  - `lib/request-timing.ts` writes one `request_timing` JSON line on stdout per widget turn (`api_chat`), test-chat turn, onboarding render and action, product/service/FAQ add, and slow or cold dashboard poll.
+  - Each line has `at`, `name`, `outcome`, `totalMs`, `cold`, `instanceAgeMs`, `processUptimeMs` and `stages`. There are no ids, names, contacts or text (enforced by tests).
+  - `cold` is true for the first request after a process starts (`instrumentation.ts` marks instance start). On the PM2 VPS it is false except after a restart.
+  - Widget turns also store `at_first_model_text` and `at_first_visible_text` in `stage_timings`. That gap is the booking-claim sentence hold, which decides item 8.
+  - Next's build-time rendering signals are not logged.
+- **One request per onboarding click** (`2c4cdbd`)
+  - `continueOnboarding(step)` runs the same server-side step check, then `redirect()`s, so the response carries the next step.
+  - `savePersonaStepAction` runs branding, then capabilities, then the step in one request. `saveBusinessStepAction` saves an existing business's step 1 and moves on.
+  - All Continue buttons use them.
+- **Dashboard polls** (`7d3c77d`)
+  - The attention badge/bell and the open-conversation panel poll `GET /api/dashboard/attention` and `GET /api/dashboard/conversations/[id]/updates`.
+  - Both read the business from the Clerk session only (`getBusinessContextForRoute`), return 401 without one, and are never cached. They run the same tenant-scoped RLS reads (`lib/dashboard-poll.ts`), and a foreign conversation id gets the old empty answer.
+  - Cadence (`lib/poll-cadence.ts`): every 1 s while something changed in the last 30 s, 5 s otherwise, paused while the tab is hidden. The owner's own action resets it to fast.
+  - The old poll actions are removed. **Not changed:** the conversation list pane (`pollConversationsAction`) still polls a Server Action every second on `/dashboard/conversations`.
+- **Lighter onboarding render** (`a065800`)
+  - `loadReadinessData` returns the readiness report plus its rows, and `onboardingProgressFrom()` grades progress from them (proved identical to `computeOnboardingProgress`).
+  - One parallel load per render: about 29 → 13 database calls, 4–5 → 3 sequential steps.
+  - No migration (the advisors flagged nothing user-facing).
+- **Embeddings after the response** (`1176a53`)
+  - Product and service create/update in the dashboard and onboarding actions pass `after()` as `embedLater`. `lib/catalog-embedding.ts` writes the embedding scoped to `business_id` + `id`, and only if `updated_at` is unchanged (a newer edit wins).
+  - The service-role client is used because the write runs after the response. Other callers still embed inline.
+- **Widget turn ends with the text** (`df69199`)
+  - `STREAM_METADATA_GRACE_MS` 3000 → 300. A slower judgement is applied in the background as before, and `final.judgementPending` tells the loader.
+  - The loader polls `/api/chat/poll` at 2.5 s for 30 s. The poll now returns `needsAttention`, `attentionFlaggedAt` and the masked `followUpContact`, the contact only when flagged.
+  - If the conversation was flagged at or after that turn started, the iframe gets `widget:late_escalation` and shows "our team will contact you" on that reply.
+  - **Limit:** a conversation already flagged before the turn gets no second banner from a late judgement. The visitor already has one, and no new alert is sent then either.
+- **Runbook** (`d3ae260`): new §9 for the VPS.
+  - PM2: one fork-mode process on a small VM; cluster only with 2+ vCPU and 4+ GB.
+  - An ecosystem file with `kill_timeout` 65 s, pm2-logrotate, and reading `request_timing` from `/var/log/ai-pilot/out.log`.
+  - The new production Supabase project goes in `ap-south-1`.
+  - The Meta log command and the Clerk key swap now point at the VPS.
+
+**Parked (owner decision):**
+- Item 6 (cold starts / lazy-loading the AI stack): only if the VPS timing logs show a problem.
+- Item 8 (stream the reply before the booking-claim check finishes): build only if `at_first_visible_text − at_first_model_text` is ≥ 0.3 s at p50. The design was approved for that case.
+- Not now: a faster model (already Flash-Lite), answer-bank expansion, prompt reordering, moving regions in code.
+
+**Before / after that can be measured offline** (the owner re-measures live after merge):
+
+| | Before | After |
+|---|---|---|
+| Requests per Personality Continue | 4 (3 actions + navigation, 4 wizard renders) | 1 |
+| Requests per other wizard Continue | 2 | 1 |
+| Database calls per onboarding render | 29, 4–5 sequential steps | 13, 3 steps |
+| Server Actions a save/test-chat send can queue behind | the 1 s poll(s) | none (polls are GET fetches); list pane still an action |
+| Poll requests per minute, quiet dashboard tab | 60 (+60 on an open conversation) | 12 after 30 s quiet (+12) |
+| Wait after the reply text before the turn ends | until the judgement, ≤ 3 s (≈0.6–1.0 s at prod p50) | ≤ 0.3 s |
+| Gemini embedding before a product/service save | 434 ms p50 (prod) | 0 (after the response) |
+| Fonts | 10 files, 143,276 B, 2 latin preloads, fetched from Google at build | the same files, bytes and preloads, no network |
+
+**Tests and checks (real output):**
+- New `npm run test:perf-speed`, 32 cases, mocks only, in CI.
+- Updated suites: `test:onboarding-flow` (persona assertion, mocks), `test:sandbox-chat` (timing stub, `scripts/lib/request-timing-stub.mjs`), `test:onboarding-capabilities` (mock).
+- `npm run lint` exit 0 and `npm run typecheck` exit 0.
+- All 44 `test:*` suites pass, 1,112 cases, including ai-honesty 52/52, output-guard 26/26 and widget-reliability 78/78.
+- `npm run build` exit 0 offline: `.env.local` moved aside, placeholder credentials, unreachable loopback DB, 84/84 pages.
+- **Not run:** `npm test` (pgTAP; no SQL change), evals and anything calling Gemini, `next dev`.
+
+**Live checks after merge:** see the PR description.
 
 ## Hotfix: test chat returned 500 for every message — 2026-11-21 — `fix/sandbox-chat-500`
 
@@ -683,6 +767,7 @@ Apply the migrations to production **before merging** because Vercel deploys `ma
 **Post-launch work (owner decision 2026-11-03: NOT built, do after launch):**
 - **Post-appointment follow-ups**: a message after a completed appointment (thank-you, review or next-booking ask). This needs a WhatsApp template per WABA too.
 - **Staff re-engagement templates**: a WhatsApp template so a staff reply can reach a customer outside the 24-hour window. Today the reply is saved, a visible "not sent" notice shows, and the conversation is flagged.
+- **Foreign-key indexes for the nightly cleanup job** (added 2026-11-21, `perf/reply-and-save-speed`; owner decision: not in that PR). Supabase's performance advisors flag 25 foreign keys with no covering index, including `messages.conversation_id` and `ai_response_metrics.conversation_id`. They slow only `delete_expired_conversations()` (production: 150 calls, mean 125 ms, max 433 ms), not any request a visitor or owner waits on. Add them in one migration after launch, applied before its merge. The same report lists 23 indexes that have never been used, worth reviewing then too.
 
 ### Round 2 commits (oldest first)
 `0b1e232` plan access + trials · `88a34be` /apache deletes cancel Razorpay · `4f86603` chat protection (limits, daily Gemini caps, Turnstile) · `c179301` committed production-ref list · `fa7e012` local `next dev` against prod blocked · `84ed075` plan-access tests + CI · `098ebfc` migration ordering · `07b9eaa` WhatsApp Embedded Signup + templates · `e8fdcb5` channel launch switches.
