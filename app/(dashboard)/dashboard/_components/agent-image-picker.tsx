@@ -58,7 +58,7 @@ export function AgentImagePicker({ name = "image_file", disabled, onPreview }: {
   return (
     <div className="flex flex-col gap-1 text-sm" onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => { event.preventDefault(); void pick(event.dataTransfer.files[0]); }}>
-      <input ref={input} name={name} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => void pick(event.currentTarget.files?.[0])} />
+      <input ref={input} name={selected ? name : undefined} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(event) => void pick(event.currentTarget.files?.[0])} />
       <button type="button" onClick={() => input.current?.click()} disabled={disabled || busy}
         className="rounded border border-ds-border px-3 py-2 text-ds-text-secondary focus-visible:outline-2 disabled:opacity-60">
         {busy ? "Preparing image…" : "Choose or drop an image"}

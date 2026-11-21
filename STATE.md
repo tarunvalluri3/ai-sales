@@ -9,6 +9,15 @@ Previous handoff: 2026-11-20 (**Widget reliability (8 items) on branch `fix/widg
 ---
 
 
+## Hotfix: optional product/service/avatar image — 2026-11-21 — `fix/optional-image-upload`
+
+Production bug: onboarding "What do you sell?" rejected a product with no image ("Choose a JPEG, PNG, or WebP image up to 2 MB."). Cause: an untouched file input submits an empty File (size 0; Next server actions give it a non-empty placeholder name), and `uploadAgentImage` only treated size 0 **and** empty name as "no upload".
+
+- `lib/agent-images.ts`: missing field, `""`, or any File with size 0 → no upload (`null`). Type, magic-bytes, 2 MB, and tenant-path checks unchanged for real files. All callers (products/services create + edit, onboarding in-place edit, avatar) share this.
+- `agent-image-picker.tsx`: the file input has a `name` only once an image is selected, so no empty file is submitted. Editing keeps the image via the `image_url` text field (unchanged); no clearing or deletion.
+- Tests (`test:onboarding-capabilities`): empty/missing inputs return null for products and avatar; picker omits name; edit still only overrides `image_url` when uploaded.
+- No migration.
+
 ## PR 4b · Onboarding capabilities · 2026-11-21
 
 - **B1:** Onboarding and dashboard catalog forms accept JPEG, PNG and WebP uploads alongside URLs. The shared public bucket has a 2 MB limit and service-role writes. File cleanup checks tenant ownership and live references. Canvas re-encoding strips browser-uploaded metadata. Direct uploads retain metadata.
