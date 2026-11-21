@@ -462,3 +462,91 @@ test("the onboarding page loads its data once: no duplicate progress, readiness,
   }
   assert.equal((page.match(/await Promise\.all\(/g) ?? []).length, 3); // the load, plus the existing new-business and plan-step pairs
 });
+
+// ---------------------- item 7: product/service embeddings after the response
+test("writeCatalogEmbedding: tenant-scoped, only onto the saved version, never throws", async () => {
+  const { writeCatalogEmbedding } = loadModule("lib/catalog-embedding.ts", {
+    "@/lib/supabase/service": {}, "@/lib/embeddings": {}, "@/lib/logger": {},
+  });
+  const run = async (overrides = {}) => {
+    const events = [];
+    const updates = [];
+    const deps = {
+      embed: async () => [0.1, 0.2],
+      update: async (...args) => { updates.push(args); return { updated: true, failed: false }; },
+      log: (event, businessId, level) => events.push([event, businessId, level]),
+      ...overrides,
+    };
+    await writeCatalogEmbedding("products", "business-a", "p1", "2026-11-21T10:00:00.123456+00:00", "Whitening", deps);
+    return { events, updates };
+  };
+  const ok = await run();
+  assert.deepEqual(JSON.parse(JSON.stringify(ok.updates)), [["products", "business-a", "p1", "2026-11-21T10:00:00.123456+00:00", [0.1, 0.2]]]);
+  assert.equal(ok.events.length, 0);
+
+  const superseded = await run({ update: async () => ({ updated: false, failed: false }) });
+  assert.deepEqual(superseded.events, [["product_embedding_superseded", "business-a", "info"]]);
+
+  const embedFails = await run({ embed: async () => { throw new Error("429"); } });
+  assert.equal(embedFails.updates.length, 0);
+  assert.deepEqual(embedFails.events, [["product_embedding_failed", "business-a", "error"]]);
+
+  const writeThrows = await run({ update: async () => { throw new Error("network"); } });
+  assert.deepEqual(writeThrows.events, [["product_embedding_write_failed", "business-a", "error"]]);
+});
+
+function loadCatalogService(file, { embedCalls }) {
+  const inserts = [];
+  const order = [];
+  const builder = (table) => {
+    const state = { table };
+    const api = {
+      insert: (row) => { inserts.push(row); order.push("insert"); return api; },
+      select: () => api,
+      single: async () => ({ data: { id: "new-id", name: "Whitening", updated_at: "2026-11-21T10:00:00.5+00:00", ...inserts.at(-1) }, error: null }),
+    };
+    return api;
+  };
+  const mod = loadModule(file, {
+    "@/lib/agent-images": { cleanupAgentImage: async () => {} },
+    "@/lib/supabase/server": { createServerSupabaseClient: () => ({ from: builder }) },
+    "@/lib/errors": { AppError: Error },
+    "@/lib/knowledge-sync": { syncGeneratedDocument: async () => { order.push("sync"); }, deleteGeneratedDocument: async () => {} },
+    "@/lib/embeddings": { embedText: async () => { embedCalls.push("inline"); order.push("embed"); return [1, 2, 3]; } },
+    "@/lib/logger": { logEvent: () => {} },
+    "@/lib/currency": { formatCatalogPrice: (price) => price },
+    "@/lib/catalog-embedding": { writeCatalogEmbedding: async (...args) => { embedCalls.push(["deferred", ...args]); } },
+  });
+  return { ...mod, inserts, order };
+}
+
+test("createProduct/createService with embedLater: saved and answered without waiting for Gemini; embedded afterwards", async () => {
+  for (const [file, fn, table] of [["lib/products.ts", "createProduct", "products"], ["lib/services.ts", "createService", "services"]]) {
+    const embedCalls = [];
+    const svc = loadCatalogService(file, { embedCalls });
+    const later = [];
+    const input = { name: "Whitening", description: "Teeth whitening in one visit", price: "3000", image_url: null, category: null, price_amount: 3000 };
+    await svc[fn]("business-a", input, "INR", undefined, { embedLater: (task) => later.push(task) });
+    assert.deepEqual(svc.order, ["insert", "sync"], file); // no Gemini call before the answer
+    assert.equal(svc.inserts[0].embedding, null, file);
+    assert.equal(svc.inserts[0].business_id, "business-a", file);
+    assert.equal(later.length, 1, file);
+    await later[0]();
+    const [kind, deferredTable, businessId, id, updatedAt] = embedCalls[0];
+    assert.deepEqual([kind, deferredTable, businessId, id, updatedAt], ["deferred", table, "business-a", "new-id", "2026-11-21T10:00:00.5+00:00"], file);
+
+    // Without embedLater (website-suggestion approval, any other caller) it embeds inline as before.
+    const inlineCalls = [];
+    const inline = loadCatalogService(file, { embedCalls: inlineCalls });
+    await inline[fn]("business-a", input, "INR");
+    assert.deepEqual(inline.order, ["embed", "insert", "sync"], file);
+    assert.deepEqual(JSON.parse(JSON.stringify(inline.inserts[0].embedding)), [1, 2, 3], file);
+  }
+});
+
+test("the dashboard and onboarding catalog actions defer embeddings with after()", () => {
+  const products = source("app/(dashboard)/dashboard/products/actions.ts");
+  const services = source("app/(dashboard)/dashboard/services/actions.ts");
+  assert.equal((products.match(/\{ embedLater: after \}/g) ?? []).length, 3); // create, update, in-place update
+  assert.equal((services.match(/\{ embedLater: after \}/g) ?? []).length, 2); // create, update
+});

@@ -472,6 +472,8 @@ test("product and service replacement and deletion pass the previous image to sa
       "@/lib/errors": { AppError: Error },
       "@/lib/knowledge-sync": { syncGeneratedDocument: async () => {}, deleteGeneratedDocument: async () => {} },
       "@/lib/embeddings": { embedText: async () => [] },
+      // Not exercised here (no embedLater passed): perf-speed covers deferred embeddings.
+      "@/lib/catalog-embedding": { writeCatalogEmbedding: async () => {} },
       "@/lib/logger": { logEvent: () => {} },
       "@/lib/currency": { formatCatalogPrice: () => null, formatPrice: () => null },
     });

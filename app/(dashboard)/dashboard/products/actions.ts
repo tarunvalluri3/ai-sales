@@ -61,7 +61,7 @@ async function createProductActionTimed(
   try {
     const uploaded = await timing.time("image_upload", () => uploadAgentImage(businessId, "products", formData.get("image_file")));
     try {
-      await timing.time("save", () => createProduct(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency));
+      await timing.time("save", () => createProduct(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency, undefined, { embedLater: after }));
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);
       throw error;
@@ -101,7 +101,7 @@ export async function updateProductAction(
   try {
     const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
     try {
-      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency, { embedLater: after });
       if (!updated) await cleanupAgentImage(businessId, uploaded);
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);
@@ -156,7 +156,7 @@ export async function updateProductInPlaceAction(
   try {
     const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
     try {
-      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency, { embedLater: after });
       if (!updated) await cleanupAgentImage(businessId, uploaded);
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);
