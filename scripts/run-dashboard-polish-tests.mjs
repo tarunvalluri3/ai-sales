@@ -137,9 +137,8 @@ test("dashboard layout backfills the org name for admins only, off the request p
 const sandboxActions = dashboard + "_components/sandbox-chat/actions.ts";
 
 test("test chat mode is a closed enum validated server-side", () => {
-  const src = source(sandboxActions);
-  assert.match(src, /sandboxModeSchema = z\.enum\(\["draft", "live"\]\)/);
-  assert.match(src, /sandboxModeSchema\.safeParse\(mode\)/);
+  assert.match(source("lib/sandbox-mode.ts"), /sandboxModeSchema = z\.enum\(\["draft", "live"\]\)/);
+  assert.match(source(sandboxActions), /sandboxModeSchema\.safeParse\(mode\)/);
 });
 
 test("live test chat takes the version from the session's business row, never from the client", () => {

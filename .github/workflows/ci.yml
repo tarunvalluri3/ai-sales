@@ -182,6 +182,9 @@ jobs:
       - name: Dashboard polish tests
         run: npm run test:dashboard-polish
 
+      - name: Sandbox chat tests
+        run: npm run test:sandbox-chat
+
       - name: Test onboarding flow
         run: npm run test:onboarding-flow
 
