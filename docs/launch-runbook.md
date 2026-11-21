@@ -53,7 +53,7 @@ Standard Access only covers people with a role on the app. That is why a connect
 If a connection fails, the page shows a message and the URL has `?error=<code>`. The server logs an `ig_connect_failed` line with Meta's own message:
 
 ```bash
-journalctl -u <service> --since "1 hour ago" | grep ig_connect_
+grep ig_connect_ /var/log/ai-pilot/out.log | tail -20   # PM2 log file, see section 9
 ```
 
 If Facebook shows an error before returning to the app, the cause is in the Meta configuration or access level, and no log line appears.
@@ -95,4 +95,77 @@ Do this before opening signups. It is all Clerk, DNS and Vercel configuration, w
 5. **Organizations settings.** Confirm Organizations are enabled, that members can create organizations only if you want them to (this affects the one-trial-per-organization rule), and that the roles used by the app exist: `org:admin` and `org:member`, plus the custom `org:sales_agent` and `org:analyst_viewer`.
 6. **Supabase JWT template / integration.** The app sends Clerk's own session token to Supabase (`getToken()` with no custom template name, `lib/supabase/server.ts`), so there is no named template to copy. Instead, enable Clerk's Supabase integration for the production instance (Clerk Dashboard > Integrations > Supabase), and in the production Supabase project add Clerk as a third-party auth provider using the production Clerk domain (Authentication > Third-party auth). Then sign in on production and confirm a dashboard page loads data. If the production Clerk domain is not registered in Supabase, every dashboard query returns nothing or fails row-level security.
 7. **Test sign-up in more than one browser.** Complete a full sign-up (email and Google), organization creation and onboarding step 1 in Chrome, Edge, Safari and a mobile browser. Some embedded or in-app browsers show Turnstile error `600010`. If one does, record which one and decide whether to tell those visitors to open the link in their normal browser.
-8. **Swap the production keys in Vercel and redeploy.** In Vercel (Production environment only), set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` to the production instance's `pk_live_` and `sk_live_` values, and update any Clerk webhook signing secret. Redeploy, then sign out and back in on the production URL. Do not put the secret key in any `NEXT_PUBLIC_*` variable.
+8. **Swap the production keys on the VPS and rebuild.** In the VPS environment file (section 9), set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` to the production instance's `pk_live_` and `sk_live_` values, and update any Clerk webhook signing secret. `NEXT_PUBLIC_*` values are baked in at build time, so run `npm run build` and `pm2 reload ai-pilot`, then sign out and back in on the production URL. Do not put the secret key in any `NEXT_PUBLIC_*` variable.
+
+## 9. VPS: process manager, logs and region
+Decided 2026-11-21: production runs on our own Google Cloud VM in Mumbai (`asia-south1`) with Node and PM2, not on Vercel. The database moves to Mumbai too, so the app and the database are in the same region.
+
+**Region.** Before launch, create the new production Supabase project in `ap-south-1` (Mumbai) and retire the Seoul one (`ap-northeast-2`):
+1. Add the new project ref to `supabase/production-project-refs.txt` and commit it (every script and test then refuses to run against it).
+2. Link it and run `npx supabase db push`, then follow section 6 (pg_cron jobs, `platform_admins`, backups).
+3. Point the VM's environment file at it (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`), rebuild and reload.
+4. Add the production Clerk domain as a third-party auth provider in the new project (section 8, step 6).
+
+Gemini needs no region setting. Measured on 2026-11-21: from India each browser request to the Seoul functions cost about 0.25 s of distance alone, and the database round trips in production took 120-370 ms per stage. Both should drop once the app and the database sit together in Mumbai.
+
+**PM2: one process on a small VM.** On an `e2-small` or `e2-medium` (2 vCPU, 2-4 GB), run a single Next.js process (`exec_mode: "fork"`, `instances: 1`). This app spends its time waiting on the database and Gemini rather than on the CPU, so one Node process copes with it. Each extra worker adds another 300-600 MB and its own copy of the in-memory caches (the 30 s widget key cache). Switch to `exec_mode: "cluster"` with `instances: 2` only on a VM with at least 2 vCPU and 4 GB, and only if the timing logs or `pm2 monit` show the CPU is the bottleneck. In cluster mode, deploy with `pm2 reload` for zero-downtime restarts.
+
+`ecosystem.config.cjs` on the server (secrets stay in the environment file next to the app, never in this file):
+
+```js
+module.exports = {
+  apps: [
+    {
+      name: "ai-pilot",
+      cwd: "/srv/ai-pilot",
+      script: "node_modules/next/dist/bin/next",
+      args: "start -p 3000",
+      exec_mode: "fork",
+      instances: 1,
+      max_memory_restart: "1G",
+      // A widget reply may stream for up to 60 s, and after() work runs once
+      // the response is sent: give both time to finish on restart.
+      kill_timeout: 65000,
+      env: { NODE_ENV: "production", APP_ENV: "production" },
+      out_file: "/var/log/ai-pilot/out.log",
+      error_file: "/var/log/ai-pilot/error.log",
+      merge_logs: true,
+    },
+  ],
+};
+```
+
+Start it, and make it survive reboots:
+
+```bash
+sudo mkdir -p /var/log/ai-pilot && sudo chown "$USER" /var/log/ai-pilot
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup   # run the command it prints
+```
+
+Deploy: `git pull && npm ci && npm run build && pm2 reload ai-pilot`.
+
+**Logs and rotation.** Every log line, including the timing logs, is written to stdout and ends up in `/var/log/ai-pilot/out.log` (errors go to `error.log`). Rotate both:
+
+```bash
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 50M
+pm2 set pm2-logrotate:retain 14
+pm2 set pm2-logrotate:compress true
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
+```
+
+Don't set `log_date_format`. The app's lines are one JSON object each, and the timing lines carry their own `at` timestamp.
+
+**Timing logs.** One `request_timing` line per widget reply (`api_chat`), test-chat turn (`sandbox_chat`), onboarding render and action (`onboarding_*`), and product/service/FAQ add (`catalog_create_*`). The dashboard polls (`dashboard_*_poll`) log only when a request is slow (1 s or more) or is the first after a restart. Each line has `at`, `name`, `outcome`, `totalMs`, `cold`, `instanceAgeMs`, `processUptimeMs` and per-stage `stages`. There are no ids, names, contacts or message text. On the VPS `cold` is `true` only for the first request after a start or reload, and `false` from then on.
+
+```bash
+grep '"event":"request_timing"' /var/log/ai-pilot/out.log | tail -50
+# slowest widget replies today (needs jq)
+grep '"event":"request_timing"' /var/log/ai-pilot/out.log | jq -s -c 'map(select(.name=="api_chat")) | sort_by(.totalMs) | .[-10:][] | {at,totalMs,cold,stages}'
+```
+
+Widget replies also store `at_first_model_text` and `at_first_visible_text` in `ai_response_metrics.stage_timings`. The gap between the two is how long the booking-claim sentence check holds back the first words.
+
+**nginx:** keep `proxy_buffering off` and no `gzip` for `text/event-stream` on `/api/chat` (section 2), or replies arrive all at once.
