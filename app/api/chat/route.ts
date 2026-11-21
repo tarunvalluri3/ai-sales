@@ -59,6 +59,7 @@ import {
   STREAM_SERVER_WATCHDOG_MS,
 } from "@/lib/chat-timeouts";
 import { TurnTimer } from "@/lib/turn-timings";
+import { RequestTiming } from "@/lib/request-timing";
 import { finalizeTurnMetrics, writeDeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { sendUsageReminderIfDue } from "@/lib/usage-reminders";
 import { checkReplyQuota } from "@/lib/usage-limit";
@@ -142,6 +143,24 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  // One identifier-free `request_timing` line per request (lib/request-timing.ts):
+  // whether it hit a cold instance, and for a stream, when the first text and
+  // the terminal event went out. A JSON response is logged here; a stream is
+  // logged by its own terminal event (onEvent below).
+  const timing = new RequestTiming("api_chat");
+  try {
+    const response = await handleChatPost(request, timing);
+    if (!response.headers.get("content-type")?.startsWith(CHAT_STREAM_CONTENT_TYPE)) {
+      timing.finish(response.status >= 500 ? "error" : response.status >= 400 ? "rejected" : "ok");
+    }
+    return response;
+  } catch (error) {
+    timing.finish("error");
+    throw error;
+  }
+}
+
+async function handleChatPost(request: NextRequest, timing: RequestTiming) {
   // The real start of the turn, on the handler's first line. Everything
   // below records into this one clock, so the persisted total is the
   // prospect's actual wait rather than a window that opens partway
@@ -871,6 +890,9 @@ export async function POST(request: NextRequest) {
           followUpContact: response.escalate
             ? await getMaskedFollowUpContact(supabase, business.businessId, conversation.id)
             : null,
+          // The judgement missed the grace (lib/chat-timeouts.ts): the widget
+          // watches /api/chat/poll for a late escalation of this turn.
+          judgementPending: Boolean(response.pendingJudgement),
         }),
         sideEffects: finalizeTurnSideEffects,
         logError: (stage, error) => {
@@ -879,6 +901,11 @@ export async function POST(request: NextRequest) {
           } else {
             logAndGetUserMessage(error);
           }
+        },
+        onEvent: (type) => {
+          if (type === "delta") timing.mark("first_delta");
+          else if (type === "final") timing.finish("ok");
+          else if (type === "error") timing.finish("error");
         },
         clientSignal: request.signal,
         keepAliveMs: STREAM_KEEPALIVE_INTERVAL_MS,

@@ -146,8 +146,17 @@ export const CHAT_MODEL_MAX_RETRIES = boundedRetries(process.env.CHAT_MODEL_MAX_
  *     event + close) if the generation has not finished by then, measured from
  *     the start of the turn. Below the platform's hard kill.
  *   CHAT_CLIENT_TIMEOUT_MS (above) -- the widget's absolute ceiling per turn.
+ *
+ * perf/reply-and-save-speed (2026-11-21): the grace went 3 s -> 0.3 s. The
+ * metadata call (p50 1.16 s in production) starts when the first words
+ * arrive, so it usually finishes 0.6-1 s AFTER the text, and the visitor's
+ * turn was held open (stop button, no Send) for that long. Now the turn ends
+ * with the text; `final` says `judgementPending`, the late result is applied
+ * in the background as before, and a late escalation reaches the widget
+ * through its existing poll (/api/chat/poll's needsAttention +
+ * attentionFlaggedAt + followUpContact), which shows the banner on that turn.
  */
-export const STREAM_METADATA_GRACE_MS = 3_000;
+export const STREAM_METADATA_GRACE_MS = 300;
 export const STREAM_KEEPALIVE_INTERVAL_MS = 5_000;
 export const STREAM_CLIENT_STALL_TIMEOUT_MS = 20_000;
 export const STREAM_SERVER_WATCHDOG_MS = Math.min(

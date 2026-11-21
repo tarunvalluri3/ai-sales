@@ -13,7 +13,7 @@ import { KnowledgeList } from "../../../dashboard/knowledge/_components/knowledg
 import { createKnowledgeDocumentAction, updateKnowledgeDocumentInPlaceAction } from "../../../dashboard/knowledge/actions";
 import type { WebsiteSuggestionState } from "@/lib/schemas/website-suggestions";
 import { WebsiteSuggestionReview } from "./website-suggestion-review";
-import { advanceOnboarding } from "../../actions";
+import { continueOnboarding } from "../../actions";
 import { Card } from "../../../dashboard/_components/ui";
 import { useToast } from "../../../dashboard/_components/toast";
 
@@ -55,12 +55,10 @@ export function TrainKnowledgeStep({ documents, agentPublished, website, imports
   function handleContinue() {
     setError(null);
     startTransition(async () => {
-      const result = await advanceOnboarding("products");
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.push("/onboarding?step=products");
+      // One request: on success the server redirects straight to the next
+      // step (continueOnboarding); only a refusal comes back here.
+      const result = await continueOnboarding("products");
+      if (result && !result.ok) setError(result.error);
     });
   }
 

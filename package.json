@@ -15,6 +15,7 @@
     "test:onboarding-capabilities": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-onboarding-capabilities-tests.mjs",
     "test:dashboard-polish": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-dashboard-polish-tests.mjs",
     "test:sandbox-chat": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-sandbox-chat-tests.mjs",
+    "test:perf-speed": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-perf-speed-tests.mjs",
     "test:onboarding-flow": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-onboarding-flow-tests.mjs",
     "test:onboarding-readiness": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-onboarding-readiness-tests.mjs",
     "test:widget-access": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-widget-access-tests.mjs",

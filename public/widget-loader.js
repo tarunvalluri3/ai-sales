@@ -196,13 +196,26 @@
   // limit of 150 (the rest covers pollNow() on refocus/reopen).
   var FAST_POLL_INTERVAL_MS = 2500;
   var SLOW_POLL_INTERVAL_MS = 15000;
+  // perf/reply-and-save-speed: a streamed turn now ends with its text, and
+  // its escalation judgement may still be running (final.judgementPending).
+  // For JUDGEMENT_WATCH_MS the loader polls FAST, and if the server says the
+  // conversation was flagged at or after that turn started, it tells the
+  // iframe to show "our team will contact you" on that turn's reply.
+  var JUDGEMENT_WATCH_MS = 30000;
+  var pendingJudgement = null;
+
+  /** True while a pending judgement is being watched; drops an expired watch. */
+  function judgementWatchActive() {
+    if (pendingJudgement && Date.now() > pendingJudgement.until) pendingJudgement = null;
+    return pendingJudgement !== null;
+  }
 
   /** The poll interval right now, or null when the widget must not poll at all. */
   function currentPollInterval() {
     if (!isPanelOpen || isSendInFlight || !conversationId || document.visibilityState !== "visible") {
       return null;
     }
-    return isHumanControl || hasHandoffSignal ? FAST_POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
+    return isHumanControl || hasHandoffSignal || judgementWatchActive() ? FAST_POLL_INTERVAL_MS : SLOW_POLL_INTERVAL_MS;
   }
 
   function schedulePoll() {
@@ -263,6 +276,25 @@
           // The server's current control decides FAST vs SLOW (both ways).
           if (body.data.control === "human") isHumanControl = true;
           else if (body.data.control === "ai") isHumanControl = false;
+          // A late escalation of the watched turn: the conversation was flagged
+          // at or after the turn started (server timestamps on both sides).
+          if (
+            judgementWatchActive() &&
+            body.data.needsAttention === true &&
+            typeof body.data.attentionFlaggedAt === "string" &&
+            Date.parse(body.data.attentionFlaggedAt) >= Date.parse(pendingJudgement.since)
+          ) {
+            hasHandoffSignal = true;
+            iframe.contentWindow.postMessage(
+              {
+                type: "widget:late_escalation",
+                requestId: pendingJudgement.requestId,
+                followUpContact: typeof body.data.followUpContact === "string" ? body.data.followUpContact : null,
+              },
+              appOrigin,
+            );
+            pendingJudgement = null;
+          }
           if (fresh.length > 0) {
             iframe.contentWindow.postMessage(
               { type: "widget:poll_result", messages: fresh },
@@ -576,6 +608,8 @@
       var buffer = "";
       var sawTerminal = false;
       var sawDelta = false;
+      // When this turn started, by the server's clock (the visitor message's own timestamp).
+      var turnStartedAt = null;
       for (;;) {
         var result = await reader.read();
         if (result.done) break;
@@ -591,7 +625,10 @@
               conversationId = event.conversationId;
               storeConversationId(conversationId);
             }
-            if (event.asOf) lastKnownMessageAt = event.asOf;
+            if (event.asOf) {
+              lastKnownMessageAt = event.asOf;
+              turnStartedAt = event.asOf;
+            }
             iframe.contentWindow.postMessage(
               { type: "widget:stream_start", requestId: requestId, conversationId: conversationId },
               appOrigin,
@@ -618,9 +655,13 @@
             sawTerminal = true;
             if (event.asOf) lastKnownMessageAt = event.asOf;
             if (event.escalate) hasHandoffSignal = true;
+            if (event.judgementPending === true && !event.escalate && turnStartedAt) {
+              pendingJudgement = { requestId: requestId, since: turnStartedAt, until: Date.now() + JUDGEMENT_WATCH_MS };
+            }
             iframe.contentWindow.postMessage(
               {
                 type: "widget:stream_end",
+                judgementPending: event.judgementPending === true,
                 requestId: requestId,
                 escalate: !!event.escalate,
                 recommendedProducts: event.recommendedProducts || [],
@@ -698,6 +739,7 @@
       conversationId = null;
       clearStoredConversationId();
       hasHandoffSignal = false;
+      pendingJudgement = null;
       isHumanControl = false;
       lastKnownMessageAt = null;
       knownMessageIds = {};
@@ -738,6 +780,7 @@
       conversationId = data.conversationId;
       storeConversationId(conversationId);
       hasHandoffSignal = false;
+      pendingJudgement = null;
       isHumanControl = false;
       restoreConversation(conversationId, function () {
         conversationId = null;

@@ -62,6 +62,12 @@ export type ChatStreamEvent =
       asOf: string | null;
       /** Widget reliability item 7: the prospect's own contact on file for this conversation, already MASKED (lib/contact-mask.ts). Null when none / not escalated. */
       followUpContact?: string | null;
+      /**
+       * perf/reply-and-save-speed: the escalation/grounding judgement had not
+       * finished when the text did. It is applied in the background; a late
+       * escalation reaches the widget through /api/chat/poll.
+       */
+      judgementPending?: boolean;
     }
   | { type: "error"; kind: ChatStreamErrorKind }
   /** Widget reliability item 1: keep-alive while the turn is still working; proves the connection is alive. */
@@ -170,7 +176,15 @@ export function asChatStreamEvent(value: unknown): ChatStreamEvent | null {
           : [];
         const followUpContact =
           typeof record.followUpContact === "string" && record.followUpContact.length <= 120 ? record.followUpContact : null;
-        return { type: "final", escalate: record.escalate, recommendedProducts, asOf: record.asOf, followUpContact };
+        return {
+          type: "final",
+          escalate: record.escalate,
+          recommendedProducts,
+          asOf: record.asOf,
+          followUpContact,
+          // Only present when true, so older frames round-trip unchanged.
+          ...(record.judgementPending === true ? { judgementPending: true } : {}),
+        };
       }
       return null;
     case "error":

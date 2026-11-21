@@ -7,8 +7,8 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Business } from "@/lib/supabase/types";
 import { SUPPORTED_WIDGET_LANGUAGES, WIDGET_LANGUAGE_LABELS } from "@/lib/widget-i18n";
-import { updateAiCapabilitiesAction, updateWidgetBrandingAction, type WidgetBrandingActionState } from "../../../dashboard/widget-settings/actions";
-import { advanceOnboarding } from "../../actions";
+import type { WidgetBrandingActionState } from "../../../dashboard/widget-settings/actions";
+import { savePersonaStepAction } from "../../actions";
 import { AgentPersonaFields } from "../../../dashboard/_components/agent-persona-fields";
 import { useOnboardingPreview } from "../preview-context";
 import { Card, CardHeader, inputClass, textareaClass } from "../../../dashboard/_components/ui";
@@ -21,21 +21,16 @@ const TONES: { key: "friendly" | "professional" | "concise"; label: string; exam
 
 const SWATCHES = [DEFAULT_WIDGET_PRIMARY, "#dc2626", "#c2410c", "#a16207", "#15803d", "#0f766e", "#2563eb", "#7e22ce"];
 
-function capabilityForm(form: FormData) {
-  const fields = new FormData();
-  for (const key of ["appointmentSlotMinutes", "appointmentsEnabled", "recommendProductsEnabled"]) {
-    const value = form.get(key);
-    if (typeof value === "string") fields.set(key, value);
-  }
-  return fields;
-}
-
 const initialState: WidgetBrandingActionState = {};
 
-/** Tone presets seed the greeting. Branding and capabilities use the dashboard save actions. */
+/**
+ * Tone presets seed the greeting. Continue is ONE request
+ * (savePersonaStepAction): the dashboard's branding and capability saves, the
+ * step check, then the server redirects to Channels.
+ */
 export function PersonaStep({ business, hoursSummary }: { business: Business; hoursSummary: string }) {
   const router = useRouter();
-  const [state, formAction, isPending] = useActionState(savePersona, initialState);
+  const [state, formAction, isPending] = useActionState(savePersonaStepAction, initialState);
   const { update } = useOnboardingPreview();
 
   const [tone, setTone] = useState<"friendly" | "professional" | "concise">("friendly");
@@ -57,17 +52,6 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
   function changeAccent(value: string) {
     setAccent(value);
     update({ accent: sanitizeAccentColor(value) });
-  }
-
-  async function savePersona(previous: WidgetBrandingActionState, form: FormData): Promise<WidgetBrandingActionState> {
-    const branding = await updateWidgetBrandingAction(previous, form);
-    if (!branding.success) return branding;
-    const capabilities = await updateAiCapabilitiesAction({}, capabilityForm(form));
-    if (!capabilities.success) return capabilities;
-    const next = await advanceOnboarding("channels");
-    if (!next.ok) return { error: next.error };
-    router.push("/onboarding?step=channels");
-    return { success: true };
   }
 
 

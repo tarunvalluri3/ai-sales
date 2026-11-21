@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { BillingPanel } from "../../../dashboard/billing/billing-panel";
 import type { BillingIdentityValues } from "../../../dashboard/billing/billing-details";
-import { advanceOnboarding } from "../../actions";
+import { continueOnboarding } from "../../actions";
 import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
 import { trialVsStarterNote, type ConnectedMetaChannels } from "@/lib/plan-channel-copy";
 
@@ -69,7 +69,7 @@ function notServingMessage(reason: string | null): string {
  * it shows the real `BillingPanel`, unchanged -- plan selection, Razorpay
  * checkout and billing identity stay exactly what /dashboard/billing ships.
  *
- * The server is the authority: Continue only works when advanceOnboarding's
+ * The server is the authority: Continue only works when continueOnboarding's
  * recheck finds the entitlement serving (lib/onboarding-steps.ts `plan`).
  * Every price is GST-INCLUSIVE (lib/plans.ts).
  */
@@ -108,7 +108,7 @@ export function PlanStep({
   const [error, setError] = useState<string | null>(null);
   // True while the server is verifying a Checkout result. Continue is held
   // until it answers: the browser's "payment succeeded" is never what marks
-  // this step complete -- the server-side recheck in advanceOnboarding is.
+  // this step complete -- the server-side recheck in continueOnboarding is.
   const [confirming, setConfirming] = useState(false);
   const valid = entitlement.serving;
   const onTrial = entitlement.isTrial && entitlement.serving;
@@ -116,12 +116,10 @@ export function PlanStep({
   function handleContinue() {
     setError(null);
     startTransition(async () => {
-      const result = await advanceOnboarding("review");
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.push("/onboarding?step=review");
+      // One request: on success the server redirects straight to the next
+      // step (continueOnboarding); only a refusal comes back here.
+      const result = await continueOnboarding("review");
+      if (result && !result.ok) setError(result.error);
     });
   }
 

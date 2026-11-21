@@ -1,24 +1,10 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk, Space_Grotesk } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { SiteHeader } from "./_components/site-header";
 import { SiteFooter } from "@/components/site/site-footer";
 import { THEME_INIT_SCRIPT } from "./_components/theme-init-script";
+import { dashboardFontVariables } from "@/app/fonts/dashboard-fonts";
 import "./globals.css";
-
-const hanken = Hanken_Grotesk({
-  variable: "--font-hanken",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space",
-  subsets: ["latin"],
-  weight: ["400", "500"],
-});
-
-
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://aipilot.waveswebstudio.in"),
@@ -53,7 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <html
         lang="en"
         suppressHydrationWarning
-        className={`${hanken.variable} ${spaceGrotesk.variable} h-full antialiased`}
+        className={`${dashboardFontVariables} h-full antialiased`}
       >
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

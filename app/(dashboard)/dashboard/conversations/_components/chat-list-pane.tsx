@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import { pollConversationsAction, type ConversationLeadSummary } from "../actions";
+import { fetchConversationList, type ConversationLeadSummary } from "@/lib/dashboard-poll-client";
+import { nextPollDelayMs, POLL_FAST_MS, POLL_SLOW_MS } from "@/lib/poll-cadence";
 import { EmptyState } from "../../_components/state-views";
 import { Avatar, ChannelIcon, Pill } from "../../_components/ui";
 import { MESSAGE_ROLE_LABEL } from "./message-bubble";
@@ -13,14 +14,12 @@ import type { ConversationWithMessageCount } from "@/lib/conversations";
 import type { LastMessagePreview } from "@/lib/messages";
 import { anonymousContactLabel, displayContactName } from "@/lib/lead-source";
 
-// Full speed while the list is the main view (nothing else to look at);
-// slower once a specific conversation is open, where LiveConversationPanel
-// runs its own concurrent 1s poll and this list becomes secondary --
-// keeping this at full speed too was doubling steady-state polling load
-// for the whole time any conversation is open, a real production
-// performance regression (see STATE.md).
-const POLL_INTERVAL_INDEX_MS = 1000;
-const POLL_INTERVAL_DETAIL_MS = 4000;
+// perf/reply-and-save-speed: polls GET /api/dashboard/conversations (no
+// longer a Server Action, so a reply or take-over never waits behind it).
+// On the list itself: every second while the list changed in the last 30 s,
+// every 5 s otherwise (lib/poll-cadence.ts). With a conversation open,
+// LiveConversationPanel polls that conversation and this list is secondary:
+// every 5 s (was 4 s), so the two never double the load.
 const INDEX_PATH = "/dashboard/conversations";
 
 // A single dropped poll is deliberately invisible (see the catch block
@@ -45,9 +44,8 @@ function toLastMessageMap(lastMessages: LastMessagePreview[]): Map<string, LastM
  * navigating between conversations. Pinned to the viewport via
  * `sticky top-0 h-screen self-start` -- the exact same technique
  * `Sidebar` already uses one level up in the tree, so this needs no
- * cooperation from `<main>`'s own (unbounded) height. Reuses the exact
- * same 1-second self-rescheduling poll (`pollConversationsAction`) the
- * former `ConversationsList` had.
+ * cooperation from `<main>`'s own (unbounded) height. Self-rescheduling
+ * poll of GET /api/dashboard/conversations; paused while the tab is hidden.
  */
 export function ChatListPane({
   initialConversations,
@@ -72,12 +70,18 @@ export function ChatListPane({
   const isMountedRef = useRef(true);
   const pollRef = useRef<() => Promise<void>>(async () => {});
   const consecutiveFailuresRef = useRef(0);
+  // When the list last changed, and what it looked like then (drives 1 s / 5 s).
+  const lastChangeAtRef = useRef(0);
+  const lastSnapshotRef = useRef<string | null>(null);
   // Depends on `pathname` so the *next* scheduled tick always uses the
-  // interval for whichever route is current -- switching between the
+  // cadence for whichever route is current -- switching between the
   // index and a specific conversation re-runs the mount effect below
-  // (cleanup + immediate reschedule at the new interval), which is fine:
-  // it only resets a timer, it doesn't fire an extra poll.
-  const pollInterval = pathname === INDEX_PATH ? POLL_INTERVAL_INDEX_MS : POLL_INTERVAL_DETAIL_MS;
+  // (cleanup + immediate reschedule), which only resets a timer.
+  const isIndex = pathname === INDEX_PATH;
+  const nextDelayMs = useCallback(
+    () => (isIndex ? nextPollDelayMs(lastChangeAtRef.current, Date.now()) : POLL_SLOW_MS),
+    [isIndex],
+  );
 
   const poll = useCallback(async () => {
     if (timeoutRef.current) {
@@ -86,8 +90,13 @@ export function ChatListPane({
     }
 
     try {
-      const result = await pollConversationsAction();
+      const result = await fetchConversationList();
       if (!isMountedRef.current) return;
+      const snapshot = JSON.stringify(result);
+      if (snapshot !== lastSnapshotRef.current) {
+        lastSnapshotRef.current = snapshot;
+        lastChangeAtRef.current = Date.now();
+      }
       consecutiveFailuresRef.current = 0;
       setIsStale(false);
       setConversations(result.conversations);
@@ -106,9 +115,9 @@ export function ChatListPane({
 
     if (!isMountedRef.current) return;
     if (document.visibilityState === "visible") {
-      timeoutRef.current = setTimeout(() => pollRef.current(), pollInterval);
+      timeoutRef.current = setTimeout(() => pollRef.current(), nextDelayMs());
     }
-  }, [pollInterval]);
+  }, [nextDelayMs]);
 
   useEffect(() => {
     pollRef.current = poll;
@@ -126,7 +135,8 @@ export function ChatListPane({
       }
     }
 
-    timeoutRef.current = setTimeout(() => pollRef.current(), pollInterval);
+    lastChangeAtRef.current = Date.now();
+    timeoutRef.current = setTimeout(() => pollRef.current(), isIndex ? POLL_FAST_MS : POLL_SLOW_MS);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
@@ -134,7 +144,7 @@ export function ChatListPane({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [poll, pollInterval]);
+  }, [poll, isIndex]);
 
   // Flagged conversations first, then most recent; `id` is a pure
   // tiebreaker so two rows with an identical created_at never swap order

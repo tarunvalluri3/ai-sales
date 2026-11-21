@@ -185,6 +185,9 @@ jobs:
       - name: Sandbox chat tests
         run: npm run test:sandbox-chat
 
+      - name: Reply and save speed tests
+        run: npm run test:perf-speed
+
       - name: Test onboarding flow
         run: npm run test:onboarding-flow
 

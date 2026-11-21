@@ -12,9 +12,8 @@ import { detectBrowserTimezone } from "@/lib/timezones";
 import { SUPPORTED_CURRENCIES, currencyForTimezone } from "@/lib/currency";
 import { TimezonePicker } from "../../../dashboard/_components/timezone-picker";
 import type { Business, BusinessHours } from "@/lib/supabase/types";
-import { useRouter } from "next/navigation";
-import { createBusiness, type CreateBusinessState } from "../../actions";
-import { updateBusinessProfileAction, type ProfileFormState } from "../../../dashboard/profile/actions";
+import { createBusiness, saveBusinessStepAction, type CreateBusinessState } from "../../actions";
+import type { ProfileFormState } from "../../../dashboard/profile/actions";
 import { useOnboardingPreview } from "../preview-context";
 import { Card, CardHeader, btnGhost, inputClass, textareaClass } from "../../../dashboard/_components/ui";
 import { WizardActions, WizardContinue } from "../wizard-actions";
@@ -44,11 +43,10 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
   hours?: BusinessHours[];
   readinessItems: ReadinessItem[];
 }) {
-  const router = useRouter();
   const isNew = business == null;
   const [createState, createFormAction, createPending] = useActionState(createBusiness, createInitialState);
   const [updateState, updateFormAction, updatePending] = useActionState(
-    updateBusinessProfileAction,
+    saveBusinessStepAction,
     updateInitialState,
   );
   const state = isNew ? createState : updateState;
@@ -100,15 +98,6 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
 
   const formAction = isNew ? createFormAction : updateFormAction;
   const fieldErrors = state.fieldErrors ?? {};
-
-  // Revisiting an already-created business: once the update succeeds,
-  // move on to the next stage. The create path never reaches this --
-  // `createBusiness` redirects itself on success.
-  useEffect(() => {
-    if (!isNew && updateState.success) {
-      router.push("/onboarding?step=knowledge");
-    }
-  }, [isNew, updateState.success, router]);
 
   return (
     <div className="flex flex-col gap-6">

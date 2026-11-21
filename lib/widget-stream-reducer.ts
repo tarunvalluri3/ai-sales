@@ -35,6 +35,22 @@ export function finalizeStreamMessage<T extends { id: string }>(messages: T[], i
 }
 
 /**
+ * perf/reply-and-save-speed: a turn whose judgement finished after its text
+ * turned out to be an escalation. Marks that reply escalated, so it shows the
+ * same "our team will contact you" banner a timely escalation shows. A reply
+ * that is gone (new chat) or already escalated is left alone.
+ */
+export function applyLateEscalation<T extends { id: string; escalate?: boolean; followUpContact?: string | null }>(
+  messages: T[],
+  id: string,
+  followUpContact: string | null,
+): T[] {
+  return messages.map((message) =>
+    message.id === id && !message.escalate ? { ...message, escalate: true, followUpContact } : message,
+  );
+}
+
+/**
  * Finalizes an interrupted/aborted stream: the partial text already shown
  * is kept as a normal (if short) reply, but a bubble that never received a
  * single delta is removed, so a cancelled-before-first-token turn leaves no

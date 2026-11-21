@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { RefreshCw, UserRoundPlus } from "lucide-react";
-import { pollConversationAction } from "../actions";
+import { fetchConversationUpdates } from "@/lib/dashboard-poll-client";
+import { nextPollDelayMs, POLL_FAST_MS } from "@/lib/poll-cadence";
 import { ControlToggle } from "./control-toggle";
 import { ReplyComposer } from "./reply-composer";
 import { MessageBubble } from "./message-bubble";
 import { DismissAttentionButton } from "../../_components/dismiss-attention-button";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
-
-const POLL_INTERVAL_MS = 1000;
 
 // Same reasoning as ChatListPane's own STALE_FAILURE_THRESHOLD -- a single
 // dropped poll stays invisible, only sustained failure surfaces a notice.
@@ -26,6 +25,12 @@ const STALE_FAILURE_THRESHOLD = 3;
  * performance regression; see STATE.md). This component's own
  * `onChanged`/`onSent`/`onDismissed`-triggered immediate poll is the
  * only mechanism these actions rely on for a live UI update.
+ *
+ * perf/reply-and-save-speed: polls GET /api/dashboard/conversations/[id]/updates
+ * (no longer a Server Action, so a reply or take-over never waits behind a
+ * poll); every second while the conversation changed in the last 30 s, every
+ * five seconds otherwise (lib/poll-cadence.ts). The owner's own actions still
+ * poll immediately, which also counts as a change.
  */
 export function LiveConversationPanel({
   conversationId,
@@ -54,6 +59,10 @@ export function LiveConversationPanel({
   // Holds the latest `poll` so its own self-rescheduling setTimeout call
   // never has to reference the `poll` binding before it's assigned.
   const pollRef = useRef<() => Promise<void>>(async () => {});
+  // When the conversation last changed (new message, control or attention flip).
+  const lastChangeAtRef = useRef(0);
+  const lastControlRef = useRef(initialControl);
+  const lastNeedsAttentionRef = useRef(initialNeedsAttention);
   const shouldReduceMotion = useReducedMotion();
 
   const mergeMessages = useCallback((incoming: Message[]) => {
@@ -70,8 +79,17 @@ export function LiveConversationPanel({
     }
 
     try {
-      const result = await pollConversationAction(conversationId, asOfRef.current);
+      const result = await fetchConversationUpdates(conversationId, asOfRef.current);
       if (!isMountedRef.current) return;
+      if (
+        result.messages.some((message) => !knownIdsRef.current.has(message.id)) ||
+        result.control !== lastControlRef.current ||
+        result.needsAttention !== lastNeedsAttentionRef.current
+      ) {
+        lastChangeAtRef.current = Date.now();
+      }
+      lastControlRef.current = result.control;
+      lastNeedsAttentionRef.current = result.needsAttention;
       consecutiveFailuresRef.current = 0;
       setIsStale(false);
       mergeMessages(result.messages);
@@ -90,7 +108,7 @@ export function LiveConversationPanel({
 
     if (!isMountedRef.current) return;
     if (document.visibilityState === "visible") {
-      timeoutRef.current = setTimeout(() => pollRef.current(), POLL_INTERVAL_MS);
+      timeoutRef.current = setTimeout(() => pollRef.current(), nextPollDelayMs(lastChangeAtRef.current, Date.now()));
     }
   }, [conversationId, mergeMessages]);
 
@@ -110,7 +128,8 @@ export function LiveConversationPanel({
       }
     }
 
-    timeoutRef.current = setTimeout(() => pollRef.current(), POLL_INTERVAL_MS);
+    lastChangeAtRef.current = Date.now();
+    timeoutRef.current = setTimeout(() => pollRef.current(), POLL_FAST_MS);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
@@ -120,12 +139,19 @@ export function LiveConversationPanel({
     };
   }, [poll]);
 
+  // The owner just acted (reply, take-over, dismiss): poll now and stay on
+  // the fast cadence while the prospect is likely to answer.
+  const pollNow = useCallback(() => {
+    lastChangeAtRef.current = Date.now();
+    return poll();
+  }, [poll]);
+
   const handleReplySent = useCallback(
     (message: Message) => {
       mergeMessages([message]);
-      void poll();
+      void pollNow();
     },
-    [mergeMessages, poll],
+    [mergeMessages, pollNow],
   );
 
   return (
@@ -135,7 +161,7 @@ export function LiveConversationPanel({
           conversationId={conversationId}
           control={control}
           needsAttention={needsAttention}
-          onChanged={poll}
+          onChanged={pollNow}
           canEdit={canEdit}
         />
         {isStale ? (
@@ -171,7 +197,7 @@ export function LiveConversationPanel({
               <UserRoundPlus className="size-4" strokeWidth={1.75} aria-hidden="true" />
               Needs attention
             </span>
-            <DismissAttentionButton conversationId={conversationId} onDismissed={poll} canEdit={canEdit} />
+            <DismissAttentionButton conversationId={conversationId} onDismissed={pollNow} canEdit={canEdit} />
             <span className="h-px min-w-6 flex-1 bg-ds-border" aria-hidden="true" />
           </div>
         ) : null}

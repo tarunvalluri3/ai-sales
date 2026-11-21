@@ -1,6 +1,7 @@
 import "server-only";
 import type { Business, OnboardingStep } from "@/lib/supabase/types";
 import { loadReadinessReport } from "@/lib/onboarding-readiness-data";
+import type { ReadinessReport } from "@/lib/onboarding-readiness";
 import { getEntitlementForBusiness } from "@/lib/subscription";
 import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
 import { getInstagramConnectionForBusiness } from "@/lib/instagram";
@@ -80,6 +81,25 @@ export async function computeOnboardingProgress(business: Business): Promise<Onb
     getInstagramConnectionForBusiness(business.id),
     listWidgetKeysForBusiness(business.id),
   ]);
+  return onboardingProgressFrom(business, { report, entitlement, whatsapp, instagram, widgetKeys });
+}
+
+/** What progress is graded from: the rows computeOnboardingProgress() reads. */
+export type OnboardingProgressInputs = {
+  report: ReadinessReport;
+  entitlement: { serving: boolean };
+  whatsapp: unknown;
+  instagram: unknown;
+  widgetKeys: { status: string }[];
+};
+
+/**
+ * The pure half of computeOnboardingProgress(), for a caller that already
+ * loaded the same rows (the onboarding page loads them once and grades
+ * progress from them, instead of reading them twice).
+ */
+export function onboardingProgressFrom(business: Business, inputs: OnboardingProgressInputs): OnboardingProgress {
+  const { report, entitlement, whatsapp, instagram, widgetKeys } = inputs;
 
   const metKeys = new Set(report.items.filter((item) => item.status !== "unmet").map((item) => item.key));
   const hasActiveWidgetKey = widgetKeys.some((key) => key.status !== "revoked");

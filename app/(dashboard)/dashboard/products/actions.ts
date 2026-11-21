@@ -11,6 +11,7 @@ import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { parseCatalogForm, readCatalogFormValues, type CatalogFieldErrors, type CatalogFormValues } from "@/lib/schemas/catalog";
 import { cleanupAgentImage, uploadAgentImage } from "@/lib/agent-images";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { withRequestTiming, type RequestTiming } from "@/lib/request-timing";
 
 const productIdSchema = z.string().uuid();
 
@@ -31,10 +32,22 @@ export type ProductFormState = {
 const INVALID_FORM_MESSAGE = "Fix the highlighted fields.";
 
 export async function createProductAction(
+  prevState: ProductFormState,
+  formData: FormData,
+): Promise<ProductFormState> {
+  return withRequestTiming(
+    "catalog_create_product",
+    (timing) => createProductActionTimed(timing, prevState, formData),
+    (state) => (state.error ? "rejected" : "ok"),
+  );
+}
+
+async function createProductActionTimed(
+  timing: RequestTiming,
   _prevState: ProductFormState,
   formData: FormData,
 ): Promise<ProductFormState> {
-  const { businessId, orgRole, currency } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await timing.time("business_context", () => requireBusinessContext());
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
@@ -46,9 +59,9 @@ export async function createProductAction(
   }
 
   try {
-    const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
+    const uploaded = await timing.time("image_upload", () => uploadAgentImage(businessId, "products", formData.get("image_file")));
     try {
-      await createProduct(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency);
+      await timing.time("save", () => createProduct(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency, undefined, { embedLater: after }));
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);
       throw error;
@@ -88,7 +101,7 @@ export async function updateProductAction(
   try {
     const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
     try {
-      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency, { embedLater: after });
       if (!updated) await cleanupAgentImage(businessId, uploaded);
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);
@@ -143,7 +156,7 @@ export async function updateProductInPlaceAction(
   try {
     const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
     try {
-      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency, { embedLater: after });
       if (!updated) await cleanupAgentImage(businessId, uploaded);
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);

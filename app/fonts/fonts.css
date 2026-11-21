@@ -1,0 +1,38 @@
+/*
+ * The font variables the app reads, set by FAMILY name. dashboard-fonts.ts
+ * and widget-fonts.ts declare one @font-face per subset file, all under the
+ * family names below (each with its own unicode-range). The bundler names
+ * each next/font call's own variable after the call, so the variables are
+ * set here instead, pointing at the shared families.
+ *
+ * The fallbacks are the same metric-adjusted Arial faces next/font/google
+ * generated for these families, so text keeps its size and line height while
+ * the font file loads. They come after the family, so a character missing
+ * from latin (₹ is in latin-ext) still uses the matching subset, not Arial.
+ */
+@font-face {
+  font-family: "Hanken Grotesk Fallback";
+  src: local("Arial");
+  ascent-override: 99.07%;
+  descent-override: 30.02%;
+  line-gap-override: 0%;
+  size-adjust: 100.94%;
+}
+
+@font-face {
+  font-family: "Space Grotesk Fallback";
+  src: local("Arial");
+  ascent-override: 89.71%;
+  descent-override: 26.62%;
+  line-gap-override: 0%;
+  size-adjust: 109.69%;
+}
+
+:root {
+  /* Dashboard and marketing (app/(dashboard)/layout.tsx). */
+  --font-hanken: "Hanken Grotesk", "Hanken Grotesk Fallback";
+  --font-space: "Space Grotesk", "Space Grotesk Fallback";
+  /* Widget (app/(widget)/layout.tsx). */
+  --widget-font-sans: "Hanken Grotesk", "Hanken Grotesk Fallback";
+  --widget-font-label: "Space Grotesk", "Space Grotesk Fallback";
+}

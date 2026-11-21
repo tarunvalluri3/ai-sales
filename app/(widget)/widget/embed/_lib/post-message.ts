@@ -117,6 +117,19 @@ export type WidgetStreamEndMessage = {
   recommendedProducts: WidgetRecommendedProduct[];
   /** Widget reliability item 7: the prospect's own contact on file, already masked server-side. */
   followUpContact: string | null;
+  /** perf/reply-and-save-speed: the escalation judgement was still running when the text ended; a widget:late_escalation may follow for this requestId. */
+  judgementPending: boolean;
+};
+
+/**
+ * perf/reply-and-save-speed: the turn `requestId` was escalated after its text
+ * had ended (its judgement was pending). The loader learned it from
+ * /api/chat/poll. Shows "our team will contact you" on that turn's reply.
+ */
+export type WidgetLateEscalationMessage = {
+  type: "widget:late_escalation";
+  requestId: string;
+  followUpContact: string | null;
 };
 
 /** Widget reliability item 1: the server's keep-alive, relayed by the loader. Re-arms the iframe's stall clock; carries nothing else. */
@@ -237,6 +250,7 @@ export type FromParentMessage =
   | WidgetStreamDeltaMessage
   | WidgetStreamRetractMessage
   | WidgetStreamEndMessage
+  | WidgetLateEscalationMessage
   | WidgetStreamAbortedMessage
   | WidgetStreamPingMessage
   | WidgetPollResultMessage
@@ -346,7 +360,13 @@ export function parseFromParentMessage(data: unknown): FromParentMessage | null 
           escalate: data.escalate,
           recommendedProducts,
           followUpContact: parseFollowUpContact(data.followUpContact),
+          judgementPending: data.judgementPending === true,
         };
+      }
+      return null;
+    case "widget:late_escalation":
+      if (typeof data.requestId === "string") {
+        return { type: "widget:late_escalation", requestId: data.requestId, followUpContact: parseFollowUpContact(data.followUpContact) };
       }
       return null;
     case "widget:stream_ping":

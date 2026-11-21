@@ -13,7 +13,7 @@ import { CATALOG_DESCRIPTION_MIN_LENGTH } from "@/lib/onboarding-readiness";
 import { ProductForm } from "../../../dashboard/products/product-form";
 import { ProductsList } from "../../../dashboard/products/products-list";
 import { createProductAction, updateProductInPlaceAction, deleteProductAction } from "../../../dashboard/products/actions";
-import { advanceOnboarding } from "../../actions";
+import { continueOnboarding } from "../../actions";
 import { useOnboardingPreview } from "../preview-context";
 import { Card, CardHeader, btnGhost, btnOutline } from "../../../dashboard/_components/ui";
 import { useToast } from "../../../dashboard/_components/toast";
@@ -53,12 +53,10 @@ export function TrainProductsStep({ products, services, industry, currency }: { 
     setError(null);
     startTransition(async () => {
       if (offerings.length > 0) update({ firstProductName: offerings[0].name });
-      const result = await advanceOnboarding("faqs");
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.push("/onboarding?step=faqs");
+      // One request: on success the server redirects straight to the next
+      // step (continueOnboarding); only a refusal comes back here.
+      const result = await continueOnboarding("faqs");
+      if (result && !result.ok) setError(result.error);
     });
   }
 

@@ -5,6 +5,7 @@ import type { Product } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { syncGeneratedDocument, deleteGeneratedDocument } from "@/lib/knowledge-sync";
 import { embedText } from "@/lib/embeddings";
+import { writeCatalogEmbedding, type EmbedLater } from "@/lib/catalog-embedding";
 import { logEvent } from "@/lib/logger";
 import { formatCatalogPrice } from "@/lib/currency";
 
@@ -154,6 +155,8 @@ export async function createProduct(
   /** businesses.currency, for the knowledge text's price (from requireBusinessContext). */
   currency: string,
   id?: string,
+  /** Pass Next's after() to embed once the save has been answered (lib/catalog-embedding.ts). */
+  options: { embedLater?: EmbedLater } = {},
 ): Promise<Product> {
   const existing = id ? await getProduct(businessId, id) : null;
   if (existing) {
@@ -161,7 +164,10 @@ export async function createProduct(
     return existing;
   }
   const supabase = createServerSupabaseClient();
-  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input, currency));
+  const knowledgeText = buildKnowledgeContent(input, currency);
+  // Deferred: the row is saved without an embedding and gets it right after
+  // the response; otherwise embedded inline as before (best effort, null on failure).
+  const embedding = options.embedLater ? null : await computeEmbeddingBestEffort(businessId, knowledgeText);
   const { data, error } = await supabase
     .from("products")
     .insert({ business_id: businessId, ...(id && { id }), ...input, embedding })
@@ -176,7 +182,12 @@ export async function createProduct(
     );
   }
 
-  await syncGeneratedDocument(businessId, "product", data.id, data.name, buildKnowledgeContent(input, currency));
+  await syncGeneratedDocument(businessId, "product", data.id, data.name, knowledgeText);
+
+  if (options.embedLater) {
+    const saved = data;
+    options.embedLater(() => writeCatalogEmbedding("products", businessId, saved.id, saved.updated_at, knowledgeText));
+  }
 
   return data;
 }
@@ -192,6 +203,8 @@ export async function updateProduct(
   id: string,
   input: ProductInput,
   currency: string,
+  /** Pass Next's after() to embed once the save has been answered (lib/catalog-embedding.ts). */
+  options: { embedLater?: EmbedLater } = {},
 ): Promise<boolean> {
   const supabase = createServerSupabaseClient();
   // A failed embedding attempt (`null`) is omitted from the update
@@ -199,7 +212,8 @@ export async function updateProduct(
   // never overwrites a previously-successful embedding with null.
   const previous = await getProduct(businessId, id);
   if (!previous) return false;
-  const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input, currency));
+  const knowledgeText = buildKnowledgeContent(input, currency);
+  const embedding = options.embedLater ? null : await computeEmbeddingBestEffort(businessId, knowledgeText);
   const mutation = supabase
     .from("products")
     .update({ ...input, ...(embedding !== null ? { embedding } : {}) })
@@ -209,7 +223,7 @@ export async function updateProduct(
   const checked = previous.image_url === null
     ? mutation.is("image_url", null)
     : mutation.eq("image_url", previous.image_url);
-  const { data, error } = await checked.select("id");
+  const { data, error } = await checked.select("id, updated_at");
 
   if (error) {
     throw new AppError(
@@ -224,7 +238,12 @@ export async function updateProduct(
   }
 
   if (previous.image_url !== input.image_url) await cleanupAgentImage(businessId, previous.image_url);
-  await syncGeneratedDocument(businessId, "product", id, input.name, buildKnowledgeContent(input, currency));
+  await syncGeneratedDocument(businessId, "product", id, input.name, knowledgeText);
+
+  if (options.embedLater) {
+    const savedAt = data[0].updated_at as string;
+    options.embedLater(() => writeCatalogEmbedding("products", businessId, id, savedAt, knowledgeText));
+  }
 
   return true;
 }

@@ -9,6 +9,7 @@ import { getConversationForBusiness } from "@/lib/conversations";
 import { listMessagesForConversationAfter } from "@/lib/messages";
 import { extractIp, extractOrigin, withCors } from "@/lib/http/widget-cors";
 import { conversationBelongsToVisitor } from "@/lib/widget-conversation-ownership";
+import { getMaskedFollowUpContact } from "@/lib/leads";
 
 /**
  * Public, unauthenticated read endpoint (docs/security.md §4), mirroring
@@ -106,10 +107,23 @@ export async function POST(request: NextRequest) {
 
     const asOf = messages.length > 0 ? messages[messages.length - 1].created_at : after;
 
+    // perf/reply-and-save-speed: a streamed turn can now end before its
+    // escalation judgement does (`judgementPending`). The loader watches
+    // these fields for a short while and shows "our team will contact you"
+    // on that turn when the conversation was flagged at or after it started.
+    // The masked contact is the same one a timely escalated `final` carries
+    // (lib/contact-mask.ts), sent only to this conversation's own visitor.
+    const followUpContact = conversation.needs_attention
+      ? await getMaskedFollowUpContact(supabase, business.businessId, conversationId)
+      : null;
+
     return withCors(
       jsonSuccess({
         conversationId,
         control: conversation.control,
+        needsAttention: conversation.needs_attention,
+        attentionFlaggedAt: conversation.attention_flagged_at,
+        followUpContact,
         messages: messages.map((message) => ({
           id: message.id,
           role: message.role,

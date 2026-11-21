@@ -11,6 +11,7 @@ import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { parseCatalogForm, readCatalogFormValues, type CatalogFieldErrors, type CatalogFormValues } from "@/lib/schemas/catalog";
 import { cleanupAgentImage, uploadAgentImage } from "@/lib/agent-images";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { withRequestTiming, type RequestTiming } from "@/lib/request-timing";
 
 const serviceIdSchema = z.string().uuid();
 
@@ -31,10 +32,22 @@ export type ServiceFormState = {
 const INVALID_FORM_MESSAGE = "Fix the highlighted fields.";
 
 export async function createServiceAction(
+  prevState: ServiceFormState,
+  formData: FormData,
+): Promise<ServiceFormState> {
+  return withRequestTiming(
+    "catalog_create_service",
+    (timing) => createServiceActionTimed(timing, prevState, formData),
+    (state) => (state.error ? "rejected" : "ok"),
+  );
+}
+
+async function createServiceActionTimed(
+  timing: RequestTiming,
   _prevState: ServiceFormState,
   formData: FormData,
 ): Promise<ServiceFormState> {
-  const { businessId, orgRole, currency } = await requireBusinessContext();
+  const { businessId, orgRole, currency } = await timing.time("business_context", () => requireBusinessContext());
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { error: authError };
@@ -46,9 +59,9 @@ export async function createServiceAction(
   }
 
   try {
-    const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
+    const uploaded = await timing.time("image_upload", () => uploadAgentImage(businessId, "products", formData.get("image_file")));
     try {
-      await createService(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency);
+      await timing.time("save", () => createService(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency, undefined, { embedLater: after }));
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);
       throw error;
@@ -97,7 +110,7 @@ export async function updateServiceInPlaceAction(
   try {
     const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
     try {
-      updated = await updateService(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      updated = await updateService(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency, { embedLater: after });
       if (!updated) await cleanupAgentImage(businessId, uploaded);
     } catch (error) {
       await cleanupAgentImage(businessId, uploaded);

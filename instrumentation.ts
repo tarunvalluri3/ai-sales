@@ -11,6 +11,8 @@ import * as Sentry from "@sentry/nextjs";
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Request timing logs measure instance age from here (lib/request-timing.ts).
+    (await import("@/lib/request-timing")).markInstanceStart();
     await import("@/lib/env");
     await import("./sentry.server.config");
   }

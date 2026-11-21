@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import { requestTimingStub } from "./lib/request-timing-stub.mjs";
 
 // Production incident 2026-11-21: actions.ts ("use server") exported a Zod
 // object, so Next.js refused to load it and every sendSandboxMessage call 500ed.
@@ -25,6 +26,7 @@ function loadModule(path, mocks = {}) {
     exports, URL, console, process, Promise,
     require: (name) => {
       if (name in mocks) return mocks[name];
+      if (name === "@/lib/request-timing") return requestTimingStub;
       if (name === "zod") return require(name);
       if (name === "server-only") return {};
       throw new Error("Unexpected dependency: " + name);

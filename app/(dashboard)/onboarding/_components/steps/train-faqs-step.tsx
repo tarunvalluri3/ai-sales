@@ -12,7 +12,7 @@ import { FAQ_QUESTION_MIN_LENGTH, FAQ_ANSWER_MIN_LENGTH } from "@/lib/onboarding
 import { FaqForm } from "../../../dashboard/faqs/faq-form";
 import { FaqsList, type FaqReadinessStatus } from "../../../dashboard/faqs/faqs-list";
 import { createFaqAction, updateFaqInPlaceAction, deleteFaqAction } from "../../../dashboard/faqs/actions";
-import { advanceOnboarding } from "../../actions";
+import { continueOnboarding } from "../../actions";
 import { useOnboardingPreview } from "../preview-context";
 
 const MIN_FAQS = 3;
@@ -96,12 +96,10 @@ export function TrainFaqsStep({
     setError(null);
     startTransition(async () => {
       if (faqs.length > 0) update({ firstFaqQuestion: faqs[0].question, firstFaqAnswer: faqs[0].answer });
-      const result = await advanceOnboarding("persona");
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.push("/onboarding?step=persona");
+      // One request: on success the server redirects straight to the next
+      // step (continueOnboarding); only a refusal comes back here.
+      const result = await continueOnboarding("persona");
+      if (result && !result.ok) setError(result.error);
     });
   }
 

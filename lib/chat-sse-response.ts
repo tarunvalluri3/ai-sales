@@ -38,12 +38,14 @@ export type SseTurnOptions<R extends SseTurnResponse> = {
   generate: (signal: AbortSignal) => AsyncIterable<SseTurnChunk<R>>;
   /** Writes the assistant message; returns the poll cursor for the terminal event. */
   persist: (response: R, interrupted: boolean) => Promise<{ asOf: string }>;
-  /** Extra fields for the `final` event (e.g. the masked follow-up contact). Failure is ignored. */
-  finalExtras?: (response: R) => Promise<{ followUpContact?: string | null }>;
+  /** Extra fields for the `final` event (the masked follow-up contact, whether the judgement is still pending). Failure is ignored. */
+  finalExtras?: (response: R) => Promise<{ followUpContact?: string | null; judgementPending?: boolean }>;
   /** Everything that happens after the answer (escalation, metrics, ...). Runs after the terminal event. */
   sideEffects: (response: R, interrupted: boolean) => Promise<void>;
   /** Server-side logging of an unexpected error (never sent to the client). */
   logError: (stage: "generate" | "persist" | "side_effects" | "watchdog", error: unknown) => void;
+  /** Told about every event actually written to the client (request timing logs). Must not throw; errors are ignored. */
+  onEvent?: (type: ChatStreamEvent["type"]) => void;
   /** The request's own abort signal (client disconnected). */
   clientSignal?: AbortSignal;
   keepAliveMs: number;
@@ -76,6 +78,12 @@ export function createChatSseStream<R extends SseTurnResponse>(options: SseTurnO
         } catch {
           // The connection is gone; persistence and side effects still run.
           open = false;
+          return;
+        }
+        try {
+          options.onEvent?.(event.type);
+        } catch {
+          // Observability only: never affects the stream.
         }
       };
 
@@ -139,7 +147,7 @@ export function createChatSseStream<R extends SseTurnResponse>(options: SseTurnO
           emit({ type: "error", kind: "failure" });
           return;
         }
-        let extras: { followUpContact?: string | null } = {};
+        let extras: { followUpContact?: string | null; judgementPending?: boolean } = {};
         if (options.finalExtras) {
           try {
             extras = await options.finalExtras(response);
@@ -155,6 +163,7 @@ export function createChatSseStream<R extends SseTurnResponse>(options: SseTurnO
           recommendedProducts: response.recommendedProducts,
           asOf,
           followUpContact: extras.followUpContact ?? null,
+          judgementPending: extras.judgementPending === true,
         });
       } catch (error) {
         options.logError("generate", error);

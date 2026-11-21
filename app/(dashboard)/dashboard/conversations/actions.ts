@@ -5,20 +5,8 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
-import {
-  dismissConversationAttention,
-  getConversationForBusiness,
-  listConversationsForBusiness,
-  setConversationControl,
-  type ConversationWithMessageCount,
-} from "@/lib/conversations";
-import { listLeadsForBusiness } from "@/lib/leads";
-import {
-  createMessage,
-  listLastMessagesForConversations,
-  listMessagesForConversationAfter,
-  type LastMessagePreview,
-} from "@/lib/messages";
+import { dismissConversationAttention, getConversationForBusiness, setConversationControl } from "@/lib/conversations";
+import { createMessage } from "@/lib/messages";
 import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
 import { generateConversationSummary } from "@/lib/conversation-summary";
 import { suggestTagsForConversation } from "@/lib/tag-suggestions";
@@ -27,7 +15,7 @@ import { logAndGetUserMessage } from "@/lib/errors";
 import { recordAuditLogEntry } from "@/lib/audit-log";
 import type { TagState } from "../leads/actions";
 import type { RemoveTagState } from "../_components/tag-chip";
-import type { ConversationControl, LeadTag, Message } from "@/lib/supabase/types";
+import type { LeadTag, Message } from "@/lib/supabase/types";
 import { getWhatsappConnectionForBusiness, WHATSAPP_CONVERSATION_SOURCE } from "@/lib/whatsapp";
 import { createWhatsappOutboundMessage, sendWhatsappOutboundMessage } from "@/lib/whatsapp-delivery";
 import { whatsappStaffReplyNotice } from "@/lib/whatsapp-rules";
@@ -293,108 +281,11 @@ export async function dismissAttentionAction(
   return { success: true };
 }
 
-const pollSchema = z.object({
-  conversationId: z.string().uuid(),
-  after: z.iso.datetime({ offset: true }),
-});
+// The open-conversation poll moved to GET /api/dashboard/conversations/[id]/updates
+// (lib/dashboard-poll.ts) so it never queues in front of a reply or take-over.
 
-export type PollConversationResult = {
-  messages: Message[];
-  control: ConversationControl;
-  needsAttention: boolean;
-  asOf: string;
-};
-
-/**
- * Polled directly from the dashboard's live conversation view (not
- * form-driven -- called as a plain async function from a client
- * component, a supported Server Action call pattern). Still
- * Zod-validated even though it's not FormData-sourced, since it's a
- * public entry point reachable with arbitrary arguments from client
- * code. Returns every role (unlike the widget's poll endpoint, which
- * excludes 'user') -- staff need to see the prospect's next message
- * live, which is the point of this stage's dashboard requirement.
- *
- * Deliberately does not swallow a DB failure into a guessed `control`
- * value -- that would risk the client flickering to a wrong state on a
- * transient error. Real failures (a thrown AppError, a network hiccup
- * in the Server Action round-trip) propagate as a rejected promise; the
- * calling client component's own poll loop catches it and simply tries
- * again next tick, per this prompt's error-handling section. Only a
- * malformed call (should not happen from this file's own client
- * caller) or a not-found/cross-tenant conversation returns early with
- * an empty, unchanged-cursor result, since those are not transient.
- */
-export async function pollConversationAction(
-  conversationId: string,
-  after: string,
-): Promise<PollConversationResult> {
-  const { businessId } = await requireBusinessContext();
-
-  const parsed = pollSchema.safeParse({ conversationId, after });
-  if (!parsed.success) {
-    return { messages: [], control: "ai", needsAttention: false, asOf: after };
-  }
-
-  const supabase = createServerSupabaseClient();
-
-  const conversation = await getConversationForBusiness(supabase, businessId, parsed.data.conversationId);
-  if (!conversation) {
-    return { messages: [], control: "ai", needsAttention: false, asOf: after };
-  }
-
-  const messages = await listMessagesForConversationAfter(
-    supabase,
-    businessId,
-    parsed.data.conversationId,
-    parsed.data.after,
-    { limit: 200 },
-  );
-
-  const asOf = messages.length > 0 ? messages[messages.length - 1].created_at : after;
-
-  return { messages, control: conversation.control, needsAttention: conversation.needs_attention, asOf };
-}
-
-export type ConversationLeadSummary = {
-  conversationId: string;
-  contactName: string | null;
-};
-
-export type PollConversationsResult = {
-  conversations: ConversationWithMessageCount[];
-  leads: ConversationLeadSummary[];
-  lastMessages: LastMessagePreview[];
-};
-
-/**
- * Polled directly from the conversations list view -- same shape as
- * pollAttentionCountAction (no input, business-scoped, a plain async
- * function call from a client component). Leads come back as
- * {conversationId, contactName} pairs (not full Lead rows) -- just
- * enough to drive the "Lead" badge and, when named, stand in for the
- * row's primary label (/impeccable layout). lastMessages is one query
- * across every conversation this poll already knows about (not N+1),
- * for the row's preview line.
- */
-export async function pollConversationsAction(): Promise<PollConversationsResult> {
-  const { businessId } = await requireBusinessContext();
-  const supabase = createServerSupabaseClient();
-
-  const conversations = await listConversationsForBusiness(supabase, businessId);
-  const conversationIds = conversations.map((conversation) => conversation.id);
-
-  const [leads, lastMessages] = await Promise.all([
-    listLeadsForBusiness(businessId),
-    listLastMessagesForConversations(supabase, businessId, conversationIds),
-  ]);
-
-  return {
-    conversations,
-    leads: leads.map((lead) => ({ conversationId: lead.conversation_id, contactName: lead.contact_name })),
-    lastMessages,
-  };
-}
+// The conversations-list poll moved to GET /api/dashboard/conversations
+// (lib/dashboard-poll.ts) so it never queues in front of a reply or take-over.
 
 const chunkIdSchema = z.string().uuid();
 
