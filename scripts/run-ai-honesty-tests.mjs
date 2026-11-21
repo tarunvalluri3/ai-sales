@@ -19,6 +19,7 @@ import { register } from "node:module";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 
 register("./alias-resolver-hooks.mjs", import.meta.url);
 
@@ -222,7 +223,7 @@ test("service claim: the live invented answer is logged, positive and negative, 
   const reply = "Yes, we do perform extractions, but we do not offer general anaesthesia at our clinic. Dr. Priya is not available on Sunday as we are closed.";
   const signals = detectServiceClaims(reply, context());
   const rules = signals.map((s) => s.rule);
-  assert.ok(rules.some((r) => r.startsWith("negative:") && r.includes("anaesthesia")), JSON.stringify(rules));
+  assert.ok(rules.some((r) => r === "unsupported_negative_claim"), JSON.stringify(rules));
   assert.ok(rules.some((r) => r.startsWith("positive:") && r.includes("extractions")), JSON.stringify(rules));
   assert.ok(signals.every((s) => s.mode === "log_only" && s.action === "logged"));
   assert.equal(checkReply(reply, context()).text, reply, "log-only never changes the reply");
@@ -234,6 +235,7 @@ for (const grounded of [
   "We accept cash, UPI and cards, and we offer EMI on treatments above Rs 10,000.",
   "I don't have details on wisdom tooth removal here -- I can have our team confirm that for you.",
   "We don't have that information here.",
+  "We don’t have any information about the pool.",
 ]) {
   test(`service claim: grounded or honest reply is not flagged -- "${grounded}"`, () => {
     assert.deepEqual(detectServiceClaims(grounded, context()), []);
@@ -243,6 +245,40 @@ for (const grounded of [
 test("service claim: the rule carries the unmatched term, capped, for false-positive review", () => {
   const [signal] = detectServiceClaims("We offer zygomaticoplasty orthognathicsurgery maxillofacialrebuild.", context());
   assert.ok(signal && signal.rule.length <= "positive:".length + 40, signal?.rule);
+});
+
+test("amenity denials require explicit negative business evidence and stay log-only on both paths", () => {
+  for (const reply of ["We don't have a pool at our studio.", "There is no pool.", "We have no pool."]) {
+    for (const businessEvidence of ["", "We have a pool.", "We have no pool table."]) {
+      const ctx = context({ businessEvidence, visitorEvidence: "You have no pool, right?" });
+      const buffered = checkReply(reply, ctx);
+      assert.equal(buffered.text, reply);
+      const signal = { type: "output_service_claim", rule: "unsupported_negative_claim", action: "logged", mode: "log_only" };
+      assert.deepEqual(buffered.signals, [signal]);
+      const streamed = runStream(reply, ctx, 3);
+      assert.equal(streamed.shown, reply);
+      assert.deepEqual(streamed.done.signals, [signal]);
+    }
+    for (const businessEvidence of ["We have no pool.", "No pool."]) {
+      assert.deepEqual(detectServiceClaims(reply, context({ businessEvidence })), []);
+    }
+  }
+});
+
+test("an honest mocked answer names the unknown amenity and offers team follow-up", () => {
+  const reply = "I don't have information about a pool. I can have the team confirm it for you.";
+  const result = checkReply(reply, context());
+  assert.equal(result.text, reply);
+  assert.deepEqual(result.signals, []);
+});
+
+test("the rendered system prompt requires yes/no evidence and team follow-up for silence", async () => {
+  const definition = read("lib/rag.ts").split("const SYSTEM_TEMPLATE = ")[1];
+  const template = ChatPromptTemplate.fromMessages([["system", definition.slice(1, definition.indexOf(String.fromCharCode(96), 1))]]);
+  const values = Object.fromEntries(template.inputVariables.map((name) => [name, "fixture"]));
+  const [message] = await template.formatMessages(values);
+  assert.match(message.content, /both yes and no require explicit support in the business's approved information/);
+  assert.match(message.content, /If the evidence is silent on availability, say you don't have that information and offer to have the team confirm it/);
 });
 
 // ------------------------------------------------------------- lead scoring

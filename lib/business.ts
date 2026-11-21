@@ -115,11 +115,9 @@ export async function createBusinessForOrg(
 
   track(supabase, data.id, "business.signed_up", { businessType: input.businessType });
 
-  // Real saved hours, not just what the form displays (2026-11-20): booking is
-  // on by default, and with no saved hours it has no slots and publishing is
-  // blocked on the "Business hours configured" item. Best effort: the business
-  // already exists, so a failure is logged and the readiness item simply asks
-  // the owner to save their hours -- creation never fails over it.
+  // Save the suggested week unless the owner sends a confirmed schedule.
+  // A failed insert leaves no confirmed hours; the owner can retry inline.
+  const confirmedAt = input.hours ? new Date().toISOString() : null;
   const { error: hoursError } = await supabase.from("business_hours").insert(
     (input.hours ?? defaultWeeklyHours()).map((day) => ({
       business_id: data.id,
@@ -127,6 +125,7 @@ export async function createBusinessForOrg(
       is_open: day.isOpen,
       start_time: day.startTime,
       end_time: day.endTime,
+      confirmed_at: confirmedAt,
     })),
   );
   if (hoursError) {

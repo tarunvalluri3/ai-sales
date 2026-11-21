@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { FileText, FileUp, Info, X } from "lucide-react";
+import { FileText, FileUp, Info, LoaderCircle, X } from "lucide-react";
 import { createFileKnowledgeDocumentAction } from "../actions";
 import type { KnowledgeFormState } from "../actions";
 
@@ -108,7 +108,12 @@ export function FileUploadForm() {
         disabled={isPending}
         className="ds-btn-label inline-flex h-9 w-full items-center justify-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
-        {isPending ? "Uploading…" : "Upload"}
+        {isPending ? (
+          <span className="inline-flex items-center gap-2">
+            <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+            {"Uploading…"}
+          </span>
+        ) : "Upload"}
       </button>
     </form>
   );

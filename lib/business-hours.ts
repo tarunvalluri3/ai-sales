@@ -40,27 +40,20 @@ export type DayHoursInput = {
   endTime: string | null;
 };
 
-/** Replaces a business's full week of hours in one call -- simpler and less error-prone than seven individual upserts from a single settings form submit. */
+/** Saves the validated seven-day week and its confirmation atomically. */
 export async function setBusinessHours(businessId: string, days: DayHoursInput[]): Promise<void> {
   const supabase = createServerSupabaseClient();
-
-  const { error: deleteError } = await supabase.from("business_hours").delete().eq("business_id", businessId);
-  if (deleteError) {
-    throw new AppError(
-      "Something went wrong saving your business hours. Please try again.",
-      "setBusinessHours delete failed",
-      deleteError,
-    );
-  }
-
-  const { error: insertError } = await supabase.from("business_hours").insert(
+  const confirmedAt = new Date().toISOString();
+  const { error: insertError } = await supabase.from("business_hours").upsert(
     days.map((day) => ({
       business_id: businessId,
       day_of_week: day.dayOfWeek,
       is_open: day.isOpen,
       start_time: day.isOpen ? day.startTime : null,
       end_time: day.isOpen ? day.endTime : null,
+      confirmed_at: confirmedAt,
     })),
+    { onConflict: "business_id,day_of_week" },
   );
 
   if (insertError) {

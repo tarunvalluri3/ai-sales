@@ -41,9 +41,9 @@ export async function updateBusinessHoursAction(
   const timezone = zone.timezone;
 
   try {
-    await setBusinessHours(businessId, week.days);
     await updateBusinessSla(businessId, slaMinutes);
     await updateBusinessTimezone(businessId, timezone);
+    await setBusinessHours(businessId, week.days);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }

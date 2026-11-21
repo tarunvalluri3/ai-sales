@@ -6,6 +6,8 @@ import { listFaqsForBusiness } from "@/lib/faqs";
 import { listProductsForBusiness } from "@/lib/products";
 import { listServicesForBusiness } from "@/lib/services";
 import { isAgentPublished } from "@/lib/agent-published";
+import { listBusinessHours } from "@/lib/business-hours";
+import { hasConfirmedBusinessHours } from "@/lib/business-hours-defaults";
 import {
   evaluateReadiness,
   type ReadinessInput,
@@ -32,14 +34,14 @@ type KnowledgeDocRow = {
 
 /** Fetches the readiness snapshot and evaluates it in one call. */
 export async function loadReadinessReport(businessId: string, business: Business): Promise<ReadinessReport> {
-  const [knowledgeDocs, chunkedDocIds, faqs, products, services, openHoursDays, dismissedItemKeys] =
+  const [knowledgeDocs, chunkedDocIds, faqs, products, services, hours, dismissedItemKeys] =
     await Promise.all([
       fetchKnowledgeDocs(businessId),
       fetchDocIdsWithChunks(businessId),
       listFaqsForBusiness(businessId),
       listProductsForBusiness(businessId),
       listServicesForBusiness(businessId),
-      countOpenBusinessHoursDays(businessId),
+      listBusinessHours(businessId),
       listDismissedItemKeys(businessId),
     ]);
 
@@ -79,7 +81,8 @@ export async function loadReadinessReport(businessId: string, business: Business
       name: item.name,
       description: item.description,
     })),
-    openBusinessHoursDayCount: openHoursDays,
+    openBusinessHoursDayCount: hours.filter((day) => day.is_open).length,
+    businessHoursConfirmed: isAgentPublished(business) || hasConfirmedBusinessHours(hours),
     dismissedItemKeys,
   };
 
@@ -118,24 +121,6 @@ async function fetchDocIdsWithChunks(businessId: string): Promise<Set<string>> {
     );
   }
   return new Set((data ?? []).map((row) => row.document_id as string));
-}
-
-async function countOpenBusinessHoursDays(businessId: string): Promise<number> {
-  const supabase = createServerSupabaseClient();
-  const { count, error } = await supabase
-    .from("business_hours")
-    .select("day_of_week", { count: "exact", head: true })
-    .eq("business_id", businessId)
-    .eq("is_open", true);
-
-  if (error) {
-    throw new AppError(
-      "Something went wrong checking your business hours. Please try again.",
-      "loadReadinessReport: business_hours count failed",
-      error,
-    );
-  }
-  return count ?? 0;
 }
 
 async function listDismissedItemKeys(businessId: string): Promise<string[]> {

@@ -2,8 +2,6 @@
 
 import { useActionState } from "react";
 import { saveOptionalDetailsAction, type OptionalDetailsState } from "../../actions";
-import { HoursSummary } from "../hours-summary";
-import type { BusinessHours } from "@/lib/supabase/types";
 
 const inputClasses =
   "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
@@ -18,15 +16,9 @@ const initialState: OptionalDetailsState = {};
 export function RecommendedDetails({
   website,
   privacyPolicyUrl,
-  hours,
-  slaMinutes,
-  timezone,
 }: {
   website: string | null;
   privacyPolicyUrl: string | null;
-  hours: BusinessHours[];
-  slaMinutes: number | null;
-  timezone: string;
 }) {
   const [state, formAction, isPending] = useActionState(saveOptionalDetailsAction, initialState);
   const fieldErrors = state.fieldErrors ?? {};
@@ -97,7 +89,6 @@ export function RecommendedDetails({
         </button>
       </form>
 
-      <HoursSummary hours={hours} slaMinutes={slaMinutes} timezone={timezone} />
     </section>
   );
 }

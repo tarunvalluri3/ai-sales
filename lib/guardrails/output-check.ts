@@ -387,18 +387,21 @@ export function rewriteBookingClaims(
  * general anaesthesia") where that thing's words appear nowhere in this
  * turn's business evidence. Keyword matching on services will have false
  * positives (synonyms, plurals the stem misses), which is why it only
- * records. The `rule` carries the polarity and the unmatched term (letters
- * only, capped) so a reviewer can judge each hit with its conversation.
+ * records. Negative claims require matching negative evidence. Their fixed
+ * reason code can be counted without collecting the content of the claim.
  */
 const SERVICE_VERB = String.raw`(?:offer|offers|provide|provides|perform|performs|do|does|carry\s+out|handle|treat|specialise\s+in|specialize\s+in|have|stock|sell)`;
 const POSITIVE_SERVICE_RE = new RegExp(
   String.raw`\b(?:we|our\s+(?:clinic|team|doctors?|staff|store|shop|studio|company))\s+(?:do\s+|also\s+|can\s+|certainly\s+|definitely\s+)*${SERVICE_VERB}\s+([a-z][a-z\s'-]{2,60}?)(?=\s*(?:[,.;:!?\n]|\band\b|\bbut\b|\bunder\b|\bat\b|\bfor\b|\bwith\b|\bin\b|\bhere\b|$))`,
   "gi",
 );
+const BUSINESS_CLAIM_SUBJECT = String.raw`(?:we|our\s+(?:clinic|team|doctors?|staff|store|shop|studio|company|facility|gym|salon|hotel|centre|center))`;
 const NEGATIVE_SERVICE_RE = new RegExp(
-  String.raw`\b(?:we|our\s+(?:clinic|team|doctors?|staff|store|shop|studio|company))\s+(?:do\s+not|don't|don’t|dont|does\s+not|doesn't|cannot|can't|currently\s+(?:do\s+not|don't))\s+(?:currently\s+)?${SERVICE_VERB}\s+([a-z][a-z\s'-]{2,60}?)(?=\s*(?:[,.;:!?\n]|\band\b|\bbut\b|\bunder\b|\bat\b|\bfor\b|\bwith\b|\bin\b|\bhere\b|$))`,
+  String.raw`\b(?:${BUSINESS_CLAIM_SUBJECT}\s+(?:(?:do\s+not|don['’]?t|does\s+not|doesn['’]t|cannot|can['’]t|currently\s+(?:do\s+not|don['’]t))\s+(?:currently\s+)?${SERVICE_VERB}|\s*(?:have|has|offer|offers)\s+no)|(?:there\s+(?:is|are)|we\s+have\s+got)\s+no)\s+([a-z][a-z\s'-]{2,60}?)(?=\s*(?:[,.;:!?\n]|\band\b|\bbut\b|\bunder\b|\bat\b|\bfor\b|\bwith\b|\bin\b|\bhere\b|$))`,
   "gi",
 );
+const NO_AMENITY_FACT_RE = /^\s*(?:[-*]\s*)?no\s+([a-z][a-z\s'-]{2,60}?)(?=\s*(?:[.!?]|$))/i;
+
 const GENERIC_WORDS = new Set([
   "a", "an", "the", "any", "some", "all", "this", "that", "these", "those", "it", "them", "you", "your", "our", "that's",
   "information", "info", "details", "detail", "answer", "answers", "help", "anything", "everything", "something", "more",
@@ -421,25 +424,40 @@ function unmatchedTerm(phrase: string, evidence: string): string | null {
   return missing.length > 0 ? missing.join(" ").slice(0, 40) : null;
 }
 
+function negativeClaimTerms(phrase: string): string {
+  // Missing information is a statement about the evidence, not the amenity.
+  if (/^\s*(?:(?:a|any|the|that|this|enough|specific|more|much)\s+)*(?:information|info|details?|answers?)\b/i.test(phrase)) return "";
+  return phrase.toLowerCase().split(/[^a-z]+/)
+    .filter((word) => word.length >= 3 && !GENERIC_WORDS.has(word))
+    .map(stemOf)
+    .join(" ");
+}
+
 export function detectServiceClaims(text: string, ctx: OutputGuardContext): GuardrailSignal[] {
   const mode: GuardrailMode = ctx.modes?.serviceClaim ?? GUARDRAIL_MODES.output_service_claim;
-  const signals: GuardrailSignal[] = [];
-  const seen = new Set<string>();
-  const scan = (re: RegExp, polarity: "positive" | "negative") => {
-    for (const match of text.matchAll(re)) {
-      const phrase = match[1] ?? "";
-      if (/^(?:not|never|no)\b/i.test(phrase)) continue; // a negation the positive pattern swallowed
-      const term = unmatchedTerm(phrase, ctx.businessEvidence);
-      if (!term) continue;
-      const rule = `${polarity}:${term}`;
-      if (seen.has(rule)) continue;
-      seen.add(rule);
-      signals.push({ type: "output_service_claim", rule, action: "logged", mode });
+  const rules = new Set<string>();
+  const supportedDenials = new Set<string>();
+  for (const sentence of ctx.businessEvidence.split(/(?<=[.!?])\s+|\n+/)) {
+    if (sentence.endsWith("?")) continue;
+    for (const [, phrase] of sentence.matchAll(NEGATIVE_SERVICE_RE)) {
+      supportedDenials.add(negativeClaimTerms(phrase));
     }
-  };
-  scan(NEGATIVE_SERVICE_RE, "negative");
-  scan(POSITIVE_SERVICE_RE, "positive");
-  return signals;
+    const explicitDenial = NO_AMENITY_FACT_RE.exec(sentence);
+    if (explicitDenial) supportedDenials.add(negativeClaimTerms(explicitDenial[1]));
+  }
+  for (const sentence of splitSentences(text)) {
+    if (sentence.trimEnd().endsWith("?")) continue;
+    for (const [, phrase] of sentence.matchAll(NEGATIVE_SERVICE_RE)) {
+      const terms = negativeClaimTerms(phrase);
+      if (terms && !supportedDenials.has(terms)) rules.add("unsupported_negative_claim");
+    }
+    for (const [, phrase] of sentence.matchAll(POSITIVE_SERVICE_RE)) {
+      if (/^(?:not|never|no)\b/i.test(phrase)) continue;
+      const term = unmatchedTerm(phrase, ctx.businessEvidence);
+      if (term) rules.add(`positive:${term}`);
+    }
+  }
+  return [...rules].map((rule) => ({ type: "output_service_claim", rule, action: "logged", mode }));
 }
 
 // ------------------------------------------------------------ whole reply

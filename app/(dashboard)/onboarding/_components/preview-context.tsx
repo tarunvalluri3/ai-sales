@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 /**
  * What the live preview panel renders. Seeded server-side from whatever
@@ -43,12 +43,12 @@ export function OnboardingPreviewProvider({
   const seedKey = JSON.stringify(seed);
   const [local, setLocal] = useState({ seedKey, patch: {} as Partial<OnboardingPreviewData> });
   if (local.seedKey !== seedKey) setLocal({ seedKey, patch: {} });
+  const update = useCallback((patch: Partial<OnboardingPreviewData>) => {
+    setLocal((prev) => ({ seedKey, patch: { ...prev.patch, ...patch } }));
+  }, [seedKey]);
   const value = useMemo<PreviewContextValue>(
-    () => ({
-      preview: { ...seed, ...local.patch },
-      update: (patch) => setLocal((prev) => ({ seedKey, patch: { ...prev.patch, ...patch } })),
-    }),
-    [seed, seedKey, local.patch],
+    () => ({ preview: { ...seed, ...local.patch }, update }),
+    [seed, local.patch, update],
   );
   return <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>;
 }

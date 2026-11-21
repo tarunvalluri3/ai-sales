@@ -3,6 +3,7 @@
 import { useEffect, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { ReadinessCounts, type ReadinessCountsData } from "../readiness-counts";
+import { HoursSummary } from "../hours-summary";
 import { RecommendedDetails } from "./recommended-details";
 import Link from "next/link";
 import { ReadinessChecklist } from "../../../dashboard/widget-settings/readiness-checklist";
@@ -32,6 +33,7 @@ export function ReviewStep({
   activeWidgetKey,
   appOrigin,
   recommendedDetails,
+  openingHours,
 }: {
   report: ReadinessReport;
   counts: ReadinessCountsData;
@@ -44,6 +46,7 @@ export function ReviewStep({
   activeWidgetKey: string | null;
   appOrigin: string;
   recommendedDetails: ComponentProps<typeof RecommendedDetails>;
+  openingHours: ComponentProps<typeof HoursSummary>;
 }) {
   const router = useRouter();
   // `isPublished` comes straight from the server-fetched business row
@@ -123,7 +126,8 @@ export function ReviewStep({
       </section>
 
       <ReadinessCounts counts={counts} />
-      <ReadinessChecklist report={report} hideActionHints />
+      <ReadinessChecklist report={report} hideActionHints hoursEditorHref="#opening-hours" />
+      <HoursSummary {...openingHours} />
 
       <RecommendedDetails {...recommendedDetails} />
 

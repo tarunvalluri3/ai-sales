@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
-import { computeOnboardingProgress, ONBOARDING_READINESS_TOTAL, ONBOARDING_STEPS, ROUTE_FOR_STEP } from "@/lib/onboarding-steps";
+import { computeOnboardingProgress, ONBOARDING_STEPS, ROUTE_FOR_STEP } from "@/lib/onboarding-steps";
 import type { OnboardingStep } from "@/lib/supabase/types";
 import { listServicesForBusiness } from "@/lib/services";
 import { listProductsForBusiness } from "@/lib/products";
@@ -27,6 +27,7 @@ import { launchedMetaChannelNames, type ConnectedMetaChannels } from "@/lib/plan
 import { SUPPLIER } from "@/lib/invoice-config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { loadReadinessReport, getFaqGeneratedDocStatuses } from "@/lib/onboarding-readiness-data";
+import { countReadinessItems, evaluateReadiness } from "@/lib/onboarding-readiness";
 import { WizardShell, type StageStatus } from "./_components/wizard-shell";
 import { OnboardingPreviewProvider } from "./_components/preview-context";
 import { WIZARD_STAGES, isOnboardingStep, stageForStep, type WizardStageKey } from "./_components/wizard-config";
@@ -84,6 +85,12 @@ export default async function OnboardingPage({
       clerkClient().then((clerk) => clerk.organizations.getOrganization({ organizationId })),
       currentUser(),
     ]);
+    const startingReadiness = evaluateReadiness({
+      name: "", businessType: "", description: null, contactEmail: null, contactPhone: null,
+      website: null, privacyPolicyUrl: null, appointmentsEnabled: true, alreadyPublished: false,
+      knowledgeSources: [], faqs: [], catalogItems: [], openBusinessHoursDayCount: 0,
+      businessHoursConfirmed: false, dismissedItemKeys: [],
+    });
     return (
       <OnboardingPreviewProvider
         seed={{
@@ -93,10 +100,7 @@ export default async function OnboardingPage({
           firstProductName: null,
           firstFaqQuestion: null,
           firstFaqAnswer: null,
-          requiredDone: 0,
-          requiredTotal: 7,
-          recommendedDone: 0,
-          readinessTotal: ONBOARDING_READINESS_TOTAL,
+          ...countReadinessItems(startingReadiness.items),
           published: false,
           accent: null,
         }}
@@ -115,7 +119,7 @@ export default async function OnboardingPage({
           description="Tell us who you are — this becomes your agent's identity."
           footer={null}
         >
-          <BusinessStep business={null} initialName={organization.name} initialEmail={user?.primaryEmailAddress?.emailAddress ?? ""} />
+          <BusinessStep business={null} readinessItems={startingReadiness.items} initialName={organization.name} initialEmail={user?.primaryEmailAddress?.emailAddress ?? ""} />
         </WizardShell>
       </OnboardingPreviewProvider>
     );
@@ -160,13 +164,7 @@ export default async function OnboardingPage({
   ]);
 
   const appOrigin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
-  const required = readiness.items.filter((item) => item.tier === "required");
-  const counts = {
-    requiredDone: required.filter((item) => item.status !== "unmet").length,
-    requiredTotal: required.length,
-    recommendedDone: readiness.items.filter((item) => item.tier === "recommended" && item.status !== "unmet").length,
-    readinessTotal: ONBOARDING_READINESS_TOTAL,
-  };
+  const counts = countReadinessItems(readiness.items);
 
   const previewSeed = {
     businessName: business.name,
@@ -207,7 +205,7 @@ export default async function OnboardingPage({
           eyebrow: "Step 1 of 6 · Your business",
           heading: "Let's set up your AI sales employee",
           description: "This becomes your agent's identity.",
-          content: <BusinessStep business={business} hours={await listBusinessHours(businessId)} />,
+          content: <BusinessStep business={business} readinessItems={readiness.items} hours={await listBusinessHours(businessId)} />,
           footer: null,
         };
       case "knowledge":
@@ -323,6 +321,8 @@ export default async function OnboardingPage({
               recommendedDetails={{
                 website: business.website,
                 privacyPolicyUrl: business.privacy_policy_url,
+              }}
+              openingHours={{
                 hours: await listBusinessHours(businessId),
                 slaMinutes: business.sla_minutes ?? null,
                 timezone: business.timezone ?? "UTC",
@@ -336,7 +336,7 @@ export default async function OnboardingPage({
   })();
 
   return (
-    <OnboardingPreviewProvider seed={previewSeed}>
+    <OnboardingPreviewProvider key={activeStep} seed={previewSeed}>
       <WizardShell
         activeStage={activeStage}
         stageStatus={stageStatus}

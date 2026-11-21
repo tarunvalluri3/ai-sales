@@ -4,9 +4,8 @@ import type { BusinessHours } from "@/lib/supabase/types";
  * The week every NEW business starts with (2026-11-20): Monday to Friday
  * 09:00-18:00 open, Saturday and Sunday closed, read in the business's own
  * time zone (`businesses.timezone`). Saved as real `business_hours` rows at
- * creation (lib/business.ts createBusinessForOrg), so the "Business hours
- * configured" readiness item is already done and booking has open slots
- * straight after publishing. The owner can change it at any time.
+ * creation (lib/business.ts createBusinessForOrg). The owner must confirm
+ * this week or save an edited schedule to satisfy publishing readiness.
  *
  * Pure, so the form's fallback display and the unit tests use the same week.
  * Indexed like `business_hours.day_of_week` (0 = Sunday).
@@ -39,4 +38,8 @@ export function weekFromBusinessHours(hours: BusinessHours[]): DefaultDayHours[]
       endTime: saved?.end_time?.slice(0, 5) ?? null,
     };
   });
+}
+
+export function hasConfirmedBusinessHours(hours: readonly Pick<BusinessHours, "confirmed_at">[]): boolean {
+  return hours.some((day) => day.confirmed_at != null);
 }

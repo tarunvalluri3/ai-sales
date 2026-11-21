@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { ImageIcon, Plus } from "lucide-react";
+import { ImageIcon, LoaderCircle, Plus } from "lucide-react";
 import type { ProductFormState } from "./actions";
 import type { CatalogFormField } from "@/lib/schemas/catalog";
 import { pricePlaceholder } from "@/lib/currency";
@@ -255,8 +255,13 @@ export function ProductForm({
         disabled={isPending}
         className="ds-btn-label inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
-        {id ? null : <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />}
-        {isPending ? pendingLabel : submitLabel}
+        {id || isPending ? null : <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />}
+        {isPending ? (
+          <span className="inline-flex items-center gap-2">
+            <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+            {pendingLabel}
+          </span>
+        ) : submitLabel}
       </button>
       <p className="text-center text-sm text-ds-text-secondary">Saves as a draft</p>
     </form>

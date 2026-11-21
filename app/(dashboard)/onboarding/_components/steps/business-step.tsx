@@ -6,7 +6,8 @@ import { WeeklyHoursFields } from "../../../dashboard/business-hours/weekly-hour
 import { HoursSummary } from "../hours-summary";
 import { Check } from "lucide-react";
 import { useActionState, useEffect, useState, useSyncExternalStore } from "react";
-import { BUSINESS_TYPES } from "@/lib/schemas/business";
+import { BUSINESS_TYPES, businessContactEmailRequiredSchema, businessDescriptionSchema, businessNameSchema, businessTypeSchema, looksLikeClerkOrganizationDefault } from "@/lib/schemas/business";
+import { DESCRIPTION_MIN_LENGTH, previewProfileReadiness, type ReadinessItem } from "@/lib/onboarding-readiness";
 import { detectBrowserTimezone } from "@/lib/timezones";
 import { SUPPORTED_CURRENCIES, currencyForTimezone } from "@/lib/currency";
 import { TimezonePicker } from "../../../dashboard/_components/timezone-picker";
@@ -18,8 +19,6 @@ import { useOnboardingPreview } from "../preview-context";
 
 const inputClasses =
   "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
-
-const DESCRIPTION_MIN = 40;
 
 function noopSubscribe() {
   return () => {};
@@ -39,7 +38,13 @@ function getServerTimezone(): string {
 const createInitialState: CreateBusinessState = {};
 const updateInitialState: ProfileFormState = {};
 
-export function BusinessStep({ business, initialName = "", initialEmail = "", hours = [] }: { business: Business | null; initialName?: string; initialEmail?: string; hours?: BusinessHours[] }) {
+export function BusinessStep({ business, initialName = "", initialEmail = "", hours = [], readinessItems }: {
+  business: Business | null;
+  initialName?: string;
+  initialEmail?: string;
+  hours?: BusinessHours[];
+  readinessItems: ReadinessItem[];
+}) {
   const router = useRouter();
   const isNew = business == null;
   const [createState, createFormAction, createPending] = useActionState(createBusiness, createInitialState);
@@ -56,6 +61,8 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
   const [businessType, setBusinessType] = useState(business?.business_type ?? "");
   const [website, setWebsite] = useState(business?.website ?? "");
   const [week, setWeek] = useState(defaultWeeklyHours);
+  const [hoursAccepted, setHoursAccepted] = useState(false);
+  const [hoursEdited, setHoursEdited] = useState(false);
   const [description, setDescription] = useState(business?.description ?? "");
   const [contactEmail, setContactEmail] = useState(business?.contact_email ?? initialEmail);
   const [contactPhone, setContactPhone] = useState(business?.contact_phone ?? "");
@@ -68,14 +75,27 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
   const [chosenCurrency, setChosenCurrency] = useState<string | null>(null);
   const currency = chosenCurrency ?? business?.currency ?? (timezone ? currencyForTimezone(timezone) : "INR");
 
-  const descriptionOk = description.trim().length >= DESCRIPTION_MIN;
-  const emailOk = /\S+@\S+\.\S+/.test(contactEmail);
-  const valid = name.trim().length >= 2 && businessType !== "" && descriptionOk && emailOk && timezone !== "";
+  const nameOk = businessNameSchema.safeParse(name).success;
+  const industry = businessTypeSchema.safeParse(businessType);
+  const validIndustry = industry.success ? industry.data : "";
+  const descriptionOk = description.trim().length >= DESCRIPTION_MIN_LENGTH && businessDescriptionSchema.safeParse(description).success;
+  const emailOk = businessContactEmailRequiredSchema.safeParse(contactEmail).success;
+  const valid = nameOk && validIndustry !== "" && descriptionOk && emailOk && timezone !== "";
+
+  useEffect(() => {
+    update({
+      businessName: name,
+      description,
+      ...previewProfileReadiness(readinessItems, { name: nameOk, businessType: validIndustry, description: descriptionOk, contactEmail: emailOk }),
+    });
+  }, [update, name, description, readinessItems, nameOk, validIndustry, descriptionOk, emailOk]);
 
   const missing: string[] = [];
-  if (name.trim().length < 2) missing.push("a business name");
-  if (businessType === "") missing.push("an industry");
-  if (!descriptionOk) missing.push(`${DESCRIPTION_MIN - description.trim().length} more characters in your description`);
+  if (!nameOk) missing.push("a business name");
+  if (!validIndustry) missing.push("an industry");
+  if (!descriptionOk) missing.push(description.trim().length < DESCRIPTION_MIN_LENGTH
+    ? `${DESCRIPTION_MIN_LENGTH - description.trim().length} more characters in your description`
+    : "a description of at most 500 characters");
   if (!emailOk) missing.push("a valid contact email");
   if (!timezone) missing.push("your time zone");
 
@@ -109,14 +129,15 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           autoComplete="organization"
           placeholder="e.g. Glow Studio"
           value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            update({ businessName: e.target.value });
-          }}
+          onChange={(e) => setName(e.target.value)}
           disabled={isPending}
           aria-invalid={fieldErrors.name ? true : undefined}
+          aria-describedby={looksLikeClerkOrganizationDefault(name) ? "business-name-hint" : undefined}
           className={inputClasses}
         />
+        {looksLikeClerkOrganizationDefault(name) && (
+          <p id="business-name-hint" className="text-xs text-ds-text-muted">Use the name your customers know your business by.</p>
+        )}
         {fieldErrors.name ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.name}</p> : null}
       </div>
 
@@ -175,10 +196,7 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           maxLength={500}
           placeholder="What you sell, where you are, and who you serve"
           value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
-            update({ description: e.target.value });
-          }}
+          onChange={(e) => setDescription(e.target.value)}
           disabled={isPending}
           aria-invalid={fieldErrors.description ? true : undefined}
           aria-describedby="description-help"
@@ -188,7 +206,7 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           <p id="description-help" className="text-xs text-ds-text-muted">
             What you sell, where you are based, and who you serve.
           </p>
-          <span className="text-xs text-ds-text-muted">{descriptionOk ? `${description.trim().length} characters` : `Minimum ${DESCRIPTION_MIN} characters`}</span>
+          <span className="text-xs text-ds-text-muted">{descriptionOk ? `${description.trim().length} characters` : `Minimum ${DESCRIPTION_MIN_LENGTH} characters`}</span>
         </div>
         {fieldErrors.description ? (
           <p role="alert" className="text-xs text-ds-danger">{fieldErrors.description}</p>
@@ -279,13 +297,32 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
       </div>
 
       {isNew ? (
-        <details className="border-t border-ds-border pt-4">
-          <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">
-            {summarizeWeeklyHours(week, timezone)} · Edit
-          </summary>
-          <input type="hidden" name="editedHours" value="true" />
-          <div className="pt-4"><WeeklyHoursFields week={week} onChange={setWeek} disabled={isPending} /></div>
-        </details>
+        <div id="opening-hours" className="scroll-mt-24 border-t border-ds-border pt-4">
+          <p className="text-sm font-medium text-ds-text-primary">
+            {hoursAccepted ? "Hours selected" : hoursEdited ? "Edited hours" : "Default hours - confirm or edit"}
+          </p>
+          {timezone && <p className="text-xs text-ds-text-muted">These hours are in {timezone}.</p>}
+          <details className="mt-2">
+            <summary className="cursor-pointer text-sm text-ds-text-primary">
+              {summarizeWeeklyHours(week, timezone)} · Edit
+            </summary>
+            <div className="pt-4">
+              <WeeklyHoursFields week={week} disabled={isPending} onChange={(updatedWeek) => {
+                setWeek(updatedWeek);
+                setHoursEdited(true);
+                setHoursAccepted(false);
+              }} />
+            </div>
+          </details>
+          <input type="hidden" name="confirmHours" value={String(hoursAccepted || hoursEdited)} />
+          {!hoursAccepted && !hoursEdited && (
+            <button type="button" onClick={() => setHoursAccepted(true)} disabled={isPending}
+              className="mt-2 text-sm font-medium text-ds-text-primary underline">
+              These are correct
+            </button>
+          )}
+          {hoursAccepted && <p role="status" className="mt-2 text-xs text-ds-text-muted">Your hours will be confirmed when you continue.</p>}
+        </div>
       ) : null}
 
       {state.error ? (
@@ -300,12 +337,12 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           {!valid ? <span className="text-xs text-ds-text-muted">Add {missing[0]} to continue</span> : null}
           <button type="submit" disabled={isPending || !valid}
             className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
-            {isPending ? "Saving…" : "Continue"}
+            {isPending ? "Saving…" : isNew && hoursEdited ? "Save hours and continue" : "Continue"}
           </button>
         </div>
       </div>
     </form>
-      {business ? <HoursSummary hours={hours} timezone={business.timezone ?? "UTC"} slaMinutes={business.sla_minutes} /> : null}
+      {business ? <HoursSummary hours={hours} timezone={timezone || "UTC"} slaMinutes={business.sla_minutes} useProfileTimezone /> : null}
     </>
   );
 }
