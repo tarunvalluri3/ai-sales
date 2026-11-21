@@ -49,8 +49,9 @@ test("request_timing: one line with only the fixed, identifier-free fields", () 
   const log = timing.finish("ok");
   assert.equal(lines.length, 1);
   const parsed = JSON.parse(lines[0]);
-  assert.deepEqual(Object.keys(parsed).sort(), ["cold", "event", "instanceAgeMs", "name", "outcome", "processUptimeMs", "stages", "totalMs"]);
+  assert.deepEqual(Object.keys(parsed).sort(), ["at", "cold", "event", "instanceAgeMs", "name", "outcome", "processUptimeMs", "stages", "totalMs"]);
   assert.equal(parsed.event, "request_timing");
+  assert.equal(parsed.at, new Date(1_000).toISOString()); // its own timestamp: PM2 log files carry no platform time
   assert.equal(parsed.totalMs, 100);
   assert.deepEqual(parsed.stages, [{ stage: "at_auth", ms: 40 }]);
   assert.deepEqual(JSON.parse(JSON.stringify(log)), parsed); // the vm realm has its own Object prototype
@@ -499,8 +500,7 @@ test("writeCatalogEmbedding: tenant-scoped, only onto the saved version, never t
 function loadCatalogService(file, { embedCalls }) {
   const inserts = [];
   const order = [];
-  const builder = (table) => {
-    const state = { table };
+  const builder = () => {
     const api = {
       insert: (row) => { inserts.push(row); order.push("insert"); return api; },
       select: () => api,

@@ -10,6 +10,13 @@
  * invisible. Every line this module writes says whether the request was the
  * first one on a fresh server instance and how old the instance was.
  *
+ * Where it goes: ONE JSON line on stdout (console.log). Vercel's runtime log
+ * and a self-hosted `next start` under PM2 (its *-out.log, see
+ * docs/launch-runbook.md section 9) both capture it as is, so the line
+ * carries its own `at` timestamp rather than relying on a log prefix. On a
+ * long-running VPS process `cold` is true only for the first request after
+ * a (re)start of that process, and false from then on.
+ *
  * Privacy contract (owner's rule): the log carries ONLY the fixed fields
  * below. `name` and stage names must match NAME_PATTERN (lowercase words and
  * digits -- code literals, never data); anything else is replaced with
@@ -26,6 +33,8 @@ export type RequestTimingStage = { stage: string; ms: number };
 
 export type RequestTimingLog = {
   event: "request_timing";
+  /** When the request started (ISO 8601, UTC). */
+  at: string;
   name: string;
   outcome: RequestTimingOutcome;
   totalMs: number;
@@ -138,6 +147,7 @@ export class RequestTiming {
     if (options.onlyIfSlowerThanMs !== undefined && !this.cold && totalMs < options.onlyIfSlowerThanMs) return null;
     const log: RequestTimingLog = {
       event: "request_timing",
+      at: new Date(this.startedAt).toISOString(),
       name: this.name,
       outcome,
       totalMs,
