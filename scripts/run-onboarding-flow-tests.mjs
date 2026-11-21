@@ -453,3 +453,26 @@ test("a failed weekly upsert leaves the schedule unconfirmed and only touches th
   assert.equal((await updateBusinessHoursAction({}, form)).success, true);
   assert.equal(hasConfirmedBusinessHours(persisted), true);
 });
+
+test("industry choices use the shared schema and the catalog placeholder fallback", () => {
+  const currency = loadAction("lib/currency.ts", {});
+  const { businessTypeSchema, BUSINESS_TYPES } = loadAction("lib/schemas/business.ts", {
+    "@/lib/widget-i18n": { SUPPORTED_WIDGET_LANGUAGES: ["en"] }, "@/lib/currency": currency,
+  });
+  const { catalogPlaceholders } = loadAction("lib/catalog-placeholders.ts", { "@/lib/currency": currency });
+  for (const [value, label] of [["fitness_wellness", "Fitness / Gym / Wellness"], ["salon_beauty", "Salon / Beauty"]]) {
+    assert.equal(businessTypeSchema.parse(value), value);
+    assert.equal(BUSINESS_TYPES.find((type) => type.value === value)?.label, label);
+    assert.equal(catalogPlaceholders(value, "INR", "service").name, "e.g. Initial consultation");
+  }
+});
+
+test("product, service and knowledge submit buttons render visible pending feedback", () => {
+  for (const file of [
+    "products/product-form.tsx", "services/service-form.tsx", "knowledge/knowledge-form.tsx",
+    "knowledge/_components/file-upload-form.tsx", "knowledge/_components/url-import-form.tsx",
+  ]) {
+    const component = source(dashboard + file);
+    assert.match(component, /disabled=\{isPending\}[\s\S]*?\{isPending \? \([\s\S]*?<LoaderCircle[\s\S]*?(?:pendingLabel|Uploading|Importing)/);
+  }
+});

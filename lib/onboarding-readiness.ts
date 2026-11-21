@@ -154,6 +154,43 @@ export type ReadinessInput = {
   dismissedItemKeys: string[];
 };
 
+
+export function countReadinessItems(items: readonly Pick<ReadinessItem, "tier" | "status">[]) {
+  const required = items.filter((item) => item.tier === "required");
+  return {
+    requiredDone: required.filter((item) => item.status === "met" || item.status === "not_applicable").length,
+    requiredTotal: required.length,
+    recommendedDone: items.filter((item) => item.tier === "recommended" && item.status !== "unmet").length,
+    readinessTotal: items.length,
+  };
+}
+
+/** Preview the current profile fields while keeping the rest of the report server-provided. */
+export function previewProfileReadiness(
+  items: readonly ReadinessItem[],
+  profile: { name: boolean; businessType: string; description: boolean; contactEmail: boolean },
+) {
+  const checked = {
+    profile_name: profile.name,
+    profile_business_type: profile.businessType !== "",
+    profile_description: profile.description,
+    profile_contact_email: profile.contactEmail,
+  };
+  return countReadinessItems(items.map((item) => {
+    switch (item.key) {
+      case "profile_name":
+      case "profile_business_type":
+      case "profile_description":
+      case "profile_contact_email":
+        return { ...item, status: checked[item.key] ? "met" : "unmet" };
+      case "catalog_present":
+        return { ...item, tier: CATALOG_REQUIRED_BUSINESS_TYPES.has(profile.businessType) ? "required" : "recommended" };
+      default:
+        return item;
+    }
+  }));
+}
+
 function trimmedLength(value: string | null | undefined): number {
   return value ? value.trim().length : 0;
 }

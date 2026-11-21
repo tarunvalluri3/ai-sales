@@ -664,7 +664,7 @@ All metrics come from real stored data.
 - **Profile details** form:
   - *Identity*:
     - Business name (required)
-    - Business type: E-commerce / Online store, Professional services, Healthcare / Clinic, Education / Training, Real estate, Hospitality / Food & beverage, Finance / Insurance, Technology / SaaS, Retail (physical store), Manufacturing, Other
+    - Business type: E-commerce / Online store, Professional services, Healthcare / Clinic, Education / Training, Real estate, Hospitality / Food & beverage, Finance / Insurance, Technology / SaaS, Retail (physical store), Manufacturing, Fitness / Gym / Wellness, Salon / Beauty, Other
     - Description (optional)
   - *Contact*:
     - Contact email. This is also **the alert/billing email**; see the global gate.

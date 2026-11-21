@@ -19,6 +19,8 @@ register("./alias-resolver-hooks.mjs", import.meta.url);
 
 const {
   evaluateReadiness,
+  countReadinessItems,
+  previewProfileReadiness,
   isDismissibleItemKey,
   DESCRIPTION_MIN_LENGTH,
   MIN_READY_FAQS,
@@ -262,4 +264,22 @@ test("an already-published business is never gated, even if it now fails every r
 test(`the FAQ minimum is ${MIN_READY_FAQS} and the description minimum is ${DESCRIPTION_MIN_LENGTH} (the rules these tests assume)`, () => {
   assert.equal(MIN_READY_FAQS, 3);
   assert.equal(DESCRIPTION_MIN_LENGTH, 40);
+});
+
+test("Step 1 preview recomputes valid fields and the catalog tier without changing the saved report", () => {
+  const report = evaluateReadiness(baseReadyInput({ businessType: "other", description: null, contactEmail: null, catalogItems: [] }));
+  const empty = { name: false, businessType: "", description: false, contactEmail: false };
+  const initial = previewProfileReadiness(report.items, empty);
+  const named = previewProfileReadiness(report.items, { ...empty, name: true });
+  assert.equal(named.requiredDone, initial.requiredDone + 1);
+  for (const businessType of ["fitness_wellness", "salon_beauty"]) {
+    const valid = previewProfileReadiness(report.items, { name: true, description: true, contactEmail: true, businessType });
+    assert.equal(valid.requiredDone, initial.requiredDone + 4);
+    assert.equal(valid.requiredTotal, initial.requiredTotal);
+    const actual = evaluateReadiness(baseReadyInput({ businessType, catalogItems: [] }));
+    assert.equal(actual.items.find((item) => item.key === "catalog_present").tier, "recommended");
+  }
+  const retail = previewProfileReadiness(report.items, { ...empty, businessType: "retail" });
+  assert.equal(retail.requiredTotal, initial.requiredTotal + 1);
+  assert.equal(countReadinessItems(report.items).requiredDone, initial.requiredDone + 2);
 });

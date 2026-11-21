@@ -72,7 +72,7 @@ export const businessWebsiteSchema = optionalTrimmed
  * category as description/contact/website: not read by lib/rag.ts or any AI
  * behavior. Closed enum matching the businesses_business_type_check DB
  * constraint (20260911000000, widened by 20261109000000 to add
- * "manufacturing") -- keep both in sync if this list changes.
+ * "manufacturing", then by 20261124000700 for fitness and beauty). Keep both in sync.
  */
 export const BUSINESS_TYPES = [
   { value: "ecommerce", label: "E-commerce / Online store" },
@@ -85,6 +85,8 @@ export const BUSINESS_TYPES = [
   { value: "technology", label: "Technology / SaaS" },
   { value: "retail", label: "Retail (physical store)" },
   { value: "manufacturing", label: "Manufacturing" },
+  { value: "fitness_wellness", label: "Fitness / Gym / Wellness" },
+  { value: "salon_beauty", label: "Salon / Beauty" },
   { value: "other", label: "Other" },
 ] as const;
 
