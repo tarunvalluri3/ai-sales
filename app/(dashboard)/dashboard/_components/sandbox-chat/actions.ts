@@ -1,7 +1,6 @@
 "use server";
 
 import { after } from "next/server";
-import { z } from "zod";
 import { requireBusinessContext } from "@/lib/business-context";
 import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
@@ -14,10 +13,17 @@ import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { DRAFT_SOURCE, loadLiveAgentSourceByVersion, type AgentSource } from "@/lib/agent-runtime";
 import { isAgentPublished } from "@/lib/agent-published";
+import {
+  LIVE_SANDBOX_ENABLED,
+  LIVE_SANDBOX_UNAVAILABLE_MESSAGE,
+  sandboxModeSchema,
+  type SandboxMode,
+} from "@/lib/sandbox-mode";
 
-/** Which version the test chat talks to. Validated server-side: the client only chooses between these two, never a version id. */
-export const sandboxModeSchema = z.enum(["draft", "live"]);
-export type SandboxMode = z.infer<typeof sandboxModeSchema>;
+// A "use server" file may export only async functions (and types). The mode
+// schema (validated server-side: the client only picks draft or live, never a
+// version id), its type and the Live switch live in lib/sandbox-mode.ts.
+export type { SandboxMode };
 
 export type SandboxChatResult =
   | { ok: true; conversationId: string; answer: string; recommendedProducts: RecommendedItem[] }
@@ -58,6 +64,9 @@ export async function sendSandboxMessage(
   const parsedMode = sandboxModeSchema.safeParse(mode);
   if (!parsedMode.success) {
     return { ok: false, error: "Choose the draft or the live agent." };
+  }
+  if (parsedMode.data === "live" && !LIVE_SANDBOX_ENABLED) {
+    return { ok: false, error: LIVE_SANDBOX_UNAVAILABLE_MESSAGE };
   }
   const { businessId, orgId } = await requireBusinessContext();
   const business = await getBusinessForOrg(orgId);

@@ -8,7 +8,8 @@ import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 import { Badge } from "../badge";
 import { Card, btnGhost, btnOutline, inputClass } from "../ui";
-import { sendSandboxMessage, type SandboxMode } from "./actions";
+import { LIVE_SANDBOX_ENABLED, type SandboxMode } from "@/lib/sandbox-mode";
+import { sendSandboxMessage } from "./actions";
 
 type DisplayMessage = ConversationMessage & {
   id: string;
@@ -128,7 +129,7 @@ export function SandboxChatPanel({ liveAvailable = false }: { /** True once the 
                   key={option}
                   type="button"
                   aria-pressed={mode === option}
-                  disabled={isPending}
+                  disabled={isPending || (option === "live" && !LIVE_SANDBOX_ENABLED)}
                   onClick={() => handleModeChange(option)}
                   className={`min-h-9 rounded-[10px] px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary disabled:opacity-50 ${
                     mode === option ? "bg-ds-primary text-ds-primary-on" : "text-ds-text-secondary hover:text-ds-text-primary"
@@ -138,6 +139,9 @@ export function SandboxChatPanel({ liveAvailable = false }: { /** True once the 
                 </button>
               ))}
             </div>
+          ) : null}
+          {liveAvailable && !LIVE_SANDBOX_ENABLED ? (
+            <p className="text-xs text-ds-text-muted">Live testing is coming soon. Draft uses your current setup.</p>
           ) : null}
         </div>
         {messages.length > 0 ? (

@@ -2,7 +2,17 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-11-21 (**Dashboard polish, 13 items, on `fix/dashboard-polish`; see the first section.**)
+Last updated: 2026-11-21 (**Hotfix: test chat 500, on `fix/sandbox-chat-500`; see the first section. Then dashboard polish, 13 items.**)
+
+## Hotfix: test chat returned 500 for every message — 2026-11-21 — `fix/sandbox-chat-500`
+
+**Cause (from production runtime logs, every POST to `/dashboard/test-agent`):** `Error: A "use server" file can only export async functions, found object.` PR #167 added `export const sandboxModeSchema = z.enum(...)` to `sandbox-chat/actions.ts`, a `"use server"` file. Next.js refuses to load such a module, so `sendSandboxMessage` failed in Draft and Live, on the dashboard page and the onboarding review step alike. It was not the `mode` argument, the live-source loading or a migration.
+
+**Fix.** The schema, the `SandboxMode` type and a Live switch moved to the pure module `lib/sandbox-mode.ts`; `actions.ts` exports only the async function and types. **Live testing ships disabled** (`LIVE_SANDBOX_ENABLED = false`): live retrieval calls `match_live_knowledge_chunks`, which migration 20261107000000 revokes from `authenticated` (service_role only), so it cannot run through the sandbox's Clerk-session client. The action refuses `live` before any lookup, and the panel shows the Live button disabled with "Live testing is coming soon. Draft uses your current setup." Enabling it needs a deliberate choice (a migration granting the RPC, or a vetted server-side path), then flip the flag. The live code path stays in place and is covered by tests with the flag mocked on. No migration, package or env var.
+
+**Tests:** new `npm run test:sandbox-chat` (9 cases, in CI, mocks only): a repo-wide guard that no `"use server"` file exports anything but async functions or types (fails on the original bug); draft end to end; the onboarding path called exactly as the panel calls it; omitted and invalid mode; live on a published business; live rejected on an unpublished one; live failing closed; Live off as shipped. `test:dashboard-polish` updated for the moved schema.
+
+---
 
 ## Dashboard polish (13 items) — 2026-11-21 — `fix/dashboard-polish`
 
