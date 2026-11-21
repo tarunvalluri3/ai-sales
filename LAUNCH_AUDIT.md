@@ -424,7 +424,7 @@ The core product is unusually well built for this stage. Tenant isolation, RLS, 
 3. **WhatsApp:** WABA verification and display-name approval, messaging tier and quality rating, webhook subscription, and whether any templates are approved.
 4. **Production migrations:** run `npx supabase migration list --linked` against prod to confirm `20261112000000` and `20261114000000` are applied. STATE.md still says "NOT YET APPLIED" for both.
 5. **Vercel production env:** `META_LOGIN_CONFIG_ID`, `META_IG_LOGIN_MODE`, `META_TOKEN_ENCRYPTION_KEY`, `CRON_SECRET` (without it the cron returns 404 and **no background sweep runs at all**: `route.ts:55`), `RAZORPAY_WEBHOOK_SECRET`, `WHATSAPP_APP_SECRET`, `RESEND_WEBHOOK_SECRET` and `NEXT_PUBLIC_APP_URL`.
-6. **Clerk:** that production uses a **production instance** (`pk_live_…`); your local key is `pk_test_…`. Check MFA is enforced for platform admins and the session lifetime.
+6. **Clerk:** that production uses a **production instance** (`pk_live_…`); your local key is `pk_test_…`. Check MFA is enforced for platform admins and the session lifetime. In the Clerk Dashboard, select the Waves AI Pilot application and the **Production** instance, then go to **Configure → Organizations → Settings → Default naming rules** and turn it off. Verify that a fresh signup must type a business name.
 7. **Razorpay dashboard:** live account activation and KYC, the webhook URL and its events (including `refund.processed`), and the card-only subscription setting.
 8. **Supabase:** current tier, backup schedule and retention, whether a restore was ever tested, and that pg_cron jobs are present in prod.
 9. **Sentry:** alert rules beyond the default, plan quota, and the DE data region (fine for DPDP, but disclose it).

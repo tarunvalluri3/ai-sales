@@ -46,6 +46,17 @@ test("failed FAQ save echoes both fields after React resets the form", async () 
   assert.equal(result.values?.answer, "Open on weekdays.");
 });
 
+test("Step 1 recognizes personalized Clerk default names without rejecting business names", () => {
+  const { looksLikeClerkOrganizationDefault } = loadAction("lib/schemas/business.ts", {
+    "@/lib/widget-i18n": { SUPPORTED_WIDGET_LANGUAGES: ["en"] },
+    "@/lib/currency": loadAction("lib/currency.ts", {}),
+  });
+  assert.equal(looksLikeClerkOrganizationDefault("Tarun's Organization"), true);
+  assert.equal(looksLikeClerkOrganizationDefault("Tarun’s organization"), true);
+  assert.equal(looksLikeClerkOrganizationDefault("Tarun’s Fitness Studio"), false);
+  assert.equal(looksLikeClerkOrganizationDefault("Community Organization"), false);
+});
+
 const onboarding = "app/(dashboard)/onboarding/";
 const steps = onboarding + "_components/steps/";
 const mockErrors = { logAndGetUserMessage: (error) => { throw error; } };

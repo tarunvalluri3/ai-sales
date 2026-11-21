@@ -6,7 +6,7 @@ import { WeeklyHoursFields } from "../../../dashboard/business-hours/weekly-hour
 import { HoursSummary } from "../hours-summary";
 import { Check } from "lucide-react";
 import { useActionState, useEffect, useState, useSyncExternalStore } from "react";
-import { BUSINESS_TYPES } from "@/lib/schemas/business";
+import { BUSINESS_TYPES, looksLikeClerkOrganizationDefault } from "@/lib/schemas/business";
 import { detectBrowserTimezone } from "@/lib/timezones";
 import { SUPPORTED_CURRENCIES, currencyForTimezone } from "@/lib/currency";
 import { TimezonePicker } from "../../../dashboard/_components/timezone-picker";
@@ -117,8 +117,12 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           }}
           disabled={isPending}
           aria-invalid={fieldErrors.name ? true : undefined}
+          aria-describedby={looksLikeClerkOrganizationDefault(name) ? "business-name-hint" : undefined}
           className={inputClasses}
         />
+        {looksLikeClerkOrganizationDefault(name) && (
+          <p id="business-name-hint" className="text-xs text-ds-text-muted">Use the name your customers know your business by.</p>
+        )}
         {fieldErrors.name ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.name}</p> : null}
       </div>
 

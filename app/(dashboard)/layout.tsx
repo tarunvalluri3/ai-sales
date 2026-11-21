@@ -39,6 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <ClerkProvider
       localization={{
+        formFieldInputPlaceholder__organizationName: "Your business name",
         taskChooseOrganization: {
           title: "What's your business called?",
           createOrganization: { title: "What's your business called?" },
