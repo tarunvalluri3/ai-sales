@@ -41,7 +41,9 @@ Last updated: 2026-11-21 (**Reply and save speed, on `perf/reply-and-save-speed`
   - The attention badge/bell and the open-conversation panel poll `GET /api/dashboard/attention` and `GET /api/dashboard/conversations/[id]/updates`.
   - Both read the business from the Clerk session only (`getBusinessContextForRoute`), return 401 without one, and are never cached. They run the same tenant-scoped RLS reads (`lib/dashboard-poll.ts`), and a foreign conversation id gets the old empty answer.
   - Cadence (`lib/poll-cadence.ts`): every 1 s while something changed in the last 30 s, 5 s otherwise, paused while the tab is hidden. The owner's own action resets it to fast.
-  - The old poll actions are removed. **Not changed:** the conversation list pane (`pollConversationsAction`) still polls a Server Action every second on `/dashboard/conversations`.
+  - The old poll actions are removed.
+  - **Conversation list pane** (`746bf7c`, owner addition): `GET /api/dashboard/conversations`, same access (any member, business from the session), the same tenant-scoped reads. Leads come back as name pairs only. Cadence 1 s → 5 s on the list, 5 s beside an open conversation (was 4 s), paused while hidden. Every dashboard poll is now a GET fetch; none is a Server Action.
+- **Impeccable** (`e2da90b`): `ignore-value overused-font "Space Grotesk"`. The owner confirmed it is the Wave brand font.
 - **Lighter onboarding render** (`a065800`)
   - `loadReadinessData` returns the readiness report plus its rows, and `onboardingProgressFrom()` grades progress from them (proved identical to `computeOnboardingProgress`).
   - One parallel load per render: about 29 → 13 database calls, 4–5 → 3 sequential steps.
@@ -72,18 +74,18 @@ Last updated: 2026-11-21 (**Reply and save speed, on `perf/reply-and-save-speed`
 | Requests per Personality Continue | 4 (3 actions + navigation, 4 wizard renders) | 1 |
 | Requests per other wizard Continue | 2 | 1 |
 | Database calls per onboarding render | 29, 4–5 sequential steps | 13, 3 steps |
-| Server Actions a save/test-chat send can queue behind | the 1 s poll(s) | none (polls are GET fetches); list pane still an action |
-| Poll requests per minute, quiet dashboard tab | 60 (+60 on an open conversation) | 12 after 30 s quiet (+12) |
+| Server Actions a save/test-chat send can queue behind | the 1 s poll(s) | none (every poll is a GET fetch) |
+| Poll requests per minute, quiet dashboard tab | 60 (+60 list, +60 open conversation on the inbox) | 12 after 30 s quiet (+12 list, +12 open conversation) |
 | Wait after the reply text before the turn ends | until the judgement, ≤ 3 s (≈0.6–1.0 s at prod p50) | ≤ 0.3 s |
 | Gemini embedding before a product/service save | 434 ms p50 (prod) | 0 (after the response) |
 | Fonts | 10 files, 143,276 B, 2 latin preloads, fetched from Google at build | the same files, bytes and preloads, no network |
 
 **Tests and checks (real output):**
-- New `npm run test:perf-speed`, 32 cases, mocks only, in CI.
+- New `npm run test:perf-speed`, 35 cases, mocks only, in CI.
 - Updated suites: `test:onboarding-flow` (persona assertion, mocks), `test:sandbox-chat` (timing stub, `scripts/lib/request-timing-stub.mjs`), `test:onboarding-capabilities` (mock).
 - `npm run lint` exit 0 and `npm run typecheck` exit 0.
-- All 44 `test:*` suites pass, 1,112 cases, including ai-honesty 52/52, output-guard 26/26 and widget-reliability 78/78.
-- `npm run build` exit 0 offline: `.env.local` moved aside, placeholder credentials, unreachable loopback DB, 84/84 pages.
+- All 44 `test:*` suites pass, 1,117 cases, including ai-honesty 52/52, output-guard 26/26 and widget-reliability 78/78.
+- `npm run build` exit 0 offline: `.env.local` moved aside, placeholder credentials, unreachable loopback DB, 85/85 pages.
 - **Not run:** `npm test` (pgTAP; no SQL change), evals and anything calling Gemini, `next dev`.
 
 **Live checks after merge:** see the PR description.
