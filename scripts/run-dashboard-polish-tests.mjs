@@ -167,3 +167,63 @@ test("Test your agent sits right under Overview and its page needs a published a
   assert.match(page, /<SandboxChatPanel liveAvailable \/>/);
   assert.doesNotMatch(source("app/(dashboard)/onboarding/_components/steps/review-step.tsx"), /liveAvailable/);
 });
+
+// ---------------------------------------------------------------- Item 3
+test("welcome card only claims the widget answers when a key lists an allowed origin", () => {
+  const { widgetAnswersVisitors } = loadModule(dashboard + "_components/launch-card.tsx", {
+    "next/link": {}, "../widget-settings/copy-key-button": {}, "./add-origin-form": {},
+    "react/jsx-runtime": { jsx() {}, jsxs() {}, Fragment: null },
+  });
+  assert.equal(widgetAnswersVisitors([]), false);
+  assert.equal(widgetAnswersVisitors([{ status: "active", allowed_origins: [] }]), false);
+  assert.equal(widgetAnswersVisitors([{ status: "revoked", allowed_origins: ["https://a.com"] }]), false);
+  assert.equal(widgetAnswersVisitors([{ status: "active", allowed_origins: ["https://a.com"] }]), true);
+});
+
+test("welcome card claims only connected, plan-allowed channels", () => {
+  const page = source(dashboard + "page.tsx");
+  assert.match(page, /meta\.whatsapp && channelAllowed\(entitlement, "whatsapp"\)/);
+  assert.match(page, /meta\.instagram && channelAllowed\(entitlement, "instagram"\)/);
+  const card = source(dashboard + "_components/launch-card.tsx");
+  assert.match(card, /widgetReady \? "Your AI sales employee is live"/);
+  assert.match(card, /\{!widgetReady \? <AddOriginForm \/> : null\}/);
+});
+
+test("add-website action validates with the Widget settings origin parser and uses the session business", async () => {
+  const calls = [];
+  const mod = loadModule(dashboard + "widget-settings/actions.ts", {
+    zod: require("zod"),
+    "@/lib/schemas/agent-persona": { agentNameSchema: {} },
+    "@/lib/agent-images": {},
+    "next/cache": { revalidatePath() {} },
+    "next/server": { after() {} },
+    "@/lib/answer-bank/generate": {},
+    "@/lib/business-context": { requireBusinessContext: async () => ({ businessId: "biz_session", userId: "u1", orgRole: "org:admin" }) },
+    "@/lib/auth": { requireMinRole: () => null },
+    "@/lib/widget-keys": {
+      createWidgetKey: async () => ({}), revokeWidgetKey: async () => true,
+      ensureWidgetKey: async (businessId, origin) => { calls.push(["ensure", businessId, origin]); return { key: { id: "k1", name: "n", allowed_origins: [] }, created: true }; },
+      updateWidgetKeyOrigins: async () => true,
+    },
+    "@/lib/onboarding-readiness-data": {}, "@/lib/onboarding-readiness": {}, "@/lib/schemas/business": {},
+    "@/lib/schemas/widget-origin": loadModule("lib/schemas/widget-origin.ts"),
+    "@/lib/widget-suggested-questions": {},
+    "@/lib/audit-log": { recordAuditLogEntry: async () => {} },
+    "@/lib/errors": { logAndGetUserMessage: () => "err" },
+    "@/lib/business": {}, "@/lib/schemas/widget-chat-request": {},
+  });
+  const submit = (origin, extra = {}) => {
+    const form = new FormData();
+    form.set("origin", origin);
+    for (const [k, v] of Object.entries(extra)) form.set(k, v);
+    return mod.addWidgetOriginAction({}, form);
+  };
+  for (const bad of ["", "example.com", "https://example.com/", "https://example.com/pricing", "https://a.com, https://b.com"]) {
+    const r = await submit(bad);
+    assert.ok(r.error, "rejects " + JSON.stringify(bad));
+  }
+  assert.equal(calls.length, 0);
+  const ok = await submit("https://example.com", { businessId: "biz_evil" });
+  assert.equal(ok.success, true);
+  assert.deepEqual(calls, [["ensure", "biz_session", "https://example.com"]]);
+});

@@ -1,7 +1,9 @@
 import { headers } from "next/headers";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { buildWidgetSnippet } from "./widget-settings/build-widget-snippet";
-import { LaunchCard } from "./_components/launch-card";
+import { LaunchCard, widgetAnswersVisitors } from "./_components/launch-card";
+import { channelAllowed, getEntitlementForBusiness } from "@/lib/subscription";
+import { loadConnectedMetaChannels } from "@/lib/connected-meta-channels";
 import { InstallWidgetBanner } from "./_components/install-widget-banner";
 import { requireLiveBusinessContext } from "@/lib/business-context";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -35,7 +37,17 @@ export default async function DashboardOverviewPage({
   const widgetKeys = await listWidgetKeysForBusiness(businessId);
   const activeKeys = widgetKeys.filter((k) => k.status !== "revoked");
   let launchSnippet: string | null = null;
+  const launchChannels: string[] = [];
   if (welcome === "1") {
+    // Only channels that are connected AND allowed on the plan are claimed as live.
+    const [meta, entitlement] = await Promise.all([
+      loadConnectedMetaChannels(businessId),
+      getEntitlementForBusiness(businessId).catch(() => null),
+    ]);
+    if (meta && entitlement) {
+      if (meta.whatsapp && channelAllowed(entitlement, "whatsapp")) launchChannels.push("WhatsApp");
+      if (meta.instagram && channelAllowed(entitlement, "instagram")) launchChannels.push("Instagram");
+    }
     const requestHeaders = await headers();
     const origin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
     launchSnippet = activeKeys[0] ? buildWidgetSnippet(activeKeys[0].key, origin) : null;
@@ -79,7 +91,7 @@ export default async function DashboardOverviewPage({
 
   return (
     <div className="flex flex-1 flex-col gap-8">
-      {welcome === "1" ? <LaunchCard snippet={launchSnippet} /> : null}
+      {welcome === "1" ? <LaunchCard snippet={launchSnippet} widgetReady={widgetAnswersVisitors(activeKeys)} channels={launchChannels} /> : null}
       {showInstallBanner ? <InstallWidgetBanner hasActiveKey={activeKeys.length > 0} /> : null}
 
       <PageHeader
