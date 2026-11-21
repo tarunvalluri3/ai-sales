@@ -3,17 +3,13 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
-import { computeOnboardingProgress, ONBOARDING_STEPS, ROUTE_FOR_STEP } from "@/lib/onboarding-steps";
+import { onboardingProgressFrom, ONBOARDING_STEPS, ROUTE_FOR_STEP } from "@/lib/onboarding-steps";
 import type { OnboardingStep } from "@/lib/supabase/types";
-import { listServicesForBusiness } from "@/lib/services";
-import { listProductsForBusiness } from "@/lib/products";
-import { listFaqsForBusiness } from "@/lib/faqs";
 import { listWebsiteImports } from "@/lib/website-suggestion-state";
 import { logEvent } from "@/lib/logger";
 import { listKnowledgeDocumentsForBusiness } from "@/lib/knowledge";
 import { summarizeSavedHours } from "@/lib/business-hours-summary";
 import { sanitizeAccentColor } from "@/lib/widget-colors";
-import { listBusinessHours } from "@/lib/business-hours";
 import { listWidgetKeysForBusiness } from "@/lib/widget-keys";
 import { getWhatsappConnectionForBusiness } from "@/lib/whatsapp";
 import { getEmbeddedSignupClientConfig } from "@/lib/whatsapp-embedded-signup";
@@ -28,7 +24,7 @@ import { connectedMetaChannelsFrom } from "@/lib/connected-meta-channels";
 import { launchedMetaChannelNames, type ConnectedMetaChannels } from "@/lib/plan-channel-copy";
 import { SUPPLIER } from "@/lib/invoice-config";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { loadReadinessReport, getFaqGeneratedDocStatuses } from "@/lib/onboarding-readiness-data";
+import { loadReadinessData } from "@/lib/onboarding-readiness-data";
 import { countReadinessItems, evaluateReadiness } from "@/lib/onboarding-readiness";
 import { WizardShell, type StageStatus } from "./_components/wizard-shell";
 import { OnboardingPreviewProvider } from "./_components/preview-context";
@@ -135,8 +131,25 @@ async function renderOnboardingPage(timing: RequestTiming, searchParams: Onboard
   }
 
   const businessId = business.id;
-  const progress = await computeOnboardingProgress(business);
-  timing.mark("progress");
+
+  // ONE parallel load for the whole render (perf/reply-and-save-speed). The
+  // readiness rows (FAQs, products, services, hours, per-FAQ statuses) are the
+  // ones the steps render, and progress is graded from the same reads, so
+  // nothing is read twice; before, progress and the page each read most of
+  // these tables, and hours were read again per step.
+  const [readinessData, knowledgeDocuments, widgetKeys, whatsapp, instagram, entitlement, requestHeaders] =
+    await Promise.all([
+      loadReadinessData(businessId, business),
+      listKnowledgeDocumentsForBusiness(businessId),
+      listWidgetKeysForBusiness(businessId),
+      getWhatsappConnectionForBusiness(businessId),
+      getInstagramConnectionForBusiness(businessId),
+      getEntitlementForBusiness(businessId),
+      headers(),
+    ]);
+  timing.mark("data");
+  const { report: readiness, products, services, faqs, hours, faqDocStatuses } = readinessData;
+  const progress = onboardingProgressFrom(business, { report: readiness, entitlement, whatsapp, instagram, widgetKeys });
 
   const requested = isOnboardingStep(stepParam) ? stepParam : null;
   const activeStep: OnboardingStep =
@@ -147,32 +160,6 @@ async function renderOnboardingPage(timing: RequestTiming, searchParams: Onboard
         ? business.onboarding_step
         : progress.currentStep;
 
-  const [
-    products,
-    services,
-    faqs,
-    knowledgeDocuments,
-    faqDocStatuses,
-    widgetKeys,
-    whatsapp,
-    instagram,
-    entitlement,
-    readiness,
-    requestHeaders,
-  ] = await Promise.all([
-    listProductsForBusiness(businessId),
-    listServicesForBusiness(businessId),
-    listFaqsForBusiness(businessId),
-    listKnowledgeDocumentsForBusiness(businessId),
-    getFaqGeneratedDocStatuses(businessId),
-    listWidgetKeysForBusiness(businessId),
-    getWhatsappConnectionForBusiness(businessId),
-    getInstagramConnectionForBusiness(businessId),
-    getEntitlementForBusiness(businessId),
-    loadReadinessReport(businessId, business),
-    headers(),
-  ]);
-  timing.mark("data");
 
   const appOrigin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
   const counts = countReadinessItems(readiness.items);
@@ -216,7 +203,7 @@ async function renderOnboardingPage(timing: RequestTiming, searchParams: Onboard
         return {
           heading: "Set up your business",
           description: "Give your agent the details it needs to represent your business.",
-          content: <BusinessStep business={business} readinessItems={readiness.items} hours={await listBusinessHours(businessId)} />,
+          content: <BusinessStep business={business} readinessItems={readiness.items} hours={hours} />,
         };
       case "knowledge":
         return {
@@ -244,7 +231,7 @@ async function renderOnboardingPage(timing: RequestTiming, searchParams: Onboard
         return {
           heading: "How should your agent sound?",
           description: "Pick a tone and write the greeting prospects see first.",
-          content: <PersonaStep business={business} hoursSummary={summarizeSavedHours(await listBusinessHours(businessId), business.timezone ?? "UTC")} />,
+          content: <PersonaStep business={business} hoursSummary={summarizeSavedHours(hours, business.timezone ?? "UTC")} />,
         };
       case "channels": {
         const instagramEntitled = channelAllowed(entitlement, "instagram");
@@ -324,7 +311,7 @@ async function renderOnboardingPage(timing: RequestTiming, searchParams: Onboard
                 privacyPolicyUrl: business.privacy_policy_url,
               }}
               openingHours={{
-                hours: await listBusinessHours(businessId),
+                hours,
                 slaMinutes: business.sla_minutes ?? null,
                 timezone: business.timezone ?? "UTC",
               }}

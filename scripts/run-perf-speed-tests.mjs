@@ -385,3 +385,80 @@ test("the attention badge and the open conversation poll with fetch, not a Serve
   assert.match(panel, /fetchConversationUpdates\(conversationId, asOfRef\.current\)/);
   assert.match(source("lib/dashboard-poll-client.ts"), /cache: "no-store"/);
 });
+
+// --------------------------------------- item 2: lighter onboarding render
+function readinessHarness() {
+  const reads = [];
+  const rows = {
+    knowledge_documents: [
+      { id: "d1", source_type: "faq", source_id: "faq-1", ingestion_status: "complete", status: "published" },
+      { id: "d2", source_type: "faq", source_id: "faq-2", ingestion_status: "processing", status: "published" },
+      { id: "d3", source_type: "manual", source_id: null, ingestion_status: "complete", status: "published" },
+    ],
+    knowledge_chunks: [{ document_id: "d1" }, { document_id: "d3" }],
+    business_readiness_dismissals: [],
+  };
+  const query = (table) => {
+    const result = { data: rows[table], error: null };
+    const builder = { select: () => builder, eq: () => builder, then: (resolve) => resolve(result) };
+    return builder;
+  };
+  const list = (name, value) => async () => { reads.push(name); return value; };
+  const mod = loadModule("lib/onboarding-readiness-data.ts", {
+    "@/lib/supabase/server": { createServerSupabaseClient: () => ({ from: (table) => { reads.push(table); return query(table); } }) },
+    "@/lib/errors": { AppError: Error },
+    "@/lib/faqs": { listFaqsForBusiness: list("faqs", [{ id: "faq-1", question: "Q1?", answer: "A1" }]) },
+    "@/lib/products": { listProductsForBusiness: list("products", [{ name: "Whitening", description: "Teeth whitening" }]) },
+    "@/lib/services": { listServicesForBusiness: list("services", []) },
+    "@/lib/business-hours": { listBusinessHours: list("business_hours", [{ is_open: true }]) },
+    "@/lib/business-hours-defaults": { hasConfirmedBusinessHours: () => true },
+    "@/lib/agent-published": { isAgentPublished: () => false },
+    "@/lib/onboarding-readiness": { evaluateReadiness: (input) => ({ items: [], canPublish: true, input }) },
+  });
+  return { ...mod, reads };
+}
+
+test("loadReadinessData: the same seven reads, and it also returns the rows the page renders", async () => {
+  const harness = readinessHarness();
+  const data = await harness.loadReadinessData("business-a", { business_type: "clinic" });
+  assert.equal(harness.reads.length, 7);
+  assert.deepEqual([...harness.reads].sort(), ["business_hours", "business_readiness_dismissals", "faqs", "knowledge_chunks", "knowledge_documents", "products", "services"]);
+  assert.equal(data.products[0].name, "Whitening");
+  assert.equal(data.hours.length, 1);
+  // Same answer getFaqGeneratedDocStatuses gave from its own extra query.
+  assert.deepEqual(JSON.parse(JSON.stringify(data.faqDocStatuses)), { "faq-1": "complete", "faq-2": "processing" });
+  assert.deepEqual(data.report.input.knowledgeSources.map((s) => s.hasChunks), [true, false, true]);
+});
+
+test("onboardingProgressFrom grades exactly like computeOnboardingProgress", async () => {
+  const report = (met, canPublish) => ({ items: met.map((key) => ({ key, status: "met" })), canPublish });
+  const cases = [
+    [report([], false), { serving: false }, null, null, []],
+    [report(["profile_name", "profile_business_type", "profile_description", "profile_contact_email", "knowledge_ready"], false), { serving: true }, null, null, [{ status: "revoked" }]],
+    [report(["profile_name", "profile_business_type", "profile_description", "profile_contact_email", "knowledge_ready", "catalog_present", "faqs_ready"], true), { serving: true }, { id: "wa" }, null, [{ status: "active" }]],
+  ];
+  for (const [rep, entitlement, whatsapp, instagram, widgetKeys] of cases) {
+    const steps = loadModule("lib/onboarding-steps.ts", {
+      "@/lib/onboarding-readiness-data": { loadReadinessReport: async () => rep },
+      "@/lib/subscription": { getEntitlementForBusiness: async () => entitlement },
+      "@/lib/whatsapp": { getWhatsappConnectionForBusiness: async () => whatsapp },
+      "@/lib/instagram": { getInstagramConnectionForBusiness: async () => instagram },
+      "@/lib/widget-keys": { listWidgetKeysForBusiness: async () => widgetKeys },
+      "@/lib/agent-published": { isAgentPublished: () => false },
+    });
+    const business = { id: "b", widget_welcome_text: "Hi", widget_language: "en" };
+    const viaLoad = await steps.computeOnboardingProgress(business);
+    const viaRows = steps.onboardingProgressFrom(business, { report: rep, entitlement, whatsapp, instagram, widgetKeys });
+    assert.deepEqual(JSON.parse(JSON.stringify(viaRows)), JSON.parse(JSON.stringify(viaLoad)));
+  }
+});
+
+test("the onboarding page loads its data once: no duplicate progress, readiness, list or hours reads", () => {
+  const page = source("app/(dashboard)/onboarding/page.tsx");
+  assert.match(page, /loadReadinessData\(businessId, business\)/);
+  assert.match(page, /onboardingProgressFrom\(business, \{ report: readiness/);
+  for (const duplicate of [/computeOnboardingProgress\(/, /loadReadinessReport\(/, /getFaqGeneratedDocStatuses\(/, /listBusinessHours\(/, /listProductsForBusiness\(/, /listServicesForBusiness\(/, /listFaqsForBusiness\(/]) {
+    assert.doesNotMatch(page, duplicate);
+  }
+  assert.equal((page.match(/await Promise\.all\(/g) ?? []).length, 3); // the load, plus the existing new-business and plan-step pairs
+});

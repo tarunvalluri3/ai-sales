@@ -1,6 +1,14 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Business, IngestionStatus, KnowledgeDocumentStatus } from "@/lib/supabase/types";
+import type {
+  Business,
+  BusinessHours,
+  Faq,
+  IngestionStatus,
+  KnowledgeDocumentStatus,
+  Product,
+  Service,
+} from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
 import { listFaqsForBusiness } from "@/lib/faqs";
 import { listProductsForBusiness } from "@/lib/products";
@@ -32,8 +40,30 @@ type KnowledgeDocRow = {
   status: KnowledgeDocumentStatus;
 };
 
+/**
+ * The readiness report together with the rows it was graded from. The
+ * onboarding page renders those same FAQs, products, services, hours and
+ * per-FAQ ingestion statuses, so it takes them from here instead of reading
+ * them a second time (perf/reply-and-save-speed: one render used to read
+ * most of these tables twice).
+ */
+export type ReadinessData = {
+  report: ReadinessReport;
+  faqs: Faq[];
+  products: Product[];
+  services: Service[];
+  hours: BusinessHours[];
+  /** Ingestion status of each FAQ's generated knowledge document, keyed by FAQ id (same as getFaqGeneratedDocStatuses). */
+  faqDocStatuses: Record<string, IngestionStatus>;
+};
+
 /** Fetches the readiness snapshot and evaluates it in one call. */
 export async function loadReadinessReport(businessId: string, business: Business): Promise<ReadinessReport> {
+  return (await loadReadinessData(businessId, business)).report;
+}
+
+/** loadReadinessReport() plus the rows behind it; the same seven tenant-scoped reads. */
+export async function loadReadinessData(businessId: string, business: Business): Promise<ReadinessData> {
   const [knowledgeDocs, chunkedDocIds, faqs, products, services, hours, dismissedItemKeys] =
     await Promise.all([
       fetchKnowledgeDocs(businessId),
@@ -86,7 +116,14 @@ export async function loadReadinessReport(businessId: string, business: Business
     dismissedItemKeys,
   };
 
-  return evaluateReadiness(input);
+  return {
+    report: evaluateReadiness(input),
+    faqs,
+    products,
+    services,
+    hours,
+    faqDocStatuses: Object.fromEntries(faqDocStatusBySourceId),
+  };
 }
 
 async function fetchKnowledgeDocs(businessId: string): Promise<KnowledgeDocRow[]> {
