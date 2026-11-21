@@ -42,7 +42,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         formFieldInputPlaceholder__organizationName: "Your business name",
         taskChooseOrganization: {
           title: "What's your business called?",
-          createOrganization: { title: "What's your business called?" },
+          createOrganization: {
+            title: "What's your business called?",
+            formFieldInputPlaceholder__name: "Your business name",
+          },
         },
       }}
       taskUrls={{ "choose-organization": "/session-tasks/choose-organization" }}

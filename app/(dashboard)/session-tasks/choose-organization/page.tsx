@@ -1,10 +1,5 @@
-import { TaskChooseOrganization } from "@clerk/nextjs";
-import { clerkDarkAppearance } from "@/lib/clerk-appearance";
+import { WaveAuthFrame } from "../../_components/wave-auth-frame";
 
 export default function ChooseOrganizationTaskPage() {
-  return (
-    <div className="flex flex-1 items-center justify-center bg-ds-bg p-6">
-      <TaskChooseOrganization redirectUrlComplete="/dashboard" appearance={clerkDarkAppearance} />
-    </div>
-  );
+  return <WaveAuthFrame screen="choose-organization" />;
 }

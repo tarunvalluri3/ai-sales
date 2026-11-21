@@ -385,3 +385,24 @@ export function WavesLogo({
     </span>
   );
 }
+
+/** Use the dashboard's first-paint theme, including its dark default. */
+export function ThemedWavesLogo({ compact = false, collapseNameOnMobile = false }: {
+  compact?: boolean;
+  collapseNameOnMobile?: boolean;
+}) {
+  return (
+    <>
+      <span className="wave-logo-on-dark">
+        {compact ? <WavesMark scale="nav" tone="dark" title="Waves AI Pilot" /> : (
+          <WavesLogo tone="dark" collapseNameOnMobile={collapseNameOnMobile} />
+        )}
+      </span>
+      <span className="wave-logo-on-light">
+        {compact ? <WavesMark scale="nav" tone="light" title="Waves AI Pilot" /> : (
+          <WavesLogo tone="light" collapseNameOnMobile={collapseNameOnMobile} />
+        )}
+      </span>
+    </>
+  );
+}

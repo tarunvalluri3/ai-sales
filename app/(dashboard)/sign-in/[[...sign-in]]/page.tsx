@@ -1,13 +1,7 @@
-import { SignIn } from "@clerk/nextjs";
-import { clerkDarkAppearance } from "@/lib/clerk-appearance";
-
 import { redirectSignedInFromAuthPage } from "@/lib/auth-page-redirect";
+import { WaveAuthFrame } from "../../_components/wave-auth-frame";
 
 export default async function SignInPage() {
   await redirectSignedInFromAuthPage();
-  return (
-    <div className="flex flex-1 items-center justify-center bg-ds-bg p-6">
-      <SignIn appearance={clerkDarkAppearance} />
-    </div>
-  );
+  return <WaveAuthFrame screen="sign-in" />;
 }

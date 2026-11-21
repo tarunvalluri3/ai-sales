@@ -407,6 +407,68 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.wave-logo-on-light,
+:root[data-theme="light"] .wave-logo-on-dark {
+  display: none;
+}
+
+:root[data-theme="light"] .wave-logo-on-light {
+  display: block;
+}
+
+.wave-auth .wave-clerk-root,
+.wave-auth .wave-clerk-card-box {
+  width: 100%;
+  max-width: 26rem;
+}
+
+.dash-shell .wave-clerk-card-box {
+  border-radius: var(--dx-card-radius);
+  background: var(--ds-surface);
+}
+
+.dash-shell .wave-clerk-card {
+  width: 100%;
+  border-radius: var(--dx-card-radius);
+  background: var(--ds-surface);
+  color: var(--ds-text-primary);
+}
+
+.dash-shell .wave-clerk-footer {
+  border-top: 1px solid var(--ds-border);
+  background: var(--ds-surface-soft);
+  color: var(--ds-text-secondary);
+}
+
+.dash-shell .wave-clerk-ink { color: var(--ds-text-primary); }
+.dash-shell .wave-clerk-muted { color: var(--ds-text-secondary); }
+
+.dash-shell .wave-clerk-link {
+  color: var(--ds-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.dash-shell .wave-clerk-input,
+.dash-shell .wave-clerk-secondary {
+  min-height: 2.75rem;
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--ds-surface);
+  color: var(--ds-text-primary);
+}
+
+.dash-shell .wave-clerk-primary {
+  min-height: 2.75rem;
+  border-radius: var(--radius-xl);
+  background: var(--ds-primary);
+  color: var(--ds-primary-on);
+}
+
+.dash-shell .wave-clerk-primary:hover { background: var(--ds-primary-hover); }
+.dash-shell .wave-clerk-secondary:hover { background: var(--ds-surface-soft); }
+
 /* Type sizes and weights match the deployed (main) dashboard: page title 28px (32px from
    sm), card title 14 (16/18 where main used them), row title 14, body 14,
    meta 12, labels/table headers/badges 11, KPI numbers 30, unclassed text 16. */
