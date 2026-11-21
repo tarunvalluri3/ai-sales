@@ -5,19 +5,8 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
-import {
-  dismissConversationAttention,
-  getConversationForBusiness,
-  listConversationsForBusiness,
-  setConversationControl,
-  type ConversationWithMessageCount,
-} from "@/lib/conversations";
-import { listLeadsForBusiness } from "@/lib/leads";
-import {
-  createMessage,
-  listLastMessagesForConversations,
-  type LastMessagePreview,
-} from "@/lib/messages";
+import { dismissConversationAttention, getConversationForBusiness, setConversationControl } from "@/lib/conversations";
+import { createMessage } from "@/lib/messages";
 import { getCitationDetails, type CitedChunk } from "@/lib/knowledge";
 import { generateConversationSummary } from "@/lib/conversation-summary";
 import { suggestTagsForConversation } from "@/lib/tag-suggestions";
@@ -295,45 +284,8 @@ export async function dismissAttentionAction(
 // The open-conversation poll moved to GET /api/dashboard/conversations/[id]/updates
 // (lib/dashboard-poll.ts) so it never queues in front of a reply or take-over.
 
-export type ConversationLeadSummary = {
-  conversationId: string;
-  contactName: string | null;
-};
-
-export type PollConversationsResult = {
-  conversations: ConversationWithMessageCount[];
-  leads: ConversationLeadSummary[];
-  lastMessages: LastMessagePreview[];
-};
-
-/**
- * Polled directly from the conversations list view -- same shape as
- * the dashboard polls (no input, business-scoped, a plain async
- * function call from a client component). Leads come back as
- * {conversationId, contactName} pairs (not full Lead rows) -- just
- * enough to drive the "Lead" badge and, when named, stand in for the
- * row's primary label (/impeccable layout). lastMessages is one query
- * across every conversation this poll already knows about (not N+1),
- * for the row's preview line.
- */
-export async function pollConversationsAction(): Promise<PollConversationsResult> {
-  const { businessId } = await requireBusinessContext();
-  const supabase = createServerSupabaseClient();
-
-  const conversations = await listConversationsForBusiness(supabase, businessId);
-  const conversationIds = conversations.map((conversation) => conversation.id);
-
-  const [leads, lastMessages] = await Promise.all([
-    listLeadsForBusiness(businessId),
-    listLastMessagesForConversations(supabase, businessId, conversationIds),
-  ]);
-
-  return {
-    conversations,
-    leads: leads.map((lead) => ({ conversationId: lead.conversation_id, contactName: lead.contact_name })),
-    lastMessages,
-  };
-}
+// The conversations-list poll moved to GET /api/dashboard/conversations
+// (lib/dashboard-poll.ts) so it never queues in front of a reply or take-over.
 
 const chunkIdSchema = z.string().uuid();
 

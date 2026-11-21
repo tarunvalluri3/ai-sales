@@ -1,4 +1,6 @@
 import type { ConversationControl, Message } from "@/lib/supabase/types";
+import type { ConversationWithMessageCount } from "@/lib/conversations";
+import type { LastMessagePreview } from "@/lib/messages";
 
 /**
  * Browser side of the dashboard polls (app/api/dashboard/). Plain GET
@@ -16,6 +18,25 @@ export type ConversationUpdates = {
   needsAttention: boolean;
   asOf: string;
 };
+
+/** A lead's contact name keyed by its conversation: enough for the list's "Lead" badge and row label. */
+export type ConversationLeadSummary = {
+  conversationId: string;
+  contactName: string | null;
+};
+
+/** The conversations inbox's left rail (GET /api/dashboard/conversations). */
+export type ConversationListSnapshot = {
+  conversations: ConversationWithMessageCount[];
+  leads: ConversationLeadSummary[];
+  lastMessages: LastMessagePreview[];
+};
+
+function isConversationListSnapshot(value: unknown): value is ConversationListSnapshot {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return Array.isArray(v.conversations) && Array.isArray(v.leads) && Array.isArray(v.lastMessages);
+}
 
 function isAttentionSnapshot(value: unknown): value is AttentionSnapshot {
   if (typeof value !== "object" || value === null) return false;
@@ -43,6 +64,12 @@ async function getJson(url: string): Promise<unknown> {
 export async function fetchAttentionSnapshot(): Promise<AttentionSnapshot> {
   const body = await getJson("/api/dashboard/attention");
   if (!isAttentionSnapshot(body)) throw new Error("poll failed: unexpected body");
+  return body;
+}
+
+export async function fetchConversationList(): Promise<ConversationListSnapshot> {
+  const body = await getJson("/api/dashboard/conversations");
+  if (!isConversationListSnapshot(body)) throw new Error("poll failed: unexpected body");
   return body;
 }
 

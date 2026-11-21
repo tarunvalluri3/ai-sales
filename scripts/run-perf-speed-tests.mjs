@@ -333,6 +333,7 @@ function loadRoute(path, { context, loaders }) {
     "@/lib/dashboard-poll": {
       loadAttentionSnapshot: async (businessId) => { seen.push(["attention", businessId]); return loaders.attention; },
       loadConversationUpdates: async (businessId, input) => { seen.push(["updates", businessId, input]); return loaders.updates; },
+      loadConversationList: async (businessId) => { seen.push(["list", businessId]); return loaders.list; },
     },
     "@/lib/errors": { logAndGetUserMessage: () => "x" },
     "@/lib/request-timing": { RequestTiming: class { time(_s, w) { return w(); } finish() { return null; } } },
@@ -710,5 +711,60 @@ test("fonts: self-hosted files, the variables the app reads point at the shared 
     assert.equal((text.match(/preload: false/g) ?? []).length, 5, file + ": only the two latin files are preloaded");
     assert.equal((text.match(/value: "Hanken Grotesk"/g) ?? []).length, 4, file);
     assert.equal((text.match(/value: "Space Grotesk"/g) ?? []).length, 3, file);
+  }
+});
+
+// --------------- conversation list poll (owner addition to item 3)
+test("GET /api/dashboard/conversations: 401 without a session business; the session's own list, never cached", async () => {
+  const denied = loadRoute("app/api/dashboard/conversations/route.ts", { context: null, loaders: {} });
+  assert.equal((await denied.GET()).status, 401);
+  assert.equal(denied.seen.length, 0);
+
+  const list = { conversations: [{ id: "c1" }], leads: [], lastMessages: [] };
+  const route = loadRoute("app/api/dashboard/conversations/route.ts", { context: { businessId: "business-a" }, loaders: { list } });
+  const response = await route.GET();
+  assert.equal(response.status, 200);
+  assert.equal(response.headers["Cache-Control"], "private, no-store");
+  assert.deepEqual(route.seen, [["list", "business-a"]]);
+});
+
+test("loadConversationList: the same tenant-scoped reads as the old action, leads reduced to name pairs", async () => {
+  const calls = [];
+  const { loadConversationList } = loadModule("lib/dashboard-poll.ts", {
+    "@/lib/supabase/server": { createServerSupabaseClient: () => ({}) },
+    "@/lib/conversations": {
+      listConversationsForBusiness: async (_s, businessId) => { calls.push(["conversations", businessId]); return [{ id: "c1" }, { id: "c2" }]; },
+    },
+    "@/lib/internal-notifications": {},
+    "@/lib/messages": {
+      listLastMessagesForConversations: async (_s, businessId, ids) => { calls.push(["last", businessId, ids.join(",")]); return []; },
+    },
+    "@/lib/leads": {
+      listLeadsForBusiness: async (businessId) => {
+        calls.push(["leads", businessId]);
+        return [{ conversation_id: "c1", contact_name: "Ravi", email: "r@x.co", phone: "+91 98" }];
+      },
+    },
+    "@/lib/logger": {},
+  });
+  const result = JSON.parse(JSON.stringify(await loadConversationList("business-a")));
+  assert.deepEqual(calls, [["conversations", "business-a"], ["leads", "business-a"], ["last", "business-a", "c1,c2"]]);
+  assert.deepEqual(result.leads, [{ conversationId: "c1", contactName: "Ravi" }]); // no email/phone in the poll
+});
+
+test("the conversation list polls with fetch: 1 s -> 5 s on the list, 5 s beside an open conversation, paused when hidden", () => {
+  const pane = source("app/(dashboard)/dashboard/conversations/_components/chat-list-pane.tsx");
+  assert.doesNotMatch(pane, /from "\.\.\/actions"/);
+  assert.match(pane, /fetchConversationList\(\)/);
+  assert.match(pane, /isIndex \? nextPollDelayMs\(lastChangeAtRef\.current, Date\.now\(\)\) : POLL_SLOW_MS/);
+  assert.match(pane, /visibilityState === "visible"/);
+  assert.doesNotMatch(source("app/(dashboard)/dashboard/conversations/actions.ts"), /pollConversationsAction/);
+  // Every dashboard poll is now a GET route; none is a Server Action.
+  for (const file of [
+    "app/(dashboard)/dashboard/_components/attention-provider.tsx",
+    "app/(dashboard)/dashboard/conversations/_components/live-conversation-panel.tsx",
+    "app/(dashboard)/dashboard/conversations/_components/chat-list-pane.tsx",
+  ]) {
+    assert.match(source(file), /@\/lib\/dashboard-poll-client/, file);
   }
 });

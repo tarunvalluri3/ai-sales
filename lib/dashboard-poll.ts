@@ -1,15 +1,17 @@
 import "server-only";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { countConversationsNeedingAttention, getConversationForBusiness } from "@/lib/conversations";
+import { countConversationsNeedingAttention, getConversationForBusiness, listConversationsForBusiness } from "@/lib/conversations";
 import { countUnreadInternalNotifications } from "@/lib/internal-notifications";
-import { listMessagesForConversationAfter } from "@/lib/messages";
+import { listLastMessagesForConversations, listMessagesForConversationAfter } from "@/lib/messages";
+import { listLeadsForBusiness } from "@/lib/leads";
 import { logEvent } from "@/lib/logger";
+import type { ConversationListSnapshot } from "@/lib/dashboard-poll-client";
 import type { ConversationControl, Message } from "@/lib/supabase/types";
 
 /**
- * The two dashboard polls (attention badge + bell, and one open
- * conversation), read by the GET routes under app/api/dashboard/. They used
+ * The dashboard polls (attention badge + bell, the conversations inbox list,
+ * and one open conversation), read by the GET routes under app/api/dashboard/. They used
  * to be Server Actions, and Next.js dispatches Server Actions one at a time
  * per tab, so a poll in flight made every save and test-chat send wait
  * behind it (perf/reply-and-save-speed, STATE.md 2026-11-21). A GET route is
@@ -51,6 +53,27 @@ export async function loadAttentionSnapshot(businessId: string): Promise<Dashboa
   }
 
   return { attentionCount, unreadNotificationCount };
+}
+
+/**
+ * The conversations inbox's left rail: the most recent conversations, each
+ * conversation's lead contact name, and one last-message preview per row
+ * (one query across the listed conversations, not N+1). Same reads as the
+ * former pollConversationsAction.
+ */
+export async function loadConversationList(businessId: string): Promise<ConversationListSnapshot> {
+  const supabase = createServerSupabaseClient();
+  const conversations = await listConversationsForBusiness(supabase, businessId);
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  const [leads, lastMessages] = await Promise.all([
+    listLeadsForBusiness(businessId),
+    listLastMessagesForConversations(supabase, businessId, conversationIds),
+  ]);
+  return {
+    conversations,
+    leads: leads.map((lead) => ({ conversationId: lead.conversation_id, contactName: lead.contact_name })),
+    lastMessages,
+  };
 }
 
 export type PollConversationResult = {
