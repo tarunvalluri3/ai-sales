@@ -890,6 +890,9 @@ async function handleChatPost(request: NextRequest, timing: RequestTiming) {
           followUpContact: response.escalate
             ? await getMaskedFollowUpContact(supabase, business.businessId, conversation.id)
             : null,
+          // The judgement missed the grace (lib/chat-timeouts.ts): the widget
+          // watches /api/chat/poll for a late escalation of this turn.
+          judgementPending: Boolean(response.pendingJudgement),
         }),
         sideEffects: finalizeTurnSideEffects,
         logError: (stage, error) => {

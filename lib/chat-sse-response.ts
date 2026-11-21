@@ -38,8 +38,8 @@ export type SseTurnOptions<R extends SseTurnResponse> = {
   generate: (signal: AbortSignal) => AsyncIterable<SseTurnChunk<R>>;
   /** Writes the assistant message; returns the poll cursor for the terminal event. */
   persist: (response: R, interrupted: boolean) => Promise<{ asOf: string }>;
-  /** Extra fields for the `final` event (e.g. the masked follow-up contact). Failure is ignored. */
-  finalExtras?: (response: R) => Promise<{ followUpContact?: string | null }>;
+  /** Extra fields for the `final` event (the masked follow-up contact, whether the judgement is still pending). Failure is ignored. */
+  finalExtras?: (response: R) => Promise<{ followUpContact?: string | null; judgementPending?: boolean }>;
   /** Everything that happens after the answer (escalation, metrics, ...). Runs after the terminal event. */
   sideEffects: (response: R, interrupted: boolean) => Promise<void>;
   /** Server-side logging of an unexpected error (never sent to the client). */
@@ -147,7 +147,7 @@ export function createChatSseStream<R extends SseTurnResponse>(options: SseTurnO
           emit({ type: "error", kind: "failure" });
           return;
         }
-        let extras: { followUpContact?: string | null } = {};
+        let extras: { followUpContact?: string | null; judgementPending?: boolean } = {};
         if (options.finalExtras) {
           try {
             extras = await options.finalExtras(response);
@@ -163,6 +163,7 @@ export function createChatSseStream<R extends SseTurnResponse>(options: SseTurnO
           recommendedProducts: response.recommendedProducts,
           asOf,
           followUpContact: extras.followUpContact ?? null,
+          judgementPending: extras.judgementPending === true,
         });
       } catch (error) {
         options.logError("generate", error);

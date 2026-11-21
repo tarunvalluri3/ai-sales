@@ -5,7 +5,7 @@ import { parseFromParentMessage, postToParent, type WidgetErrorKind, type Widget
 import type { WidgetStrings } from "@/lib/widget-i18n";
 import { CHAT_CLIENT_TIMEOUT_MS, STREAM_CLIENT_STALL_TIMEOUT_MS } from "@/lib/chat-timeouts";
 import { WidgetTurnWatch } from "@/lib/widget-turn-watch";
-import { appendStreamDelta, finalizeStreamMessage, finalizeAbortedStream, retractStreamMessage } from "@/lib/widget-stream-reducer";
+import { appendStreamDelta, applyLateEscalation, finalizeStreamMessage, finalizeAbortedStream, retractStreamMessage } from "@/lib/widget-stream-reducer";
 
 export type ChatMessage = {
   id: string;
@@ -87,6 +87,8 @@ export function useWidgetChat(
       { userMessageId: string; assistantPlaceholderId: string; text: string; watch: WidgetTurnWatch; sawDelta?: boolean }
     >(),
   );
+  // Finished turns whose escalation judgement was still running: requestId -> reply id.
+  const lateJudgementRef = useRef(new Map<string, string>());
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -164,6 +166,15 @@ export function useWidgetChat(
             recommendedProducts: message.recommendedProducts,
           }),
         );
+        // The judgement may still escalate this turn (widget:late_escalation).
+        if (message.judgementPending && !message.escalate) {
+          lateJudgementRef.current.set(message.requestId, pending.assistantPlaceholderId);
+        }
+      } else if (message.type === "widget:late_escalation") {
+        const replyId = lateJudgementRef.current.get(message.requestId);
+        if (!replyId) return;
+        lateJudgementRef.current.delete(message.requestId);
+        setMessages((prev) => applyLateEscalation(prev, replyId, message.followUpContact));
       } else if (message.type === "widget:stream_aborted") {
         const pending = pendingRef.current.get(message.requestId);
         if (!pending) return;

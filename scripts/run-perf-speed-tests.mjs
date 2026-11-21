@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import { createLoaderHarness, jsonResponse, sseResponse } from "./lib/widget-loader-harness.mjs";
 
 // perf/reply-and-save-speed (STATE.md 2026-11-21). Mocks only -- no network,
 // database or Gemini.
@@ -549,4 +550,133 @@ test("the dashboard and onboarding catalog actions defer embeddings with after()
   const services = source("app/(dashboard)/dashboard/services/actions.ts");
   assert.equal((products.match(/\{ embedLater: after \}/g) ?? []).length, 3); // create, update, in-place update
   assert.equal((services.match(/\{ embedLater: after \}/g) ?? []).length, 2); // create, update
+});
+
+// ----------------------- item 5: the widget turn ends when the text ends
+test("the server waits at most 0.3 s for the judgement after the text, and says when it is still pending", async () => {
+  assert.match(source("lib/chat-timeouts.ts"), /export const STREAM_METADATA_GRACE_MS = 300;/);
+  const { createChatSseStream } = loadModule("lib/chat-sse-response.ts", {
+    "@/lib/chat-stream": { encodeStreamEvent: (event) => `data: ${JSON.stringify(event)}\n\n` },
+  }, { TextEncoder, TextDecoder, ReadableStream, AbortController, setInterval, clearInterval });
+  const finalOf = async (pending) => {
+    const stream = createChatSseStream({
+      meta: { conversationId: "c", asOf: "2026-11-21T10:00:00.000Z" },
+      async *generate() {
+        yield { kind: "delta", text: "Our team can help with that." };
+        yield { kind: "final", response: { escalate: false, recommendedProducts: [], pendingJudgement: pending }, interrupted: false };
+      },
+      persist: async () => ({ asOf: "2026-11-21T10:00:01.000Z" }),
+      finalExtras: async (response) => ({ followUpContact: null, judgementPending: Boolean(response.pendingJudgement) }),
+      sideEffects: async () => {},
+      logError: () => {},
+      keepAliveMs: 10_000,
+      watchdogMs: 10_000,
+    });
+    const text = await new Response(stream).text();
+    return JSON.parse(text.split("\n\n").filter(Boolean).at(-1).slice(6));
+  };
+  assert.equal((await finalOf(Promise.resolve(null))).judgementPending, true);
+  assert.equal((await finalOf(undefined)).judgementPending, false);
+  assert.match(source("app/api/chat/route.ts"), /judgementPending: Boolean\(response\.pendingJudgement\)/);
+});
+
+const CONVERSATION = "22222222-2222-4222-8222-222222222222";
+const TURN_STARTED = "2026-11-21T10:00:00.000Z";
+
+function lateJudgementHarness(pollData) {
+  const sse = sseResponse();
+  const h = createLoaderHarness({
+    fetchHandler: (r) =>
+      r.path === "/api/chat"
+        ? sse.response
+        : r.path === "/api/chat/poll"
+          ? jsonResponse({ ok: true, data: { conversationId: CONVERSATION, control: "ai", messages: [], asOf: TURN_STARTED, ...pollData() } })
+          : undefined,
+  });
+  return { h, sse };
+}
+
+async function finishPendingTurn({ h, sse }) {
+  h.fromIframe({ type: "widget:ready" });
+  h.fromIframe({ type: "widget:panel_open", open: true });
+  h.fromIframe({ type: "widget:send", requestId: "r1", text: "Can someone call me about whitening?", consentGiven: true });
+  await h.flush();
+  sse.push({ type: "meta", conversationId: CONVERSATION, asOf: TURN_STARTED });
+  sse.push({ type: "delta", text: "Teeth whitening is 3,000 rupees." });
+  sse.push({ type: "final", escalate: false, recommendedProducts: [], asOf: "2026-11-21T10:00:02.000Z", followUpContact: null, judgementPending: true });
+  sse.end();
+  await h.flush();
+}
+
+test("late escalation: the existing widget poll shows the banner on that turn's reply", async () => {
+  let flagged = false;
+  const harness = lateJudgementHarness(() =>
+    flagged
+      ? { needsAttention: true, attentionFlaggedAt: "2026-11-21T10:00:03.500Z", followUpContact: "+91 98•••••210" }
+      : { needsAttention: false, attentionFlaggedAt: null, followUpContact: null },
+  );
+  await finishPendingTurn(harness);
+  const { h } = harness;
+  const [end] = h.postedOfType("widget:stream_end");
+  assert.equal(end.judgementPending, true, "the turn ended with its text; the judgement is still running");
+  assert.equal(h.postedOfType("widget:late_escalation").length, 0);
+  await h.advance(2_500); // first fast poll: not escalated yet
+  assert.equal(h.postedOfType("widget:late_escalation").length, 0);
+  flagged = true; // the background judgement escalated and flagged the conversation
+  await h.advance(2_500);
+  const late = h.postedOfType("widget:late_escalation");
+  assert.equal(late.length, 1);
+  assert.equal(late[0].requestId, "r1");
+  assert.equal(late[0].followUpContact, "+91 98•••••210");
+  await h.advance(10_000);
+  assert.equal(h.postedOfType("widget:late_escalation").length, 1, "shown once");
+});
+
+test("late escalation: a flag raised BEFORE this turn does not put a banner on it", async () => {
+  const harness = lateJudgementHarness(() => ({ needsAttention: true, attentionFlaggedAt: "2026-11-21T09:00:00.000Z", followUpContact: "r•••@gmail.com" }));
+  await finishPendingTurn(harness);
+  await harness.h.advance(30_000);
+  assert.equal(harness.h.postedOfType("widget:late_escalation").length, 0);
+});
+
+test("late escalation: polls fast only while watching (30 s), then back to the slow cadence", async () => {
+  const harness = lateJudgementHarness(() => ({ needsAttention: false, attentionFlaggedAt: null, followUpContact: null }));
+  await finishPendingTurn(harness);
+  const { h } = harness;
+  const polled = () => h.requestsTo("/api/chat/poll").length;
+  await h.advance(30_000);
+  assert.equal(polled(), 12, "2.5 s cadence for the 30 s watch");
+  const atEnd = polled();
+  await h.advance(14_000);
+  assert.ok(polled() - atEnd <= 1, "slow cadence after the watch");
+});
+
+test("the widget puts the late banner on the right reply, once, and the message is validated", () => {
+  const { applyLateEscalation } = loadModule("lib/widget-stream-reducer.ts");
+  const messages = [
+    { id: "u1", role: "user", content: "hi" },
+    { id: "a1", role: "assistant", content: "Whitening is 3,000 rupees." },
+    { id: "a2", role: "assistant", content: "Anything else?", escalate: true, followUpContact: "x" },
+  ];
+  const out = JSON.parse(JSON.stringify(applyLateEscalation(messages, "a1", "+91 98•••••210")));
+  assert.deepEqual(out[1], { id: "a1", role: "assistant", content: "Whitening is 3,000 rupees.", escalate: true, followUpContact: "+91 98•••••210" });
+  assert.deepEqual(out[0], messages[0]);
+  assert.equal(JSON.parse(JSON.stringify(applyLateEscalation(messages, "a2", "y")))[2].followUpContact, "x", "an escalated reply is untouched");
+
+  const { parseFromParentMessage } = loadModule("app/(widget)/widget/embed/_lib/post-message.ts");
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(parseFromParentMessage({ type: "widget:late_escalation", requestId: "r1", followUpContact: "+91 98•••••210" }))),
+    { type: "widget:late_escalation", requestId: "r1", followUpContact: "+91 98•••••210" },
+  );
+  assert.equal(parseFromParentMessage({ type: "widget:late_escalation" }), null);
+  const hook = source("app/(widget)/widget/embed/_lib/use-widget-chat.ts");
+  assert.match(hook, /if \(message\.judgementPending && !message\.escalate\) \{\s*lateJudgementRef\.current\.set\(message\.requestId, pending\.assistantPlaceholderId\)/);
+  assert.match(hook, /applyLateEscalation\(prev, replyId, message\.followUpContact\)/);
+});
+
+test("the widget poll reports the flag, when it was raised, and the masked contact only when flagged", () => {
+  const poll = source("app/api/chat/poll/route.ts");
+  assert.match(poll, /needsAttention: conversation\.needs_attention/);
+  assert.match(poll, /attentionFlaggedAt: conversation\.attention_flagged_at/);
+  assert.match(poll, /conversation\.needs_attention\s*\?\s*await getMaskedFollowUpContact\(supabase, business\.businessId, conversationId\)\s*:\s*null/);
 });
