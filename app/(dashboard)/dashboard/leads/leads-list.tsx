@@ -1,5 +1,7 @@
 "use client";
 
+import { formatDate, formatMonthDay, formatTime } from "@/lib/format-business-time";
+import { useBusinessTime } from "../_components/business-time";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
@@ -64,15 +66,13 @@ type TabId = "all" | LeadStatus;
 const TAB_ORDER: TabId[] = ["all", ...LEAD_STATUSES];
 
 
-function formatCreated(iso: string): string {
-  const date = new Date(iso);
+/** "Today, 3:49 pm" / "Yesterday" / "21 Nov", with "today" decided in the business time zone. */
+function formatCreated(iso: string, timezone: string): string {
   const now = new Date();
-  const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  if (date.toDateString() === now.toDateString()) return `Today, ${time}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const day = formatDate(iso, timezone);
+  if (day === formatDate(now, timezone)) return `Today, ${formatTime(iso, timezone)}`;
+  if (day === formatDate(now.getTime() - 24 * 60 * 60 * 1000, timezone)) return "Yesterday";
+  return formatMonthDay(iso, timezone);
 }
 
 export function LeadsList({
@@ -374,6 +374,7 @@ function LeadRow({
 }) {
   const rowTone = selected ? "bg-ds-lime-soft group-hover:bg-ds-surface-soft" : "";
   const displayName = displayContactName(lead.contact_name) ?? "Unnamed prospect";
+  const businessTime = useBusinessTime();
 
   return (
     <TableRow>
@@ -416,7 +417,7 @@ function LeadRow({
       <TableCell className={rowTone}>
         <StatusSelect id={lead.id} status={lead.status} canEdit={canEdit} />
       </TableCell>
-      <TableCell className={`text-sm text-ds-text-primary ${rowTone}`}>{formatCreated(lead.created_at)}</TableCell>
+      <TableCell className={`text-sm text-ds-text-primary ${rowTone}`}>{formatCreated(lead.created_at, businessTime.timezone)}</TableCell>
     </TableRow>
   );
 }
@@ -444,12 +445,7 @@ function LeadDetails({
 }) {
   const appliedTagIds = new Set(leadTags.map((tag) => tag.id));
   const availableTags = allTags.filter((tag) => !appliedTagIds.has(tag.id));
-  const captured = new Date(lead.created_at).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const captured = useBusinessTime().dateTime(lead.created_at);
 
   return (
     <Card as="aside" aria-label="Lead details" className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-4">

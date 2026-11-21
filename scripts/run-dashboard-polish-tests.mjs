@@ -253,3 +253,51 @@ test("welcome card shows a confirmation mark that animates only without reduced-
   const css = source("app/(dashboard)/globals.css");
   assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*\.launch-card-mark \{\s*animation: launch-card-mark/);
 });
+
+// ---------------------------------------------------------------- Item 6
+import { readdirSync, statSync } from "node:fs";
+
+test("the same instant is shown in the business zone, Indian format for India", () => {
+  const { formatDateTime, formatDate, formatTime, formatCalendarDate, localeForTimezone } = loadModule("lib/format-business-time.ts");
+  const instant = "2026-11-20T10:19:27Z"; // the header bug: UTC 10:19 is 3:49 pm in India
+  assert.equal(formatDateTime(instant, "Asia/Kolkata"), "20 Nov 2026, 3:49 pm");
+  assert.equal(formatDateTime(instant, "America/New_York"), "Nov 20, 2026, 5:19 AM");
+  assert.equal(formatTime(instant, "Asia/Kolkata"), "3:49 pm");
+  assert.equal(formatDate(instant, "Asia/Calcutta"), "20 Nov 2026");
+  assert.equal(localeForTimezone("Asia/Kolkata"), "en-IN");
+  assert.equal(localeForTimezone("Europe/London"), "en-US");
+  // Midnight rollover: 19:00 UTC is already the next day in India.
+  assert.equal(formatDate("2026-11-20T19:00:00Z", "Asia/Kolkata"), "21 Nov 2026");
+  // A stored calendar day never shifts with the zone.
+  assert.equal(formatCalendarDate("2026-11-21", "Asia/Kolkata"), "Sat, 21 Nov, 2026");
+  assert.equal(formatCalendarDate("2026-11-21", "Pacific/Auckland"), "Sat, Nov 21, 2026");
+});
+
+test("bad input never throws", () => {
+  const { formatDateTime } = loadModule("lib/format-business-time.ts");
+  assert.equal(formatDateTime("not a date", "Asia/Kolkata"), "");
+  assert.match(formatDateTime("2026-11-20T10:19:27Z", "Not/AZone"), /2026/);
+});
+
+test("no dashboard file formats a date without the business zone", () => {
+  const offenders = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(new URL("../" + dir, import.meta.url))) {
+      const path = dir + "/" + name;
+      if (statSync(new URL("../" + path, import.meta.url)).isDirectory()) walk(path);
+      else if (/\.tsx?$/.test(name)) {
+        const text = source(path);
+        if (text.includes(".toLocaleDateString(") || text.includes(".toLocaleTimeString(") || /new Date\([^)]*\)\.toLocaleString\(/.test(text)) offenders.push(path);
+        if (/new Intl\.DateTimeFormat\((?!"en-CA")/.test(text)) offenders.push(path);
+      }
+    }
+  };
+  walk("app/(dashboard)/dashboard");
+  assert.deepEqual(offenders, []);
+});
+
+test("the dashboard layout provides the business zone from the session's business", () => {
+  const layout = source(dashboard + "layout.tsx");
+  assert.match(layout, /<BusinessTimeProvider timezone=\{timezone\}>/);
+  assert.match(source("lib/business-context.ts"), /timezone: business\.timezone/);
+});

@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/lib/format-business-time";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -57,14 +58,11 @@ const APPOINTMENT_STATUS_TONE: Record<AppointmentStatus, PillTone> = {
   expired: "gray",
 };
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
 
 export default async function CustomerProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { businessId, orgRole } = await requireLiveBusinessContext();
+  const { businessId, orgRole, timezone } = await requireLiveBusinessContext();
+  const formatDate = (iso: string) => formatDateTime(iso, timezone);
   const canEdit = hasMinRole(orgRole, "org:sales_agent");
 
   const [profile, allTags] = await Promise.all([getCustomerProfile(businessId, id), listTagsForBusiness(businessId)]);

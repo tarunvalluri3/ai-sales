@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useBusinessTime } from "../../_components/business-time";
 import { ChevronDown } from "lucide-react";
 import type { Message } from "@/lib/supabase/types";
 import { getCitationDetailsAction } from "../actions";
@@ -20,6 +21,7 @@ const BUBBLE_STYLE: Record<Message["role"], string> = {
 };
 
 export function MessageBubble({ message }: { message: Message }) {
+  const businessTime = useBusinessTime();
   const isUser = message.role === "user";
   const isHumanAgent = message.role === "human_agent";
   const hasCitations = message.source_chunk_ids.length > 0;
@@ -50,7 +52,7 @@ export function MessageBubble({ message }: { message: Message }) {
     <div className={`flex flex-col ${isUser ? "items-start" : "items-end"}`}>
       <div className={bubbleClassName}>{message.content}</div>
       <span className={`mt-1.5 text-xs ${isHumanAgent ? "font-medium text-ds-text-primary" : "text-ds-text-secondary"}`}>
-        {MESSAGE_ROLE_LABEL[message.role]} · {new Date(message.created_at).toLocaleString("en-US")}
+        {MESSAGE_ROLE_LABEL[message.role]} · {businessTime.dateTime(message.created_at)}
       </span>
 
       {hasCitations ? (

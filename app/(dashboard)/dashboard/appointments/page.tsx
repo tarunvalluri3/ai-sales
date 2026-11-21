@@ -1,3 +1,4 @@
+import { formatTime, formatWeekdayDay } from "@/lib/format-business-time";
 import Link from "next/link";
 import { ArrowUpRight, CalendarCheck, Globe, Mail, MessageCircle, Phone } from "lucide-react";
 import { requireLiveBusinessContext } from "@/lib/business-context";
@@ -54,8 +55,8 @@ export default async function AppointmentsPage({
     countByStatus.set(appointment.status, (countByStatus.get(appointment.status) ?? 0) + 1);
   }
   const pending = allAppointments.filter((appointment) => appointment.status === "pending");
-  const dayFormatter = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "short", day: "numeric", month: "short" });
-  const timeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "numeric", minute: "2-digit" });
+  const dayFormatter = { format: (date: Date) => formatWeekdayDay(date, timezone) };
+  const timeFormatter = { format: (date: Date) => formatTime(date, timezone) };
 
   return (
     <div className="flex flex-1 flex-col gap-8">

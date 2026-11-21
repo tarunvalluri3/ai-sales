@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessTime } from "../_components/business-time";
 import { useActionState, useState } from "react";
 import { createExceptionAction, deleteExceptionAction, type ExceptionActionState } from "./exceptions-actions";
 import type { BusinessHoursException } from "@/lib/supabase/types";
@@ -43,6 +44,7 @@ function describeException(exception: BusinessHoursException): string {
  * its own "Advanced overrides" card.
  */
 export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessHoursException[]; canEdit: boolean }) {
+  const businessTime = useBusinessTime();
   const [createState, createFormAction, isCreating] = useActionState(createExceptionAction, initialState);
   const [mode, setMode] = useState<Mode>("close_range");
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -160,12 +162,7 @@ export function ExceptionsPanel({ exceptions, canEdit }: { exceptions: BusinessH
                 <CalendarDays className="size-5 shrink-0 text-ds-text-primary" strokeWidth={1.75} aria-hidden="true" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="text-sm font-medium text-ds-text-primary">
-                    {new Date(`${exception.date}T00:00:00`).toLocaleDateString("en-US", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}{" "}
+                    {businessTime.calendarDate(exception.date)}{" "}
                     · {describeException(exception)}
                   </span>
                   {exception.reason ? <span className="text-xs text-ds-text-secondary">{exception.reason}</span> : null}

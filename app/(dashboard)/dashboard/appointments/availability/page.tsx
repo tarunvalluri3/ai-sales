@@ -1,3 +1,4 @@
+import { formatCalendarDate } from "@/lib/format-business-time";
 import Link from "next/link";
 import { requireBusinessContext } from "@/lib/business-context";
 import { hasMinRole } from "@/lib/auth";
@@ -54,12 +55,7 @@ export default async function AppointmentAvailabilityPage({
 
   const prevDate = shiftDateKey(date, -1);
   const nextDate = shiftDateKey(date, 1);
-  const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const dateLabel = formatCalendarDate(date, timezone);
   const relativeLabel = date === today ? "Today" : date === shiftDateKey(today, 1) ? "Tomorrow" : null;
 
   return (

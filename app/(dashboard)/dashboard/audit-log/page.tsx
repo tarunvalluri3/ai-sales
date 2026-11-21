@@ -18,6 +18,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { requireLiveBusinessContext } from "@/lib/business-context";
+import { formatDate, formatTime } from "@/lib/format-business-time";
 import { listAuditLogForBusiness } from "@/lib/audit-log";
 import type { AuditLogAction } from "@/lib/supabase/types";
 import { EmptyState } from "../_components/state-views";
@@ -78,7 +79,7 @@ const ACTION_LABEL: Record<AuditLogAction, string> = {
   "subscription.activated": "Subscription activated",
   "subscription.charged": "Subscription payment taken",
   "subscription.payment_failed": "Subscription payment failed",
-  "subscription.grace_lapsed": "Grace period lapsed -- AI replies paused",
+  "subscription.grace_lapsed": "Grace period lapsed — AI replies paused",
   "subscription.cancellation_scheduled": "Cancellation scheduled for period end",
   "subscription.expired": "Subscription ended",
   "subscription.plan_changed": "Plan changed",
@@ -177,22 +178,20 @@ function humanizeKey(key: string): string {
 }
 
 export default async function AuditLogPage() {
-  const { businessId } = await requireLiveBusinessContext();
+  const { businessId, timezone } = await requireLiveBusinessContext();
   const entries = await listAuditLogForBusiness(businessId);
 
   // Group consecutive entries (already newest first) under their calendar day.
   const groups: { day: string; entries: typeof entries }[] = [];
   for (const entry of entries) {
-    const day = new Date(entry.created_at).toDateString();
+    const day = formatDate(entry.created_at, timezone);
     const last = groups[groups.length - 1];
     if (last && last.day === day) last.entries.push(entry);
     else groups.push({ day, entries: [entry] });
   }
   const now = new Date();
-  const todayKey = now.toDateString();
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const yesterdayKey = yesterday.toDateString();
+  const todayKey = formatDate(now, timezone);
+  const yesterdayKey = formatDate(now.getTime() - 24 * 60 * 60 * 1000, timezone);
 
   return (
     <div className="flex flex-1 flex-col gap-8">
@@ -220,8 +219,7 @@ export default async function AuditLogPage() {
           </p>
 
           {groups.map((group) => {
-            const date = new Date(group.entries[0].created_at);
-            const dateLabel = date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+            const dateLabel = group.day;
             const prefix = group.day === todayKey ? "Today · " : group.day === yesterdayKey ? "Yesterday · " : "";
             return (
               <section key={group.day} className="flex flex-col gap-1">
@@ -264,7 +262,7 @@ export default async function AuditLogPage() {
                           </span>
                         </p>
                         <time dateTime={entry.created_at} className="w-24 shrink-0 text-right text-sm tabular-nums text-ds-text-primary">
-                          {new Date(entry.created_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                          {formatTime(entry.created_at, timezone)}
                         </time>
                       </li>
                     );

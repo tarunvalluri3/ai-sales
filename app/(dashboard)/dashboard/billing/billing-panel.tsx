@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { AlertTriangle } from "lucide-react";
 import { useToast } from "../_components/toast";
+import { BILLING_TIME_ZONE, formatDate as formatBusinessDate } from "@/lib/format-business-time";
 import { BillingDetailsFields, type BillingIdentityValues } from "./billing-details";
 import { GstBreakdown } from "./gst-breakdown";
 import { TRIAL_NOT_AVAILABLE_MESSAGE } from "@/lib/trial-messages";
@@ -104,12 +105,7 @@ function formatInr(paise: number): string {
 
 /** Customers are India-only for v1, so dates are shown in IST. */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatBusinessDate(iso, BILLING_TIME_ZONE);
 }
 
 export function BillingPanel({

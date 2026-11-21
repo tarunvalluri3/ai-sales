@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Info, Sparkles } from "lucide-react";
+import { useBusinessTime } from "../../_components/business-time";
 import { generateConversationSummaryAction, type GenerateSummaryState } from "../actions";
 
 const initialState: GenerateSummaryState = {};
@@ -27,6 +28,7 @@ export function AiSummaryCard({
   initialMessageCount: number | null;
   currentMessageCount: number;
 }) {
+  const businessTime = useBusinessTime();
   const [state, formAction, isPending] = useActionState(generateConversationSummaryAction, initialState);
 
   const summary = state.summary ?? initialSummary;
@@ -52,7 +54,7 @@ export function AiSummaryCard({
           AI summary
         </h3>
         {generatedAt ? (
-          <span className="text-xs text-ds-text-secondary">Generated {new Date(generatedAt).toLocaleString("en-US")}</span>
+          <span className="text-xs text-ds-text-secondary">Generated {businessTime.dateTime(generatedAt)}</span>
         ) : null}
       </div>
 

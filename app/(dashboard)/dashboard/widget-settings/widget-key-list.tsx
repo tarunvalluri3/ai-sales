@@ -6,25 +6,21 @@ import { updateWidgetKeyOriginsAction, revokeWidgetKeyAction, type WidgetKeyActi
 import { CopyKeyButton } from "./copy-key-button";
 import { buildWidgetSnippet } from "./build-widget-snippet";
 import { DeleteButton, ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { useBusinessTime } from "../_components/business-time";
 import { Pill, btnPrimary, helpClass, inputClass, labelClass, textareaClass } from "../_components/ui";
 
 const initialState: WidgetKeyActionState = {};
 
-function formatDate(value: string, widgetLanguage: string): string {
-  return new Intl.DateTimeFormat(widgetLanguage, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
 function WidgetKeyCard({
   widgetKey,
   appOrigin,
-  widgetLanguage,
   canEdit = true,
 }: {
   widgetKey: WidgetKey;
   appOrigin: string;
-  widgetLanguage: string;
   canEdit?: boolean;
 }) {
+  const businessTime = useBusinessTime();
   const [origins, setOrigins] = useState(widgetKey.allowed_origins.join("\n"));
   const [name, setName] = useState(widgetKey.name ?? "");
   const [updateState, updateAction, updatePending] = useActionState(updateWidgetKeyOriginsAction, initialState);
@@ -43,10 +39,10 @@ function WidgetKeyCard({
             </Pill>
           </div>
           <p className="text-sm text-ds-text-secondary">
-            Created {formatDate(widgetKey.created_at, widgetLanguage)}
-            {widgetKey.revoked_at ? ` · Revoked ${formatDate(widgetKey.revoked_at, widgetLanguage)}` : ""}
+            Created {businessTime.dateTime(widgetKey.created_at)}
+            {widgetKey.revoked_at ? ` · Revoked ${businessTime.dateTime(widgetKey.revoked_at)}` : ""}
             {" · "}
-            {widgetKey.last_used_at ? `Last used ${formatDate(widgetKey.last_used_at, widgetLanguage)}` : "Never used yet"}
+            {widgetKey.last_used_at ? `Last used ${businessTime.dateTime(widgetKey.last_used_at)}` : "Never used yet"}
           </p>
         </div>
         {!isRevoked ? <CopyKeyButton value={snippet} label="Copy snippet" /> : null}
@@ -144,7 +140,6 @@ function WidgetKeyCard({
 export function WidgetKeyList({
   widgetKeys,
   appOrigin,
-  widgetLanguage = "en",
   canEdit = true,
 }: {
   widgetKeys: WidgetKey[];
@@ -167,7 +162,6 @@ export function WidgetKeyList({
           key={widgetKey.id}
           widgetKey={widgetKey}
           appOrigin={appOrigin}
-          widgetLanguage={widgetLanguage}
           canEdit={canEdit}
         />
       ))}
