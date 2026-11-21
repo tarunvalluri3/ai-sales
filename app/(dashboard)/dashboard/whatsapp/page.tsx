@@ -75,12 +75,16 @@ export default async function WhatsappPage() {
         />
         <details className="dx-card group">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary [&::-webkit-details-marker]:hidden">
-            Already have a system-user token? Connect manually instead
+            Advanced: connect manually
             <span aria-hidden="true" className="text-ds-text-secondary transition-transform group-open:rotate-180">
               ▾
             </span>
           </summary>
-          <div className="border-t border-ds-border p-5">
+          <div className="flex flex-col gap-5 border-t border-ds-border p-5">
+            <p className="text-sm text-ds-text-secondary">
+              For developers: connect with a Meta app and a permanent system-user token instead of the Facebook flow.
+            </p>
+            <WhatsappSetupGuide hasConnection={false} />
             <ConnectWhatsappForm />
           </div>
         </details>
@@ -118,7 +122,7 @@ export default async function WhatsappPage() {
 
       {/* Until a number is connected the setup guide leads; afterwards it
           recedes to the bottom of the page. */}
-      {!connection && canEdit && entitled ? <WhatsappSetupGuide hasConnection={false} /> : null}
+      {!connection && canEdit && entitled && !embeddedSignup ? <WhatsappSetupGuide hasConnection={false} /> : null}
 
       <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">{connectionArea}</div>

@@ -326,3 +326,17 @@ test("Appearance preview lays the widget out in flow so it can never be clipped"
   assert.match(preview, /pointer-events-none absolute inset-x-5 top-5/);
   assert.match(preview, /<div className=\{`relative flex flex-col gap-3 \$\{alignLeft/);
 });
+
+// ---------------------------------------------------------------- Item 10
+test("WhatsApp: Connect with Facebook comes first and the developer guide sits under Advanced", () => {
+  const page = source(dashboard + "whatsapp/page.tsx");
+  const signup = page.indexOf("<EmbeddedSignupButton");
+  const advanced = page.indexOf("Advanced: connect manually");
+  const guideInAdvanced = page.indexOf("<WhatsappSetupGuide hasConnection={false} />", advanced);
+  assert.ok(signup > 0 && advanced > signup && guideInAdvanced > advanced);
+  // The standalone guide above the connect area only remains where Embedded Signup is not configured.
+  assert.match(page, /!connection && canEdit && entitled && !embeddedSignup \? <WhatsappSetupGuide/);
+  // Entitlement and permission gates are untouched.
+  assert.match(page, /!entitled \? \(\s*<ChannelUpgradeNotice/);
+  assert.match(page, /canEdit \? \(\s*embeddedSignup/);
+});
