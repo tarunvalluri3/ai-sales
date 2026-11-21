@@ -82,6 +82,8 @@ export default async function WidgetSettingsPage({
       {activeTab === "appearance" ? (
         <WidgetBrandingForm
           businessName={businessName}
+          initialAgentName={business?.agent_name ?? null}
+          initialAgentAvatarUrl={business?.agent_avatar_url ?? null}
           initialAccentColor={business?.widget_accent_color ?? ""}
           initialLogoUrl={business?.widget_logo_url ?? ""}
           initialWelcomeText={business?.widget_welcome_text ?? ""}

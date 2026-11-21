@@ -94,6 +94,8 @@ export default async function OnboardingPage({
     return (
       <OnboardingPreviewProvider
         seed={{
+          agentName: null,
+          agentAvatarUrl: null,
           businessName: organization.name,
           description: null,
           greeting: null,
@@ -168,6 +170,8 @@ export default async function OnboardingPage({
 
   const previewSeed = {
     businessName: business.name,
+    agentName: business.agent_name,
+    agentAvatarUrl: business.agent_avatar_url,
     description: business.description,
     greeting: business.widget_welcome_text,
     firstProductName: products[0]?.name ?? services[0]?.name ?? null,

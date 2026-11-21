@@ -20,6 +20,8 @@ export type Business = {
   widget_cta_text: string | null;
   widget_position: WidgetPosition;
   widget_language: WidgetLanguage;
+  agent_name: string | null;
+  agent_avatar_url: string | null;
   widget_suggested_questions: string[] | null;
   recommend_products_enabled: boolean;
   published_at: string | null;

@@ -13,6 +13,8 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
  */
 export type OnboardingPreviewData = {
   businessName: string;
+  agentName: string | null;
+  agentAvatarUrl: string | null;
   description: string | null;
   greeting: string | null;
   firstProductName: string | null;

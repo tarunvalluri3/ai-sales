@@ -43,10 +43,13 @@ export function OnboardingPreviewPanel() {
         <div className="flex items-center justify-between gap-2 border-b border-ds-border bg-ds-surface-elevated px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-full" style={{ backgroundColor: accent, color: readableOnColor(accent) }}>
-              <MessageCircle aria-hidden className="size-3.5" />
+              {preview.agentAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- locally selected blob or tenant Storage URL.
+                <img src={preview.agentAvatarUrl} alt="" className="size-7 rounded-full object-cover" />
+              ) : <MessageCircle aria-hidden className="size-3.5" />}
             </span>
             <span className="text-sm font-medium text-ds-text-primary">
-              {preview.businessName || "Your AI sales employee"}
+              {preview.agentName || preview.businessName || "Your AI sales employee"}
             </span>
           </div>
           <Badge tone={preview.published ? "success" : "muted"} size="sm">

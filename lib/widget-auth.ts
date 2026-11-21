@@ -106,7 +106,7 @@ const AUTH_COLUMNS = "id, clerk_org_id, live_version_id, status, deleted_at, cur
 
 // The branding endpoint additionally keeps the draft widget columns, used only
 // as a cosmetic fallback for an agent that has never been published.
-const BRANDING_COLUMNS = `${AUTH_COLUMNS}, name, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, privacy_policy_url`;
+const BRANDING_COLUMNS = `${AUTH_COLUMNS}, name, agent_name, agent_avatar_url, widget_language, widget_accent_color, widget_logo_url, widget_welcome_text, widget_welcome_text_closed, widget_cta_text, widget_position, widget_suggested_questions, privacy_policy_url`;
 
 type WidgetAuthRow = {
   id: string;
@@ -125,6 +125,8 @@ type WidgetBrandingRow = WidgetAuthRow & {
   widget_language: WidgetLanguage;
   widget_accent_color: string | null;
   widget_logo_url: string | null;
+  agent_name: string | null;
+  agent_avatar_url: string | null;
   widget_welcome_text: string | null;
   widget_welcome_text_closed: string | null;
   widget_cta_text: string | null;
@@ -289,6 +291,8 @@ export type WidgetBranding = {
   language: WidgetLanguage;
   accentColor: string | null;
   logoUrl: string | null;
+  agentName: string | null;
+  agentAvatarUrl: string | null;
   welcomeText: string | null;
   welcomeTextClosed: string | null;
   ctaText: string | null;
@@ -343,6 +347,8 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
         language: config.language,
         accentColor: config.channels.accentColor,
         logoUrl: config.channels.logoUrl,
+        agentName: config.persona.agentName ?? null,
+        agentAvatarUrl: config.persona.agentAvatarUrl ?? null,
         welcomeText: config.persona.welcomeText,
         welcomeTextClosed: config.persona.welcomeTextClosed,
         ctaText: config.persona.ctaText,
@@ -366,6 +372,8 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
     language: data.businesses.widget_language,
     accentColor: data.businesses.widget_accent_color,
     logoUrl: data.businesses.widget_logo_url,
+    agentName: data.businesses.live_version_id ? null : (data.businesses.agent_name ?? null),
+    agentAvatarUrl: data.businesses.live_version_id ? null : (data.businesses.agent_avatar_url ?? null),
     welcomeText: data.businesses.widget_welcome_text,
     welcomeTextClosed: data.businesses.widget_welcome_text_closed,
     ctaText: data.businesses.widget_cta_text,

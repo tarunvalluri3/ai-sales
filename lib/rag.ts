@@ -7,6 +7,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { AIMessage, AIMessageChunk, BaseMessage } from "@langchain/core/messages";
 import { ToolMessage } from "@langchain/core/messages";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
+import { agentIntroduction } from "@/lib/schemas/agent-persona";
 import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
@@ -236,6 +237,7 @@ export type ConversationMessage = {
  * prompt, never a blank/placeholder value.
  */
 export type BusinessProfileContext = {
+  agentName?: string | null;
   description: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -486,6 +488,7 @@ const SYSTEM_TEMPLATE = `PLATFORM RULES -- these come from the platform operator
 
 You are a sales employee of {businessName} -- not a support chatbot. Your job is to understand what this prospect actually needs, recommend the specific thing from {businessName}'s real offerings that fits, and keep the conversation moving toward a real outcome (more detail, a concrete recommendation, or getting them in touch with the team) rather than just answering a question and stopping. You represent only {businessName} to this prospect -- never any other business.
 {languageInstruction}
+{agentIntroduction}
 {recommendationInstruction}
 {appointmentInstruction}
 {capabilityChainingInstruction}
@@ -1154,6 +1157,7 @@ async function buildTurnContext(
     profileTag: tags.profile,
     canary: tags.canary,
     businessName: cleanUntrustedLine(businessName, 120),
+    agentIntroduction: agentIntroduction(cleanUntrustedLine(businessName, 120), businessProfile.agentName),
     languageInstruction: formatLanguageInstruction(language),
     recommendationInstruction: formatRecommendationInstruction(aiCapabilities.recommendProductsEnabled),
     appointmentInstruction: formatAppointmentInstruction(aiCapabilities.appointmentsEnabled),
@@ -1365,7 +1369,7 @@ export async function askSalesEmployee(
     // send_reply existed (the plain system message), byte-for-byte.
     const { loopSystemMessage, plainSystemMessage, messages, tools } = await buildTurnContext(
       businessName,
-      businessProfile,
+      source.kind === "live" ? { ...businessProfile, agentName: source.snapshot.config.persona.agentName } : businessProfile,
       question,
       history,
       language,
@@ -1859,7 +1863,7 @@ export async function* streamSalesEmployee(
   try {
     const { plainSystemMessage, messages, tools } = await buildTurnContext(
       businessName,
-      businessProfile,
+      source.kind === "live" ? { ...businessProfile, agentName: source.snapshot.config.persona.agentName } : businessProfile,
       question,
       history,
       language,

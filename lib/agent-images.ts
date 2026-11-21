@@ -65,6 +65,11 @@ export async function cleanupAgentImage(businessId: string, url: string | null |
     ]);
     if (products.error || services.error) throw new Error("Could not verify image references.");
     if (products.data.length || services.data.length || live.includes(url)) return;
+    if (suffix.startsWith("avatar/")) {
+      const draft = await db.from("businesses").select("agent_avatar_url").eq("id", businessId).maybeSingle();
+      if (draft.error || !draft.data) throw new Error("Could not verify avatar references.");
+      if (draft.data.agent_avatar_url === url) return;
+    }
     const result = await bucket.remove([businessId + "/" + suffix]);
     if (result.error) throw result.error;
   } catch {

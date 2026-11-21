@@ -50,6 +50,8 @@ export const agentSnapshotSchema = z.object({
     website: nullableString,
     language: z.enum(["en", "es", "fr", "de", "pt", "hi"]),
     persona: z.object({
+      agentName: nullableString.optional(),
+      agentAvatarUrl: nullableString.optional(),
       welcomeText: nullableString,
       welcomeTextClosed: nullableString,
       ctaText: nullableString,
