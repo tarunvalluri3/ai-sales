@@ -9,7 +9,7 @@ import { agentImageSchema, agentImagePath, detectAgentImageType, type AgentImage
 const BUCKET = "agent-images";
 
 export async function uploadAgentImage(businessId: string, purpose: AgentImagePurpose, input: unknown) {
-  if (input == null || input === "" || (input instanceof File && input.size === 0 && input.name === "")) return null;
+  if (input == null || input === "" || (input instanceof File && input.size === 0)) return null; // untouched file inputs submit an empty File
   const parsed = agentImageSchema.safeParse(input);
   if (!parsed.success) throw new AppError("Choose a JPEG, PNG, or WebP image up to 2 MB.");
   const bytes = new Uint8Array(await parsed.data.arrayBuffer());

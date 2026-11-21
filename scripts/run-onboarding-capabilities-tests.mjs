@@ -62,6 +62,23 @@ test("upload rejects unsupported types, wrong magic bytes and oversize files", a
   assert.equal(uploaded.length, 0);
 });
 
+test("missing or empty files mean no upload (create, edit, avatar all share this)", async () => {
+  const { images, uploaded } = imageMock();
+  const empties = [null, undefined, "", new File([], ""), new File([], "undefined", { type: "application/octet-stream" }), new File([], "empty.png", { type: "image/png" })];
+  for (const input of empties) {
+    assert.equal(await images.uploadAgentImage(tenantA, "products", input), null);
+    assert.equal(await images.uploadAgentImage(tenantA, "avatar", input), null);
+  }
+  assert.equal(uploaded.length, 0);
+});
+
+test("image picker omits the file field when nothing is selected; edit keeps image_url text field", () => {
+  const picker = readFileSync("app/(dashboard)/dashboard/_components/agent-image-picker.tsx", "utf8");
+  assert.match(picker, /name=\{selected \? name : undefined\}/);
+  const actions = readFileSync("app/(dashboard)/dashboard/products/actions.ts", "utf8");
+  assert.equal((actions.match(/uploaded \? \{ \.\.\.input, image_url: uploaded \} : input/g) ?? []).length, 2);
+});
+
 test("upload uses server tenant and generated file name; cleanup affects only unreferenced tenant files", async () => {
   const { images, removed, uploaded, references } = imageMock();
   const url = await images.uploadAgentImage(tenantA, "products", new File([png], tenantB + ".png", { type: "image/png" }));
