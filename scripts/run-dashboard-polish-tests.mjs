@@ -317,3 +317,12 @@ test("mobile header is one non-wrapping row with the account controls behind a m
   assert.match(bar, /<span className="sm:hidden">Publish<\/span>/);
   assert.match(bar, /hidden font-normal sm:inline/);
 });
+
+// ---------------------------------------------------------------- Item 9
+test("Appearance preview lays the widget out in flow so it can never be clipped", () => {
+  const preview = source(dashboard + "widget-settings/widget-preview.tsx");
+  assert.doesNotMatch(preview, /absolute inset-x-5 bottom-5/);
+  assert.match(preview, /relative flex min-h-\[30rem\] flex-col justify-end/);
+  assert.match(preview, /pointer-events-none absolute inset-x-5 top-5/);
+  assert.match(preview, /<div className=\{`relative flex flex-col gap-3 \$\{alignLeft/);
+});
