@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CircleCheck } from "lucide-react";
 import { CopyKeyButton } from "../widget-settings/copy-key-button";
 import { AddOriginForm } from "./add-origin-form";
 
@@ -37,7 +38,9 @@ export function LaunchCard({
       className="flex flex-col gap-4 rounded-3xl bg-ds-lime-soft dx-card-pad"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 items-start gap-3">
+          <CircleCheck className="launch-card-mark mt-0.5 size-6 shrink-0 text-ds-success" strokeWidth={1.75} aria-hidden="true" />
+        <div className="flex flex-col gap-1" role="status">
           <h2 id="launch-card-heading" className="dx-title text-lg">
             {widgetReady ? "Your AI sales employee is live" : "Your agent is published, but your website widget won’t answer yet"}
           </h2>
@@ -47,6 +50,7 @@ export function LaunchCard({
               : "Add your website address below so the widget can answer visitors there."}
             {!widgetReady && channels.length > 0 ? " Add your website address below so the widget can answer visitors there too." : ""}
           </p>
+        </div>
         </div>
         <Link
           href="/dashboard"

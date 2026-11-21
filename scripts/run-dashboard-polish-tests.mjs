@@ -171,7 +171,7 @@ test("Test your agent sits right under Overview and its page needs a published a
 // ---------------------------------------------------------------- Item 3
 test("welcome card only claims the widget answers when a key lists an allowed origin", () => {
   const { widgetAnswersVisitors } = loadModule(dashboard + "_components/launch-card.tsx", {
-    "next/link": {}, "../widget-settings/copy-key-button": {}, "./add-origin-form": {},
+    "next/link": {}, "lucide-react": {}, "../widget-settings/copy-key-button": {}, "./add-origin-form": {},
     "react/jsx-runtime": { jsx() {}, jsxs() {}, Fragment: null },
   });
   assert.equal(widgetAnswersVisitors([]), false);
@@ -226,4 +226,30 @@ test("add-website action validates with the Widget settings origin parser and us
   const ok = await submit("https://example.com", { businessId: "biz_evil" });
   assert.equal(ok.success, true);
   assert.deepEqual(calls, [["ensure", "biz_session", "https://example.com"]]);
+});
+
+// ---------------------------------------------------------------- Items 4 and 7 (already fixed; pinned)
+test("Appearance hours hint keeps its Business Hours link text", () => {
+  const src = source(dashboard + "widget-settings/widget-branding-form.tsx");
+  assert.match(src, /Your schedule is set in\{" "\}\s+<Link href="\/dashboard\/business-hours"[^>]*>\s+Business Hours\s+<\/Link>/);
+});
+
+test("dashboard sidebar and drawer use the theme-aware logo", () => {
+  const sidebar = source(dashboard + "_components/sidebar.tsx");
+  assert.match(sidebar, /<ThemedWavesLogo \/>/);
+  assert.match(sidebar, /<ThemedWavesLogo compact \/>/);
+  const logo = source("app/(dashboard)/_components/waves-logo.tsx");
+  assert.match(logo, /wave-logo-on-dark[\s\S]*tone="dark"[\s\S]*wave-logo-on-light[\s\S]*tone="light"/);
+});
+
+// ---------------------------------------------------------------- Item 5
+test("onboarding step heading keeps programmatic focus but loses the mouse focus box", () => {
+  assert.match(source("app/(dashboard)/onboarding/_components/wizard-shell.tsx"), /heading\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(source("app/(dashboard)/onboarding/onboarding.css"), /h1\[tabindex="-1"\]:focus:not\(:focus-visible\)\s*\{\s*outline: none;/);
+});
+
+test("welcome card shows a confirmation mark that animates only without reduced-motion", () => {
+  assert.match(source(dashboard + "_components/launch-card.tsx"), /launch-card-mark/);
+  const css = source("app/(dashboard)/globals.css");
+  assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*\.launch-card-mark \{\s*animation: launch-card-mark/);
 });

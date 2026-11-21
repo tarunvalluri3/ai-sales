@@ -298,3 +298,12 @@ a.onboarding-stage:hover {
     animation: onboarding-published 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 }
+
+/* The step heading takes programmatic focus on every step change (screen
+   readers and keyboard users need that). Mouse and touch users must not see
+   the browser's default focus box on it, so the outline is removed unless
+   :focus-visible applies (keyboard navigation), where the dashboard's ring
+   rule still draws. */
+.onboarding-content h1[tabindex="-1"]:focus:not(:focus-visible) {
+  outline: none;
+}
