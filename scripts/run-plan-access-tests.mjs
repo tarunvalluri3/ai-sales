@@ -245,7 +245,8 @@ test("checkout without a row creates a non-serving placeholder, never free Scale
 
 test("UI: onboarding Continue needs the server's serving verdict; pricing shows the configured trial", () => {
   const step = read("app/(dashboard)/onboarding/_components/steps/plan-step.tsx");
-  assert.match(step, /disabled=\{isPending \|\| confirming \|\| !valid\}/);
+  assert.match(step, /<WizardContinue[\s\S]*?pending=\{isPending \|\| confirming\} disabled=\{!valid\}/);
+  assert.match(read("app/(dashboard)/onboarding/_components/wizard-actions.tsx"), /disabled=\{disabled \|\| pending\}/);
   assert.match(step, /Your free trial is on — no card needed/);
   assert.match(read("lib/onboarding-steps.ts"), /plan: entitlement\.serving,/);
   const pricing = read("app/(dashboard)/pricing/page.tsx");

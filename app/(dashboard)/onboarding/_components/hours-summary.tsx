@@ -11,8 +11,8 @@ export function HoursSummary({ hours, timezone, slaMinutes, useProfileTimezone }
 }) {
   const confirmed = hasConfirmedBusinessHours(hours);
   return (
-    <details id="opening-hours" open={!confirmed} className="scroll-mt-24 border-t border-ds-border pt-4">
-      <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">
+    <details id="opening-hours" open={!confirmed} className="scroll-mt-24">
+      <summary className="dx-card cursor-pointer px-4 py-3 text-sm font-medium text-ds-text-primary">
         {confirmed ? summarizeSavedHours(hours, timezone) : "Default hours - confirm or edit"} · Edit
       </summary>
       <div className="pt-4">

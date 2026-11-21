@@ -1,7 +1,9 @@
 "use client";
 
+import { WizardActions, WizardContinue } from "../wizard-actions";
+
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { ServiceForm } from "../../../dashboard/services/service-form";
 import { ServicesList } from "../../../dashboard/services/services-list";
 import { createServiceAction, updateServiceInPlaceAction, deleteServiceAction } from "../../../dashboard/services/actions";
@@ -13,6 +15,8 @@ import { ProductsList } from "../../../dashboard/products/products-list";
 import { createProductAction, updateProductInPlaceAction, deleteProductAction } from "../../../dashboard/products/actions";
 import { advanceOnboarding } from "../../actions";
 import { useOnboardingPreview } from "../preview-context";
+import { Card, CardHeader, btnGhost, btnOutline } from "../../../dashboard/_components/ui";
+import { useToast } from "../../../dashboard/_components/toast";
 
 const MIN_PRODUCTS = 1;
 
@@ -28,6 +32,14 @@ export function TrainProductsStep({ products, services, industry, currency }: { 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [kind, setKind] = useState<"product" | "service">("product");
   const { update } = useOnboardingPreview();
+  const { toast } = useToast();
+  const confirmAdded = useCallback(() => {
+    toast({ variant: "success", title: kind === "product" ? "Product added" : "Service added" });
+  }, [kind, toast]);
+  const confirmEdited = useCallback(() => {
+    setEditingId(null);
+    toast({ variant: "success", title: "Changes saved" });
+  }, [toast]);
 
   const offerings = [...products, ...services];
   const completeCount = offerings.filter(isProductComplete).length;
@@ -61,6 +73,7 @@ export function TrainProductsStep({ products, services, industry, currency }: { 
 
   return (
     <div className="flex flex-col gap-6">
+      {offerings.length > 0 ? <div className="onboarding-table flex min-w-0 flex-col gap-4">
       {products.length > 0 ? (
         <ProductsList
           products={products}
@@ -74,13 +87,9 @@ export function TrainProductsStep({ products, services, industry, currency }: { 
         <ServicesList services={services} currency={currency} canEdit
           deleteServiceAction={deleteServiceAction} onEdit={(id) => editOffering(id, "service")} />
       ) : null}
-      {offerings.length === 0 ? (
-        <p className="border border-dashed border-ds-border bg-ds-surface px-4 py-8 text-center text-sm text-ds-text-muted">
-          No products or services added yet.
-        </p>
-      ) : null}
+      </div> : null}
 
-      <section className="flex w-full flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+      <Card className="onboarding-save-form flex flex-col gap-4">
         {offering ? (
           <>
             <div className="flex items-center justify-between">
@@ -107,25 +116,27 @@ export function TrainProductsStep({ products, services, industry, currency }: { 
               initialPriceAmount={offering.price_amount != null ? String(offering.price_amount) : ""}
               submitLabel="Save changes"
               pendingLabel="Saving…"
-              onSuccess={() => setEditingId(null)}
+              onSuccess={confirmEdited}
             />
           </>
         ) : (
           <>
-            <h2 className="text-sm font-medium text-ds-text-primary">Add a product or service</h2>
+            <CardHeader title="Add a product or service"
+              description={offerings.length === 0 ? "Start with something customers often ask you about." : undefined} />
             <div className="flex flex-wrap gap-2" role="group" aria-label="Offering type">
               {(["product", "service"] as const).map((type) => (
                 <button type="button" key={type} aria-pressed={kind === type} onClick={() => setKind(type)}
-                  className={kind === type ? "border border-ds-primary bg-ds-primary px-3 py-1.5 text-sm text-ds-primary-on" : "border border-ds-border px-3 py-1.5 text-sm text-ds-text-secondary"}>
+                  className={(kind === type ? btnOutline + " bg-ds-lime-soft" : btnGhost) + " min-h-11"}>
                   {type === "product" ? "Product" : "Service"}
                 </button>
               ))}
             </div>
             <Form key={kind} action={kind === "product" ? createProductAction : createServiceAction}
-              onboardingPlaceholders={placeholders} currency={currency} submitLabel="Add" pendingLabel="Adding…" />
+              onboardingPlaceholders={placeholders} currency={currency} submitLabel={kind === "product" ? "Add product" : "Add service"}
+              pendingLabel="Adding…" onSuccess={confirmAdded} />
           </>
         )}
-      </section>
+      </Card>
 
       {error ? (
         <p role="alert" className="text-sm text-ds-danger">
@@ -133,32 +144,12 @@ export function TrainProductsStep({ products, services, industry, currency }: { 
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary"
-        >
-          Back
-        </button>
-        <div className="flex items-center gap-3">
-          {!valid ? (
-            <span className="text-xs text-ds-text-muted">
-              {offerings.length === 0
-                ? "Add at least one product or service to continue"
-                : "Give it a short description (10+ characters) to continue"}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            {isPending ? "Saving…" : "Continue"}
-          </button>
-        </div>
-      </div>
+      <WizardActions onBack={handleBack}>
+        <WizardContinue onClick={handleContinue} pending={isPending} disabled={!valid}
+          reason={valid ? undefined : offerings.length === 0
+            ? "Add a product or service to continue"
+            : "Add a description of at least 10 characters to continue"} />
+      </WizardActions>
     </div>
   );
 }

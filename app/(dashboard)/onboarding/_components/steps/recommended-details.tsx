@@ -1,10 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
+import { LoaderCircle } from "lucide-react";
 import { saveOptionalDetailsAction, type OptionalDetailsState } from "../../actions";
-
-const inputClasses =
-  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+import { Card, CardHeader, btnOutline, inputClass } from "../../../dashboard/_components/ui";
 
 const initialState: OptionalDetailsState = {};
 
@@ -24,13 +23,8 @@ export function RecommendedDetails({
   const fieldErrors = state.fieldErrors ?? {};
 
   return (
-    <section className="flex flex-col gap-5 border border-ds-border bg-ds-surface p-5">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-medium text-ds-text-primary">Add recommended details</h2>
-        <p className="text-sm text-ds-text-secondary">
-          Optional, and you can skip them. They make your agent more accurate, and you can change them later.
-        </p>
-      </div>
+    <Card className="flex flex-col gap-5">
+      <CardHeader title="Recommended details" description="You can add these now or update them later in the dashboard." />
 
       <form action={formAction} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
@@ -45,7 +39,7 @@ export function RecommendedDetails({
             placeholder="e.g. https://example.com"
             disabled={isPending}
             aria-invalid={fieldErrors.website ? true : undefined}
-            className={inputClasses}
+            className={inputClass}
           />
           {fieldErrors.website ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.website}</p> : null}
         </div>
@@ -63,7 +57,7 @@ export function RecommendedDetails({
             disabled={isPending}
             aria-describedby="rd-privacy-help"
             aria-invalid={fieldErrors.privacyPolicyUrl ? true : undefined}
-            className={inputClasses}
+            className={inputClass}
           />
           <p id="rd-privacy-help" className="text-xs text-ds-text-muted">
             The chat widget&rsquo;s consent notice links here. Must start with https://.
@@ -83,12 +77,13 @@ export function RecommendedDetails({
         <button
           type="submit"
           disabled={isPending}
-          className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className={btnOutline + " min-h-11 self-start"}
         >
+          {isPending ? <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden /> : null}
           {isPending ? "Saving…" : "Save details"}
         </button>
       </form>
 
-    </section>
+    </Card>
   );
 }

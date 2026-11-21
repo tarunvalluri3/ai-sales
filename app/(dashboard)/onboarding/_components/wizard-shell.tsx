@@ -1,203 +1,186 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Check, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Check, Eye, X } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { clerkDarkCompactAppearance } from "@/lib/clerk-appearance";
-import { WavesLogo } from "../../_components/waves-logo";
+import { ThemeToggle } from "../../_components/theme-toggle";
+import { ThemedWavesLogo } from "../../_components/waves-logo";
+import { useWaveClerkAppearance } from "../../_components/wave-clerk-appearance";
+import { btnGhost, btnIcon, PageHeader } from "../../dashboard/_components/ui";
 import { WIZARD_STAGES, type WizardStageKey } from "./wizard-config";
 import { OnboardingPreviewPanel } from "./preview-panel";
+import { ReadinessProgress } from "./readiness-counts";
+import { useOnboardingPreview } from "./preview-context";
 
 export type StageStatus = "done" | "current" | "upcoming";
 
-/**
- * The one `/onboarding` shell every step renders inside (2026-10-29
- * redesign, STATE.md). Owns the top bar, the left progress rail (a
- * collapsed top bar + stage name on mobile), the centered step column,
- * and the collapsible live-preview panel on the right. Each step passes
- * its own eyebrow/heading/description/footer; this only lays them out.
- */
+/** Keep the sticky action row inside the visible viewport when a soft keyboard opens. */
+function useKeyboardClearance(ref: React.RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const shell = ref.current;
+    const viewport = window.visualViewport;
+    if (!shell || !viewport) return;
+
+    function updateClearance() {
+      if (!shell || !viewport) return;
+      const editing = document.activeElement?.matches("input, textarea, [contenteditable=true]");
+      const inset = editing && viewport.scale === 1
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0;
+      shell.style.setProperty("--onboarding-keyboard", inset + "px");
+    }
+
+    viewport.addEventListener("resize", updateClearance);
+    viewport.addEventListener("scroll", updateClearance);
+    return () => {
+      viewport.removeEventListener("resize", updateClearance);
+      viewport.removeEventListener("scroll", updateClearance);
+    };
+  }, [ref]);
+}
+
 export function WizardShell({
   activeStage,
   stageStatus,
   stageHref,
-  eyebrow,
+  trainingPart,
   heading,
   description,
-  footer,
   children,
 }: {
   activeStage: WizardStageKey;
   stageStatus: Record<WizardStageKey, StageStatus>;
-  /** Where clicking a completed stage on the rail navigates to. */
   stageHref: Record<WizardStageKey, string>;
-  eyebrow: string;
+  trainingPart?: 1 | 2 | 3;
   heading: string;
   description?: string;
-  footer: ReactNode;
   children: ReactNode;
 }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const reduceMotion = useReducedMotion();
-  const activeIndex = WIZARD_STAGES.findIndex((s) => s.key === activeStage);
+  const appearance = useWaveClerkAppearance();
+  const shell = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const previewButton = useRef<HTMLButtonElement>(null);
+  const content = useRef<HTMLElement>(null);
+  const { preview } = useOnboardingPreview();
+  useKeyboardClearance(shell);
+
+  const activeIndex = WIZARD_STAGES.findIndex((stage) => stage.key === activeStage);
+  const complete = WIZARD_STAGES.filter((stage) => stageStatus[stage.key] === "done").length;
+  const stagePosition = (activeIndex + 1) + " of " + WIZARD_STAGES.length;
+
+  useEffect(() => {
+    const heading = content.current?.querySelector("h1");
+    if (!heading) return;
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  }, [heading]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1280px)");
+    function closeOnDesktop() {
+      if (desktop.matches) dialog.current?.close();
+    }
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
+  }, []);
 
   return (
-    <div className="flex min-h-screen flex-col bg-ds-bg">
-      <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-ds-border bg-ds-bg px-4 py-3 md:px-6">
-        <Link href="/" className="flex items-center">
-          <WavesLogo collapseNameOnMobile />
-        </Link>
-        <span
-          role="status"
-          className="hidden items-center gap-1.5 bg-ds-surface px-2.5 py-1 text-xs text-ds-text-muted sm:flex"
-        >
-          <Check aria-hidden className="size-3.5 text-ds-success" />
-          All changes saved
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPreviewOpen((v) => !v)}
-            aria-expanded={previewOpen}
-            className="flex items-center gap-1.5 border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary lg:hidden"
-          >
-            {previewOpen ? <PanelRightClose className="size-3.5" aria-hidden /> : <PanelRightOpen className="size-3.5" aria-hidden />}
-            Preview
-          </button>
-          <UserButton appearance={clerkDarkCompactAppearance} />
+    <div ref={shell} className="onboarding-wizard">
+      <header className="onboarding-header">
+        <div className="onboarding-frame flex items-center justify-between gap-3">
+          <Link href="/" className="inline-flex min-w-0 rounded-lg" aria-label="Waves AI Pilot home">
+            <ThemedWavesLogo collapseNameOnMobile />
+          </Link>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <button
+              ref={previewButton}
+              type="button"
+              aria-haspopup="dialog"
+              onClick={() => dialog.current?.showModal()}
+              className={btnGhost + " min-h-11 xl:hidden"}
+            >
+              <Eye className="size-4" aria-hidden />
+              Preview
+            </button>
+            <ThemeToggle className="!size-11 rounded-xl" />
+            <UserButton appearance={appearance} />
+          </div>
         </div>
       </header>
 
-      {/* Mobile: a slim progress bar + current stage name replaces the rail. */}
-      <div className="flex flex-col gap-1 border-b border-ds-border px-4 py-3 md:hidden">
-        <div className="h-1.5 w-full overflow-hidden bg-ds-surface-raised">
-          <div
-            className="h-full bg-ds-primary transition-all"
-            style={{ width: `${((activeIndex + 1) / WIZARD_STAGES.length) * 100}%` }}
-          />
-        </div>
-        <p className="text-xs font-medium text-ds-text-secondary">
-          Step {activeIndex + 1} of {WIZARD_STAGES.length} &middot;{" "}
-          {WIZARD_STAGES[activeIndex]?.label ?? ""}
-        </p>
-      </div>
-
-      <div className="flex flex-1 items-start">
-        <nav
-          aria-label="Onboarding progress"
-          className="sticky top-[57px] hidden w-64 shrink-0 flex-col gap-1 self-start px-4 py-8 md:flex"
-        >
-          {WIZARD_STAGES.map((stage, index) => {
-            const status = stageStatus[stage.key];
-            const clickable = status !== "upcoming" && stage.key !== activeStage;
-            const content = (
-              <>
-                <span
-                  className={`flex size-6 shrink-0 ds-label items-center justify-center text-2xs ${
-                    status === "done"
-                      ? "bg-ds-success-bg text-ds-success"
-                      : status === "current"
-                        ? "bg-ds-primary text-ds-primary-on"
-                        : "bg-ds-surface-elevated text-ds-text-muted"
-                  }`}
-                >
-                  {status === "done" ? <Check className="size-3.5" aria-hidden /> : index + 1}
-                </span>
-                <span className="flex flex-col gap-0.5">
-                  <span
-                    className={`text-sm font-medium ${
-                      status === "upcoming" ? "text-ds-text-muted" : "text-ds-text-primary"
-                    }`}
-                  >
-                    {stage.label}
+      <div className="onboarding-frame onboarding-grid">
+        <nav aria-label="Onboarding progress" className="onboarding-rail min-w-0">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+            <p className="text-sm font-medium text-ds-text-primary">Step {stagePosition}</p>
+            <p className="text-xs text-ds-text-secondary md:hidden">{WIZARD_STAGES[activeIndex]?.label}</p>
+            <p className="hidden text-xs text-ds-text-secondary md:block">{complete} complete</p>
+          </div>
+          <progress className="onboarding-meter mt-2" value={complete} max={WIZARD_STAGES.length}
+            aria-label="Onboarding stages completed" aria-valuetext={complete + " of " + WIZARD_STAGES.length + " stages complete"} />
+          <ol className="mt-5 hidden flex-col gap-1 md:flex">
+            {WIZARD_STAGES.map((stage, index) => {
+              const status = stageStatus[stage.key];
+              const active = stage.key === activeStage;
+              const style = "onboarding-stage " + (active ? "onboarding-stage-current" : "");
+              const label = (
+                <>
+                  <span className={"onboarding-stage-marker " + (status === "done" ? "onboarding-stage-done" : "")} aria-hidden>
+                    {status === "done" ? <Check className="size-4" /> : index + 1}
                   </span>
-                  <span className="text-xs text-ds-text-muted">{stage.subtitle}</span>
-                </span>
-              </>
-            );
-
-            return clickable ? (
-              <Link
-                key={stage.key}
-                href={stageHref[stage.key]}
-                className="flex items-start gap-3 px-2 py-2.5 transition-colors hover:bg-ds-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-              >
-                {content}
-              </Link>
-            ) : (
-              <div
-                key={stage.key}
-                aria-current={stage.key === activeStage ? "step" : undefined}
-                className={`flex items-start gap-3 px-2 py-2.5 ${
-                  stage.key === activeStage ? "bg-ds-surface" : ""
-                }`}
-              >
-                {content}
-              </div>
-            );
-          })}
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-ds-text-primary">{stage.label}</span>
+                    <span className="block text-xs text-ds-text-secondary">{stage.subtitle}</span>
+                    {status === "done" ? <span className="sr-only">Complete</span> : null}
+                  </span>
+                </>
+              );
+              return (
+                <li key={stage.key}>
+                  {status !== "upcoming" && !active ? (
+                    <Link href={stageHref[stage.key]} className={style}>{label}</Link>
+                  ) : (
+                    <div aria-current={active ? "step" : undefined} className={style}>{label}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
         </nav>
 
-        <main className="flex min-h-[calc(100vh-57px)] min-w-0 flex-1 flex-col">
-          <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-6 px-4 py-8 md:px-8">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={eyebrow}
-                initial={reduceMotion ? undefined : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduceMotion ? undefined : { opacity: 0 }}
-                transition={{ duration: 0.18 }}
-                className="flex flex-1 flex-col gap-6"
-              >
-                <div className="flex flex-col gap-1.5">
-                  <p className="ds-label text-ds-accent">
-                    {eyebrow}
-                  </p>
-                  <h1 className="text-[28px] leading-[1.15] font-light text-ds-text-primary sm:text-[32px]">{heading}</h1>
-                  {description ? (
-                    <p className="max-w-lg text-sm text-ds-text-secondary">{description}</p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-1 flex-col gap-6 pb-24">{children}</div>
-              </motion.div>
-            </AnimatePresence>
+        <main ref={content} className="onboarding-content">
+          <div className="flex min-w-0 flex-col gap-3">
+            <PageHeader title={heading} description={description} />
+            {trainingPart ? <p className="text-xs font-medium text-ds-text-secondary">Training · Part {trainingPart} of 3</p> : null}
+            <ReadinessProgress counts={preview} className="xl:hidden" />
           </div>
-
-          {footer ? (
-            // z-20: the footer (Back / Continue) must paint above anything in the
-            // step content, including another sticky element (2026-11-20 bug:
-            // a sticky card covered Continue on desktop). Below the z-30 header.
-            <div className="sticky bottom-0 z-20 border-t border-ds-border bg-ds-bg px-4 py-4 md:px-8">
-              <div className="mx-auto w-full max-w-xl">{footer}</div>
-            </div>
-          ) : null}
+          {children}
         </main>
 
-        <aside className="sticky top-[57px] hidden w-80 shrink-0 self-start px-4 py-8 pr-6 lg:block">
+        <aside aria-label="Agent preview and readiness" className="onboarding-preview hidden xl:block">
+          <ReadinessProgress counts={preview} />
           <OnboardingPreviewPanel />
         </aside>
       </div>
 
-      {previewOpen ? (
-        <div className="fixed inset-0 z-40 flex justify-end bg-ds-scrim lg:hidden" role="dialog" aria-modal="true">
-          <div className="flex h-full w-full max-w-sm flex-col gap-4 bg-ds-bg p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-ds-text-primary">Live preview</p>
-              <button
-                type="button"
-                onClick={() => setPreviewOpen(false)}
-                className="px-2 py-1 text-sm text-ds-text-secondary hover:text-ds-text-primary"
-              >
-                Close
-              </button>
-            </div>
-            <OnboardingPreviewPanel />
+      <dialog
+        ref={dialog}
+        aria-labelledby="onboarding-preview-title"
+        className="onboarding-preview-sheet"
+        onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}
+        onClose={() => previewButton.current?.focus()}
+      >
+        <div className="onboarding-sheet-content flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="onboarding-preview-title" className="text-base font-medium">Live preview</h2>
+            <button type="button" autoFocus onClick={() => dialog.current?.close()}
+              className={btnIcon + " !size-11"} aria-label="Close preview">
+              <X className="size-5" aria-hidden />
+            </button>
           </div>
+          <OnboardingPreviewPanel showTitle={false} />
         </div>
-      ) : null}
+      </dialog>
     </div>
   );
 }

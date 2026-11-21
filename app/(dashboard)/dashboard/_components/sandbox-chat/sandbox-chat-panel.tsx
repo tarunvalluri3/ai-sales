@@ -1,11 +1,13 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { LoaderCircle } from "lucide-react";
 import type { ConversationMessage } from "@/lib/rag";
 import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 import { Badge } from "../badge";
+import { Card, btnGhost, btnOutline, inputClass } from "../ui";
 import { sendSandboxMessage } from "./actions";
 
 type DisplayMessage = ConversationMessage & {
@@ -92,27 +94,24 @@ export function SandboxChatPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
+    <Card className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-medium text-ds-text-primary">Test your AI</h2>
+            <h2 className="dx-title">Test your agent</h2>
             <Badge tone="accent" size="sm" title="This chat reads your draft, including changes you haven't published yet.">
               Testing draft
             </Badge>
           </div>
           <p className="text-sm text-ds-text-secondary">
-            Chat with your AI sales employee exactly as a prospect would -- this uses your current
-            draft products, services, FAQs, and knowledge (including changes you haven&rsquo;t published
-            yet), but nothing here is visible to prospects or counted as a real lead unless you say
-            something that triggers a callback request.
+            Ask a question a prospect might ask. This chat uses your current draft and is private to your setup.
           </p>
         </div>
         {messages.length > 0 ? (
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="shrink-0 border border-ds-border px-3 py-1.5 text-sm font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+            className={btnGhost + " min-h-11"}
           >
             Start new chat
           </button>
@@ -126,7 +125,7 @@ export function SandboxChatPanel() {
         role="log"
         aria-live="polite"
         aria-label="Test conversation"
-        className="flex max-h-80 min-h-32 flex-col overflow-y-auto overscroll-contain border border-ds-border bg-ds-surface-elevated p-3"
+        className="flex max-h-80 min-h-32 flex-col overflow-y-auto overscroll-contain rounded-2xl border border-ds-border bg-ds-bg p-3"
       >
         <div ref={contentRef} className="flex flex-col gap-3">
         {messages.length === 0 ? (
@@ -137,7 +136,7 @@ export function SandboxChatPanel() {
           messages.map((m) => (
             <div key={m.id} className={`flex flex-col gap-1 ${m.role === "user" ? "items-end" : "items-start"}`}>
               <div
-                className={`max-w-[85%] px-3 py-2 text-sm ${
+                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm [overflow-wrap:anywhere] ${
                   m.role === "user"
                     ? "ds-btn-label bg-ds-primary text-ds-primary-on"
                     : "bg-ds-surface text-ds-text-primary"
@@ -214,16 +213,20 @@ export function SandboxChatPanel() {
           disabled={isPending}
           placeholder="Ask what a prospect might ask…"
           maxLength={2000}
-          className="flex-1 border border-ds-border bg-transparent px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-text-primary focus:outline-none disabled:opacity-60"
+          aria-describedby="sandbox-chat-help"
+          className={inputClass + " min-h-11 min-w-0 flex-1"}
         />
         <button
           type="submit"
           disabled={isPending || !input.trim()}
-          className="ds-btn-label shrink-0 bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          aria-describedby="sandbox-chat-help"
+          className={btnOutline + " min-h-11"}
         >
+          {isPending ? <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden /> : null}
           {isPending ? "Sending…" : "Send"}
         </button>
       </form>
-    </div>
+      <p id="sandbox-chat-help" className="text-xs text-ds-text-secondary">Enter a message to send a test.</p>
+    </Card>
   );
 }

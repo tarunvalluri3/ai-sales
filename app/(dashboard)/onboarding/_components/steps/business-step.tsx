@@ -16,9 +16,8 @@ import { useRouter } from "next/navigation";
 import { createBusiness, type CreateBusinessState } from "../../actions";
 import { updateBusinessProfileAction, type ProfileFormState } from "../../../dashboard/profile/actions";
 import { useOnboardingPreview } from "../preview-context";
-
-const inputClasses =
-  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+import { Card, CardHeader, btnGhost, inputClass, textareaClass } from "../../../dashboard/_components/ui";
+import { WizardActions, WizardContinue } from "../wizard-actions";
 
 function noopSubscribe() {
   return () => {};
@@ -112,8 +111,10 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
   }, [isNew, updateState.success, router]);
 
   return (
-    <>
+    <div className="flex flex-col gap-6">
     <form id="business-step-form" action={formAction} className="flex flex-col gap-5">
+      <Card className="flex flex-col gap-4">
+      <CardHeader title="Business profile" description="Give your agent the details it can use to introduce your business." />
       <div className="flex flex-col gap-1.5">
         <label htmlFor="name" className="text-sm font-medium text-ds-text-primary">
           Business name
@@ -125,25 +126,24 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           required
           minLength={2}
           maxLength={120}
-          autoFocus
           autoComplete="organization"
           placeholder="e.g. Glow Studio"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={isPending}
           aria-invalid={fieldErrors.name ? true : undefined}
-          aria-describedby={looksLikeClerkOrganizationDefault(name) ? "business-name-hint" : undefined}
-          className={inputClasses}
+          aria-describedby={[looksLikeClerkOrganizationDefault(name) && "business-name-hint", fieldErrors.name && "business-name-error"].filter(Boolean).join(" ") || undefined}
+          className={inputClass}
         />
         {looksLikeClerkOrganizationDefault(name) && (
           <p id="business-name-hint" className="text-xs text-ds-text-muted">Use the name your customers know your business by.</p>
         )}
-        {fieldErrors.name ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.name}</p> : null}
+        {fieldErrors.name ? <p id="business-name-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.name}</p> : null}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ds-text-primary">Industry</span>
-        <div className="flex flex-wrap gap-2">
+        <span id="industry-label" className="text-sm font-medium text-ds-text-primary">Industry</span>
+        <div role="group" aria-labelledby="industry-label" aria-describedby={fieldErrors.businessType ? "industry-error" : undefined} className="flex flex-wrap gap-2">
           {BUSINESS_TYPES.map((type) => (
             <button
               key={type.value}
@@ -151,9 +151,9 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
               onClick={() => setBusinessType(type.value)}
               aria-pressed={businessType === type.value}
               disabled={isPending}
-              className={`border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary ${
+              className={`min-h-11 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 businessType === type.value
-                  ? "border-ds-primary bg-ds-primary text-ds-primary-on"
+                  ? "border-ds-primary bg-ds-lime-soft text-ds-text-primary"
                   : "border-ds-border text-ds-text-secondary hover:border-ds-border-strong"
               }`}
             >
@@ -163,7 +163,7 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
         </div>
         <input type="hidden" name="businessType" value={businessType} />
         {fieldErrors.businessType ? (
-          <p role="alert" className="text-xs text-ds-danger">{fieldErrors.businessType}</p>
+          <p id="industry-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.businessType}</p>
         ) : null}
       </div>
 
@@ -180,9 +180,10 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           onChange={(e) => setWebsite(e.target.value)}
           disabled={isPending}
           aria-invalid={fieldErrors.website ? true : undefined}
-          className={inputClasses}
+          aria-describedby={fieldErrors.website ? "business-website-error" : undefined}
+          className={inputClass}
         />
-        {fieldErrors.website ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.website}</p> : null}
+        {fieldErrors.website ? <p id="business-website-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.website}</p> : null}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -199,20 +200,23 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           onChange={(e) => setDescription(e.target.value)}
           disabled={isPending}
           aria-invalid={fieldErrors.description ? true : undefined}
-          aria-describedby="description-help"
-          className={inputClasses}
+          aria-describedby={fieldErrors.description ? "description-help description-error" : "description-help"}
+          className={textareaClass}
         />
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p id="description-help" className="text-xs text-ds-text-muted">
             What you sell, where you are based, and who you serve.
           </p>
           <span className="text-xs text-ds-text-muted">{descriptionOk ? `${description.trim().length} characters` : `Minimum ${DESCRIPTION_MIN_LENGTH} characters`}</span>
         </div>
         {fieldErrors.description ? (
-          <p role="alert" className="text-xs text-ds-danger">{fieldErrors.description}</p>
+          <p id="description-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.description}</p>
         ) : null}
       </div>
+      </Card>
 
+      <Card className="flex flex-col gap-4">
+      <CardHeader title="Contact and regional settings" description="Set where alerts go and how the agent presents times and prices." />
       <div className="flex flex-col gap-1.5">
         <label htmlFor="contactEmail" className="text-sm font-medium text-ds-text-primary">
           Contact email
@@ -226,20 +230,20 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           value={contactEmail}
           onChange={(e) => setContactEmail(e.target.value)}
           disabled={isPending}
-          aria-describedby="contactEmail-help"
+          aria-describedby={fieldErrors.contactEmail ? "contactEmail-help contact-email-error" : "contactEmail-help"}
           aria-invalid={fieldErrors.contactEmail ? true : undefined}
-          className={inputClasses}
+          className={inputClass}
         />
         <p id="contactEmail-help" className="text-xs text-ds-text-muted">
           Lead, appointment and handoff alerts go here.
         </p>
         {fieldErrors.contactEmail ? (
-          <p role="alert" className="text-xs text-ds-danger">{fieldErrors.contactEmail}</p>
+          <p id="contact-email-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.contactEmail}</p>
         ) : null}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex min-w-0 flex-col gap-1.5">
           <label htmlFor="timezone" className="text-sm font-medium text-ds-text-primary">
             Time zone
           </label>
@@ -250,13 +254,13 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
             onChange={setChosenTimezone}
             disabled={isPending}
             invalid={Boolean(fieldErrors.timezone)}
-            describedBy="timezone-help"
-            triggerClassName={inputClasses}
+            describedBy={fieldErrors.timezone ? "timezone-help timezone-error" : "timezone-help"}
+            triggerClassName={inputClass}
           />
           <p id="timezone-help" className="text-xs text-ds-text-muted">
             {timezoneIsDetected ? "Detected from your browser. " : ""}Your opening hours and appointment times use this.
           </p>
-          {fieldErrors.timezone ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.timezone}</p> : null}
+          {fieldErrors.timezone ? <p id="timezone-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.timezone}</p> : null}
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="currency" className="text-sm font-medium text-ds-text-primary">
@@ -268,9 +272,9 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
             value={currency}
             onChange={(e) => setChosenCurrency(e.target.value)}
             disabled={isPending}
-            aria-describedby="currency-help"
+            aria-describedby={fieldErrors.currency ? "currency-help currency-error" : "currency-help"}
             aria-invalid={fieldErrors.currency ? true : undefined}
-            className={inputClasses}
+            className={inputClass}
           >
             {SUPPORTED_CURRENCIES.map((option) => (
               <option key={option.code} value={option.code}>
@@ -281,7 +285,7 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           <p id="currency-help" className="text-xs text-ds-text-muted">
             Prices you add are shown in this currency.
           </p>
-          {fieldErrors.currency ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.currency}</p> : null}
+          {fieldErrors.currency ? <p id="currency-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.currency}</p> : null}
         </div>
       </div>
 
@@ -290,14 +294,17 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           Contact phone <span className="text-ds-text-muted">Optional</span>
         </label>
         <input id="contactPhone" name="contactPhone" type="tel" autoComplete="tel"
-          placeholder="e.g. +91 98765 43210" className={inputClasses}
+          placeholder="e.g. +91 98765 43210" className={inputClass}
           value={contactPhone} onChange={(event) => setContactPhone(event.target.value)}
-          disabled={isPending} aria-invalid={Boolean(fieldErrors.contactPhone)} />
-        {fieldErrors.contactPhone ? <p role="alert" className="text-xs text-ds-danger">{fieldErrors.contactPhone}</p> : null}
+          disabled={isPending} aria-invalid={Boolean(fieldErrors.contactPhone)}
+          aria-describedby={fieldErrors.contactPhone ? "contact-phone-error" : undefined} />
+        {fieldErrors.contactPhone ? <p id="contact-phone-error" role="alert" className="text-xs text-ds-danger">{fieldErrors.contactPhone}</p> : null}
       </div>
+      </Card>
 
       {isNew ? (
-        <div id="opening-hours" className="scroll-mt-24 border-t border-ds-border pt-4">
+        <div id="opening-hours" className="dx-card dx-card-pad scroll-mt-24">
+          <CardHeader title="Opening hours" />
           <p className="text-sm font-medium text-ds-text-primary">
             {hoursAccepted ? "Hours selected" : hoursEdited ? "Edited hours" : "Default hours - confirm or edit"}
           </p>
@@ -317,7 +324,7 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           <input type="hidden" name="confirmHours" value={String(hoursAccepted || hoursEdited)} />
           {!hoursAccepted && !hoursEdited && (
             <button type="button" onClick={() => setHoursAccepted(true)} disabled={isPending}
-              className="mt-2 text-sm font-medium text-ds-text-primary underline">
+              className={btnGhost + " mt-3 min-h-11"}>
               These are correct
             </button>
           )}
@@ -331,18 +338,13 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <span />
-        <div className="flex items-center gap-3">
-          {!valid ? <span className="text-xs text-ds-text-muted">Add {missing[0]} to continue</span> : null}
-          <button type="submit" disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
-            {isPending ? "Saving…" : isNew && hoursEdited ? "Save hours and continue" : "Continue"}
-          </button>
-        </div>
-      </div>
     </form>
       {business ? <HoursSummary hours={hours} timezone={timezone || "UTC"} slaMinutes={business.sla_minutes} useProfileTimezone /> : null}
-    </>
+      <WizardActions>
+        <WizardContinue type="submit" form="business-step-form" pending={isPending} disabled={!valid}
+          reason={valid ? undefined : "Add " + missing[0] + " to continue"}
+          label={isNew && hoursEdited ? "Save hours and continue" : "Continue"} />
+      </WizardActions>
+    </div>
   );
 }

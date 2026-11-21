@@ -339,7 +339,8 @@ test("wizard wiring uses saved key, timed trial confirmation, and shared readine
   assert.match(channels, /primaryKey \? <WidgetInstallGuide/);
   assert.match(channels, /add my website later/);
   assert.match(channels, /Your website address/);
-  assert.match(source(steps + "plan-step.tsx"), /animate-spin[\s\S]*?Setting up your trial/);
+  assert.match(source(steps + "plan-step.tsx"), /<WizardContinue[\s\S]*?pending=\{isPending \|\| confirming\}[\s\S]*?Setting up your trial/);
+  assert.match(source(onboarding + "_components/wizard-actions.tsx"), /pending \? <LoaderCircle[\s\S]*?animate-spin/);
   assert.match(source(onboarding + "actions.ts"), /onboarding_trial_timing.*\{ step, durationMs:/);
   const page = source(onboarding + "page.tsx");
   assert.match(page, /Free trial · ends \$\{trialEnd\} · \$\{quota.repliesUsed\} of/);

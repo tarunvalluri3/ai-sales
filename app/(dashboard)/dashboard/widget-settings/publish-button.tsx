@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useId, type ReactNode } from "react";
+import { CircleCheck, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { publishBusinessAction, type PublishBusinessState } from "./actions";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
+import { Card, btnPrimary } from "../_components/ui";
 
 const initialState: PublishBusinessState = {};
 
@@ -19,6 +21,8 @@ export function PublishButton({
   blockingCount = 0,
   canEdit = true,
   redirectOnSuccess,
+  backAction,
+  footerClassName = "",
 }: {
   isPublished: boolean;
   hasActiveKey: boolean;
@@ -30,6 +34,8 @@ export function PublishButton({
   canEdit?: boolean;
   /** Where to send the owner once a publish succeeds (onboarding: the dashboard welcome). */
   redirectOnSuccess?: string;
+  backAction?: ReactNode;
+  footerClassName?: string;
 }) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(publishBusinessAction, initialState);
@@ -48,9 +54,11 @@ export function PublishButton({
   // "Publish agent"). Later publishes go through the dashboard header's
   // "Publish changes", which submits the same action. Both are readiness-gated.
   const blockedNow = !published && readinessBlocked;
+  const reasonId = useId();
 
   return (
-    <div className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-5">
+    <>
+    <Card className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-medium text-ds-text-primary">
@@ -63,7 +71,7 @@ export function PublishButton({
           </p>
         </div>
         <span
-          className={`shrink-0 px-2.5 py-1 text-2xs font-medium uppercase tracking-wide-ds ${
+          className={`dx-pill shrink-0 px-2.5 py-1 text-xs font-medium ${
             published ? "bg-ds-success-bg text-ds-success" : "bg-ds-warning-bg text-ds-warning"
           }`}
         >
@@ -94,14 +102,15 @@ export function PublishButton({
       ) : null}
 
       {blockedNow ? (
-        <p role="status" className="bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
+        <p id={reasonId} role="status" className="bg-ds-warning-bg px-3 py-2 text-xs text-ds-warning">
           Finish the {blockingCount} required {blockingCount === 1 ? "item" : "items"} in the readiness
           checklist above before you publish. Your AI needs them to answer prospects accurately.
         </p>
       ) : null}
 
       {confirming ? (
-        <p role="status" className="bg-ds-success-bg px-3 py-2 text-xs font-medium text-ds-success">
+        <p role="status" className="flex items-center gap-2 bg-ds-success-bg px-3 py-2 text-sm font-medium text-ds-success">
+          <CircleCheck className="onboarding-published-mark size-5 shrink-0" aria-hidden />
           Your agent is live. Taking you to your dashboard…
         </p>
       ) : null}
@@ -119,16 +128,24 @@ export function PublishButton({
         </div>
       ) : null}
 
-      <form action={formAction}>
+    </Card>
+    <div className={footerClassName}>
+      {backAction}
+      {blockedNow ? <p className="onboarding-action-reason text-xs text-ds-text-secondary">Complete the required checklist to publish.</p> : null}
+      <form action={formAction} className="ml-auto min-w-0">
         <button
           type="submit"
           disabled={isPending || !canEdit || blockedNow || confirming}
+          aria-describedby={blockedNow ? reasonId : undefined}
+          aria-busy={isPending}
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
-          className="ds-btn-label self-start bg-ds-primary px-4 py-2 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className={btnPrimary}
         >
+          {isPending ? <LoaderCircle className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden /> : null}
           {isPending ? "Publishing…" : confirming ? "Taking you to your dashboard…" : "Publish agent"}
         </button>
       </form>
     </div>
+    </>
   );
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { WizardActions, WizardContinue } from "../wizard-actions";
+
 import { DEFAULT_WIDGET_PRIMARY, sanitizeAccentColor } from "@/lib/widget-colors";
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -9,9 +11,7 @@ import { updateAiCapabilitiesAction, updateWidgetBrandingAction, type WidgetBran
 import { advanceOnboarding } from "../../actions";
 import { AgentPersonaFields } from "../../../dashboard/_components/agent-persona-fields";
 import { useOnboardingPreview } from "../preview-context";
-
-const inputClasses =
-  "border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted transition-colors focus:border-ds-border-strong focus:outline-none disabled:opacity-60";
+import { Card, CardHeader, inputClass, textareaClass } from "../../../dashboard/_components/ui";
 
 const TONES: { key: "friendly" | "professional" | "concise"; label: string; example: string }[] = [
   { key: "friendly", label: "Friendly", example: "Hey there! Happy to help you find the right fit 😊" },
@@ -82,12 +82,32 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
       <input type="hidden" name="welcomeText" value={greeting} />
       <input type="hidden" name="language" value={language} />
 
-      <AgentPersonaFields businessName={business.name} initialName={business.agent_name}
-        initialAvatar={business.agent_avatar_url} disabled={isPending} onPreview={update} />
+      <Card className="flex flex-col gap-4">
+        <CardHeader title="Agent identity" description="Choose the name, avatar and colour prospects see in your website widget." />
+        <AgentPersonaFields businessName={business.name} initialName={business.agent_name}
+          initialAvatar={business.agent_avatar_url} disabled={isPending} onPreview={update} />
+        <fieldset disabled={isPending} className="flex flex-col gap-2">
+          <legend className="mb-2 text-sm font-medium text-ds-text-primary">Brand colour</legend>
+          <div className="flex flex-wrap gap-2">
+            {SWATCHES.map((colour) => (
+              <button key={colour} type="button" aria-label={colour} aria-pressed={accent.toLowerCase() === colour}
+                onClick={() => changeAccent(colour)} style={{ backgroundColor: colour }}
+                className="size-11 rounded-full border border-ds-border aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ds-text-primary" />
+            ))}
+          </div>
+          <label htmlFor="accentColor" className="text-xs text-ds-text-secondary">Hex colour</label>
+          <input id="accentColor" name="accentColor" className={inputClass} value={accent}
+            onChange={(event) => changeAccent(event.target.value)} aria-invalid={Boolean(accentError)}
+            aria-describedby={accentError ? "accent-error" : undefined} maxLength={7} />
+          {accentError ? <p id="accent-error" role="alert" className="text-xs text-ds-danger">{accentError}</p> : null}
+        </fieldset>
+      </Card>
 
+      <Card className="flex flex-col gap-4">
+      <CardHeader title="Voice and language" description="Set how your agent greets people and which language it uses." />
       <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ds-text-primary">Tone</span>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <span id="persona-tone" className="text-sm font-medium text-ds-text-primary">Tone</span>
+        <div role="group" aria-labelledby="persona-tone" className="grid gap-2 sm:grid-cols-3">
           {TONES.map((t) => (
             <button
               key={t.key}
@@ -124,8 +144,7 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
             update({ greeting: e.target.value });
           }}
           disabled={isPending}
-          autoFocus
-          className={inputClasses}
+          className={textareaClass}
         />
       </div>
 
@@ -138,7 +157,7 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
           value={language}
           onChange={(e) => setLanguage(e.target.value as typeof language)}
           disabled={isPending}
-          className={inputClasses}
+          className={inputClass}
         >
           {SUPPORTED_WIDGET_LANGUAGES.map((lang) => (
             <option key={lang} value={lang}>
@@ -147,24 +166,11 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
           ))}
         </select>
       </div>
+      </Card>
 
-      <fieldset disabled={isPending} className="flex flex-col gap-2">
-        <legend className="text-sm font-medium text-ds-text-primary">Brand colour</legend>
-        <div className="flex flex-wrap gap-2">
-          {SWATCHES.map((colour) => (
-            <button key={colour} type="button" aria-label={colour} aria-pressed={accent.toLowerCase() === colour}
-              onClick={() => changeAccent(colour)} style={{ backgroundColor: colour }}
-              className="size-8 rounded-full border border-ds-border aria-pressed:outline-2 aria-pressed:outline-offset-2 aria-pressed:outline-ds-text-primary" />
-          ))}
-        </div>
-        <label htmlFor="accentColor" className="text-xs text-ds-text-muted">Hex colour</label>
-        <input id="accentColor" name="accentColor" className={inputClasses} value={accent}
-          onChange={(event) => changeAccent(event.target.value)} aria-invalid={Boolean(accentError)} maxLength={7} />
-        {accentError ? <p role="alert" className="text-xs text-ds-danger">{accentError}</p> : null}
-      </fieldset>
-
+      <Card>
       <fieldset disabled={isPending} className="flex flex-col gap-3">
-        <legend className="text-sm font-medium text-ds-text-primary">Capabilities</legend>
+        <legend className="mb-3 text-base font-medium text-ds-text-primary">Capabilities</legend>
         <label className="flex items-start gap-2 text-sm text-ds-text-primary">
           <input type="checkbox" name="appointmentsEnabled" checked={appointments} onChange={(event) => setAppointments(event.target.checked)} className="mt-1 accent-ds-accent" />
           <span>Book appointments
@@ -179,6 +185,7 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
           </span>
         </label>
       </fieldset>
+      </Card>
 
       {state.error ? (
         <p role="alert" className="text-sm text-ds-danger">
@@ -186,25 +193,10 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => router.push("/onboarding?step=faqs")}
-          className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary"
-        >
-          Back
-        </button>
-        <div className="flex items-center gap-3">
-          {!valid ? <span className="text-xs text-ds-text-muted">Add a greeting to continue</span> : null}
-          <button
-            type="submit"
-            disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            {isPending ? "Saving…" : "Continue"}
-          </button>
-        </div>
-      </div>
+      <WizardActions onBack={() => router.push("/onboarding?step=faqs")}>
+        <WizardContinue type="submit" pending={isPending} disabled={!valid}
+          reason={accentError ?? (!valid ? "Add a greeting to continue" : undefined)} />
+      </WizardActions>
     </form>
   );
 }
