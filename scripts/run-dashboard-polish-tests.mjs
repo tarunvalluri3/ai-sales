@@ -301,3 +301,19 @@ test("the dashboard layout provides the business zone from the session's busines
   assert.match(layout, /<BusinessTimeProvider timezone=\{timezone\}>/);
   assert.match(source("lib/business-context.ts"), /timezone: business\.timezone/);
 });
+
+// ---------------------------------------------------------------- Item 8
+test("mobile header is one non-wrapping row with the account controls behind a menu", () => {
+  const header = source(dashboard + "_components/dashboard-header.tsx");
+  assert.match(header, /<header className="relative flex w-full min-h-16 items-center[^"]*md:flex-wrap/);
+  assert.doesNotMatch(header, /<header className="[^"]*\bflex-wrap\b(?<!md:flex-wrap)/);
+  assert.match(header, /aria-expanded=\{menuOpen\}/);
+  assert.match(header, /event\.key === "Escape"/);
+  // Each Clerk control and the bell are mounted exactly once.
+  assert.equal(header.split("<OrganizationSwitcher").length - 1, 1);
+  assert.equal(header.split("<UserButton").length - 1, 1);
+  assert.equal(header.split("<NotificationBell").length - 1, 1);
+  const bar = source(dashboard + "_components/publish-bar.tsx");
+  assert.match(bar, /<span className="sm:hidden">Publish<\/span>/);
+  assert.match(bar, /hidden font-normal sm:inline/);
+});
