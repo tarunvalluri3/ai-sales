@@ -7,6 +7,7 @@ import { ImageIcon, LoaderCircle, Plus } from "lucide-react";
 import type { ProductFormState } from "./actions";
 import type { CatalogFormField } from "@/lib/schemas/catalog";
 import { pricePlaceholder } from "@/lib/currency";
+import { CATALOG_DESCRIPTION_MIN_LENGTH } from "@/lib/onboarding-readiness";
 
 const initialState: ProductFormState = {};
 
@@ -146,19 +147,23 @@ export function ProductForm({
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="description" className={labelClasses}>
-            Description
+            Description{onboardingPlaceholders ? <span className="text-ds-danger"> *</span> : null}
           </label>
+          {onboardingPlaceholders ? <input type="hidden" name="require_description" value="1" /> : null}
           <textarea
             id="description"
             name="description"
             rows={3}
             placeholder="Describe what’s included and who it’s for"
             defaultValue={values?.description ?? initialDescription}
+            required={onboardingPlaceholders ? true : undefined}
+            minLength={onboardingPlaceholders ? CATALOG_DESCRIPTION_MIN_LENGTH : undefined}
             disabled={isPending}
             aria-invalid={errors.description ? true : undefined}
-            aria-describedby={describedBy("description")}
+            aria-describedby={describedBy("description", onboardingPlaceholders ? "description-hint" : undefined)}
             className={`${inputClasses} leading-relaxed`}
           />
+          {onboardingPlaceholders ? <p id="description-hint" className={hintClasses}>Required, at least {CATALOG_DESCRIPTION_MIN_LENGTH} characters. The AI answers from this.</p> : null}
           {fieldError("description")}
         </div>
         <div className="grid gap-3.5 sm:grid-cols-2">

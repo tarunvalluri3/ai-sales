@@ -60,7 +60,7 @@ export function FaqForm({
 
   useEffect(() => {
     const input = questionRef.current;
-    const sync = () => setQuestionText(input?.value ?? "");
+    const sync = () => { setQuestionText(input?.value ?? ""); setDraftFeedback(undefined); };
     input?.addEventListener("faq-question-changed", sync);
     return () => input?.removeEventListener("faq-question-changed", sync);
   }, []);
@@ -109,7 +109,7 @@ export function FaqForm({
           maxLength={300}
           placeholder="e.g. What happens after I request a quote?"
           defaultValue={initialQuestion}
-          onChange={(event) => setQuestionText(event.currentTarget.value)}
+          onChange={(event) => { setQuestionText(event.currentTarget.value); setDraftFeedback(undefined); }}
           disabled={isPending || draftPending}
           className={inputClasses}
         />
@@ -127,6 +127,7 @@ export function FaqForm({
           minLength={1}
           maxLength={2000}
           defaultValue={initialAnswer}
+          onChange={() => setDraftFeedback(undefined)}
           disabled={isPending || draftPending}
           className={`${inputClasses} leading-relaxed`}
         />

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { parsePriceAmount, plainNumericPrice } from "@/lib/currency";
+import { CATALOG_DESCRIPTION_MIN_LENGTH } from "@/lib/onboarding-readiness";
 
 /**
  * Shared Zod fields for products and services (both: name, optional
@@ -115,9 +116,13 @@ export type CatalogFormResult =
 export function parseCatalogForm(formData: FormData): CatalogFormResult {
   const values = readCatalogFormValues(formData);
   const parsed = catalogItemFieldsSchema.safeParse(values);
-  if (parsed.success) return { ok: true, data: parsed.data };
+  // The onboarding forms send this flag: the readiness gate needs a real description (CATALOG_DESCRIPTION_MIN_LENGTH),
+  // so Add/Save rejects a shorter one up front instead of letting Continue fail later. The dashboard forms do not send it.
+  const descriptionTooShort = formData.get("require_description") === "1" && values.description.trim().length < CATALOG_DESCRIPTION_MIN_LENGTH;
+  if (parsed.success && !descriptionTooShort) return { ok: true, data: parsed.data };
   const fieldErrors: CatalogFieldErrors = {};
-  for (const issue of parsed.error.issues) {
+  if (descriptionTooShort) fieldErrors.description = `Describe it in at least ${CATALOG_DESCRIPTION_MIN_LENGTH} characters.`;
+  for (const issue of parsed.success ? [] : parsed.error.issues) {
     const field = issue.path[0];
     if (typeof field === "string" && (CATALOG_FORM_FIELDS as readonly string[]).includes(field) && !(field in fieldErrors)) {
       fieldErrors[field as CatalogFormField] = issue.message;

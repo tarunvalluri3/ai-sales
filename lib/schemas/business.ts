@@ -92,7 +92,8 @@ export const BUSINESS_TYPES = [
 
 /** Clerk's personalized default can be valid text without being the business name. */
 export function looksLikeClerkOrganizationDefault(name: string): boolean {
-  return /^.+['’]s\s+organization$/i.test(name.trim());
+  // "<name>'s Organization" and Clerk's other default, "My Organization".
+  return /^(?:.+['’]s|my)\s+organization$/i.test(name.trim());
 }
 
 export const businessTypeSchema = z.enum(

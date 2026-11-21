@@ -119,7 +119,8 @@ function faqMock({ quote = "Open weekdays from 9 to 5.", outcome = "supported", 
         select() { return this; },
         eq(key, value) { if (key === "business_id") scoped.push([table, value]); return this; },
         in() { return this; },
-        or() { return this; },
+        or() { this.keyword = true; return this; },
+        order() { return this; },
         limit: async () => ({ data: table === "knowledge_documents" && rows
           ? [{ title: "Hours", content: "Open weekdays from 9 to 5." }] : [] }),
       }),
@@ -147,13 +148,82 @@ test("FAQ draft uses only approved tenant evidence and requires every source quo
   assert.equal(response.answer, "Open weekdays from 9 to 5.");
   assert.equal(grounded.calls.length, 1);
   assert.equal(grounded.calls[0][1], "faq_draft");
-  assert.equal(grounded.scoped.length, 3);
+  assert.equal(grounded.scoped.length, 6); // keyword + recent lookups for documents, products and services
   assert.ok(grounded.scoped.every(([, id]) => id === tenantA));
   for (const fixture of [faqMock({ quote: "Open all night." }), faqMock({ outcome: "insufficient" }), faqMock({ rows: false })]) {
     const result = await fixture.draftFaqAnswer(tenantA, "Acme", "What hours are you open?");
     assert.equal(result.answer, undefined);
     assert.match(result.hint, /add it to Knowledge/i);
   }
+});
+
+const peakKnowledge = "Peak Fitness Studio is in Gachibowli, Hyderabad. Monthly membership is 3000 rupees. Personal training is 900 rupees per session.";
+
+function peakMock(content = peakKnowledge, locatedQuote = "Peak Fitness Studio is in Gachibowli, Hyderabad.") {
+  const seen = [];
+  const { draftFaqAnswer } = load("lib/faq-drafting.ts", {
+    "@/lib/supabase/server": { createServerSupabaseClient: () => ({
+      from: (table) => {
+        const query = { keyword: false, ordered: false };
+        const rowsFor = () => table === "knowledge_documents" ? [{ title: "About us", content }]
+          : table === "services" ? [{ name: "Monthly Membership", description: null, price: "₹3,000 per month" }] : [];
+        Object.assign(query, {
+          select: () => query, eq: () => query, in: () => query,
+          or: () => { query.keyword = true; return query; },
+          order: () => { query.ordered = true; return query; },
+          // A literal keyword match finds nothing for these questions; only the recent-rows lookup returns data.
+          limit: async () => ({ data: query.keyword ? [] : rowsFor() }),
+        });
+        return query;
+      },
+    }) },
+    "@/lib/rate-limit": { checkAndIncrementRateLimit: async () => true },
+    "@/lib/owner-generation": {
+      canRunOwnerGeneration: async () => true,
+      generateOwnerDraft: async (_business, _feature, _schema, _system, input) => {
+        seen.push(input);
+        const find = (text) => input.sources.findIndex((source) => source.includes(text));
+        if (/price/i.test(input.question)) {
+          return { outcome: "supported", excerpts: [
+            { source: find("Monthly membership"), quote: "Monthly membership is 3000 rupees." },
+            { source: find("Monthly membership"), quote: "Personal training is 900 rupees per session." },
+            { source: find("₹3,000"), quote: "Price: ₹3,000 per month" },
+          ] };
+        }
+        if (/located/i.test(input.question)) {
+          return { outcome: "supported", excerpts: [{ source: find("Gachibowli"), quote: locatedQuote }] };
+        }
+        return { outcome: "insufficient", excerpts: [] };
+      },
+    },
+    "@/lib/source-evidence": evidence,
+  });
+  return { draftFaqAnswer, seen };
+}
+
+test("FAQ draft answers common questions whose words never appear in the knowledge text", async () => {
+  const prices = await peakMock().draftFaqAnswer(tenantA, "Peak Fitness Studio", "What are your prices?");
+  assert.equal(prices.hint, undefined);
+  assert.match(prices.answer, /Monthly membership is 3000 rupees./);
+  assert.match(prices.answer, /Personal training is 900 rupees per session./);
+  assert.match(prices.answer, /₹3,000 per month/);
+  const located = await peakMock().draftFaqAnswer(tenantA, "Peak Fitness Studio", "Where are you located?");
+  assert.equal(located.answer, "Peak Fitness Studio is in Gachibowli, Hyderabad.");
+  // Ellipsis-separated knowledge text is split the same way as full stops.
+  const ellipsis = peakMock(peakKnowledge.replaceAll(". ", "… "), "Peak Fitness Studio is in Gachibowli, Hyderabad…");
+  assert.equal((await ellipsis.draftFaqAnswer(tenantA, "Peak Fitness Studio", "Where are you located?")).answer,
+    "Peak Fitness Studio is in Gachibowli, Hyderabad…");
+});
+
+test("FAQ draft still refuses a question the knowledge does not support, and unsupported quotes", async () => {
+  const unsupported = peakMock();
+  const result = await unsupported.draftFaqAnswer(tenantA, "Peak Fitness Studio", "Do you have a swimming pool?");
+  assert.equal(result.answer, undefined);
+  assert.match(result.hint, /add it to Knowledge/i);
+  assert.equal(unsupported.seen.length, 1); // the model was asked and declined; nothing was invented
+  const none = await peakMock("").draftFaqAnswer(tenantA, "Peak Fitness Studio", "Where are you located?");
+  assert.equal(none.answer, undefined); // a model quote that is not in any source is rejected
+  assert.match(none.hint, /add it to Knowledge/i);
 });
 
 test("FAQ rates, daily limits and direct injection are enforced before generation", async () => {

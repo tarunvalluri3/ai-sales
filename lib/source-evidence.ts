@@ -12,7 +12,7 @@ export function sourceStatement(source: string, quote: string): string | null {
   const excerpt = sourceExcerpt(source, quote);
   if (!excerpt) return null;
   const normalized = source.normalize("NFC").replace(/[^\S\n]+/gu, " ");
-  const scoped = normalized.split(/\n|(?<=[.!?।])\s+/u);
-  return scoped.some((statement) => normalizeEvidence(statement).replace(/[.!?।]$/u, "") === excerpt.replace(/[.!?।]$/u, ""))
+  const scoped = normalized.split(/\n|(?<=[.!?।…])\s+/u);
+  return scoped.some((statement) => normalizeEvidence(statement).replace(/[.!?।…]$/u, "") === excerpt.replace(/[.!?।…]$/u, ""))
     ? excerpt : null;
 }

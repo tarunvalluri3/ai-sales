@@ -55,6 +55,9 @@ test("Step 1 recognizes personalized Clerk default names without rejecting busin
   assert.equal(looksLikeClerkOrganizationDefault("Tarun's Organization"), true);
   assert.equal(looksLikeClerkOrganizationDefault("Tarun’s organization"), true);
   assert.equal(looksLikeClerkOrganizationDefault("Tarun’s Fitness Studio"), false);
+  assert.equal(looksLikeClerkOrganizationDefault("My Organization"), true);
+  assert.equal(looksLikeClerkOrganizationDefault("  my organization "), true);
+  assert.equal(looksLikeClerkOrganizationDefault("My Organization Studio"), false);
   assert.equal(looksLikeClerkOrganizationDefault("Community Organization"), false);
 });
 
@@ -477,4 +480,76 @@ test("product, service and knowledge submit buttons render visible pending feedb
     const component = source(dashboard + file);
     assert.match(component, /disabled=\{isPending\}[\s\S]*?\{isPending \? \([\s\S]*?<LoaderCircle[\s\S]*?(?:pendingLabel|Uploading|Importing)/);
   }
+});
+
+function personaActionFixture() {
+  const saved = [];
+  const uploads = [];
+  const business = loadAction("lib/schemas/business.ts", {
+    "@/lib/widget-i18n": { SUPPORTED_WIDGET_LANGUAGES: ["en", "es", "fr", "de", "pt", "hi", "te", "ta", "kn", "mr", "bn", "auto"] },
+    "@/lib/currency": loadAction("lib/currency.ts", {}),
+  });
+  const images = loadAction("lib/agent-images.ts", {
+    "@/lib/supabase/service": { createServiceSupabaseClient: () => ({ storage: { from: () => ({
+      getPublicUrl: (path) => ({ data: { publicUrl: "https://storage.invalid/" + path } }),
+      upload: async (path) => { uploads.push(path); return {}; },
+    }) } }) },
+    "@/lib/supabase/server": { createServerSupabaseClient: () => { throw new Error("no database in this test"); } },
+    "@/lib/errors": { AppError: Error },
+    "@/lib/logger": { logEvent: () => {} },
+    "@/lib/schemas/agent-image": loadAction("lib/schemas/agent-image.ts", {}),
+  });
+  const actions = loadAction(dashboard + "widget-settings/actions.ts", {
+    "next/cache": { revalidatePath: () => {} },
+    "next/server": { after: () => {} },
+    "@/lib/answer-bank/generate": {},
+    "@/lib/business-context": { requireBusinessContext: async () => ({
+      businessId: "928247ec-cf6a-4387-a166-313ab80e0f5c", userId: "user", orgId: "org_a", orgRole: "org:admin",
+    }) },
+    "@/lib/auth": { requireMinRole: () => null },
+    "@/lib/widget-keys": {},
+    "@/lib/business": {
+      getBusinessForOrg: async () => ({ agent_avatar_url: null }),
+      updateWidgetBranding: async (orgId, input, persona) => { saved.push({ orgId, input, persona }); },
+      updateWidgetSuggestedQuestions: async () => {}, updateAiCapabilities: async () => {},
+      publishBusinessForOrg: async () => {}, BusinessNotReadyError: class extends Error {},
+    },
+    "@/lib/onboarding-readiness-data": {},
+    "@/lib/onboarding-readiness": { isDismissibleItemKey: () => false },
+    "@/lib/schemas/business": business,
+    "@/lib/schemas/widget-origin": {},
+    "@/lib/widget-suggested-questions": { generateSuggestedQuestions: async () => [], NoBusinessContentError: class extends Error {} },
+    "@/lib/audit-log": { recordAuditLogEntry: async () => {} },
+    "@/lib/errors": { logAndGetUserMessage: (error) => "ERROR: " + error.message },
+    "@/lib/schemas/agent-persona": loadAction("lib/schemas/agent-persona.ts", {}),
+    "@/lib/agent-images": images,
+  });
+  return { actions, saved, uploads };
+}
+
+// Production bug 2026-11-21: Personality -> Continue failed for every new signup. The cause was a missing database
+// column (migration 20261124001200 not applied), not these inputs; these cases pin down that the action hands the
+// right values to the database layer for exactly the combinations that were tried live.
+test("Personality save: Maya/auto, Maya/en and empty name/en, with no avatar chosen (empty File), all reach the update", async () => {
+  for (const [agentName, language, expected] of [["Maya", "auto", "Maya"], ["Maya", "en", "Maya"], ["", "en", null]]) {
+    const { actions, saved, uploads } = personaActionFixture();
+    const form = new FormData();
+    for (const [key, value] of Object.entries({
+      accentColor: "#3f3f46", logoUrl: "", welcomeText: "Hey! Welcome to Peak Fitness Studio. How can I help today?",
+      welcomeTextClosed: "", ctaText: "", position: "bottom-right", language, privacyPolicyUrl: "", agentName,
+    })) form.set(key, value);
+    form.set("agentAvatar", new File([], "undefined")); // what an untouched file input submits
+    const result = await actions.updateWidgetBrandingAction({}, form);
+    assert.deepEqual({ ...result }, { success: true }, agentName + "/" + language);
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].orgId, "org_a");
+    assert.equal(saved[0].input.language, language);
+    assert.deepEqual({ ...saved[0].persona }, { name: expected, avatar: undefined });
+    assert.equal(uploads.length, 0);
+  }
+});
+
+test("widget branding update writes the persona columns only when a persona is passed", () => {
+  const text = source("lib/business.ts");
+  assert.match(text, /\.\.\.\(persona && \{ agent_name: persona\.name, agent_avatar_url: persona\.avatar \}\)/);
 });

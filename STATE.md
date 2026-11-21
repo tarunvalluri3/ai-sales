@@ -2,7 +2,7 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-11-21 (**Onboarding visual redesign on `feat/onboarding-visual-redesign`.**)
+Last updated: 2026-11-21 (**Onboarding hotfix `fix/onboarding-persona-save`: persona save failure = unapplied production migration `20261124001200`; see the first section.**)
 
 ## Onboarding visual redesign — 2026-11-21
 
@@ -18,6 +18,18 @@ Previous handoff: 2026-11-20 (**Widget reliability (8 items) on branch `fix/widg
 
 ---
 
+
+## Hotfix: onboarding persona save + FAQ draft + catalog description — 2026-11-21 — `fix/onboarding-persona-save`
+
+**1. Persona save blocker (NOT a code bug).** Production logs (`vercel logs --query updateWidgetBranding`) show `PGRST204: Could not find the 'agent_name' column of 'businesses' in the schema cache` on every Personality save. Migration `20261124001200_onboarding_agent_persona.sql` (and possibly `...1100`, `...1000`, `...0900`, `...0800` from PR #163) was **not applied to production** before the 4b code deployed. `updateWidgetBranding` always sends `agent_name` when the form has an agent-name field, so every save fails, including Widget settings -> Appearance. **Fix = apply the 4b migrations (in the order listed under "PR 4b") to production. APPLIED by the user 2026-11-21 (per the user; not re-verified via `migration list`).** Verify with `npx supabase migration list --linked`. No code change; the new tests (`test:onboarding-flow`) pin the exact failing inputs (Maya/auto, Maya/en, empty name/en, empty avatar File).
+**2. FAQ draft "Your info doesn't cover this question".** Cause: `findEvidence` matched only the question's literal words (`ilike`), so "prices" and "located" never matched "3000 rupees" / "Gachibowli", the model was never called, and the hint came back. Fix: the tenant's most recent approved documents, products and services are appended to the keyword hits, so the model decides relevance. Still tenant-scoped; every drafted sentence must still be a verbatim sentence of a source (`sourceStatement`), so unsupported questions are still refused. Trade-off: every non-injection draft now makes one model call (was zero when no keyword matched); the 30/h limit and daily caps still apply. `sourceStatement` also splits on `…`. The hint clears when the question or answer changes or an FAQ is added.
+**3. Products description.** Cause: `CATALOG_DESCRIPTION_MIN_LENGTH` (10) is the publish-readiness rule (`isCatalogItemComplete` -> catalog readiness item, the products step Continue gate), but the form showed Description as optional. Onboarding forms now mark it required with the 10-character hint, and add/edit reject a shorter one (`require_description` flag read by `parseCatalogForm`). The dashboard product/service forms are unchanged (description stays optional there).
+**4.** The business-name hint also matches "My Organization".
+**5. Step 1 "Save hours and continue" 15-20s: NOT measured, not changed.** Production logs outside the last 30 minutes are not retained (Hobby plan), so no timing was available. By reading the code: the action does ~5 sequential Supabase calls (insert, analytics event, hours insert, step save) each with a Clerk token fetch, then redirects into a full `/onboarding?step=knowledge` render (auth, business, `computeOnboardingProgress`, then ~8 parallel queries, then more awaits). Functions run in `icn1` next to Supabase (Seoul). Likely mix: cold start of a 21 MB function plus serial round trips. To measure, repeat the save and pull `vercel logs` within 30 minutes.
+
+No migration in this PR. Checks: lint, typecheck, build (placeholder credentials, loopback DB) exit 0; all 41 mocked `test:*` suites pass (1,045 cases).
+
+---
 
 ## Hotfix: optional product/service/avatar image — 2026-11-21 — `fix/optional-image-upload`
 
