@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Plus } from "lucide-react";
-import type { FaqFormState } from "./actions";
+import { draftFaqAnswerAction, type FaqFormState } from "./actions";
 
 const initialState: FaqFormState = {};
 
@@ -33,13 +33,42 @@ export function FaqForm({
   const [state, formAction, isPending] = useActionState(action, initialState);
   const questionRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const [questionText, setQuestionText] = useState(initialQuestion);
+  const [draftPending, startDraft] = useTransition();
+  const [draftFeedback, setDraftFeedback] = useState<{ text: string; error?: boolean }>();
+
+  function requestDraft() {
+    setDraftFeedback(undefined);
+    startDraft(async () => {
+      try {
+        const result = await draftFaqAnswerAction(questionText);
+        const answer = formRef.current?.elements.namedItem("answer");
+        if (result.answer && answer instanceof HTMLTextAreaElement) {
+          answer.value = result.answer;
+          setDraftFeedback({ text: "Draft — check before saving" });
+        } else {
+          setDraftFeedback({ text: result.hint ?? result.error ?? "Could not draft an answer.", error: Boolean(result.error) });
+        }
+      } catch {
+        setDraftFeedback({ text: "Could not draft an answer. Try again or write it yourself.", error: true });
+      }
+    });
+  }
 
   const successHandler = useRef(onSuccess);
   useEffect(() => { successHandler.current = onSuccess; }, [onSuccess]);
 
   useEffect(() => {
+    const input = questionRef.current;
+    const sync = () => setQuestionText(input?.value ?? "");
+    input?.addEventListener("faq-question-changed", sync);
+    return () => input?.removeEventListener("faq-question-changed", sync);
+  }, []);
+
+  useEffect(() => {
     if (suggestedQuestion && questionRef.current && !questionRef.current.disabled) {
       questionRef.current.value = suggestedQuestion.text;
+      questionRef.current.dispatchEvent(new Event("faq-question-changed"));
       questionRef.current.focus();
     }
   }, [suggestedQuestion]);
@@ -48,11 +77,17 @@ export function FaqForm({
     if (state.values && formRef.current) {
       const question = questionRef.current;
       const answer = formRef.current.elements.namedItem("answer");
-      if (question) question.value = state.values.question;
+      if (question) {
+        question.value = state.values.question;
+        question.dispatchEvent(new Event("faq-question-changed"));
+      }
       if (answer instanceof HTMLTextAreaElement) answer.value = state.values.answer;
     }
     if (state.success) {
-      if (!id) formRef.current?.reset();
+      if (!id) {
+        formRef.current?.reset();
+        questionRef.current?.dispatchEvent(new Event("faq-question-changed"));
+      }
       successHandler.current?.();
     }
   }, [state, id]);
@@ -74,7 +109,8 @@ export function FaqForm({
           maxLength={300}
           placeholder="e.g. What happens after I request a quote?"
           defaultValue={initialQuestion}
-          disabled={isPending}
+          onChange={(event) => setQuestionText(event.currentTarget.value)}
+          disabled={isPending || draftPending}
           className={inputClasses}
         />
       </div>
@@ -91,9 +127,16 @@ export function FaqForm({
           minLength={1}
           maxLength={2000}
           defaultValue={initialAnswer}
-          disabled={isPending}
+          disabled={isPending || draftPending}
           className={`${inputClasses} leading-relaxed`}
         />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={!questionText.trim() || isPending || draftPending} onClick={requestDraft}
+          className="rounded border border-ds-border px-3 py-2 text-sm disabled:opacity-60">
+          {draftPending ? "Drafting…" : "Draft an answer from my info"}
+        </button>
+        {draftFeedback && <p role={draftFeedback.error ? "alert" : "status"} className="text-sm text-ds-text-secondary">{draftFeedback.text}</p>}
       </div>
       {state.error ? (
         <p role="alert" className="rounded-xl bg-ds-danger-bg px-3 py-2 text-sm text-ds-danger">
@@ -102,7 +145,7 @@ export function FaqForm({
       ) : null}
       <button
         type="submit"
-        disabled={isPending}
+        disabled={isPending || draftPending}
         className="ds-btn-label inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
       >
         {id ? null : <Plus strokeWidth={1.75} className="size-4" aria-hidden="true" />}

@@ -31,6 +31,7 @@ export type RateLimitScope =
   | "business"
   | "gemini_daily_business"
   | "gemini_daily_global"
+  | "faq_draft"
   // Round 3, item 1: one "a person will follow up" notice per WhatsApp /
   // Instagram conversation per UTC day while a daily cap blocks it.
   | "gemini_cap_notice";

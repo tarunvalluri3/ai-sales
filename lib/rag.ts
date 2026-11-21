@@ -650,7 +650,7 @@ const sendReplyTool = {
  * call and makes every call slower. Any future change here needs its own
  * measurement; `ai_response_metrics.thinking_tokens` is what to read.
  */
-export function getChatModel(): ChatGoogleGenerativeAI {
+export function getChatModel(maxRetries = CHAT_MODEL_MAX_RETRIES): ChatGoogleGenerativeAI {
   return new ChatGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY!,
     model: process.env.GEMINI_CHAT_MODEL!,
@@ -660,7 +660,7 @@ export function getChatModel(): ChatGoogleGenerativeAI {
     // Production readiness (LAUNCH_AUDIT.md §12): LangChain's default is 6
     // retries with exponential backoff, which can't finish inside the
     // per-call abort and hammers a throttled key. See lib/chat-timeouts.ts.
-    maxRetries: CHAT_MODEL_MAX_RETRIES,
+    maxRetries,
   });
 }
 

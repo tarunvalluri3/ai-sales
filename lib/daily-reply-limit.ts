@@ -88,7 +88,7 @@ export async function checkDailyReplyLimit(params: {
 }
 
 /** Both counters in one round trip. A cap of 0 is off, so its counter is neither bumped nor read. */
-async function incrementDailyCounters(businessId: string, caps: DailyReplyCaps): Promise<DailyReplyCounts> {
+export async function incrementDailyCounters(businessId: string, caps: DailyReplyCaps): Promise<DailyReplyCounts> {
   const checks: BatchedRateLimitCheck[] = [];
   if (caps.perBusiness > 0) {
     checks.push({ scope: "gemini_daily_business", identifier: businessId, limit: caps.perBusiness, windowSeconds: DAY_SECONDS });

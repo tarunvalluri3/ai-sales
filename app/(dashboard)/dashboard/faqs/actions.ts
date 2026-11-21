@@ -42,6 +42,21 @@ export type FaqFormState = {
   values?: { question: string; answer: string };
 };
 
+export async function draftFaqAnswerAction(question: unknown): Promise<{ answer?: string; hint?: string; error?: string }> {
+  const { businessId, businessName, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) return { error: authError };
+  const parsed = faqFieldsSchema.shape.question.safeParse(question);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  try {
+    const { draftFaqAnswer } = await import("@/lib/faq-drafting");
+    return await draftFaqAnswer(businessId, businessName, parsed.data);
+  } catch (error) {
+    logAndGetUserMessage(error);
+    return { error: "Could not draft an answer. Try again, or write it yourself." };
+  }
+}
+
 export async function createFaqAction(
   _prevState: FaqFormState,
   formData: FormData,
