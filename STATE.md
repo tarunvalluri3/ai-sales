@@ -19,15 +19,15 @@ Previous handoff: 2026-11-20 (**Widget reliability (8 items) on branch `fix/widg
 
 **Migrations in application order**
 
-1. `20261124000600_onboarding_public_images.sql`
-2. `20261124000700_onboarding_agent_persona.sql`
-3. `20261124000800_onboarding_faq_draft_rate_limit.sql`
-4. `20261124000900_onboarding_widget_languages.sql`
-5. `20261124001000_onboarding_website_suggestions.sql`
+1. `20261124000800_onboarding_faq_draft_rate_limit.sql`
+2. `20261124000900_onboarding_widget_languages.sql`
+3. `20261124001000_onboarding_website_suggestions.sql`
+4. `20261124001100_onboarding_public_images.sql`
+5. `20261124001200_onboarding_agent_persona.sql`
 
 Apply the migrations to production **before merging** because Vercel deploys `main` automatically. Staging pgTAP covers storage roles, snapshot behavior, languages and the review table's tenant boundary. No packages or env vars changed.
 
-**Checks:** `npm run lint` and `npm run typecheck` exited 0. `npm run build` exited 0 with placeholder credentials and an unreachable loopback Supabase URL (82/82 prerendered, expected admin metrics connection warnings). All 41 mocked `test:*` suites passed, including 15/15 onboarding capability tests after the last two regression cases were added. Local verification used no live database or Gemini calls. The production walkthrough and migration order are in the PR.
+**Checks after rebase onto `61c0363`:** `npm run lint` and `npm run typecheck` exited 0. `npm run build` exited 0 with placeholder credentials and an unreachable loopback Supabase URL (82/82 prerendered, expected admin metrics connection warnings). All 41 mocked `test:*` suites passed, including 15/15 onboarding capability tests after the last two regression cases were added. Local verification used no live database or Gemini calls. The production walkthrough is in PR #163. Use the migration order above. Only the two versions that overlapped with PR #162 were regenerated. The existing staging CI had already recorded the FAQ drafting, language and website suggestion versions.
 
 ---
 
