@@ -1,4 +1,5 @@
 import "server-only";
+import { cleanupAgentImage } from "@/lib/agent-images";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/supabase/types";
 import { AppError } from "@/lib/errors";
@@ -190,6 +191,8 @@ export async function updateProduct(
   // A failed embedding attempt (`null`) is omitted from the update
   // payload rather than written, so a transient failure on an edit
   // never overwrites a previously-successful embedding with null.
+  const previous = await getProduct(businessId, id);
+  if (!previous) return false;
   const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input, currency));
   const { data, error } = await supabase
     .from("products")
@@ -210,6 +213,7 @@ export async function updateProduct(
     return false;
   }
 
+  if (previous.image_url !== input.image_url) await cleanupAgentImage(businessId, previous.image_url);
   await syncGeneratedDocument(businessId, "product", id, input.name, buildKnowledgeContent(input, currency));
 
   return true;
@@ -223,7 +227,7 @@ export async function deleteProduct(businessId: string, id: string): Promise<boo
     .delete()
     .eq("business_id", businessId)
     .eq("id", id)
-    .select("id");
+    .select("id, image_url");
 
   if (error) {
     throw new AppError(
@@ -237,6 +241,7 @@ export async function deleteProduct(businessId: string, id: string): Promise<boo
     return false;
   }
 
+  await cleanupAgentImage(businessId, data[0].image_url);
   await deleteGeneratedDocument(businessId, "product", id);
 
   return true;

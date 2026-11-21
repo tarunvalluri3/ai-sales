@@ -25,6 +25,7 @@ const FRAME_DENY_SOURCES = [
 const nextConfig: NextConfig = {
   /* config options here */
   devIndicators: false,
+  experimental: { serverActions: { bodySizeLimit: "3mb" } },
   // Phase B2 (STATE.md, "AI sales agent, not chatbot" -- PDF catalog
   // photos): @napi-rs/canvas ships a native binding (.node addon via
   // js-binding.js) that Turbopack cannot bundle into a Server Component

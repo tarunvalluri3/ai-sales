@@ -182,6 +182,9 @@ jobs:
       - name: Test onboarding flow
         run: npm run test:onboarding-flow
 
+      - name: Onboarding capability tests
+        run: npm run test:onboarding-capabilities
+
       - name: Meta signed_request verification tests
         # 2026-11-01: Meta App Review's deauthorize / data-deletion callbacks.
         # Valid, tampered, wrong-secret and malformed signed requests; pure.

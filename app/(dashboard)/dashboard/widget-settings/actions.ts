@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { cleanupAgentImage, readLiveAgentImagesForCleanup } from "@/lib/agent-images";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { kickAnswerBankRefresh } from "@/lib/answer-bank/generate";
@@ -261,6 +262,7 @@ export async function publishBusinessAction(
     return { error: authError };
   }
 
+  const oldImages = await readLiveAgentImagesForCleanup(businessId);
   let result;
   try {
     result = await publishBusinessForOrg(orgId);
@@ -281,6 +283,7 @@ export async function publishBusinessAction(
     // Instant answers: publishing is when stored answers become servable, so
     // build them now (off the response) rather than waiting for the daily run.
     after(() => kickAnswerBankRefresh(businessId));
+    after(async () => { await Promise.all(oldImages.map((url) => cleanupAgentImage(businessId, url))); });
   }
 
   revalidatePath("/dashboard", "layout");
