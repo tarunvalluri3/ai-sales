@@ -285,3 +285,16 @@ test("Indic widget locales cover all chrome strings, preserve placeholders, and 
   assert.equal(widgetLanguageSchema.parse("auto"), "auto");
   assert.equal(getWidgetStrings("auto"), english);
 });
+
+test("onboarding catalog forms require a 10+ character description; the dashboard forms do not", () => {
+  const base = { name: "Monthly Membership", price: "₹3,000 per month", category: "", image_url: "", price_amount: "" };
+  const withFlag = (description) => form({ ...base, description, require_description: "1" });
+  for (const description of ["", "   ", "Gym only"]) {
+    const result = catalog.parseCatalogForm(withFlag(description));
+    assert.equal(result.ok, false);
+    assert.match(result.fieldErrors.description, /at least 10 characters/);
+    assert.equal(result.values.description, description);
+  }
+  assert.equal(catalog.parseCatalogForm(withFlag("Unlimited gym access")).ok, true);
+  assert.equal(catalog.parseCatalogForm(form({ ...base, description: "" })).ok, true);
+});
