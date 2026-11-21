@@ -5,6 +5,7 @@ import {
   BookOpen,
   CalendarDays,
   Camera,
+  FlaskConical,
   CircleHelp,
   Clock,
   CreditCard,
@@ -47,7 +48,10 @@ export type NavGroup = {
  */
 export const NAV_GROUPS: NavGroup[] = [
   {
-    items: [{ label: "Overview", href: "/dashboard", icon: House }],
+    items: [
+      { label: "Overview", href: "/dashboard", icon: House },
+      { label: "Test your agent", href: "/dashboard/test-agent", icon: FlaskConical },
+    ],
   },
   {
     label: "Engage",

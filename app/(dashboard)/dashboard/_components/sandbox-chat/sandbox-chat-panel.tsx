@@ -8,7 +8,7 @@ import { renderWidgetMarkdown } from "@/lib/widget-markdown";
 import { useStickToBottom } from "@/lib/use-stick-to-bottom";
 import { Badge } from "../badge";
 import { Card, btnGhost, btnOutline, inputClass } from "../ui";
-import { sendSandboxMessage } from "./actions";
+import { sendSandboxMessage, type SandboxMode } from "./actions";
 
 type DisplayMessage = ConversationMessage & {
   id: string;
@@ -31,7 +31,8 @@ function newId(): string {
  * /dashboard/widget-settings so a business can re-test any time after
  * changing knowledge/products/FAQs, not only once during onboarding.
  */
-export function SandboxChatPanel() {
+export function SandboxChatPanel({ liveAvailable = false }: { /** True once the agent is published: shows the Draft / Live switch. */ liveAvailable?: boolean }) {
+  const [mode, setMode] = useState<SandboxMode>("draft");
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -46,6 +47,12 @@ export function SandboxChatPanel() {
     messages.length,
     lastOwnMessageId,
   );
+
+  function handleModeChange(next: SandboxMode) {
+    if (next === mode) return;
+    setMode(next);
+    handleStartNewChat();
+  }
 
   function handleStartNewChat() {
     if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
@@ -72,7 +79,7 @@ export function SandboxChatPanel() {
     slowTimerRef.current = setTimeout(() => setIsSlow(true), SLOW_RESPONSE_NOTICE_MS);
 
     try {
-      const result = await sendSandboxMessage(conversationIdRef.current, history, text);
+      const result = await sendSandboxMessage(conversationIdRef.current, history, text, mode);
       if (result.ok) {
         conversationIdRef.current = result.conversationId;
         setMessages((prev) => [
@@ -99,13 +106,39 @@ export function SandboxChatPanel() {
         <div className="flex min-w-0 flex-1 basis-56 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="dx-title">Test your agent</h2>
-            <Badge tone="accent" size="sm" title="This chat reads your draft, including changes you haven't published yet.">
-              Testing draft
-            </Badge>
+            {mode === "live" ? (
+              <Badge tone="success" size="sm" title="This chat uses the version your visitors get.">
+                Testing live
+              </Badge>
+            ) : (
+              <Badge tone="accent" size="sm" title="This chat reads your draft, including changes you haven't published yet.">
+                Testing draft
+              </Badge>
+            )}
           </div>
           <p className="text-sm text-ds-text-secondary">
-            Ask a question a prospect might ask. This chat uses your current draft and is private to your setup.
+            {mode === "live"
+              ? "Ask a question a prospect might ask. This chat uses your published agent, exactly what visitors get, and is private to your setup."
+              : "Ask a question a prospect might ask. This chat uses your current draft and is private to your setup."}
           </p>
+          {liveAvailable ? (
+            <div role="group" aria-label="Which version to test" className="mt-1 inline-flex w-fit rounded-xl border border-ds-border p-0.5">
+              {(["draft", "live"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={mode === option}
+                  disabled={isPending}
+                  onClick={() => handleModeChange(option)}
+                  className={`min-h-9 rounded-[10px] px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary disabled:opacity-50 ${
+                    mode === option ? "bg-ds-primary text-ds-primary-on" : "text-ds-text-secondary hover:text-ds-text-primary"
+                  }`}
+                >
+                  {option === "draft" ? "Draft" : "Live"}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         {messages.length > 0 ? (
           <button

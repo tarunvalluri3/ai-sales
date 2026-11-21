@@ -132,3 +132,38 @@ test("dashboard layout backfills the org name for admins only, off the request p
   const src = source(dashboard + "layout.tsx");
   assert.match(src, /hasMinRole\(orgRole, "org:admin"\)\) after\(\(\) => ensureClerkOrganizationName\(orgId, businessName\)\)/);
 });
+
+// ---------------------------------------------------------------- Item 2
+const sandboxActions = dashboard + "_components/sandbox-chat/actions.ts";
+
+test("test chat mode is a closed enum validated server-side", () => {
+  const src = source(sandboxActions);
+  assert.match(src, /sandboxModeSchema = z\.enum\(\["draft", "live"\]\)/);
+  assert.match(src, /sandboxModeSchema\.safeParse\(mode\)/);
+});
+
+test("live test chat takes the version from the session's business row, never from the client", () => {
+  const src = source(sandboxActions);
+  assert.match(src, /loadLiveAgentSourceByVersion\(businessId, business\.live_version_id\)/);
+  assert.match(src, /const \{ businessId, orgId \} = await requireBusinessContext\(\)/);
+  const signature = src.slice(src.indexOf("export async function sendSandboxMessage"), src.indexOf("): Promise<SandboxChatResult>"));
+  assert.doesNotMatch(signature, /version/i);
+  assert.match(src, /isAgentPublished\(business\)/);
+});
+
+test("test chat keeps its sandbox guarantees in both modes", () => {
+  const src = source(sandboxActions);
+  assert.match(src, /SANDBOX_CONVERSATION_SOURCE/);
+  assert.match(src, /Test booking — nothing was saved and no one was notified\./);
+  assert.match(src, /"dashboard",\s+source,\s+\)/);
+  assert.match(src, /prepareProspectMessage\(message\)/);
+});
+
+test("Test your agent sits right under Overview and its page needs a published agent", () => {
+  const nav = source(dashboard + "_components/nav-items.tsx");
+  assert.match(nav, /label: "Overview"[^}]*\},\s+\{ label: "Test your agent", href: "\/dashboard\/test-agent"/);
+  const page = source(dashboard + "test-agent/page.tsx");
+  assert.match(page, /requireLiveBusinessContext\(\)/);
+  assert.match(page, /<SandboxChatPanel liveAvailable \/>/);
+  assert.doesNotMatch(source("app/(dashboard)/onboarding/_components/steps/review-step.tsx"), /liveAvailable/);
+});
