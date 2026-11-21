@@ -194,7 +194,7 @@ function buildApproachingLimitEmail(
       heading: `You've used ${threshold}% of your AI replies`,
       paragraphs: [
         `Your AI sales employee has answered ${repliesUsed.toLocaleString("en-IN")} of the ${replyQuota.toLocaleString("en-IN")} replies included in ${planLabel} this period.`,
-        "At 100% it stops replying. Prospects are told that someone from your team will follow up and the conversation is flagged in your dashboard, so nothing on your site breaks and nothing gets invented -- but those enquiries wait on a person instead.",
+        "At 100% it stops replying. Prospects are told that someone from your team will follow up and the conversation is flagged in your dashboard, so nothing on your site breaks and nothing gets invented — but those enquiries wait on a person instead.",
         "If you look like running out before the period ends, moving up a plan takes effect straight away.",
       ],
       facts: [
@@ -226,9 +226,9 @@ function buildLimitReachedEmail(businessName: string, status: ReplyQuotaStatus, 
 
   const paragraphs = [
     entitlement.isTrial
-      ? `Your free trial's ${replyQuota.toLocaleString("en-IN")} AI replies are used up -- ${repliesUsed.toLocaleString("en-IN")} prospect conversations your AI sales employee handled for ${businessName} without anyone on your team touching them.`
+      ? `Your free trial's ${replyQuota.toLocaleString("en-IN")} AI replies are used up — ${repliesUsed.toLocaleString("en-IN")} prospect conversations your AI sales employee handled for ${businessName} without anyone on your team touching them.`
       : `Your AI sales employee has answered all ${replyQuota.toLocaleString("en-IN")} replies included in your ${entitlement.planName} plan this period. That is ${replyQuota.toLocaleString("en-IN")} prospect conversations it handled for ${businessName} without anyone on your team touching them.`,
-    "It has paused for now. Prospects who message are told that someone from your team will follow up, and every one of those conversations is flagged in your dashboard -- your site is not broken and your AI is not inventing answers. Those enquiries are simply waiting on a person again.",
+    "It has paused for now. Prospects who message are told that someone from your team will follow up, and every one of those conversations is flagged in your dashboard — your site is not broken and your AI is not inventing answers. Those enquiries are simply waiting on a person again.",
   ];
 
   if (upgrade) {
@@ -243,7 +243,7 @@ function buildLimitReachedEmail(businessName: string, status: ReplyQuotaStatus, 
 
   paragraphs.push(
     entitlement.isTrial
-      ? "Either way, nothing you have set up goes anywhere -- your knowledge, products and conversations are all exactly where you left them."
+      ? "Either way, nothing you have set up goes anywhere — your knowledge, products and conversations are all exactly where you left them."
       : `Your quota resets on ${formatDate(entitlement.periodEnd)} either way.`,
   );
 

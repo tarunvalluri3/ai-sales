@@ -78,7 +78,7 @@ async function fetchUrlContent(url: string): Promise<string> {
 
   if (rendered.length < MIN_CONTENT_LENGTH) {
     throw new AppError(
-      "This page didn't have enough readable content, even after rendering it directly -- it may require sign-in, block automated access, or genuinely have little text. Paste the page's content in manually instead using \"Add knowledge manually.\"",
+      "This page didn't have enough readable content, even after rendering it directly — it may require sign-in, block automated access, or genuinely have little text. Paste the page's content in manually instead using \"Add knowledge manually.\"",
     );
   }
 

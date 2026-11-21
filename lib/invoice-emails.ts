@@ -107,7 +107,7 @@ export function buildInvoiceHeldEmail(params: {
       heading: "We need your billing details",
       paragraphs: [
         `We received your payment of ${formatPaiseAsInr2dp(params.amountPaise)} on ${formatIsoDate(params.paidOnDate)}, but we cannot issue the GST tax invoice for it yet: ${params.detail}.`,
-        "Please open Billing and fill in your billing name, address and state (and your GSTIN, if you are registered). The moment you save them we issue the invoice automatically and email it to you -- there is nothing else to do.",
+        "Please open Billing and fill in your billing name, address and state (and your GSTIN, if you are registered). The moment you save them we issue the invoice automatically and email it to you — there is nothing else to do.",
       ],
       cta: { label: "Add billing details", url: `${getAppUrl()}/dashboard/billing` },
       footnote: "We will not guess a state or an address on a tax invoice: it cannot be changed once it is issued.",

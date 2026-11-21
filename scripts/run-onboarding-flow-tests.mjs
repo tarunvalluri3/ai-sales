@@ -82,6 +82,8 @@ function onboardingActions(business, keys = {}, paths = []) {
   return loadAction(onboarding + "actions.ts", {
     "next/cache": { revalidatePath: (path) => paths.push(path) },
     "next/navigation": { redirect: (path) => { throw new Error(path); } },
+    "next/server": { after: () => {} },
+    "@/lib/clerk-org-name": { syncClerkOrganizationName: async () => {} },
     "@/lib/auth": { requireAuthContext: async () => admin, requireMinRole: () => null },
     "@/lib/business-context": { requireBusinessContext: async () => admin },
     "@/lib/business": business,

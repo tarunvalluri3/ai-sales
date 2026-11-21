@@ -114,7 +114,7 @@ async function recordCancellation(
     .maybeSingle<{ razorpay_subscription_id: string | null; razorpay_customer_id: string | null; status: string }>();
   if (readError) {
     throw new AppError(
-      "We couldn't check your subscription before deleting. Nothing was deleted -- please try again.",
+      "We couldn't check your subscription before deleting. Nothing was deleted — please try again.",
       "recordCancellationForDeletion: subscription read failed",
       readError,
     );

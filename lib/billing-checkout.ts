@@ -289,7 +289,7 @@ export async function confirmMonthlyCheckout(params: {
     // Sentry, and nothing is written.
     logEvent("billing_checkout_signature_invalid", params.businessId, { kind: "subscription" }, "error");
     throw new AppError(
-      "We could not verify that payment. Nothing has been charged twice -- please contact us before trying again.",
+      "We could not verify that payment. Nothing has been charged twice — please contact us before trying again.",
       "razorpay_subscription_signature_invalid",
     );
   }
@@ -307,7 +307,7 @@ export async function confirmMonthlyCheckout(params: {
       "error",
     );
     throw new AppError(
-      "Your payment went through, but we could not match it to a plan. We are on it -- please contact us.",
+      "Your payment went through, but we could not match it to a plan. We are on it — please contact us.",
       "razorpay_subscription_plan_id_unrecognised",
     );
   }
@@ -436,7 +436,7 @@ export async function confirmOrderCheckout(params: {
   if (!verified) {
     logEvent("billing_checkout_signature_invalid", params.businessId, { kind: "order" }, "error");
     throw new AppError(
-      "We could not verify that payment. Nothing has been charged twice -- please contact us before trying again.",
+      "We could not verify that payment. Nothing has been charged twice — please contact us before trying again.",
       "razorpay_order_signature_invalid",
     );
   }

@@ -101,7 +101,7 @@ function reachabilitySentence(result: AppointmentStatusNotifyResult, contactPhon
     case "sent":
       return "We emailed them to let them know.";
     case "no_address":
-      return `We could NOT email them -- they never gave an email address.${channel}${phone}`;
+      return `We could NOT email them — they never gave an email address.${channel}${phone}`;
     case "suppressed":
       return `We could NOT email them: their address previously bounced or reported spam.${channel}${phone}`;
     case "failed":

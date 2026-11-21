@@ -360,3 +360,19 @@ test("Billing page shows the billing details form once and pre-fills it from wha
   assert.match(panel, /<BillingDetailsFields\s+defaults=\{identity\}[\s\S]*idPrefix="checkout"/);
   assert.doesNotMatch(source("app/(dashboard)/onboarding/_components/steps/plan-step.tsx"), /savedDetails/);
 });
+
+// ---------------------------------------------------------------- Item 12
+test("business-facing copy uses an em dash, not a double hyphen", () => {
+  const files = [
+    "app/(dashboard)/dashboard/audit-log/page.tsx",
+    "app/(dashboard)/dashboard/appointments/actions.ts",
+    "lib/business.ts", "lib/billing-cancellation.ts", "lib/billing-checkout.ts", "lib/billing-emails.ts",
+    "lib/usage-reminders.ts", "lib/invoice-emails.ts", "lib/gstin.ts", "lib/file-ingestion.ts", "lib/url-ingestion.ts",
+  ];
+  for (const file of files) {
+    const bad = source(file).split("\n").filter((line) =>
+      line.includes(" -- ") && !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(line) && /["'`][^"'`]* -- /.test(line));
+    assert.deepEqual(bad, [], file);
+  }
+  assert.match(source("app/(dashboard)/dashboard/audit-log/page.tsx"), /Grace period lapsed — AI replies paused/);
+});
