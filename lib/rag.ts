@@ -39,7 +39,7 @@ import { AGENT_UNAVAILABLE_MESSAGE } from "@/lib/agent-serving";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
 import { embedText, isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
-import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
+import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT, usesLocalizedModelReplies } from "@/lib/widget-i18n";
 import { TurnTimer } from "@/lib/turn-timings";
 import { recordTurnMetrics, type DeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { recordGeminiUsage, withGeminiUsageLog, type GeminiUsageTrigger } from "@/lib/gemini-usage-log";
@@ -263,7 +263,7 @@ export type BusinessProfileContext = {
 
 /** Phase 25a: instructs the model to reply in the business's configured widget language. English is the default and needs no special instruction (the model already replies in the prospect's own language by default; being explicit for `en` would be redundant, not incorrect, but is skipped to keep the prompt minimal for the common case). */
 function formatLanguageInstruction(language: WidgetLanguage): string {
-  if (language === "en") return "";
+  if (language === "auto") return "\nReply in the language the prospect uses in their latest message. Use the conversation language if the message is ambiguous.\n";
   return `\nAlways reply in ${WIDGET_LANGUAGE_NAMES_FOR_PROMPT[language]}, regardless of the language the prospect writes in.\n`;
 }
 
@@ -561,6 +561,7 @@ function buildOutputGuardContext(
   question: string,
   history: ConversationMessage[],
   outcome: BookingTurnOutcome,
+  language: WidgetLanguage,
 ): OutputGuardContext {
   const profileParts = [profile.description, profile.website, profile.contactEmail, profile.contactPhone].filter(
     (part): part is string => Boolean(part),
@@ -570,6 +571,7 @@ function buildOutputGuardContext(
     canary: tags.canary,
     protectedShingles: PROTECTED_SHINGLES,
     ...buildEvidence([...profileParts, context.replace(/search_query="[^"]*"/, ""), ...toolEvidence], visitorParts),
+    language,
     appointmentBooked: outcome.appointmentBooked,
     callbackRequested: outcome.callbackRequested,
   };
@@ -972,7 +974,7 @@ async function prepareTurn(
   // is deliberately no "don't count this" switch.
   const firstTurn = isFirstTurn(history);
   let instantMissReason: string | undefined;
-  if (instant?.enabled) {
+  if (instant?.enabled && !usesLocalizedModelReplies(language)) {
     const local = await timer.time("instant_local", () =>
       decideLocalInstant(
         { message: question, language, isFirstTurn: firstTurn, context: instant },
@@ -1034,7 +1036,7 @@ async function prepareTurn(
   const retrieval = retriever.invoke(question);
   retrieval.catch(() => undefined);
 
-  if (instant?.enabled && faqPhaseEligible({ message: question, isFirstTurn: firstTurn, context: instant }) === null) {
+  if (instant?.enabled && !usesLocalizedModelReplies(language) && faqPhaseEligible({ message: question, isFirstTurn: firstTurn, context: instant }) === null) {
     try {
       const faq = await timer.time("faq_match", () =>
         decideFaqInstant(
@@ -1680,7 +1682,7 @@ export async function askSalesEmployee(
 
     // Guardrails Phase 4: the same deterministic output checks every channel
     // gets (widget JSON, WhatsApp, Instagram, sandbox all reach here).
-    const checked = checkReply(result.answer, buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome));
+    const checked = checkReply(result.answer, buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome, language));
     noteGuardrailSignals(businessId, conversationId, checked.signals);
     const response: SalesEmployeeResponse = {
       answer: checked.text,
@@ -1854,7 +1856,7 @@ export async function* streamSalesEmployee(
   // tool result this turn is known), so the evidence is complete.
   let outputGuard: StreamOutputGuard | null = null;
   const makeGuardContext = (): OutputGuardContext =>
-    buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome);
+    buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome, language);
 
   const sourceChunkIds = (): string[] => [
     ...new Set([...documents.map((document) => document.metadata.chunkId), ...additionalSourceChunkIds]),

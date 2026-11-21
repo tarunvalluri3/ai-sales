@@ -176,3 +176,44 @@ test("owner generation invokes the model once and records its usage", async () =
   assert.equal(logs[0][0].businessId, tenantA);
   assert.equal(logs[0][1].promptTokens, 30);
 });
+
+const booking = load("lib/guardrails/booking-languages.ts");
+const localizedClaims = {"es":"Tu cita está confirmada para el lunes.","fr":"Votre rendez-vous est confirmé pour lundi.","de":"Ihr Termin wurde für Montag bestätigt.","pt":"Sua consulta foi confirmada para segunda-feira.","hi":"आपका अपॉइंटमेंट सोमवार को बुक हो गया है।","te":"మీ అపాయింట్‌మెంట్ సోమవారం సాయంత్రం 6 గంటలకు బుక్ చేయబడింది.","ta":"உங்கள் சந்திப்பு திங்களன்று உறுதி செய்யப்பட்டது.","kn":"ನಿಮ್ಮ ಭೇಟಿ ಸೋಮವಾರಕ್ಕೆ ನಿಗದಿಯಾಗಿದೆ.","mr":"तुमची भेट सोमवारी निश्चित झाली आहे.","bn":"আপনার অ্যাপয়েন্টমেন্ট সোমবারের জন্য নিশ্চিত হয়েছে।"};
+
+test("the booking claim detector covers each supported non-English language", () => {
+  for (const [language, claim] of Object.entries(localizedClaims)) {
+    assert.equal(booking.localizedBookingLanguage(claim, language), language, claim);
+    assert.equal(booking.localizedBookingLanguage(booking.localizedBookingRewrite(language, false), language), undefined);
+  }
+});
+
+test("Telugu and auto-mode claims are rewritten in buffered and streamed output", async () => {
+  const { register } = await import("node:module");
+  register("./alias-resolver-hooks.mjs", import.meta.url);
+  const { StreamOutputGuard, checkReply } = await import("../lib/guardrails/output-check.ts");
+  for (const language of ["te", "auto"]) {
+    const context = { canary: "test-canary", protectedShingles: new Set(), businessEvidence: "", visitorEvidence: "", language };
+    const claim = localizedClaims.te;
+    const rewrite = booking.localizedBookingRewrite("te", false);
+    assert.equal(checkReply(claim, context).text, rewrite);
+    const stream = new StreamOutputGuard(context);
+    let streamed = "";
+    for (const character of claim) streamed += stream.push(character).emit;
+    const end = stream.finish();
+    assert.equal(streamed + end.emit, rewrite);
+    assert.equal(checkReply(claim, {...context, appointmentBooked: true}).text, claim);
+  }
+});
+
+test("negative diagnostic remains log-only with language metadata", async () => {
+  const guard = await import("../lib/guardrails/output-check.ts");
+  const context = { canary: "test-canary", protectedShingles: new Set(), businessEvidence: "", visitorEvidence: "", language: "te" };
+  const result = guard.checkReply("మా సమాచారం. We don't offer general anaesthesia.", context);
+  assert.equal(result.signals.find((signal) => signal.type === "output_service_claim")?.replyLanguage, "te");
+  assert.match(result.text, /We don't offer/);
+});
+
+test("auto mode requests the prospect language in the shared prompt", () => {
+  const rag = readFileSync(new URL("../lib/rag.ts", import.meta.url), "utf8");
+  assert.match(rag, /language === "auto".*Reply in the language the prospect uses/);
+});

@@ -1,3 +1,4 @@
+import { BN, KN, MR, TA, TE } from "@/lib/widget-i18n-indic";
 import type { WidgetLanguage } from "@/lib/supabase/types";
 
 /**
@@ -14,7 +15,7 @@ import type { WidgetLanguage } from "@/lib/supabase/types";
  * pass before relying on it for a real non-English-market launch.
  */
 
-export const SUPPORTED_WIDGET_LANGUAGES = ["en", "es", "fr", "de", "pt", "hi"] as const;
+export const SUPPORTED_WIDGET_LANGUAGES = ["en", "es", "fr", "de", "pt", "hi", "te", "ta", "kn", "mr", "bn", "auto"] as const;
 
 export const WIDGET_LANGUAGE_LABELS: Record<WidgetLanguage, string> = {
   en: "English",
@@ -23,6 +24,12 @@ export const WIDGET_LANGUAGE_LABELS: Record<WidgetLanguage, string> = {
   de: "Deutsch (German)",
   pt: "Português (Portuguese)",
   hi: "हिन्दी (Hindi)",
+  te: "తెలుగు (Telugu)",
+  ta: "தமிழ் (Tamil)",
+  kn: "ಕನ್ನಡ (Kannada)",
+  mr: "मराठी (Marathi)",
+  bn: "বাংলা (Bengali)",
+  auto: "Reply in the prospect’s language",
 };
 
 /** The plain English language name to interpolate into the Gemini system prompt (lib/rag.ts) -- a model instruction, not UI copy, so it stays in English regardless of `widget_language`. */
@@ -33,6 +40,12 @@ export const WIDGET_LANGUAGE_NAMES_FOR_PROMPT: Record<WidgetLanguage, string> = 
   de: "German",
   pt: "Portuguese",
   hi: "Hindi",
+  te: "Telugu",
+  ta: "Tamil",
+  kn: "Kannada",
+  mr: "Marathi",
+  bn: "Bengali",
+  auto: "the prospect’s language",
 };
 
 export type WidgetStrings = {
@@ -305,7 +318,11 @@ const HI: WidgetStrings = {
   newMessageLabel: "नया संदेश",
 };
 
-const DICTIONARIES: Record<WidgetLanguage, WidgetStrings> = { en: EN, es: ES, fr: FR, de: DE, pt: PT, hi: HI };
+const DICTIONARIES: Record<WidgetLanguage, WidgetStrings> = { en: EN, es: ES, fr: FR, de: DE, pt: PT, hi: HI, te: TE, ta: TA, kn: KN, mr: MR, bn: BN, auto: EN };
+
+export function usesLocalizedModelReplies(language: WidgetLanguage): boolean {
+  return language === "auto" || language === "te" || language === "ta" || language === "kn" || language === "mr" || language === "bn";
+}
 
 export function getWidgetStrings(language: WidgetLanguage): WidgetStrings {
   return DICTIONARIES[language] ?? EN;

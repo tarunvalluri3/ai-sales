@@ -26,6 +26,8 @@ export type GuardrailSignal = {
   rule: string;
   action: GuardrailAction;
   mode: GuardrailMode;
+  replyLanguage?: string;
+  languageMode?: string;
 };
 
 export type PreparedProspectMessage = {

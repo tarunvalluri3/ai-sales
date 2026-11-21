@@ -46,7 +46,7 @@ export type Business = {
 };
 
 export type WidgetPosition = "bottom-right" | "bottom-left";
-export type WidgetLanguage = "en" | "es" | "fr" | "de" | "pt" | "hi";
+export type WidgetLanguage = (typeof import("@/lib/widget-i18n").SUPPORTED_WIDGET_LANGUAGES)[number];
 export type OnboardingStep =
   | "account"
   | "verify"

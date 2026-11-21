@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUPPORTED_WIDGET_LANGUAGES } from "@/lib/widget-i18n";
 
 /**
  * Draft -> Publish -> Live (2026-10-29). The shape of `agent_versions.snapshot`
@@ -48,7 +49,7 @@ export const agentSnapshotSchema = z.object({
     contactEmail: nullableString,
     contactPhone: nullableString,
     website: nullableString,
-    language: z.enum(["en", "es", "fr", "de", "pt", "hi"]),
+    language: z.enum(SUPPORTED_WIDGET_LANGUAGES),
     persona: z.object({
       agentName: nullableString.optional(),
       agentAvatarUrl: nullableString.optional(),
