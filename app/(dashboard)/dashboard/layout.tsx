@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { requireBusinessContext } from "@/lib/business-context";
+import { ensureClerkOrganizationName } from "@/lib/clerk-org-name";
 import { hasMinRole } from "@/lib/auth";
 import { listActiveAnnouncementsForCurrentBusiness } from "@/lib/announcements";
 import { getAgentPublishStatus, type AgentPublishStatus } from "@/lib/agent-publish-status";
@@ -7,13 +9,16 @@ import { logAndGetUserMessage } from "@/lib/errors";
 import { Sidebar } from "./_components/sidebar";
 import { AttentionProvider } from "./_components/attention-provider";
 import { ToastProvider } from "./_components/toast";
+import { BusinessTimeProvider } from "./_components/business-time";
 import { DashboardHeader } from "./_components/dashboard-header";
 import { ContactEmailGate } from "./_components/contact-email-gate";
 import { AnnouncementBanner } from "./_components/announcement-banner";
 import { SubscriptionBanner } from "./_components/subscription-banner";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
-  const { businessId, businessName, contactEmail, orgRole } = await requireBusinessContext();
+  const { businessId, businessName, contactEmail, orgRole, orgId, timezone } = await requireBusinessContext();
+  // Existing accounts whose Clerk org still has a Clerk default name: rename once, best-effort, off the request path.
+  if (hasMinRole(orgRole, "org:admin")) after(() => ensureClerkOrganizationName(orgId, businessName));
   const [announcements, entitlement, publishStatus] = await Promise.all([
     listActiveAnnouncementsForCurrentBusiness(),
     // Fail-soft like the publish status: a billing read must never take the
@@ -32,6 +37,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
 
   return (
     <ToastProvider>
+      <BusinessTimeProvider timezone={timezone}>
       <AttentionProvider>
         {/* `.dash-shell` scopes the dashboard's own light palette, font and
             rounded primitives (globals.css); nothing outside /dashboard has it. */}
@@ -60,6 +66,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
             pathname, and it must not block the very page that fixes it. */}
         <ContactEmailGate hasContactEmail={Boolean(contactEmail)} />
       </AttentionProvider>
+      </BusinessTimeProvider>
     </ToastProvider>
   );
 }

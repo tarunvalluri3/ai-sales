@@ -128,7 +128,7 @@ function paymentFailed(context: BillingNoticeContext): BillingNoticeEmail {
       paragraphs: [
         `We could not collect the ${plan.name} payment for ${context.businessName}. This is usually an expired card or a bank-side limit, not anything you did.`,
         `Nothing has changed for your prospects. Your AI sales employee is still replying, with your full quota, until ${formatDate(context.periodEndIso)} while we keep retrying.`,
-        `If it is still unpaid after that, the AI stops replying: visitors are told that someone from your team will follow up and the conversation is flagged in your dashboard. Your site does not break and nothing gets invented -- but those enquiries wait on a person.`,
+        `If it is still unpaid after that, the AI stops replying: visitors are told that someone from your team will follow up and the conversation is flagged in your dashboard. Your site does not break and nothing gets invented — but those enquiries wait on a person.`,
         "Updating your payment method takes a minute and switches the retry back on.",
       ],
       facts: [
@@ -177,7 +177,7 @@ function graceLapsed(context: BillingNoticeContext): BillingNoticeEmail {
       heading: "Your AI employee has paused",
       paragraphs: [
         `We were not able to collect the ${plan.name} payment for ${context.businessName}, and the five days we keep everything running for have now passed.`,
-        "Here is exactly what a visitor sees: the chat widget still opens and still works, and anyone who messages is told that someone from your team will follow up. Every one of those conversations is flagged in your dashboard, so nothing is lost. Your AI is not inventing answers and your site is not broken -- it has simply stopped generating replies.",
+        "Here is exactly what a visitor sees: the chat widget still opens and still works, and anyone who messages is told that someone from your team will follow up. Every one of those conversations is flagged in your dashboard, so nothing is lost. Your AI is not inventing answers and your site is not broken — it has simply stopped generating replies.",
         "Paying switches it straight back on, with everything exactly where you left it: your knowledge, products, conversations and leads are all untouched.",
       ],
       facts: [
@@ -199,7 +199,7 @@ function subscriptionCancelled(context: BillingNoticeContext): BillingNoticeEmai
       heading: "Your plan is cancelled",
       paragraphs: [
         `Your ${plan.name} plan for ${context.businessName} is cancelled and will not be charged again.`,
-        `You keep everything until ${formatDate(context.periodEndIso)} -- the end of the period you have already paid for. After that your AI employee stops replying, and visitors are told that someone from your team will follow up.`,
+        `You keep everything until ${formatDate(context.periodEndIso)} — the end of the period you have already paid for. After that your AI employee stops replying, and visitors are told that someone from your team will follow up.`,
         "Your data stays where it is. If you come back, your knowledge, products and conversations will all still be there.",
         "If you cancelled because something was not working, reply to this email and tell us. We would genuinely rather fix it.",
       ],
@@ -208,7 +208,7 @@ function subscriptionCancelled(context: BillingNoticeContext): BillingNoticeEmai
         { label: "Access until", value: formatDate(context.periodEndIso) },
       ],
       cta: { label: "Open billing", url: BILLING_URL() },
-      footnote: `Sent to the contact email for ${context.businessName}. Fees already paid are not refundable -- see our Cancellation and Refunds Policy.`,
+      footnote: `Sent to the contact email for ${context.businessName}. Fees already paid are not refundable — see our Cancellation and Refunds Policy.`,
     }),
   };
 }
@@ -249,7 +249,7 @@ function annualRenewal(context: BillingNoticeContext, daysOut: number): BillingN
     email: renderBrandedEmail({
       heading: `Your annual plan ends on ${formatDate(context.periodEndIso)}`,
       paragraphs: [
-        `${context.businessName}'s ${plan.name} year is nearly up. Annual plans are paid in one go rather than by a recurring mandate, so this one will not renew by itself -- that is deliberate, and it means no surprise charge, but it does mean the renewal is yours to make.`,
+        `${context.businessName}'s ${plan.name} year is nearly up. Annual plans are paid in one go rather than by a recurring mandate, so this one will not renew by itself — that is deliberate, and it means no surprise charge, but it does mean the renewal is yours to make.`,
         `Renew before ${formatDate(context.periodEndIso)} and nothing changes for your prospects. If the term ends unpaid, we keep everything running for five more days, and after that your AI employee stops replying: visitors are told that someone from your team will follow up and the conversation is flagged for you.`,
         "You can switch to monthly billing at the same time if that suits you better.",
       ],
@@ -277,8 +277,8 @@ function trialEnding(context: BillingNoticeContext): BillingNoticeEmail {
     email: renderBrandedEmail({
       heading: `Your trial ends on ${formatDate(context.periodEndIso)}`,
       paragraphs: [
-        `${context.businessName}'s 14-day trial is nearly up and there is no payment method on the account yet, so nothing will be charged -- and nothing will continue either.`,
-        "When the trial ends, your AI employee stops replying. Visitors are told that someone from your team will follow up and the conversation is flagged in your dashboard, so no enquiry is lost -- but it waits on a person.",
+        `${context.businessName}'s 14-day trial is nearly up and there is no payment method on the account yet, so nothing will be charged — and nothing will continue either.`,
+        "When the trial ends, your AI employee stops replying. Visitors are told that someone from your team will follow up and the conversation is flagged in your dashboard, so no enquiry is lost — but it waits on a person.",
         "Picking a plan takes a minute, and everything you have set up stays exactly as it is.",
       ],
       facts: [

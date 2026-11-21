@@ -33,13 +33,13 @@ const initialState: PublishBusinessState = {};
 /** The white "Sales agent / <name>" pill at the start of the top bar. */
 function AgentPill({ agentName }: { agentName: string }) {
   return (
-    <p className="flex h-10 min-w-0 items-center gap-2.5 rounded-full border border-ds-border bg-ds-surface px-4 text-sm text-ds-text-primary">
+    <p className="flex h-9 min-w-0 items-center gap-2 rounded-full border border-ds-border bg-ds-surface px-3 text-sm text-ds-text-primary md:h-10 md:gap-2.5 md:px-4">
       <Headset className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
       <span className="hidden text-ds-text-secondary sm:inline">Sales agent</span>
       <span aria-hidden="true" className="hidden text-ds-text-faint sm:inline">
         /
       </span>
-      <span className="truncate font-medium" title={agentName}>
+      <span className="max-w-[6.5rem] truncate font-medium min-[420px]:max-w-[9rem] md:max-w-none" title={agentName}>
         {agentName}
       </span>
     </p>
@@ -113,10 +113,10 @@ export function PublishBar({
 
   if (!status || !status.isLive) {
     return (
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-wrap md:gap-3">
         <AgentPill agentName={agentName} />
         {status ? (
-          <Pill tone="gray" dot className="h-10 px-4">
+          <Pill tone="gray" dot className="h-9 px-3 md:h-10 md:px-4">
             Not live
           </Pill>
         ) : null}
@@ -127,12 +127,12 @@ export function PublishBar({
   const groups = groupByArea(status.changes);
 
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+    <div className="flex min-w-0 flex-1 items-center gap-x-2 md:flex-wrap md:gap-x-3 md:gap-y-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-wrap md:gap-3">
         <AgentPill agentName={agentName} />
-        <Pill tone="lime" dot className="h-10 px-4">
+        <Pill tone="lime" dot className="h-9 px-3 md:h-10 md:px-4">
           <span className="font-medium">Live</span>
-          {status.hasUnpublishedChanges ? <span className="font-normal">· Unpublished changes</span> : null}
+          {status.hasUnpublishedChanges ? <span className="hidden font-normal sm:inline">· Unpublished changes</span> : null}
         </Pill>
       </div>
 
@@ -149,10 +149,11 @@ export function PublishBar({
             setSeenState(state);
             setOpen(true);
           }}
-          className={btnPrimary}
+          className={`${btnPrimary} shrink-0`}
         >
           <CloudUpload className="size-5" strokeWidth={1.75} aria-hidden="true" />
-          Publish changes ({status.changeCount})
+          <span className="sm:hidden">Publish</span>
+          <span className="hidden sm:inline">Publish changes</span> ({status.changeCount})
         </button>
       ) : null}
 

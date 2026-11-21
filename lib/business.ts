@@ -374,7 +374,7 @@ export async function publishBusinessForOrg(orgId: string): Promise<PublishAgent
   const entitlement = await getEntitlementForBusiness(business.id);
   if (!entitlement.serving) {
     throw new BusinessNotReadyError(
-      "Your subscription is not active, so changes can't go live. Choose a plan in Billing, then publish again -- your current agent is unchanged.",
+      "Your subscription is not active, so changes can't go live. Choose a plan in Billing, then publish again — your current agent is unchanged.",
       [],
     );
   }
@@ -395,7 +395,7 @@ export async function publishBusinessForOrg(orgId: string): Promise<PublishAgent
   if (error) {
     if (error.message?.includes(PUBLISH_PROCESSING_PREFIX)) {
       throw new BusinessNotReadyError(
-        "Some of your knowledge is still being processed. Try again in a few seconds -- your live agent is unchanged.",
+        "Some of your knowledge is still being processed. Try again in a few seconds — your live agent is unchanged.",
         [],
       );
     }

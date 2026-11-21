@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessTime } from "../_components/business-time";
 import { useActionState, useState } from "react";
 import { CalendarDays, Camera, Flag, Info, RefreshCw } from "lucide-react";
 import type { InstagramConnection } from "@/lib/supabase/types";
@@ -47,6 +48,7 @@ export function InstagramConnectionStatus({
   connection: InstagramConnection;
   canEdit: boolean;
 }) {
+  const businessTime = useBusinessTime();
   const [state, formAction, isPending] = useActionState(disconnectInstagramAction, initialState);
   const [confirming, setConfirming] = useState(false);
   const broken = connection.status === "disconnected" || connection.status === "error";
@@ -87,7 +89,7 @@ export function InstagramConnectionStatus({
               <CalendarDays className="size-5" strokeWidth={1.75} aria-hidden="true" />
               <dt>Connected on</dt>
               <dd className="border-l border-ds-border pl-6 font-medium">
-                {new Date(connection.connected_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+                {businessTime.date(connection.connected_at)}
               </dd>
             </div>
           ) : null}

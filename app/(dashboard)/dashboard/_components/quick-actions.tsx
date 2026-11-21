@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { BookOpen, Box, CircleHelp, SlidersHorizontal, Tag, Users } from "lucide-react";
+import { BookOpen, Box, CircleHelp, FlaskConical, SlidersHorizontal, Tag, Users } from "lucide-react";
 import { Card } from "./ui";
 
 const ACTIONS = [
+  { label: "Test your agent", href: "/dashboard/test-agent", icon: FlaskConical },
   { label: "Add product", href: "/dashboard/products", icon: Box },
   { label: "Add service", href: "/dashboard/services", icon: Tag },
   { label: "Add FAQ", href: "/dashboard/faqs", icon: CircleHelp },

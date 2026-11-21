@@ -5,22 +5,20 @@ import Link from "next/link";
 import { markNotificationReadAction, type ActionState } from "./actions";
 import { Bell, MessageCircle } from "lucide-react";
 import { Card } from "../_components/ui";
+import { useBusinessTime } from "../_components/business-time";
 import type { InternalNotification } from "@/lib/supabase/types";
 
 const initialState: ActionState = {};
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
 function NotificationRow({ notification }: { notification: InternalNotification }) {
   const [state, formAction, isPending] = useActionState(markNotificationReadAction, initialState);
   const unread = !notification.read_at;
+  const businessTime = useBusinessTime();
 
   const content = (
     <>
       <span className={`text-sm leading-snug ${unread ? "font-medium text-ds-text-primary" : "text-ds-text-muted"}`}>{notification.message}</span>
-      <span className="text-sm text-ds-text-secondary">{formatDate(notification.created_at)}</span>
+      <span className="text-sm text-ds-text-secondary">{businessTime.dateTime(notification.created_at)}</span>
     </>
   );
 

@@ -1,5 +1,12 @@
 import Link from "next/link";
+import { CircleCheck } from "lucide-react";
 import { CopyKeyButton } from "../widget-settings/copy-key-button";
+import { AddOriginForm } from "./add-origin-form";
+
+/** The card's honest state: the widget only answers once a key lists an allowed origin. Pure so it is unit-testable. */
+export function widgetAnswersVisitors(keys: { status: string; allowed_origins: string[] }[]): boolean {
+  return keys.some((key) => key.status === "active" && key.allowed_origins.length > 0);
+}
 
 const NEXT_STEPS = [
   { label: "Test it on your site", detail: "Paste the snippet below, then send a message as a visitor.", href: "/dashboard/widget-settings" },
@@ -12,20 +19,38 @@ const NEXT_STEPS = [
  * the first publish. Dismissing it is just a link back to `/dashboard`, so
  * there is no stored state to get out of sync.
  */
-export function LaunchCard({ snippet }: { snippet: string | null }) {
+export function LaunchCard({
+  snippet,
+  widgetReady,
+  channels,
+}: {
+  snippet: string | null;
+  /** True once a widget key has an allowed origin (see `widgetAnswersVisitors`). */
+  widgetReady: boolean;
+  /** Only channels that are connected AND allowed on the plan, e.g. ["WhatsApp"]. */
+  channels: string[];
+}) {
+  const answeringOn = [...(widgetReady ? ["your website"] : []), ...channels];
+  const channelList = answeringOn.length > 1 ? `${answeringOn.slice(0, -1).join(", ")} and ${answeringOn.at(-1)}` : (answeringOn[0] ?? "");
   return (
     <section
       aria-labelledby="launch-card-heading"
       className="flex flex-col gap-4 rounded-3xl bg-ds-lime-soft dx-card-pad"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 items-start gap-3">
+          <CircleCheck className="launch-card-mark mt-0.5 size-6 shrink-0 text-ds-success" strokeWidth={1.75} aria-hidden="true" />
+        <div className="flex flex-col gap-1" role="status">
           <h2 id="launch-card-heading" className="dx-title text-lg">
-            Your AI sales employee is live
+            {widgetReady ? "Your AI sales employee is live" : "Your agent is published, but your website widget won’t answer yet"}
           </h2>
           <p className="text-sm text-ds-text-secondary">
-            Prospects can chat with it now. Here&rsquo;s what to do next.
+            {answeringOn.length > 0
+              ? `It is answering prospects on ${channelList}. Here’s what to do next.`
+              : "Add your website address below so the widget can answer visitors there."}
+            {!widgetReady && channels.length > 0 ? " Add your website address below so the widget can answer visitors there too." : ""}
           </p>
+        </div>
         </div>
         <Link
           href="/dashboard"
@@ -34,6 +59,8 @@ export function LaunchCard({ snippet }: { snippet: string | null }) {
           Dismiss
         </Link>
       </div>
+
+      {!widgetReady ? <AddOriginForm /> : null}
 
       <ol className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {NEXT_STEPS.map((step, index) => (
@@ -51,7 +78,7 @@ export function LaunchCard({ snippet }: { snippet: string | null }) {
         ))}
       </ol>
 
-      {snippet ? (
+      {snippet && widgetReady ? (
         <div className="flex flex-col gap-2">
           <p className="text-xs font-medium text-ds-text-primary">Website embed code</p>
           <div className="flex items-center gap-2">

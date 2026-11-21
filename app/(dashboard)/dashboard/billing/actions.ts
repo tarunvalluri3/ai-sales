@@ -4,6 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireAuthContext } from "@/lib/auth";
 import { requireBusinessContext } from "@/lib/business-context";
+import { BILLING_TIME_ZONE, formatDate } from "@/lib/format-business-time";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { PLAN_KEYS } from "@/lib/plans";
 import { billingIdentitySchema, parseBillingIdentityForm } from "@/lib/billing-identity";
@@ -341,10 +342,5 @@ export async function updateBillingDetailsAction(
 
 /** Customers are India-only for v1, so dates are shown in IST. */
 function formatIstDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatDate(iso, BILLING_TIME_ZONE);
 }

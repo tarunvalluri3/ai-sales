@@ -78,7 +78,7 @@ export function gstinProblemMessage(problem: GstinProblem): string {
     case "format":
       return "That does not look like a valid 15-character GSTIN.";
     case "check_digit":
-      return "That GSTIN is not valid -- its last character does not match the rest. Please check it for a typo.";
+      return "That GSTIN is not valid — its last character does not match the rest. Please check it for a typo.";
     case "state_unknown":
       return "The first two digits of that GSTIN are not a state we can invoice.";
     case "state_mismatch":

@@ -2,7 +2,28 @@
 
 **Read this file first, at the start of every task.** It is the source of truth for where the project stands. Never infer the current phase from the codebase.
 
-Last updated: 2026-11-21 (**Onboarding hotfix `fix/onboarding-persona-save`: persona save failure = unapplied production migration `20261124001200`; see the first section.**)
+Last updated: 2026-11-21 (**Dashboard polish, 13 items, on `fix/dashboard-polish`; see the first section.**)
+
+## Dashboard polish (13 items) — 2026-11-21 — `fix/dashboard-polish`
+
+From the owner's production testing on 20-21 Nov 2026. **No migration, no new package, no env var.** One commit per item. Verified with lint, typecheck, build and mock test suites only (no dev server, DB or Gemini).
+
+1. **Clerk org name.** `lib/clerk-org-name.ts`: `syncClerkOrganizationName` (after onboarding step 1 and profile saves, session org only, best-effort, logged) and `ensureClerkOrganizationName` (admin dashboard load, `after()`, once per org per server instance, only renames a Clerk default name). `OrgNameRefresh` reloads the browser's Clerk org object when its name differs.
+2. **Test your agent.** `/dashboard/test-agent` (nav, right under Overview; also a quick action), the onboarding sandbox panel with a Draft / Live switch. `sendSandboxMessage(…, mode)`: Zod enum; live reads `live_version_id` from the session's business row. Allowance: unchanged from onboarding test chat. The quota gate runs first (an exhausted or expired plan blocks test chat), but sandbox turns write no `ai_response_metrics` row (the authenticated client has no INSERT grant), so they do not count toward the plan's reply allowance. Live mode could not be run offline; a live-mode first-turn cache write is best-effort and may log `ai_response_cache_write_failed`.
+3. **Welcome card.** `LaunchCard` says "live" only when an active key has an allowed origin (`widgetAnswersVisitors`); otherwise it says the website widget won't answer yet and shows an inline form (`addWidgetOriginAction`, validated by `parseOrigins`/`originSchema`, the same as Widget settings). WhatsApp/Instagram are named only when connected and allowed on the plan.
+4. **Appearance hours hint:** already fixed by the redesign (pinned by a test). **7. Dark-mode logo:** already fixed (`ThemedWavesLogo`; pinned).
+5. **Onboarding heading focus:** `h1[tabindex="-1"]:focus:not(:focus-visible){outline:none}`. Welcome card has a reduced-motion-aware confirmation mark. The onboarding "Your agent is live" panel already existed (2.5 s) and could not be reproduced offline.
+6. **Dates.** `lib/format-business-time.ts` (en-IN for Asia/Kolkata and Asia/Calcutta, en-US otherwise, always a month name), `BusinessTimeProvider`/`useBusinessTime` for client components, `timezone` on `BusinessContext` for server pages. A test fails if a dashboard file formats a date without a zone. Billing dates stay IST (`BILLING_TIME_ZONE`) through the same formatter. Onboarding and /apache were not converted.
+8. **Mobile header:** one row below `md` (menu, agent status, Publish, "More"); theme toggle, bell, org switcher and user button live in a popover mounted once.
+9. **Appearance preview:** widget laid out in flow, never clipped.
+10. **WhatsApp:** Connect with Facebook first; the guide and manual form sit under "Advanced: connect manually" when Embedded Signup is configured.
+11. **Billing:** one editable billing-details form (re-keyed on saved values); checkout sends saved details as hidden inputs and is blocked with "Add your billing details first" when nothing is saved. The onboarding plan step keeps its inline fields.
+12. **"--" → "—"** in user-visible strings only (audit-log label, publish/billing/ingestion errors, billing, usage and invoice emails). Comments, /apache copy and AI prompts and tool descriptions untouched.
+13. **Runbook:** `docs/launch-runbook.md` §8, Clerk production checklist. The Supabase step describes Clerk's third-party auth integration, because the app sends Clerk's session token with no named JWT template.
+
+Tests: new `npm run test:dashboard-polish` (28 cases, in CI); `test:onboarding-flow` mocks updated for the new imports.
+
+---
 
 ## Onboarding visual redesign — 2026-11-21
 

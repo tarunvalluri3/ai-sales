@@ -6,16 +6,10 @@ import type { UpcomingActionItem } from "@/lib/copilot-actions";
 import { Clock, MessageCircle } from "lucide-react";
 import { Pill, btnOutlineSm } from "../_components/ui";
 import { EmptyState } from "../_components/state-views";
+import { formatDateTime } from "@/lib/format-business-time";
 
 function formatSnoozedUntil(iso: string, timezone: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(iso));
+  return formatDateTime(iso, timezone);
 }
 
 /**

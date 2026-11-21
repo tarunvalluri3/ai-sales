@@ -8,7 +8,7 @@ import { after } from "next/server";
 import { kickAnswerBankRefresh } from "@/lib/answer-bank/generate";
 import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
-import { createWidgetKey, revokeWidgetKey, updateWidgetKeyOrigins } from "@/lib/widget-keys";
+import { createWidgetKey, ensureWidgetKey, revokeWidgetKey, updateWidgetKeyOrigins } from "@/lib/widget-keys";
 import {
   getBusinessForOrg,
   updateWidgetBranding,
@@ -108,6 +108,55 @@ export async function updateWidgetKeyOriginsAction(
 
   revalidatePath("/dashboard/widget-settings");
   revalidatePath("/onboarding");
+  return { success: true };
+}
+
+/**
+ * Dashboard welcome card: add the website address (an allowed origin) to the
+ * business's active widget key, creating the key if none exists. Validated by
+ * the exact function Widget settings uses (parseOrigins -> originSchema): a bare
+ * origin, no path, no trailing slash. `businessId` comes from the session.
+ */
+export async function addWidgetOriginAction(
+  _prevState: WidgetKeyActionState,
+  formData: FormData,
+): Promise<WidgetKeyActionState> {
+  const { businessId, userId, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:admin");
+  if (authError) {
+    return { error: authError };
+  }
+
+  const raw = String(formData.get("origin") ?? "").trim();
+  if (raw.length === 0) {
+    return { error: "Enter your website address, like https://example.com." };
+  }
+  if (raw.includes("\n") || raw.includes(",")) {
+    return { error: "Enter one website address." };
+  }
+  const { origins, error } = parseOrigins(raw);
+  if (error || !origins || origins.length !== 1) {
+    return { error: error ?? "Enter one website address." };
+  }
+  const origin = origins[0];
+
+  try {
+    const { key, created } = await ensureWidgetKey(businessId, origin);
+    if (created) {
+      await recordAuditLogEntry(businessId, userId, "widget_key.created", "widget_key", key.id);
+    } else if (!key.allowed_origins.includes(origin)) {
+      const updated = await updateWidgetKeyOrigins(businessId, key.id, [...key.allowed_origins, origin], key.name);
+      if (!updated) {
+        return { error: "This widget key no longer exists or has been revoked." };
+      }
+      await recordAuditLogEntry(businessId, userId, "widget_key.origins_updated", "widget_key", key.id);
+    }
+  } catch (err) {
+    return { error: logAndGetUserMessage(err) };
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/widget-settings");
   return { success: true };
 }
 

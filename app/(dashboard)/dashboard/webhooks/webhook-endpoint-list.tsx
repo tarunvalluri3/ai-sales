@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessTime } from "../_components/business-time";
 import { useActionState, useState } from "react";
 import type { WebhookEndpoint } from "@/lib/supabase/types";
 import { deleteWebhookEndpointAction, type WebhookActionState } from "./actions";
@@ -38,6 +39,7 @@ function SecretReveal({ secret }: { secret: string }) {
 }
 
 function WebhookEndpointRow({ endpoint, canEdit = true }: { endpoint: WebhookEndpoint; canEdit?: boolean }) {
+  const businessTime = useBusinessTime();
   const [state, formAction, isPending] = useActionState(deleteWebhookEndpointAction, initialState);
 
   return (
@@ -53,7 +55,7 @@ function WebhookEndpointRow({ endpoint, canEdit = true }: { endpoint: WebhookEnd
         </TableCell>
         <TableCell>
           <span className="text-sm text-ds-text-primary">
-            {new Date(endpoint.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+            {businessTime.date(endpoint.created_at)}
           </span>
         </TableCell>
         <TableCell>

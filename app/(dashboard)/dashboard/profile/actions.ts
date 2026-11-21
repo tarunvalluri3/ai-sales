@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { syncClerkOrganizationName } from "@/lib/clerk-org-name";
 import { requireAuthContext } from "@/lib/auth";
 import { deleteBusinessForOrg, getBusinessForOrg, updateBusinessProfile } from "@/lib/business";
 import { exportBusinessData } from "@/lib/data-export";
@@ -65,6 +67,9 @@ export async function updateBusinessProfileAction(
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
+
+  const sessionOrgId = context.orgId;
+  after(() => syncClerkOrganizationName(sessionOrgId, parsed.data.name));
 
   revalidatePath("/dashboard/profile");
   revalidatePath("/onboarding");

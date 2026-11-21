@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireLiveBusinessContext } from "@/lib/business-context";
+import { formatDateTime } from "@/lib/format-business-time";
 import { hasMinRole } from "@/lib/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getConversationForBusiness } from "@/lib/conversations";
@@ -27,7 +28,7 @@ export default async function ConversationDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { businessId, orgId, orgRole } = await requireLiveBusinessContext();
+  const { businessId, orgId, orgRole, timezone } = await requireLiveBusinessContext();
   const supabase = createServerSupabaseClient();
 
   const conversation = await getConversationForBusiness(supabase, businessId, id);
@@ -78,7 +79,7 @@ export default async function ConversationDetailPage({
                 {displayContactName(lead?.contact_name) ?? anonymousContactLabel(conversation.source)}
               </h2>
               <p className="truncate text-sm text-ds-text-secondary">
-                {channelLabel(conversation.source)} · {new Date(conversation.created_at).toLocaleString("en-US")}
+                {channelLabel(conversation.source)} · {formatDateTime(conversation.created_at, timezone)}
               </p>
             </div>
           </div>

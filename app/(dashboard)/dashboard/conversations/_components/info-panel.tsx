@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, CalendarDays, CircleDot, Flag, Info, Mail, Phone, ShieldAlert, Target, UserRound } from "lucide-react";
 import { AiSummaryCard } from "./ai-summary-card";
+import { formatDateTime } from "@/lib/format-business-time";
 import { TagsCard } from "./tags-card";
 import { Pill, linkAccent, type PillTone } from "../../_components/ui";
 import { channelLabel } from "@/lib/conversation-channel";
@@ -179,14 +180,7 @@ export function InfoPanel({
         {appointment ? (
           <>
             <p className="text-sm font-medium text-ds-text-primary">
-              {new Intl.DateTimeFormat("en-US", {
-                timeZone: timezone,
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              }).format(new Date(appointment.starts_at))}
+              {formatDateTime(appointment.starts_at, timezone)}
             </p>
             {appointment.notes ? <p className="text-sm text-ds-text-secondary">{appointment.notes}</p> : null}
             <Link href="/dashboard/appointments" className={linkAccent}>
@@ -231,7 +225,7 @@ export function InfoPanel({
         <p className="text-sm text-ds-text-secondary">
           {channelLabel(conversation.source)} · {messageCount} message{messageCount === 1 ? "" : "s"}
         </p>
-        <p className="text-xs text-ds-text-secondary">Started: {new Date(conversation.created_at).toLocaleString("en-US")}</p>
+        <p className="text-xs text-ds-text-secondary">Started: {formatDateTime(conversation.created_at, timezone)}</p>
         {conversation.needs_attention ? <p className="text-sm font-medium text-ds-warning">Needs attention</p> : null}
       </div>
     </div>

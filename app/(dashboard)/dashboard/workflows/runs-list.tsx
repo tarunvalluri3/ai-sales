@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { cancelWorkflowRunAction, type ActionState } from "./actions";
 import { Zap } from "lucide-react";
 import { Pill, type PillTone } from "../_components/ui";
+import { useBusinessTime } from "../_components/business-time";
 import type { WorkflowRun, WorkflowRunStatus } from "@/lib/supabase/types";
 
 const STATUS_TONE: Record<WorkflowRunStatus, PillTone> = {
@@ -14,10 +15,6 @@ const STATUS_TONE: Record<WorkflowRunStatus, PillTone> = {
   skipped: "gray",
   cancelled: "gray",
 };
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
 
 const initialState: ActionState = {};
 
@@ -39,6 +36,7 @@ function CancelRunButton({ id }: { id: string }) {
 }
 
 export function RunsList({ runs, workflowNameById }: { runs: WorkflowRun[]; workflowNameById: Record<string, string> }) {
+  const businessTime = useBusinessTime();
   if (runs.length === 0) {
     return (
       <p className="rounded-2xl bg-ds-surface-soft px-4 py-6 text-center text-sm text-ds-text-secondary">
@@ -58,7 +56,7 @@ export function RunsList({ runs, workflowNameById }: { runs: WorkflowRun[]; work
             {run.failure_reason ? <span className="text-xs text-ds-text-secondary">{run.failure_reason}</span> : null}
           </div>
           <span className="text-sm text-ds-text-secondary">
-            {formatDate(run.created_at)} · Step {run.next_step_index}/{run.steps.length}
+            {businessTime.dateTime(run.created_at)} · Step {run.next_step_index}/{run.steps.length}
           </span>
           <Pill tone={STATUS_TONE[run.status]} size="sm" className="font-medium capitalize">
             {run.status}

@@ -94,8 +94,9 @@ export function WidgetPreview({
   const alignLeft = position === "bottom-left";
 
   return (
-    <div aria-hidden="true" className="relative flex min-h-[30rem] flex-col gap-4 overflow-hidden rounded-2xl bg-ds-surface-soft p-5">
-      {/* Placeholder page behind the widget. */}
+    <div aria-hidden="true" className="relative flex min-h-[30rem] flex-col justify-end overflow-hidden rounded-2xl bg-ds-surface-soft p-5">
+      {/* Placeholder page behind the widget: a background layer, so the widget itself sits in normal flow and the box grows to fit it (nothing is ever clipped). */}
+      <div className="pointer-events-none absolute inset-x-5 top-5 flex flex-col gap-4">
       <div className="flex gap-4">
         <span className="h-3 w-28 rounded-full bg-[#dfe2e0]" />
         <span className="h-3 w-20 rounded-full bg-[#dfe2e0]" />
@@ -105,8 +106,9 @@ export function WidgetPreview({
       <span className={`h-32 w-44 rounded-xl bg-[#dfe2e0] ${alignLeft ? "self-end" : ""}`} />
       <span className={`h-3 w-40 rounded-full bg-[#dfe2e0] ${alignLeft ? "self-end" : ""}`} />
       <span className={`h-3 w-28 rounded-full bg-[#dfe2e0] ${alignLeft ? "self-end" : ""}`} />
+      </div>
 
-      <div className={`absolute inset-x-5 bottom-5 flex flex-col gap-3 ${alignLeft ? "items-start" : "items-end"}`}>
+      <div className={`relative flex flex-col gap-3 ${alignLeft ? "items-start" : "items-end"}`}>
         {panel}
         <div className={`flex items-center gap-3 ${alignLeft ? "flex-row-reverse" : ""}`}>
           <span className="rounded-full bg-white px-4 py-2.5 text-sm font-medium text-[#151713] shadow-[0_6px_18px_rgba(21,23,19,0.12)]">

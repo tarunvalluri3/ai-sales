@@ -780,3 +780,15 @@ input:disabled + .dx-switch,
     padding-inline: 2rem;
   }
 }
+
+/* One-time "you're live" mark on the dashboard welcome card. Motion only when the visitor has not asked for less. */
+@keyframes launch-card-mark {
+  from { transform: scale(0.8); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .launch-card-mark {
+    animation: launch-card-mark 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}

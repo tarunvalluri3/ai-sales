@@ -100,7 +100,7 @@ export async function createFileKnowledgeDocument(businessId: string, file: File
   if (!parsed.success) {
     throw new AppError(
       pdf
-        ? "This PDF doesn't have any extractable text -- it may be a scanned image with no text layer. Try a text-based PDF, or paste the content in manually using \"Add knowledge manually.\""
+        ? "This PDF doesn't have any extractable text — it may be a scanned image with no text layer. Try a text-based PDF, or paste the content in manually using \"Add knowledge manually.\""
         : "This file doesn't have any readable text content.",
       "createFileKnowledgeDocument content validation failed",
       parsed.error,

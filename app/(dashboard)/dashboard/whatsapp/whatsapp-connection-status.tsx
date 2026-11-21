@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessTime } from "../_components/business-time";
 import { useActionState, useState } from "react";
 import type { WhatsappConnection } from "@/lib/supabase/types";
 import { disconnectWhatsappAction, type WhatsappActionState } from "./actions";
@@ -63,6 +64,7 @@ export function WhatsappConnectionStatus({
   connection: WhatsappConnection;
   canEdit: boolean;
 }) {
+  const businessTime = useBusinessTime();
   const [state, formAction, isPending] = useActionState(disconnectWhatsappAction, initialState);
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -124,7 +126,7 @@ export function WhatsappConnectionStatus({
         {connection.connected_at ? (
           <li className="flex items-center gap-3">
             <CalendarDays className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-            Connected {new Date(connection.connected_at).toLocaleDateString(undefined, { dateStyle: "medium" })}
+            Connected {businessTime.date(connection.connected_at)}
           </li>
         ) : null}
       </ul>

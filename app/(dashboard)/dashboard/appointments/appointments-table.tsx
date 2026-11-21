@@ -1,5 +1,6 @@
 "use client";
 
+import { formatWeekdayDateTime } from "@/lib/format-business-time";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AppointmentActions } from "./appointment-actions";
@@ -67,15 +68,7 @@ export function AppointmentsTable({
   const [sort, setSort] = useState<SortState>(null);
 
   const formatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: timezone,
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        hour: "numeric",
-        minute: "2-digit",
-      }),
+    () => ({ format: (date: Date) => formatWeekdayDateTime(date, timezone) }),
     [timezone],
   );
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { after } from "next/server";
+import { z } from "zod";
 import { requireBusinessContext } from "@/lib/business-context";
 import { prepareProspectMessage } from "@/lib/guardrails/prepare-message";
 import { recordGuardrailSignals } from "@/lib/guardrails/record";
@@ -11,6 +12,12 @@ import { createMessage } from "@/lib/messages";
 import { askSalesEmployee, type ConversationMessage } from "@/lib/rag";
 import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { DRAFT_SOURCE, loadLiveAgentSourceByVersion, type AgentSource } from "@/lib/agent-runtime";
+import { isAgentPublished } from "@/lib/agent-published";
+
+/** Which version the test chat talks to. Validated server-side: the client only chooses between these two, never a version id. */
+export const sandboxModeSchema = z.enum(["draft", "live"]);
+export type SandboxMode = z.infer<typeof sandboxModeSchema>;
 
 export type SandboxChatResult =
   | { ok: true; conversationId: string; answer: string; recommendedProducts: RecommendedItem[] }
@@ -37,16 +44,38 @@ export type SandboxChatResult =
  * real leads/appointments row (and request_callback's webhook) for a
  * sandbox conversation, while still running their normal validation so
  * the sandbox stays a realistic preview.
+ *
+ * `mode` picks the draft (default) or the published agent. The live version
+ * id is read from the session's own business row, never from the client, and
+ * live is refused for a business that has not published.
  */
 export async function sendSandboxMessage(
   conversationId: string | null,
   history: ConversationMessage[],
   message: string,
+  mode: SandboxMode = "draft",
 ): Promise<SandboxChatResult> {
+  const parsedMode = sandboxModeSchema.safeParse(mode);
+  if (!parsedMode.success) {
+    return { ok: false, error: "Choose the draft or the live agent." };
+  }
   const { businessId, orgId } = await requireBusinessContext();
   const business = await getBusinessForOrg(orgId);
   if (!business) {
     return { ok: false, error: "Business not found." };
+  }
+
+  let source: AgentSource = DRAFT_SOURCE;
+  let liveConfig: Awaited<ReturnType<typeof loadLiveAgentSourceByVersion>> = null;
+  if (parsedMode.data === "live") {
+    if (!isAgentPublished(business) || !business.live_version_id) {
+      return { ok: false, error: "Publish your agent before testing the live version." };
+    }
+    liveConfig = await loadLiveAgentSourceByVersion(businessId, business.live_version_id);
+    if (!liveConfig) {
+      return { ok: false, error: "The live version could not be loaded. Try the draft instead." };
+    }
+    source = liveConfig;
   }
 
   // Guardrails Phase 1: same sanitise/cap/mask pipeline as every other channel.
@@ -74,25 +103,42 @@ export async function sendSandboxMessage(
       supabase,
       businessId,
       conversation.id,
-      business.name,
-      {
-        agentName: business.agent_name,
-        description: business.description,
-        contactEmail: business.contact_email,
-        contactPhone: business.contact_phone,
-        website: business.website,
-        currency: business.currency,
-      },
+      liveConfig ? liveConfig.snapshot.config.name : business.name,
+      liveConfig
+        ? {
+            agentName: liveConfig.snapshot.config.persona.agentName,
+            description: liveConfig.snapshot.config.description,
+            contactEmail: liveConfig.snapshot.config.contactEmail,
+            contactPhone: liveConfig.snapshot.config.contactPhone,
+            website: liveConfig.snapshot.config.website,
+            currency: business.currency,
+            timezone: business.timezone,
+          }
+        : {
+            agentName: business.agent_name,
+            description: business.description,
+            contactEmail: business.contact_email,
+            contactPhone: business.contact_phone,
+            website: business.website,
+            currency: business.currency,
+            timezone: business.timezone,
+          },
       trimmed,
       [...history, { role: "user", content: trimmed }],
-      business.widget_language,
-      { recommendProductsEnabled: business.recommend_products_enabled, appointmentsEnabled: business.appointments_enabled },
+      liveConfig ? liveConfig.snapshot.config.language : business.widget_language,
+      liveConfig
+        ? {
+            recommendProductsEnabled: liveConfig.snapshot.config.capabilities.recommendProducts,
+            appointmentsEnabled: liveConfig.snapshot.config.capabilities.appointments,
+          }
+        : { recommendProductsEnabled: business.recommend_products_enabled, appointmentsEnabled: business.appointments_enabled },
       undefined,
       undefined,
       undefined,
       undefined,
       false,
       "dashboard",
+      source,
     );
 
     await createMessage(

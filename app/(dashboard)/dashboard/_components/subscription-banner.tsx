@@ -1,14 +1,10 @@
 import Link from "next/link";
 import type { Entitlement } from "@/lib/subscription";
+import { BILLING_TIME_ZONE, formatDate as formatBusinessDate } from "@/lib/format-business-time";
 
 /** Customers are India-only for v1, so dates are shown in IST (same as the billing page). */
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "Asia/Kolkata",
-  });
+  return formatBusinessDate(iso, BILLING_TIME_ZONE);
 }
 
 /**

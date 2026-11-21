@@ -1,5 +1,6 @@
 "use client";
 
+import { useBusinessTime } from "./business-time";
 import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Bell, Check } from "lucide-react";
@@ -40,7 +41,7 @@ const CATEGORY_LABELS: Record<NotificationCategory, string> = {
 };
 
 /** Short relative time, built locally rather than adding a date dependency. */
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, formatOlder: (iso: string) => string): string {
   const deltaMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(deltaMs / 60000);
   if (minutes < 1) return "just now";
@@ -49,10 +50,11 @@ function formatRelativeTime(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatOlder(iso);
 }
 
 export function NotificationBell() {
+  const businessTime = useBusinessTime();
   const unreadCount = useUnreadNotificationCount();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<InternalNotification[] | null>(null);
@@ -203,7 +205,7 @@ export function NotificationBell() {
                         <span className={isUnread ? "text-sm font-medium text-ds-text-primary" : "text-sm text-ds-text-muted"}>
                           {notification.message}
                         </span>
-                        <span className="text-2xs text-ds-text-muted">{formatRelativeTime(notification.created_at)}</span>
+                        <span className="text-2xs text-ds-text-muted">{formatRelativeTime(notification.created_at, businessTime.date)}</span>
                       </div>
                     </div>
                   );

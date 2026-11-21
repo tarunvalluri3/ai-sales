@@ -8,6 +8,8 @@ import { recordAuditLogEntry } from "@/lib/audit-log";
 import { onboardingWebsiteSchema, websiteOrigin } from "@/lib/schemas/onboarding-website";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { syncClerkOrganizationName } from "@/lib/clerk-org-name";
 import { redirect } from "next/navigation";
 import { requireAuthContext } from "@/lib/auth";
 import {
@@ -119,6 +121,11 @@ export async function createBusiness(
   if (createFailed) {
     return { error: errorMessage };
   }
+
+  // Keep the Clerk organization (top-right switcher) named after the business.
+  // The org id is the session's own; best-effort, after the response.
+  const sessionOrgId = context.orgId;
+  after(() => syncClerkOrganizationName(sessionOrgId, parsed.data.name));
 
   // Onboarding route guard + resume: the "business" step is done the
   // moment the row exists with these fields, so advance the cached step
