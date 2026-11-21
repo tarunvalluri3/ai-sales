@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { CheckCircle2, AlertCircle, Circle, MinusCircle } from "lucide-react";
 import { Badge } from "../_components/badge";
@@ -63,10 +64,12 @@ function ChecklistItem({
   item,
   canEdit,
   hideActionHint,
+  hoursEditorHref,
 }: {
   item: ReadinessItem;
   canEdit: boolean;
   hideActionHint: boolean;
+  hoursEditorHref: string;
 }) {
   return (
     <li className="flex flex-col gap-1 border-t border-ds-border py-3 first:border-t-0">
@@ -94,6 +97,11 @@ function ChecklistItem({
           {item.status === "unmet" && item.action && !hideActionHint ? (
             <p className="text-xs text-ds-text-muted">{item.action}</p>
           ) : null}
+          {item.key === "business_hours" && item.status === "unmet" && (
+            <Link href={hoursEditorHref} className="self-start text-xs font-medium text-ds-text-primary underline">
+              Confirm or edit hours
+            </Link>
+          )}
           {item.dismissible && item.status !== "met" ? (
             <DismissControl item={item} canEdit={canEdit} />
           ) : null}
@@ -115,11 +123,13 @@ export function ReadinessChecklist({
   report,
   canEdit = true,
   hideActionHints = false,
+  hoursEditorHref = "/dashboard/business-hours",
 }: {
   report: ReadinessReport;
   canEdit?: boolean;
   /** The onboarding wizard edits these inline, so the "go to page X" hints would mislead. */
   hideActionHints?: boolean;
+  hoursEditorHref?: string;
 }) {
   const required = report.items.filter((item) => item.tier === "required");
   const recommended = report.items.filter((item) => item.tier === "recommended");
@@ -149,7 +159,7 @@ export function ReadinessChecklist({
         </h3>
         <ul className="flex flex-col">
           {required.map((item) => (
-            <ChecklistItem key={item.key} item={item} canEdit={canEdit} hideActionHint={hideActionHints} />
+            <ChecklistItem key={item.key} item={item} canEdit={canEdit} hideActionHint={hideActionHints} hoursEditorHref={hoursEditorHref} />
           ))}
         </ul>
       </div>
@@ -160,7 +170,7 @@ export function ReadinessChecklist({
         </h3>
         <ul className="flex flex-col">
           {recommended.map((item) => (
-            <ChecklistItem key={item.key} item={item} canEdit={canEdit} hideActionHint={hideActionHints} />
+            <ChecklistItem key={item.key} item={item} canEdit={canEdit} hideActionHint={hideActionHints} hoursEditorHref={hoursEditorHref} />
           ))}
         </ul>
       </div>

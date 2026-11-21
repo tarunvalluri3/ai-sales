@@ -323,6 +323,8 @@ export default async function OnboardingPage({
               recommendedDetails={{
                 website: business.website,
                 privacyPolicyUrl: business.privacy_policy_url,
+              }}
+              openingHours={{
                 hours: await listBusinessHours(businessId),
                 slaMinutes: business.sla_minutes ?? null,
                 timezone: business.timezone ?? "UTC",

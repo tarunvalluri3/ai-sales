@@ -56,6 +56,8 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
   const [businessType, setBusinessType] = useState(business?.business_type ?? "");
   const [website, setWebsite] = useState(business?.website ?? "");
   const [week, setWeek] = useState(defaultWeeklyHours);
+  const [hoursAccepted, setHoursAccepted] = useState(false);
+  const [hoursEdited, setHoursEdited] = useState(false);
   const [description, setDescription] = useState(business?.description ?? "");
   const [contactEmail, setContactEmail] = useState(business?.contact_email ?? initialEmail);
   const [contactPhone, setContactPhone] = useState(business?.contact_phone ?? "");
@@ -279,13 +281,32 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
       </div>
 
       {isNew ? (
-        <details className="border-t border-ds-border pt-4">
-          <summary className="cursor-pointer text-sm font-medium text-ds-text-primary">
-            {summarizeWeeklyHours(week, timezone)} · Edit
-          </summary>
-          <input type="hidden" name="editedHours" value="true" />
-          <div className="pt-4"><WeeklyHoursFields week={week} onChange={setWeek} disabled={isPending} /></div>
-        </details>
+        <div id="opening-hours" className="scroll-mt-24 border-t border-ds-border pt-4">
+          <p className="text-sm font-medium text-ds-text-primary">
+            {hoursAccepted ? "Hours selected" : hoursEdited ? "Edited hours" : "Default hours - confirm or edit"}
+          </p>
+          {timezone && <p className="text-xs text-ds-text-muted">These hours are in {timezone}.</p>}
+          <details className="mt-2">
+            <summary className="cursor-pointer text-sm text-ds-text-primary">
+              {summarizeWeeklyHours(week, timezone)} · Edit
+            </summary>
+            <div className="pt-4">
+              <WeeklyHoursFields week={week} disabled={isPending} onChange={(updatedWeek) => {
+                setWeek(updatedWeek);
+                setHoursEdited(true);
+                setHoursAccepted(false);
+              }} />
+            </div>
+          </details>
+          <input type="hidden" name="confirmHours" value={String(hoursAccepted || hoursEdited)} />
+          {!hoursAccepted && !hoursEdited && (
+            <button type="button" onClick={() => setHoursAccepted(true)} disabled={isPending}
+              className="mt-2 text-sm font-medium text-ds-text-primary underline">
+              These are correct
+            </button>
+          )}
+          {hoursAccepted && <p role="status" className="mt-2 text-xs text-ds-text-muted">Your hours will be confirmed when you continue.</p>}
+        </div>
       ) : null}
 
       {state.error ? (
@@ -300,12 +321,12 @@ export function BusinessStep({ business, initialName = "", initialEmail = "", ho
           {!valid ? <span className="text-xs text-ds-text-muted">Add {missing[0]} to continue</span> : null}
           <button type="submit" disabled={isPending || !valid}
             className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
-            {isPending ? "Saving…" : "Continue"}
+            {isPending ? "Saving…" : isNew && hoursEdited ? "Save hours and continue" : "Continue"}
           </button>
         </div>
       </div>
     </form>
-      {business ? <HoursSummary hours={hours} timezone={business.timezone ?? "UTC"} slaMinutes={business.sla_minutes} /> : null}
+      {business ? <HoursSummary hours={hours} timezone={timezone || "UTC"} slaMinutes={business.sla_minutes} useProfileTimezone /> : null}
     </>
   );
 }

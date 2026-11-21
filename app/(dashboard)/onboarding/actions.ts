@@ -101,7 +101,7 @@ export async function createBusiness(
     return { error: "Fix the highlighted fields below.", fieldErrors };
   }
 
-  const week = formData.has("editedHours") ? parseWeeklyHours(formData) : undefined;
+  const week = formData.get("confirmHours") === "true" ? parseWeeklyHours(formData) : undefined;
   if (week && "error" in week) return { error: week.error };
 
   let createFailed = false;

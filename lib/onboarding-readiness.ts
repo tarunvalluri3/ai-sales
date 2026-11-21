@@ -149,6 +149,7 @@ export type ReadinessInput = {
   catalogItems: ReadinessCatalogItem[];
   /** Number of weekly days marked open in business_hours. */
   openBusinessHoursDayCount: number;
+  businessHoursConfirmed: boolean;
   /** Item keys the owner has explicitly marked not-applicable. */
   dismissedItemKeys: string[];
 };
@@ -285,9 +286,9 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessReport {
         ? "Appointment booking is on, and the agent offers slots only inside your open hours. With no hours set, there are no bookable slots at all."
         : "Set your open hours so the agent can greet prospects accurately and answer “are you open now?”.",
       tier: input.appointmentsEnabled ? "required" : "recommended",
-      met: input.openBusinessHoursDayCount > 0,
+      met: input.openBusinessHoursDayCount > 0 && input.businessHoursConfirmed,
       dismissible: false,
-      action: "Set your weekly open hours (Appointments → Availability).",
+      action: "Confirm or edit your weekly opening hours.",
     },
     {
       key: "contact_phone",

@@ -111,7 +111,7 @@ test("creation validates and forwards edited hours and the contact phone for the
     name: "Test clinic", businessType: "healthcare", contactEmail: "owner@example.com",
     description: "We offer routine dental care in Hyderabad to adults and children.",
     contactPhone: "+91 98765 43210", timezone: "Asia/Calcutta", currency: "INR",
-    editedHours: "true", "day-1-open": "on", "day-1-start": "bad", "day-1-end": "18:00",
+    confirmHours: "true", "day-1-open": "on", "day-1-start": "bad", "day-1-end": "18:00",
   });
   const rejected = await actions.createBusiness({}, form);
   assert.match(rejected.error, /valid start\/end times/);
@@ -339,4 +339,106 @@ test("wizard wiring uses saved key, timed trial confirmation, and shared readine
   assert.match(review, /ReadinessCounts counts=\{counts\}/);
   assert.match(review, /privacyPolicyFieldHref="#rd-privacy"/);
   assert.match(source(dashboard + "_components/sandbox-chat/actions.ts"), /response.sandboxBooking[\s\S]*?Test booking — nothing was saved and no one was notified/);
+});
+
+
+test("the server publish path blocks unconfirmed defaults and recognizes published schedules", async () => {
+  const isAgentPublished = loadAction("lib/agent-published.ts", {});
+  const defaults = loadAction("lib/business-hours-defaults.ts", {});
+  const readiness = loadAction("lib/onboarding-readiness.ts", {});
+  const business = {
+    id: admin.businessId, live_version_id: null, name: "Test studio", business_type: "other",
+    description: "We run weekly coached fitness classes for adults at our local studio.",
+    contact_email: "owner@example.com", appointments_enabled: true,
+  };
+  const hours = defaults.defaultWeeklyHours().map((day) => ({ is_open: day.isOpen, confirmed_at: null }));
+  const faqs = [1, 2, 3].map((id) => ({
+    id: String(id), question: "When can I join a coached class?", answer: "Book in advance and arrive ten minutes early.",
+  }));
+  const data = {
+    knowledge_documents: faqs.map(({ id }) => ({
+      id, source_id: id, source_type: "faq", ingestion_status: "complete", status: "published",
+    })),
+    knowledge_chunks: faqs.map(({ id }) => ({ document_id: id })),
+    business_readiness_dismissals: [],
+  };
+  const supabase = { createServerSupabaseClient: () => ({
+    rpc: unused,
+    from: (table) => ({ select: () => ({ eq: (column, value) => {
+      if (table === "businesses") {
+        assert.equal(column, "clerk_org_id");
+        assert.equal(value, admin.orgId);
+        return { maybeSingle: async () => ({ data: business }) };
+      }
+      assert.equal(column, "business_id");
+      assert.equal(value, admin.businessId);
+      return Promise.resolve({ data: data[table] });
+    } }) }),
+  }) };
+  const readinessData = loadAction("lib/onboarding-readiness-data.ts", {
+    "@/lib/supabase/server": supabase, "@/lib/errors": {}, "@/lib/agent-published": isAgentPublished,
+    "@/lib/business-hours-defaults": defaults, "@/lib/onboarding-readiness": readiness,
+    "@/lib/business-hours": { listBusinessHours: async (id) => { assert.equal(id, business.id); return hours; } },
+    "@/lib/faqs": { listFaqsForBusiness: async () => faqs },
+    "@/lib/products": { listProductsForBusiness: async () => [] },
+    "@/lib/services": { listServicesForBusiness: async () => [] },
+  });
+  const service = loadAction("lib/business.ts", {
+    react: { cache: (fn) => fn }, "@/lib/supabase/server": supabase, "@/lib/errors": {},
+    "@/lib/onboarding-readiness-data": readinessData, "@/lib/onboarding-readiness": readiness,
+    "@/lib/agent-published": isAgentPublished, "@/lib/subscription": { getEntitlementForBusiness: async () => ({ serving: true }) },
+    "@/lib/business-hours-defaults": defaults, "@/lib/analytics-events": {}, "@/lib/billing-cancellation": {}, "@/lib/logger": {},
+  });
+  await assert.rejects(service.publishBusinessForOrg(admin.orgId), (error) => {
+    assert.equal(error.name, "BusinessNotReadyError");
+    assert.equal(Array.from(error.blockingItems, ({ key }) => key).join(","), "business_hours");
+    return true;
+  });
+  business.live_version_id = "already-published";
+  const report = await readinessData.loadReadinessReport(business.id, business);
+  assert.equal(report.items.find(({ key }) => key === "business_hours").status, "met");
+});
+
+test("a failed weekly upsert leaves the schedule unconfirmed and only touches the session tenant", async () => {
+  const { defaultWeeklyHours, hasConfirmedBusinessHours } = loadAction("lib/business-hours-defaults.ts", {});
+  const { parseWeeklyHours } = loadAction("lib/schemas/weekly-hours.ts", {});
+  let persisted = [{ confirmed_at: null }];
+  let fail = true;
+  const businessHours = loadAction("lib/business-hours.ts", {
+    "@/lib/supabase/server": { createServerSupabaseClient: () => ({
+      from: (table) => {
+        assert.equal(table, "business_hours");
+        return { upsert: async (next, options) => {
+          assert.equal(options.onConflict, "business_id,day_of_week");
+          assert.equal(next.length, 7);
+          assert.ok(next.every((day) => day.business_id === admin.businessId && day.confirmed_at));
+          if (fail) return { error: new Error("mock write failure") };
+          persisted = next;
+          return { error: null };
+        } };
+      },
+    }) },
+    "@/lib/errors": { AppError: Error },
+  });
+  const { updateBusinessHoursAction } = loadAction(dashboard + "business-hours/actions.ts", {
+    "next/cache": { revalidatePath: () => {} },
+    "@/lib/business-context": { requireBusinessContext: async () => admin },
+    "@/lib/auth": { requireMinRole: () => null },
+    "@/lib/business-hours": { ...businessHours, updateBusinessSla: async () => {}, updateBusinessTimezone: async () => {} },
+    "@/lib/schemas/weekly-hours": { parseWeeklyHours },
+    "@/lib/timezones": loadAction("lib/timezones.ts", {}),
+    "@/lib/audit-log": { recordAuditLogEntry: async () => {} },
+    "@/lib/errors": { logAndGetUserMessage: (error) => error.message },
+  });
+  const form = formData({ timezone: "Asia/Kolkata", businessId: "tenant-b" });
+  for (const day of defaultWeeklyHours().filter((day) => day.isOpen)) {
+    form.set("day-" + day.dayOfWeek + "-open", "on");
+    form.set("day-" + day.dayOfWeek + "-start", day.startTime);
+    form.set("day-" + day.dayOfWeek + "-end", day.endTime);
+  }
+  assert.match((await updateBusinessHoursAction({}, form)).error, /saving your business hours/);
+  assert.equal(hasConfirmedBusinessHours(persisted), false);
+  fail = false;
+  assert.equal((await updateBusinessHoursAction({}, form)).success, true);
+  assert.equal(hasConfirmedBusinessHours(persisted), true);
 });

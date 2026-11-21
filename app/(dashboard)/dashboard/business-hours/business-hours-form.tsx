@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowUpRight, CalendarDays, Clock, Lock } from "lucide-react";
 import { updateBusinessHoursAction, type BusinessHoursState } from "./actions";
 import type { BusinessHours } from "@/lib/supabase/types";
-import { weekFromBusinessHours } from "@/lib/business-hours-defaults";
+import { hasConfirmedBusinessHours, weekFromBusinessHours } from "@/lib/business-hours-defaults";
 import { WeeklyHoursFields } from "./weekly-hours-fields";
 import { TimezonePicker } from "../_components/timezone-picker";
 import { ROLE_DENIED_TITLE } from "../_components/delete-button";
@@ -33,6 +33,7 @@ export function BusinessHoursForm({
   timezone,
   canEdit = true,
   embedded = false,
+  useProfileTimezone = false,
 }: {
   hours: BusinessHours[];
   slaMinutes: number | null;
@@ -40,11 +41,15 @@ export function BusinessHoursForm({
   canEdit?: boolean;
   /** Set by the onboarding wizard: drops the dashboard-only extras (the link to appointment availability and the admins-only note). */
   embedded?: boolean;
+  useProfileTimezone?: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(updateBusinessHoursAction, initialState);
 
   const [week, setWeek] = useState(() => weekFromBusinessHours(hours));
-  const [zone, setZone] = useState(timezone);
+  const [hoursEdited, setHoursEdited] = useState(false);
+  const confirmed = state.success || hasConfirmedBusinessHours(hours);
+  const [chosenZone, setZone] = useState<string | null>(null);
+  const zone = useProfileTimezone ? timezone : chosenZone ?? timezone;
   const [sla, setSla] = useState(slaMinutes === null ? "" : String(slaMinutes));
   const hasSavedHours = hours.length > 0;
   const disabled = isPending || !canEdit;
@@ -59,10 +64,15 @@ export function BusinessHoursForm({
         </p>
       ) : null}
 
+      {embedded && !confirmed && <p className="text-sm text-ds-text-secondary">Confirm or edit these hours in {zone}.</p>}
       <div className="grid grid-cols-1 items-start gap-5 @4xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <WeeklyHoursFields week={week} onChange={setWeek} disabled={disabled} />
+        <WeeklyHoursFields week={week} disabled={disabled} onChange={(updatedWeek) => {
+          setWeek(updatedWeek);
+          setHoursEdited(true);
+        }} />
 
         <div className="flex flex-col gap-4">
+          {useProfileTimezone ? <input type="hidden" name="timezone" value={zone} /> : (
           <section className={cardClasses}>
             <label htmlFor="timezone" className="dx-title">
               Business timezone
@@ -77,6 +87,7 @@ export function BusinessHoursForm({
             />
             <p className="text-sm text-ds-text-secondary">All times in this schedule use this timezone.</p>
           </section>
+          )}
 
           <section className={cardClasses}>
             <div className="flex flex-col gap-0.5">
@@ -155,7 +166,7 @@ export function BusinessHoursForm({
           title={canEdit ? undefined : ROLE_DENIED_TITLE}
           className="ds-btn-label inline-flex h-9 min-w-48 items-center justify-center rounded-xl bg-ds-primary px-4 text-sm text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-primary"
         >
-          {isPending ? "Saving…" : "Save"}
+          {isPending ? "Saving…" : embedded && !confirmed && !hoursEdited ? "These are correct" : embedded ? "Save hours" : "Save"}
         </button>
       </div>
 

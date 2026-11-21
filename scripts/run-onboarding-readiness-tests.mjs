@@ -55,6 +55,7 @@ function baseReadyInput(overrides = {}) {
     faqs: [readyFaq(1), readyFaq(2), readyFaq(3)],
     catalogItems: [{ name: "Oak dining table", description: "A solid oak six-seat dining table." }],
     openBusinessHoursDayCount: 0,
+    businessHoursConfirmed: false,
     dismissedItemKeys: [],
     ...overrides,
   };
@@ -212,7 +213,10 @@ test("business hours are required only when appointment booking is on", () => {
   assert.equal(bookingNoHours.canPublish, false);
   assert.deepEqual(blockingKeys(bookingNoHours), ["business_hours"]);
 
-  const bookingWithHours = evaluateReadiness(baseReadyInput({ appointmentsEnabled: true, openBusinessHoursDayCount: 2 }));
+  const unconfirmed = evaluateReadiness(baseReadyInput({ appointmentsEnabled: true, openBusinessHoursDayCount: 5 }));
+  assert.deepEqual(blockingKeys(unconfirmed), ["business_hours"]);
+
+  const bookingWithHours = evaluateReadiness(baseReadyInput({ appointmentsEnabled: true, openBusinessHoursDayCount: 2, businessHoursConfirmed: true }));
   assert.equal(bookingWithHours.canPublish, true);
 
   const noBookingNoHours = evaluateReadiness(baseReadyInput({ appointmentsEnabled: false, openBusinessHoursDayCount: 0 }));
