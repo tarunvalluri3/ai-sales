@@ -1,4 +1,5 @@
 import localFont from "next/font/local";
+import "./fonts.css";
 
 // Fonts for the widget root layout (app/(widget)/layout.tsx): the same Hanken files as the dashboard, and the 500-only Space Grotesk cut the widget always used.
 // Self-hosted: nothing is fetched from Google at build or run time. These are
@@ -6,13 +7,17 @@ import localFont from "next/font/local";
 // (SIL OFL 1.1, see OFL.txt in each font folder). Each subset is its own call
 // so it keeps its own unicode-range under ONE shared family name, and the
 // browser fetches a subset only when the page uses one of its characters. Only
-// latin is preloaded and carries the metric-adjusted Arial fallback, as before.
-// next/font needs literal option values, so the ranges are written out.
-
+// latin is preloaded, as before. The CSS variables the app uses are set in
+// fonts.css by that family name (the bundler names each call's own variable
+// after the call, not the family), with the same metric-adjusted Arial
+// fallback Google served. next/font needs literal option values, so the
+// ranges are written out.
 const hankenLatin = localFont({
   src: "./hanken-grotesk/latin.woff2",
   weight: "300 500",
-  variable: "--widget-font-sans",
+  variable: "--font-subset-widget-hanken-latin",
+  // The metric-adjusted fallback is declared once, by family name, in fonts.css.
+  adjustFontFallback: false,
   declarations: [
     { prop: "font-family", value: "Hanken Grotesk" },
     { prop: "unicode-range", value: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD" },
@@ -22,8 +27,9 @@ const hankenLatin = localFont({
 const hankenLatinExt = localFont({
   src: "./hanken-grotesk/latin-ext.woff2",
   weight: "300 500",
-  variable: "--widget-font-sans-latin-ext",
+  variable: "--font-subset-widget-hanken-latin-ext",
   preload: false,
+  // The metric-adjusted fallback is declared once, by family name, in fonts.css.
   adjustFontFallback: false,
   declarations: [
     { prop: "font-family", value: "Hanken Grotesk" },
@@ -34,8 +40,9 @@ const hankenLatinExt = localFont({
 const hankenVietnamese = localFont({
   src: "./hanken-grotesk/vietnamese.woff2",
   weight: "300 500",
-  variable: "--widget-font-sans-vietnamese",
+  variable: "--font-subset-widget-hanken-vietnamese",
   preload: false,
+  // The metric-adjusted fallback is declared once, by family name, in fonts.css.
   adjustFontFallback: false,
   declarations: [
     { prop: "font-family", value: "Hanken Grotesk" },
@@ -46,8 +53,9 @@ const hankenVietnamese = localFont({
 const hankenCyrillicExt = localFont({
   src: "./hanken-grotesk/cyrillic-ext.woff2",
   weight: "300 500",
-  variable: "--widget-font-sans-cyrillic-ext",
+  variable: "--font-subset-widget-hanken-cyrillic-ext",
   preload: false,
+  // The metric-adjusted fallback is declared once, by family name, in fonts.css.
   adjustFontFallback: false,
   declarations: [
     { prop: "font-family", value: "Hanken Grotesk" },
@@ -58,7 +66,9 @@ const hankenCyrillicExt = localFont({
 const spaceLatin = localFont({
   src: "./space-grotesk/latin-500.woff2",
   weight: "500",
-  variable: "--widget-font-label",
+  variable: "--font-subset-widget-space-latin",
+  // The metric-adjusted fallback is declared once, by family name, in fonts.css.
+  adjustFontFallback: false,
   declarations: [
     { prop: "font-family", value: "Space Grotesk" },
     { prop: "unicode-range", value: "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD" },
@@ -68,8 +78,9 @@ const spaceLatin = localFont({
 const spaceLatinExt = localFont({
   src: "./space-grotesk/latin-ext-500.woff2",
   weight: "500",
-  variable: "--widget-font-label-latin-ext",
+  variable: "--font-subset-widget-space-latin-ext",
   preload: false,
+  // The metric-adjusted fallback is declared once, by family name, in fonts.css.
   adjustFontFallback: false,
   declarations: [
     { prop: "font-family", value: "Space Grotesk" },
@@ -80,8 +91,9 @@ const spaceLatinExt = localFont({
 const spaceVietnamese = localFont({
   src: "./space-grotesk/vietnamese-500.woff2",
   weight: "500",
-  variable: "--widget-font-label-vietnamese",
+  variable: "--font-subset-widget-space-vietnamese",
   preload: false,
+  // The metric-adjusted fallback is declared once, by family name, in fonts.css.
   adjustFontFallback: false,
   declarations: [
     { prop: "font-family", value: "Space Grotesk" },
@@ -89,7 +101,7 @@ const spaceVietnamese = localFont({
   ],
 });
 
-/** Class names for <html>: defines --widget-font-sans and --widget-font-label, and pulls in every subset's @font-face. */
+/** Class names for <html>: pulls in every subset's @font-face (the variables the widget reads, --widget-font-sans and --widget-font-label, are set in fonts.css). */
 export const widgetFontVariables = [
   hankenLatin,
   hankenLatinExt,
