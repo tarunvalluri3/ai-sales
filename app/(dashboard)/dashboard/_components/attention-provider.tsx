@@ -1,9 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { pollAttentionCountAction } from "../actions";
-
-const POLL_INTERVAL_MS = 1000;
+import { fetchAttentionSnapshot } from "@/lib/dashboard-poll-client";
+import { nextPollDelayMs, POLL_FAST_MS } from "@/lib/poll-cadence";
 
 /**
  * TWO separate primitive contexts, deliberately, not one object-valued
@@ -52,9 +51,14 @@ function playAttentionChime(context: AudioContext) {
  * Owns the single, shared poll for the count of conversations needing
  * attention across the whole dashboard (Phase 15c) -- mounted once in
  * dashboard/layout.tsx, not duplicated per nav surface. Same
- * self-rescheduling poll shape as LiveConversationPanel (Phase 15b,
- * interval tightened to 1s Phase 25e): pause on tab-hidden, immediate poll on resume, cleanup
- * on unmount (only ever unmounted by leaving /dashboard/* entirely).
+ * self-rescheduling poll shape as LiveConversationPanel: pause on
+ * tab-hidden, immediate poll on resume, cleanup on unmount (only ever
+ * unmounted by leaving /dashboard/* entirely).
+ *
+ * perf/reply-and-save-speed: a GET fetch (GET /api/dashboard/attention), no
+ * longer a Server Action, so it never makes the owner's saves wait in the
+ * Server Action queue; every second while a count changed in the last 30 s,
+ * every five seconds otherwise (lib/poll-cadence.ts).
  *
  * The chime plays only when a count genuinely increases relative to
  * what this tab already knew, and never on the first poll after mount
@@ -74,6 +78,8 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
   const isMountedRef = useRef(true);
   const audioContextRef = useRef<AudioContext | null>(null);
   const pollRef = useRef<() => Promise<void>>(async () => {});
+  // When either count last changed; drives the 1 s / 5 s cadence.
+  const lastChangeAtRef = useRef(0);
 
   const poll = useCallback(async () => {
     if (timeoutRef.current) {
@@ -82,7 +88,7 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const result = await pollAttentionCountAction();
+      const result = await fetchAttentionSnapshot();
       if (!isMountedRef.current) return;
 
       const attentionRose = previousCountRef.current !== null && result.attentionCount > previousCountRef.current;
@@ -96,6 +102,9 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
         playAttentionChime(audioContextRef.current);
       }
 
+      if (result.attentionCount !== previousCountRef.current || result.unreadNotificationCount !== previousUnreadRef.current) {
+        lastChangeAtRef.current = Date.now();
+      }
       previousCountRef.current = result.attentionCount;
       previousUnreadRef.current = result.unreadNotificationCount;
       setCount(result.attentionCount);
@@ -107,7 +116,7 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
 
     if (!isMountedRef.current) return;
     if (document.visibilityState === "visible") {
-      timeoutRef.current = setTimeout(() => pollRef.current(), POLL_INTERVAL_MS);
+      timeoutRef.current = setTimeout(() => pollRef.current(), nextPollDelayMs(lastChangeAtRef.current, Date.now()));
     }
   }, []);
 
@@ -141,7 +150,8 @@ export function AttentionProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    timeoutRef.current = setTimeout(() => pollRef.current(), POLL_INTERVAL_MS);
+    lastChangeAtRef.current = Date.now();
+    timeoutRef.current = setTimeout(() => pollRef.current(), POLL_FAST_MS);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {

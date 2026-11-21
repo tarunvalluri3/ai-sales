@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { auth } from "@clerk/nextjs/server";
 import { requireAuthContext } from "@/lib/auth";
 import { getBusinessForOrg } from "@/lib/business";
 import { isAgentPublished } from "@/lib/agent-published";
@@ -53,6 +54,34 @@ export async function requireBusinessContext(): Promise<BusinessContext> {
     userId: context.userId,
     orgId: context.orgId,
     orgRole: context.orgRole,
+    businessId: business.id,
+    businessName: business.name,
+    contactEmail: business.contact_email,
+    timezone: business.timezone,
+    currency: business.currency,
+    published: isAgentPublished(business),
+  };
+}
+
+/**
+ * The same validated `{ userId, businessId }` resolution as
+ * requireBusinessContext(), for route handlers that answer a fetch (the
+ * dashboard polls, app/api/dashboard/): instead of redirecting (which a
+ * fetch would follow into an HTML page) it returns null, and the route
+ * answers 401. Same rules: the org comes from the Clerk session only, the
+ * business from that org, and a suspended or deleted business gets nothing.
+ */
+export async function getBusinessContextForRoute(): Promise<BusinessContext | null> {
+  const session = await auth();
+  if (!session.userId || !session.orgId) return null;
+
+  const business = await getBusinessForOrg(session.orgId);
+  if (!business || businessLifecycleBlock(business)) return null;
+
+  return {
+    userId: session.userId,
+    orgId: session.orgId,
+    orgRole: session.orgRole ?? undefined,
     businessId: business.id,
     businessName: business.name,
     contactEmail: business.contact_email,

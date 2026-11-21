@@ -282,3 +282,106 @@ test("no wizard step makes a second request after Continue", () => {
   assert.match(business, /useActionState\(\s*saveBusinessStepAction/);
   assert.doesNotMatch(business, /router\.push\("\/onboarding\?step=knowledge"\)/);
 });
+
+// --------------------------- item 3: polls off the Server Action queue
+test("poll cadence: 1 s while things changed in the last 30 s, then 5 s", () => {
+  const { nextPollDelayMs, POLL_FAST_MS, POLL_SLOW_MS } = loadModule("lib/poll-cadence.ts");
+  assert.equal(POLL_FAST_MS, 1_000);
+  assert.equal(POLL_SLOW_MS, 5_000);
+  assert.equal(nextPollDelayMs(0, 0), 1_000);
+  assert.equal(nextPollDelayMs(0, 29_999), 1_000);
+  assert.equal(nextPollDelayMs(0, 30_000), 5_000);
+  assert.equal(nextPollDelayMs(0, 600_000), 5_000);
+});
+
+function loadBusinessContext({ session, business }) {
+  return loadModule("lib/business-context.ts", {
+    "next/navigation": { redirect: (path) => { throw new Error("redirect " + path); } },
+    "@clerk/nextjs/server": { auth: async () => session },
+    "@/lib/auth": { requireAuthContext: async () => session },
+    "@/lib/business": { getBusinessForOrg: async (orgId) => (business && orgId === "org-a" ? business : null) },
+    "@/lib/agent-published": { isAgentPublished: () => true },
+    "@/lib/business-lifecycle": loadModule("lib/business-lifecycle.ts", { "@/lib/agent-published": { isAgentPublished: () => true } }),
+  });
+}
+
+const tenantA = { id: "business-a", name: "A", contact_email: null, timezone: "Asia/Kolkata", currency: "INR", status: "active", deleted_at: null };
+
+test("route context: business only from the Clerk session; signed-out, org-less and suspended get null", async () => {
+  const ok = await loadBusinessContext({ session: { userId: "u", orgId: "org-a", orgRole: "org:member" }, business: tenantA }).getBusinessContextForRoute();
+  assert.equal(ok.businessId, "business-a");
+  for (const [session, business] of [
+    [{ userId: null, orgId: null }, tenantA],
+    [{ userId: "u", orgId: null }, tenantA],
+    [{ userId: "u", orgId: "org-b" }, tenantA],
+    [{ userId: "u", orgId: "org-a" }, { ...tenantA, status: "suspended" }],
+    [{ userId: "u", orgId: "org-a" }, { ...tenantA, deleted_at: "2026-11-01T00:00:00Z" }],
+  ]) {
+    assert.equal(await loadBusinessContext({ session, business }).getBusinessContextForRoute(), null);
+  }
+});
+
+function loadRoute(path, { context, loaders }) {
+  const seen = [];
+  const mod = loadModule(path, {
+    "next/server": {
+      NextResponse: { json: (body, init = {}) => ({ body, status: init.status ?? 200, headers: init.headers ?? {} }) },
+    },
+    "@/lib/business-context": { getBusinessContextForRoute: async () => context },
+    "@/lib/dashboard-poll": {
+      loadAttentionSnapshot: async (businessId) => { seen.push(["attention", businessId]); return loaders.attention; },
+      loadConversationUpdates: async (businessId, input) => { seen.push(["updates", businessId, input]); return loaders.updates; },
+    },
+    "@/lib/errors": { logAndGetUserMessage: () => "x" },
+    "@/lib/request-timing": { RequestTiming: class { time(_s, w) { return w(); } finish() { return null; } } },
+  });
+  return { ...mod, seen };
+}
+
+test("GET /api/dashboard/attention: 401 without a session business; counts for the session's own business, never cached", async () => {
+  const denied = loadRoute("app/api/dashboard/attention/route.ts", { context: null, loaders: {} });
+  const refused = await denied.GET();
+  assert.equal(refused.status, 401);
+  assert.equal(denied.seen.length, 0);
+
+  const route = loadRoute("app/api/dashboard/attention/route.ts", {
+    context: { businessId: "business-a" },
+    loaders: { attention: { attentionCount: 2, unreadNotificationCount: 5 } },
+  });
+  const response = await route.GET();
+  assert.equal(response.status, 200);
+  assert.equal(response.body.attentionCount, 2);
+  assert.equal(response.headers["Cache-Control"], "private, no-store");
+  assert.deepEqual(route.seen, [["attention", "business-a"]]);
+});
+
+test("GET conversation updates: session business only; another tenant's or a bad id gets the old empty answer", async () => {
+  const request = { nextUrl: new URL("https://x.test/api/dashboard/conversations/c1/updates?after=2026-11-21T10:00:00.000Z&businessId=business-b") };
+  const params = { params: Promise.resolve({ id: "c1" }) };
+  const denied = loadRoute("app/api/dashboard/conversations/[id]/updates/route.ts", { context: null, loaders: {} });
+  assert.equal((await denied.GET(request, params)).status, 401);
+
+  const foreign = loadRoute("app/api/dashboard/conversations/[id]/updates/route.ts", {
+    context: { businessId: "business-a" },
+    loaders: { updates: null }, // loadConversationUpdates found no conversation of business-a with this id
+  });
+  const empty = await foreign.GET(request, params);
+  assert.equal(empty.status, 200);
+  assert.deepEqual(JSON.parse(JSON.stringify(empty.body)), { messages: [], control: "ai", needsAttention: false, asOf: "2026-11-21T10:00:00.000Z" });
+  // The business id in the query string is ignored; the session's is used.
+  assert.equal(foreign.seen[0][1], "business-a");
+  assert.equal(foreign.seen[0][2].conversationId, "c1");
+});
+
+test("the attention badge and the open conversation poll with fetch, not a Server Action", () => {
+  const provider = source("app/(dashboard)/dashboard/_components/attention-provider.tsx");
+  const panel = source("app/(dashboard)/dashboard/conversations/_components/live-conversation-panel.tsx");
+  for (const text of [provider, panel]) {
+    assert.doesNotMatch(text, /from "\.\.\/actions"|from "\.\.\/\.\.\/actions"/);
+    assert.match(text, /nextPollDelayMs\(lastChangeAtRef\.current, Date\.now\(\)\)/);
+    assert.match(text, /visibilityState === "visible"/); // still pauses while hidden
+  }
+  assert.match(provider, /fetchAttentionSnapshot\(\)/);
+  assert.match(panel, /fetchConversationUpdates\(conversationId, asOfRef\.current\)/);
+  assert.match(source("lib/dashboard-poll-client.ts"), /cache: "no-store"/);
+});
