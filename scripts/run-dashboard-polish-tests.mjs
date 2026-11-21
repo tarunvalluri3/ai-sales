@@ -376,3 +376,11 @@ test("business-facing copy uses an em dash, not a double hyphen", () => {
   }
   assert.match(source("app/(dashboard)/dashboard/audit-log/page.tsx"), /Grace period lapsed — AI replies paused/);
 });
+
+// ---------------------------------------------------------------- Item 13
+test("launch runbook carries the Clerk production checklist", () => {
+  const doc = source("docs/launch-runbook.md");
+  for (const needle of ["## 8. Clerk production checklist", "DNS records", "Waves AI Pilot", "Default naming rules", "CAPTCHA", "Organizations settings", "third-party auth provider", "Chrome, Edge, Safari", "600010", "CLERK_SECRET_KEY"]) {
+    assert.ok(doc.includes(needle), needle);
+  }
+});
