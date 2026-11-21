@@ -680,3 +680,35 @@ test("the widget poll reports the flag, when it was raised, and the masked conta
   assert.match(poll, /attentionFlaggedAt: conversation\.attention_flagged_at/);
   assert.match(poll, /conversation\.needs_attention\s*\?\s*await getMaskedFollowUpContact\(supabase, business\.businessId, conversationId\)\s*:\s*null/);
 });
+
+test("withRequestTiming: Next's own rendering signals (build-time static probe) are rethrown without a log line", async () => {
+  const { withRequestTiming } = loadModule("lib/request-timing.ts", {}, { globalThis: {} });
+  const lines = [];
+  const probe = Object.assign(new Error("Dynamic server usage: headers"), { digest: "DYNAMIC_SERVER_USAGE" });
+  await assert.rejects(
+    withRequestTiming("onboarding_render", async () => { throw probe; }, undefined, { write: (line) => lines.push(line) }),
+    (error) => error === probe,
+  );
+  assert.equal(lines.length, 0);
+});
+
+test("fonts: self-hosted files, the variables the app reads point at the shared family names", () => {
+  for (const file of ["app/(dashboard)/layout.tsx", "app/(widget)/layout.tsx"]) {
+    assert.doesNotMatch(source(file), /next\/font\/google/, file);
+  }
+  const css = source("app/fonts/fonts.css");
+  for (const variable of ["--font-hanken", "--widget-font-sans"]) {
+    assert.match(css, new RegExp(variable + ': "Hanken Grotesk", "Hanken Grotesk Fallback";'));
+  }
+  for (const variable of ["--font-space", "--widget-font-label"]) {
+    assert.match(css, new RegExp(variable + ': "Space Grotesk", "Space Grotesk Fallback";'));
+  }
+  for (const file of ["app/fonts/dashboard-fonts.ts", "app/fonts/widget-fonts.ts"]) {
+    const text = source(file);
+    assert.match(text, /import "\.\/fonts\.css";/);
+    assert.equal((text.match(/localFont\(\{/g) ?? []).length, 7, file);
+    assert.equal((text.match(/preload: false/g) ?? []).length, 5, file + ": only the two latin files are preloaded");
+    assert.equal((text.match(/value: "Hanken Grotesk"/g) ?? []).length, 4, file);
+    assert.equal((text.match(/value: "Space Grotesk"/g) ?? []).length, 3, file);
+  }
+});

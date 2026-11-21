@@ -178,6 +178,26 @@ export function timingOutcomeForError(error: unknown): RequestTimingOutcome {
 }
 
 /**
+ * Signals Next.js throws while it decides HOW to render (e.g. `next build`
+ * probing a page that reads headers/auth for static rendering). They are not
+ * requests anyone waited on, so they are rethrown without a log line. Same
+ * set unstable_rethrow() checks, duck-typed to keep this module Next-free.
+ */
+const RENDERING_SIGNAL_DIGESTS = new Set([
+  "DYNAMIC_SERVER_USAGE",
+  "BAILOUT_TO_CLIENT_SIDE_RENDERING",
+  "HANGING_PROMISE_REJECTION",
+  "NEXT_PRERENDER_INTERRUPTED",
+]);
+
+export function isRenderingSignal(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if ((error as { $$typeof?: unknown }).$$typeof === Symbol.for("react.postpone")) return true;
+  const digest = "digest" in error ? String((error as { digest: unknown }).digest) : "";
+  return RENDERING_SIGNAL_DIGESTS.has(digest);
+}
+
+/**
  * Wraps a whole server action or page render: logs one line whether it
  * returns, redirects or throws, and rethrows exactly what it got.
  */
@@ -193,7 +213,7 @@ export async function withRequestTiming<T>(
     timing.finish(outcomeOf(result));
     return result;
   } catch (error) {
-    timing.finish(timingOutcomeForError(error));
+    if (!isRenderingSignal(error)) timing.finish(timingOutcomeForError(error));
     throw error;
   }
 }
