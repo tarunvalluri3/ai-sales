@@ -158,3 +158,127 @@ test("the SSE stream reports each written event to onEvent, and a throwing obser
   assert.deepEqual(seen, ["meta", "delta", "delta", "final"]);
   assert.match(text, /"type":"final"/);
 });
+
+// ------------------------------------------- item 1: one request per click
+const STEPS = ["account", "verify", "business", "knowledge", "products", "faqs", "persona", "channels", "plan", "review", "live"];
+
+function loadOnboardingActions({ currentStep = "persona", savedStep = "faqs", branding, capabilities, profile } = {}) {
+  const calls = [];
+  const redirectTo = (path) => {
+    calls.push(["redirect", path]);
+    throw Object.assign(new Error("NEXT_REDIRECT"), { digest: `NEXT_REDIRECT;push;${path};307;` });
+  };
+  const mod = loadModule("app/(dashboard)/onboarding/actions.ts", {
+    "next/cache": { revalidatePath: (path) => calls.push(["revalidate", path]) },
+    "next/navigation": { redirect: redirectTo },
+    "next/server": { after: () => {} },
+    "@/lib/clerk-org-name": { syncClerkOrganizationName: async () => {} },
+    "@/lib/auth": { requireAuthContext: async () => ({ userId: "u", orgId: "org-a", orgRole: "org:admin" }), requireMinRole: () => null },
+    "@/lib/business-context": { requireBusinessContext: async () => ({ businessId: "b", orgId: "org-a", orgRole: "org:admin" }) },
+    "@/lib/business": {
+      getBusinessForOrg: async () => ({ id: "b", onboarding_step: savedStep }),
+      saveOnboardingStep: async (_org, step) => calls.push(["save_step", step]),
+    },
+    "@/lib/onboarding-steps": {
+      ONBOARDING_STEPS: STEPS,
+      computeOnboardingProgress: async () => ({ currentStep }),
+    },
+    "@/lib/schemas/business": {},
+    "@/lib/schemas/weekly-hours": {},
+    "@/lib/schemas/onboarding-website": {},
+    "@/lib/timezones": {},
+    "@/lib/currency": {},
+    "@/lib/errors": { logAndGetUserMessage: () => "Something went wrong." },
+    "@/lib/widget-keys": {},
+    "@/lib/audit-log": { recordAuditLogEntry: async () => {} },
+    "@/lib/request-timing": loadModule("lib/request-timing.ts", {}, { globalThis: {} }),
+    "../dashboard/profile/actions": {
+      updateBusinessProfileAction: async () => { calls.push(["profile"]); return profile ?? { success: true }; },
+    },
+    "../dashboard/widget-settings/actions": {
+      updateWidgetBrandingAction: async () => { calls.push(["branding"]); return branding ?? { success: true }; },
+      updateAiCapabilitiesAction: async (_prev, fields) => {
+        calls.push(["capabilities", [...fields.keys()].sort().join(",")]);
+        return capabilities ?? { success: true };
+      },
+    },
+  }, { FormData, globalThis: {} });
+  return { ...mod, calls };
+}
+
+const isRedirect = (path) => (error) => typeof error.digest === "string" && error.digest.includes(`;${path};`);
+
+// The vm's console.log would print each timing line; keep test output clean.
+const quiet = async (fn) => {
+  const log = console.log;
+  console.log = () => {};
+  try { return await fn(); } finally { console.log = log; }
+};
+
+test("continueOnboarding: a reached step saves and redirects in the same request", async () => {
+  const { continueOnboarding, calls } = loadOnboardingActions({ currentStep: "persona", savedStep: "faqs" });
+  await quiet(() => assert.rejects(continueOnboarding("persona"), isRedirect("/onboarding?step=persona")));
+  assert.deepEqual(calls.map((c) => c[0]), ["save_step", "revalidate", "redirect"]);
+});
+
+test("continueOnboarding: a step not yet reached, an unknown step and live are refused without a redirect", async () => {
+  for (const step of ["channels", "bogus", "live"]) {
+    const { continueOnboarding, calls } = loadOnboardingActions({ currentStep: "persona" });
+    const result = await quiet(() => continueOnboarding(step));
+    assert.equal(result.ok, false, step);
+    assert.ok(!calls.some((c) => c[0] === "redirect" || c[0] === "save_step"), step);
+  }
+});
+
+test("savePersonaStepAction: branding, then capabilities, then the step, then Channels -- one request", async () => {
+  const { savePersonaStepAction, calls } = loadOnboardingActions({ currentStep: "channels", savedStep: "persona" });
+  const form = new FormData();
+  for (const [key, value] of [["welcomeText", "Hi"], ["appointmentsEnabled", "on"], ["appointmentSlotMinutes", "30"], ["accentColor", "#3f3f46"]]) form.set(key, value);
+  await quiet(() => assert.rejects(savePersonaStepAction({}, form), isRedirect("/onboarding?step=channels")));
+  assert.deepEqual(calls.map((c) => c[0]), ["branding", "capabilities", "save_step", "revalidate", "redirect"]);
+  // Capabilities get exactly the fields the browser used to send them.
+  assert.equal(calls[1][1], "appointmentSlotMinutes,appointmentsEnabled");
+});
+
+test("savePersonaStepAction: the first failure is returned and nothing after it runs", async () => {
+  const brandingFails = loadOnboardingActions({ branding: { error: "Enter a six-digit hex colour." } });
+  assert.deepEqual(await quiet(() => brandingFails.savePersonaStepAction({}, new FormData())), { error: "Enter a six-digit hex colour." });
+  assert.deepEqual(brandingFails.calls.map((c) => c[0]), ["branding"]);
+
+  const capabilitiesFail = loadOnboardingActions({ capabilities: { error: "Slot length must be…" } });
+  await quiet(() => capabilitiesFail.savePersonaStepAction({}, new FormData()));
+  assert.deepEqual(capabilitiesFail.calls.map((c) => c[0]), ["branding", "capabilities"]);
+
+  const stepRefused = loadOnboardingActions({ currentStep: "faqs" });
+  const refused = await quiet(() => stepRefused.savePersonaStepAction({}, new FormData()));
+  assert.match(refused.error, /Finish the "faqs" step first/);
+  assert.ok(!stepRefused.calls.some((c) => c[0] === "redirect"));
+});
+
+test("saveBusinessStepAction: a saved profile goes straight to Train; a rejected one stays", async () => {
+  const ok = loadOnboardingActions();
+  await quiet(() => assert.rejects(ok.saveBusinessStepAction({}, new FormData()), isRedirect("/onboarding?step=knowledge")));
+  const bad = loadOnboardingActions({ profile: { error: "Fix the highlighted fields below.", fieldErrors: { name: "Required" } } });
+  const state = await quiet(() => bad.saveBusinessStepAction({}, new FormData()));
+  assert.equal(state.error, "Fix the highlighted fields below.");
+  assert.ok(!bad.calls.some((c) => c[0] === "redirect"));
+});
+
+test("no wizard step makes a second request after Continue", () => {
+  const steps = "app/(dashboard)/onboarding/_components/steps/";
+  for (const [file, next] of [
+    ["train-knowledge-step.tsx", "products"], ["train-products-step.tsx", "faqs"], ["train-faqs-step.tsx", "persona"],
+    ["channels-step.tsx", "plan"], ["plan-step.tsx", "review"],
+  ]) {
+    const text = source(steps + file);
+    assert.ok(text.includes(`continueOnboarding("${next}")`), file);
+    assert.doesNotMatch(text, /advanceOnboarding/, file);
+    assert.ok(!text.includes(`router.push("/onboarding?step=${next}")`), file);
+  }
+  const persona = source(steps + "persona-step.tsx");
+  assert.match(persona, /useActionState\(savePersonaStepAction/);
+  assert.doesNotMatch(persona, /router\.push\("\/onboarding\?step=channels"\)/);
+  const business = source(steps + "business-step.tsx");
+  assert.match(business, /useActionState\(\s*saveBusinessStepAction/);
+  assert.doesNotMatch(business, /router\.push\("\/onboarding\?step=knowledge"\)/);
+});

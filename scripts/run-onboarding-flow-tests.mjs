@@ -98,6 +98,10 @@ function onboardingActions(business, keys = {}, paths = []) {
     "@/lib/errors": mockErrors,
     "@/lib/widget-keys": keys,
     "@/lib/audit-log": { recordAuditLogEntry: async () => {} },
+    // Composed by the one-request wizard actions (saveBusinessStepAction,
+    // savePersonaStepAction); their behaviour is covered in run-perf-speed-tests.mjs.
+    "../dashboard/profile/actions": {},
+    "../dashboard/widget-settings/actions": {},
   });
 }
 
@@ -337,7 +341,13 @@ test("wizard wiring covers organization branding, profile defaults, training car
   assert.match(source(dashboard + "faqs/faq-form.tsx"), /type="submit"\s+disabled=\{isPending \|\| draftPending\}/);
   const persona = source(steps + "persona-step.tsx");
   assert.match(persona, /DEFAULT_WIDGET_PRIMARY, (?:"#[a-f0-9]{6}", ){6}"#[a-f0-9]{6}"/);
-  assert.match(persona, /await updateWidgetBrandingAction[\s\S]*?await updateAiCapabilitiesAction[\s\S]*?await advanceOnboarding/);
+  // One request per click: the same three saves, in the same order, now run
+  // server-side in savePersonaStepAction (perf/reply-and-save-speed).
+  assert.match(persona, /useActionState\(savePersonaStepAction/);
+  assert.match(
+    source(onboarding + "actions.ts"),
+    /updateWidgetBrandingAction\(prevState, formData\)[\s\S]*?updateAiCapabilitiesAction\([\s\S]*?advanceOnboardingTimed\(timing, "channels"\)/,
+  );
   assert.match(persona, /Uses your business hours: \{hoursSummary\}/);
 });
 

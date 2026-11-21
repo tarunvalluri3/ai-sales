@@ -35,6 +35,12 @@ import { normalizeTimezone, TIMEZONE_ERROR_MESSAGES } from "@/lib/timezones";
 import { currencyForTimezone } from "@/lib/currency";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { withRequestTiming, type RequestTiming } from "@/lib/request-timing";
+import { updateBusinessProfileAction, type ProfileFormState } from "../dashboard/profile/actions";
+import {
+  updateAiCapabilitiesAction,
+  updateWidgetBrandingAction,
+  type WidgetBrandingActionState,
+} from "../dashboard/widget-settings/actions";
 
 const createBusinessSchema = z.object({
   name: businessNameSchema,
@@ -249,6 +255,75 @@ async function advanceOnboardingTimed(timing: RequestTiming, nextStep: Onboardin
     revalidatePath("/onboarding");
   }
   return { ok: true };
+}
+
+/**
+ * One request per wizard click (perf/reply-and-save-speed): the same
+ * server-side completeness check as advanceOnboarding(), then a redirect, so
+ * the response that confirms the step also carries the next step's page.
+ * Before, the client awaited advanceOnboarding() (whose revalidatePath
+ * re-rendered the whole wizard) and then navigated: a second full render.
+ * `nextStep` is client input: advanceOnboardingTimed() rejects anything that
+ * is not a real step the business has genuinely reached, and the redirect
+ * target is built only from a step that passed that check.
+ */
+export async function continueOnboarding(nextStep: OnboardingStep): Promise<AdvanceOnboardingResult> {
+  const result = await withRequestTiming(
+    "onboarding_continue",
+    (timing) => advanceOnboardingTimed(timing, nextStep),
+    (outcome) => (outcome.ok ? "redirect" : "rejected"),
+  );
+  if (!result.ok) return result;
+  redirect(`/onboarding?step=${nextStep}`);
+}
+
+/** Step 1 for a business that already exists: save the profile, then open Train in the same request. */
+export async function saveBusinessStepAction(prevState: ProfileFormState, formData: FormData): Promise<ProfileFormState> {
+  const state = await withRequestTiming(
+    "onboarding_business_step",
+    (timing) => timing.time("save_profile", () => updateBusinessProfileAction(prevState, formData)),
+    (result) => (result.success ? "redirect" : "rejected"),
+  );
+  if (!state.success) return state;
+  redirect("/onboarding?step=knowledge");
+}
+
+/**
+ * The Personality step's three saves in one request (branding, then
+ * capabilities, then the step), then the Channels step. The same actions in
+ * the same order with the same checks as when the browser called them one
+ * by one; the first failure is returned and nothing after it runs.
+ */
+export async function savePersonaStepAction(
+  prevState: WidgetBrandingActionState,
+  formData: FormData,
+): Promise<WidgetBrandingActionState> {
+  const state = await withRequestTiming(
+    "onboarding_persona_step",
+    async (timing): Promise<WidgetBrandingActionState> => {
+      const branding = await timing.time("save_branding", () => updateWidgetBrandingAction(prevState, formData));
+      if (!branding.success) return branding;
+      const capabilities = await timing.time("save_capabilities", () =>
+        updateAiCapabilitiesAction({}, capabilityFields(formData)),
+      );
+      if (!capabilities.success) return capabilities;
+      const next = await advanceOnboardingTimed(timing, "channels");
+      return next.ok ? { success: true } : { error: next.error };
+    },
+    (result) => (result.success ? "redirect" : "rejected"),
+  );
+  if (!state.success) return state;
+  redirect("/onboarding?step=channels");
+}
+
+/** The capability toggles from the Personality form, exactly as updateAiCapabilitiesAction reads them. */
+function capabilityFields(form: FormData): FormData {
+  const fields = new FormData();
+  for (const key of ["appointmentSlotMinutes", "appointmentsEnabled", "recommendProductsEnabled"]) {
+    const value = form.get(key);
+    if (typeof value === "string") fields.set(key, value);
+  }
+  return fields;
 }
 
 export type OnboardingWebsiteState = { error?: string; saved?: boolean };

@@ -17,7 +17,7 @@ import { WhatsappConnectionStatus } from "../../../dashboard/whatsapp/whatsapp-c
 import { ConnectInstagramButton } from "../../../dashboard/instagram/connect-instagram-button";
 import { InstagramConnectionStatus } from "../../../dashboard/instagram/instagram-connection-status";
 import { ChannelUpgradeNotice } from "../../../dashboard/_components/channel-upgrade-notice";
-import { advanceOnboarding, saveOnboardingWebsiteAction } from "../../actions";
+import { continueOnboarding, saveOnboardingWebsiteAction } from "../../actions";
 
 export function ChannelsStep({
   widgetKeys,
@@ -62,12 +62,10 @@ export function ChannelsStep({
   function handleContinue() {
     setError(null);
     startTransition(async () => {
-      const result = await advanceOnboarding("plan");
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      router.push("/onboarding?step=plan");
+      // One request: on success the server redirects straight to the next
+      // step (continueOnboarding); only a refusal comes back here.
+      const result = await continueOnboarding("plan");
+      if (result && !result.ok) setError(result.error);
     });
   }
 
