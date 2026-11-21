@@ -121,6 +121,7 @@ export function BillingPanel({
   connectedChannels,
   aside,
   compactPlans,
+  savedDetails,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -138,6 +139,13 @@ export function BillingPanel({
   /** Optional card rendered beside the current-plan card (the Billing page's "Invoice details" summary). */
   aside?: ReactNode;
   compactPlans?: boolean;
+  /**
+   * Billing page: the ONE billing-details form is the card below the plans, so
+   * checkout does not repeat the fields. Pass the saved summary (null when
+   * nothing is on file yet, which blocks checkout until it is). Omit it (the
+   * onboarding plan step) and the fields render inline as before.
+   */
+  savedDetails?: { stateName: string | null; complete: boolean };
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -449,12 +457,44 @@ export function BillingPanel({
           <input type="hidden" name="planKey" value={selectedPlan} />
           <input type="hidden" name="interval" value={interval} />
 
-          <BillingDetailsFields
-            defaults={identity}
-            gstRatePercent={gstRatePercent}
-            supplierStateName={supplierStateName}
-            idPrefix="checkout"
-          />
+          {savedDetails ? (
+            savedDetails.complete ? (
+              <>
+                <input type="hidden" name="billingName" value={identity.name} />
+                <input type="hidden" name="billingAddress" value={identity.address} />
+                <input type="hidden" name="stateCode" value={identity.stateCode} />
+                <input type="hidden" name="gstin" value={identity.gstin} />
+                <p className="text-sm text-ds-text-secondary">
+                  Invoice to{" "}
+                  <span className="font-medium text-ds-text-primary">
+                    {identity.name}
+                    {savedDetails.stateName ? `, ${savedDetails.stateName}` : ""}
+                  </span>
+                  .{" "}
+                  <a href="#billing-details" className="font-medium text-ds-primary underline underline-offset-4">
+                    Edit billing details
+                  </a>
+                </p>
+              </>
+            ) : (
+              <p role="status" className="flex items-start gap-2 rounded-2xl bg-ds-warning-bg p-4 text-sm text-ds-text-primary">
+                <AlertTriangle strokeWidth={1.75} className="mt-0.5 size-4 shrink-0 text-ds-warning" aria-hidden="true" />
+                <span>
+                  Add your billing details first. They go on your GST invoice.{" "}
+                  <a href="#billing-details" className="font-medium text-ds-primary underline underline-offset-4">
+                    Go to billing details
+                  </a>
+                </span>
+              </p>
+            )
+          ) : (
+            <BillingDetailsFields
+              defaults={identity}
+              gstRatePercent={gstRatePercent}
+              supplierStateName={supplierStateName}
+              idPrefix="checkout"
+            />
+          )}
 
           {starterWarning ? (
             <div role="alert" className="flex flex-col gap-3 rounded-2xl bg-ds-warning-bg p-4">
@@ -483,6 +523,7 @@ export function BillingPanel({
                 startPending ||
                 changePending ||
                 checkoutOpen ||
+                (savedDetails !== undefined && !savedDetails.complete) ||
                 (starterWarning !== null && !starterLossAcknowledged) ||
                 (selectedPlan === entitlement.planKey && isSubscribed && interval === entitlement.billingInterval)
               }

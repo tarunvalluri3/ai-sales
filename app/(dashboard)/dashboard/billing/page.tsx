@@ -188,6 +188,7 @@ export default async function BillingPage() {
           degraded: quota.degraded,
         }}
         identity={identityDefaults}
+        savedDetails={{ stateName: billingStateName, complete: hasBillingDetails }}
         plans={ORDERED_PLANS.map((p) => ({
           key: p.key,
           name: p.name,
@@ -208,6 +209,7 @@ export default async function BillingPage() {
       />
 
       <BillingDetailsCard
+        key={`${identityDefaults.name}|${identityDefaults.address}|${identityDefaults.stateCode}|${identityDefaults.gstin}`}
         defaults={identityDefaults}
         gstRatePercent={GST_RATE_PERCENT}
         supplierStateName={SUPPLIER.stateName}

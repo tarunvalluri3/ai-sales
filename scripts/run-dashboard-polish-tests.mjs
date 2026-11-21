@@ -340,3 +340,23 @@ test("WhatsApp: Connect with Facebook comes first and the developer guide sits u
   assert.match(page, /!entitled \? \(\s*<ChannelUpgradeNotice/);
   assert.match(page, /canEdit \? \(\s*embeddedSignup/);
 });
+
+// ---------------------------------------------------------------- Item 11
+test("Billing page shows the billing details form once and pre-fills it from what is saved", () => {
+  const page = source(dashboard + "billing/page.tsx");
+  const panel = source(dashboard + "billing/billing-panel.tsx");
+  // The page's single editable form is re-keyed on the saved values so it re-syncs after a save.
+  assert.match(page, /<BillingDetailsCard\s+key=\{`\$\{identityDefaults\.name\}\|\$\{identityDefaults\.address\}\|\$\{identityDefaults\.stateCode\}\|\$\{identityDefaults\.gstin\}`\}/);
+  assert.match(page, /savedDetails=\{\{ stateName: billingStateName, complete: hasBillingDetails \}\}/);
+  // With saved details the checkout form sends them as hidden inputs instead of repeating the fields.
+  assert.match(panel, /savedDetails \? \(\s+savedDetails\.complete \? \(/);
+  for (const name of ["billingName", "billingAddress", "stateCode", "gstin"]) {
+    assert.match(panel, new RegExp(`<input type="hidden" name="${name}" value=\{identity\.`));
+  }
+  // Nothing on file: checkout is blocked with "Add your billing details first".
+  assert.match(panel, /savedDetails !== undefined && !savedDetails\.complete/);
+  assert.match(panel, /Add your billing details first\./);
+  // The onboarding plan step (no savedDetails) keeps its inline fields.
+  assert.match(panel, /<BillingDetailsFields\s+defaults=\{identity\}[\s\S]*idPrefix="checkout"/);
+  assert.doesNotMatch(source("app/(dashboard)/onboarding/_components/steps/plan-step.tsx"), /savedDetails/);
+});
