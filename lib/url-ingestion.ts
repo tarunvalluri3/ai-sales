@@ -98,6 +98,7 @@ export async function createUrlKnowledgeDocument(
   url: string,
   title: string,
   refreshIntervalHours: number | null,
+  onboarding = false,
 ): Promise<KnowledgeDocument> {
   const content = knowledgeContentSchema.parse(await fetchUrlContent(url));
 
@@ -108,6 +109,7 @@ export async function createUrlKnowledgeDocument(
     .insert({
       business_id: businessId,
       source_type: "url",
+      ...(onboarding && { onboarding_website_import: true }),
       source_id: null,
       title,
       content,

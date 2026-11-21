@@ -153,12 +153,18 @@ export async function createProduct(
   input: ProductInput,
   /** businesses.currency, for the knowledge text's price (from requireBusinessContext). */
   currency: string,
+  id?: string,
 ): Promise<Product> {
+  const existing = id ? await getProduct(businessId, id) : null;
+  if (existing) {
+    await syncGeneratedDocument(businessId, "product", existing.id, existing.name, buildKnowledgeContent(existing, currency));
+    return existing;
+  }
   const supabase = createServerSupabaseClient();
   const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input, currency));
   const { data, error } = await supabase
     .from("products")
-    .insert({ business_id: businessId, ...input, embedding })
+    .insert({ business_id: businessId, ...(id && { id }), ...input, embedding })
     .select()
     .single();
 
@@ -194,12 +200,16 @@ export async function updateProduct(
   const previous = await getProduct(businessId, id);
   if (!previous) return false;
   const embedding = await computeEmbeddingBestEffort(businessId, buildKnowledgeContent(input, currency));
-  const { data, error } = await supabase
+  const mutation = supabase
     .from("products")
     .update({ ...input, ...(embedding !== null ? { embedding } : {}) })
     .eq("business_id", businessId)
-    .eq("id", id)
-    .select("id");
+    .eq("id", id);
+  // Do not overwrite a concurrent image replacement using a stale old path.
+  const checked = previous.image_url === null
+    ? mutation.is("image_url", null)
+    : mutation.eq("image_url", previous.image_url);
+  const { data, error } = await checked.select("id");
 
   if (error) {
     throw new AppError(

@@ -81,11 +81,16 @@ export async function listPendingReviewFaqs(businessId: string): Promise<Faq[]> 
 }
 
 /** Creates an FAQ for a business. `businessId` must come from `requireBusinessContext()`. */
-export async function createFaq(businessId: string, input: FaqInput): Promise<Faq> {
+export async function createFaq(businessId: string, input: FaqInput, id?: string): Promise<Faq> {
+  const existing = id ? await getFaq(businessId, id) : null;
+  if (existing) {
+    await syncGeneratedDocument(businessId, "faq", existing.id, existing.question, buildKnowledgeContent(existing));
+    return existing;
+  }
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("faqs")
-    .insert({ business_id: businessId, ...input })
+    .insert({ business_id: businessId, ...(id && { id }), ...input })
     .select()
     .single();
 

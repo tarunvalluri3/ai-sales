@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { faqFieldsSchema } from "@/lib/schemas/faq";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -26,11 +27,6 @@ import { processIngestionQueue } from "@/lib/ingestion-queue";
 function triggerIngestionProcessing(): void {
   after(() => processIngestionQueue("dashboard"));
 }
-
-const faqFieldsSchema = z.object({
-  question: z.string().trim().min(1, "Enter a question.").max(300, "Question must be 300 characters or fewer."),
-  answer: z.string().trim().min(1, "Enter an answer.").max(2000, "Answer must be 2000 characters or fewer."),
-});
 
 const updateFaqSchema = faqFieldsSchema.extend({
   id: z.string().uuid(),

@@ -9,6 +9,8 @@ import { UrlImportForm } from "../../../dashboard/knowledge/_components/url-impo
 import { AddKnowledgeTabs } from "../../../dashboard/knowledge/_components/add-knowledge-tabs";
 import { KnowledgeList } from "../../../dashboard/knowledge/_components/knowledge-list";
 import { createKnowledgeDocumentAction, updateKnowledgeDocumentInPlaceAction } from "../../../dashboard/knowledge/actions";
+import type { WebsiteSuggestionState } from "@/lib/schemas/website-suggestions";
+import { WebsiteSuggestionReview } from "./website-suggestion-review";
 import { advanceOnboarding } from "../../actions";
 
 const MIN_SOURCES = 1;
@@ -19,7 +21,12 @@ function isSourceReady(document: KnowledgeDocument): boolean {
   return document.status === "published" && document.ingestion_status === "complete";
 }
 
-export function TrainKnowledgeStep({ documents, agentPublished }: { documents: KnowledgeDocument[]; agentPublished: boolean }) {
+export function TrainKnowledgeStep({ documents, agentPublished, website, imports }: {
+  documents: KnowledgeDocument[];
+  agentPublished: boolean;
+  website: string;
+  imports: WebsiteSuggestionState[];
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -28,16 +35,18 @@ export function TrainKnowledgeStep({ documents, agentPublished }: { documents: K
   const readyCount = documents.filter(isSourceReady).length;
   const valid = readyCount >= MIN_SOURCES;
   const stillSettling = documents.length > 0 && !valid;
+  const importProcessing = imports.some(({ document_id, generation_status }) => generation_status === "running" ||
+    documents.some((doc) => doc.id === document_id && (doc.ingestion_status === "pending" || doc.ingestion_status === "processing")));
 
   // While at least one source exists but none is both published and
   // fully ingested yet, poll so Continue enables itself the moment
   // embedding finishes (or the user publishes a draft from the list)
   // without a manual reload (2026-10-29 bugfix, STATE.md).
   useEffect(() => {
-    if (!stillSettling) return;
+    if (!stillSettling && !importProcessing) return;
     const timer = setInterval(() => router.refresh(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [stillSettling, router]);
+  }, [stillSettling, importProcessing, router]);
 
   function handleContinue() {
     setError(null);
@@ -55,8 +64,6 @@ export function TrainKnowledgeStep({ documents, agentPublished }: { documents: K
 
   return (
     <div className="flex flex-col gap-6">
-      <KnowledgeList documents={documents} agentPublished={agentPublished} stacked canEdit onEdit={(id) => setEditingId(id)} />
-
       {editingDocument ? (
         <div className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
           <div className="flex items-center justify-between">
@@ -83,13 +90,20 @@ export function TrainKnowledgeStep({ documents, agentPublished }: { documents: K
       ) : (
         <AddKnowledgeTabs
           sticky={false}
+          websiteFirst
           manualForm={
             <KnowledgeForm action={createKnowledgeDocumentAction} submitLabel="Add knowledge" pendingLabel="Adding…" />
           }
           fileForm={<FileUploadForm />}
-          urlForm={<UrlImportForm />}
+          urlForm={<UrlImportForm initialUrl={website} onboarding />}
         />
       )}
+
+      <KnowledgeList documents={documents} agentPublished={agentPublished} stacked canEdit onEdit={(id) => setEditingId(id)} />
+      {imports.map((review) => {
+        const document = documents.find((row) => row.id === review.document_id);
+        return document ? <WebsiteSuggestionReview key={document.id} document={document} review={review} /> : null;
+      })}
 
       {error ? (
         <p role="alert" className="text-sm text-ds-danger">

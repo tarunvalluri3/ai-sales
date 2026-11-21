@@ -254,6 +254,17 @@ export async function createUrlKnowledgeDocumentAction(
   _prevState: KnowledgeFormState,
   formData: FormData,
 ): Promise<KnowledgeFormState> {
+  return createUrlImport(formData, false);
+}
+
+export async function createOnboardingUrlImportAction(
+  _prevState: KnowledgeFormState,
+  formData: FormData,
+): Promise<KnowledgeFormState> {
+  return createUrlImport(formData, true);
+}
+
+async function createUrlImport(formData: FormData, onboarding: boolean): Promise<KnowledgeFormState> {
   const { businessId, orgRole } = await requireBusinessContext();
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
@@ -271,7 +282,7 @@ export async function createUrlKnowledgeDocumentAction(
   }
 
   try {
-    await createUrlKnowledgeDocument(businessId, parsed.data.url, parsed.data.title, parsed.data.refreshIntervalHours);
+    await createUrlKnowledgeDocument(businessId, parsed.data.url, parsed.data.title, parsed.data.refreshIntervalHours, onboarding);
   } catch (error) {
     return { error: logAndGetUserMessage(error) };
   }
@@ -344,6 +355,7 @@ async function publishOne(businessId: string, userId: string, id: string): Promi
   // "Extract now" is the deliberate manual escape hatch for re-running
   // extraction later.
   if (result.isFirstPublish) {
+    if (result.onboardingWebsiteImport) return true;
     const title = result.title;
     const content = result.content;
     const storagePath = result.storagePath;
@@ -512,6 +524,9 @@ export async function extractNowAction(
   const document = await getKnowledgeDocument(businessId, parsed.data.id);
   if (!document) {
     return { error: "This knowledge document no longer exists." };
+  }
+  if (document.onboarding_website_import) {
+    return { error: "Use the website review in onboarding to suggest items from this page." };
   }
   if (document.status !== "published") {
     return { error: "Publish this document before extracting catalog data from it." };

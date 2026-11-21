@@ -158,6 +158,7 @@ export type KnowledgeDocument = {
   id: string;
   business_id: string;
   source_type: KnowledgeSourceType;
+  onboarding_website_import?: boolean;
   source_id: string | null;
   title: string;
   content: string;

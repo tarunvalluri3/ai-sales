@@ -481,7 +481,7 @@ function KnowledgeRow({
             />
           ) : null}
           {document.source_type === "url" ? <RefreshUrlButton id={document.id} canEdit={canEdit} /> : null}
-          {isPublished ? <ExtractNowButton id={document.id} canEdit={canEdit} /> : null}
+          {isPublished && !document.onboarding_website_import ? <ExtractNowButton id={document.id} canEdit={canEdit} /> : null}
           <DeleteButton
             action={deleteKnowledgeDocumentAction}
             id={document.id}
