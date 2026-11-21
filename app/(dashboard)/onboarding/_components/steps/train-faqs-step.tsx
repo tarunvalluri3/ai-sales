@@ -1,7 +1,12 @@
 "use client";
 
+import { WizardActions, WizardContinue } from "../wizard-actions";
+import { Check } from "lucide-react";
+import { Card, CardHeader } from "../../../dashboard/_components/ui";
+import { useToast } from "../../../dashboard/_components/toast";
+
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import type { Faq, IngestionStatus } from "@/lib/supabase/types";
 import { FAQ_QUESTION_MIN_LENGTH, FAQ_ANSWER_MIN_LENGTH } from "@/lib/onboarding-readiness";
 import { FaqForm } from "../../../dashboard/faqs/faq-form";
@@ -101,6 +106,14 @@ export function TrainFaqsStep({
   }
 
   const editingFaq = editingId ? (faqs.find((f) => f.id === editingId) ?? null) : null;
+  const { toast } = useToast();
+  const confirmAdded = useCallback(() => {
+    toast({ variant: "success", title: "FAQ added" });
+  }, [toast]);
+  const confirmEdited = useCallback(() => {
+    setEditingId(null);
+    toast({ variant: "success", title: "FAQ saved" });
+  }, [toast]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -109,6 +122,7 @@ export function TrainFaqsStep({
       </p>
 
       {faqs.length > 0 ? (
+        <div className="onboarding-table onboarding-faqs">
         <FaqsList
           faqs={faqs}
           canEdit
@@ -116,13 +130,12 @@ export function TrainFaqsStep({
           onEdit={(id) => setEditingId(id)}
           readinessByFaqId={statusByFaqId}
         />
+        </div>
       ) : (
-        <p className="border border-dashed border-ds-border bg-ds-surface px-4 py-8 text-center text-sm text-ds-text-muted">
-          No FAQs yet.
-        </p>
+        <p className="text-sm text-ds-text-secondary">No FAQs yet. Choose a common question below or write your own.</p>
       )}
 
-      <section className="flex w-full flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+      <Card className="onboarding-save-form flex flex-col gap-4">
         {editingFaq ? (
           <>
             <div className="flex items-center justify-between">
@@ -143,21 +156,24 @@ export function TrainFaqsStep({
               initialAnswer={editingFaq.answer}
               submitLabel="Save changes"
               pendingLabel="Saving…"
-              onSuccess={() => setEditingId(null)}
+              onSuccess={confirmEdited}
             />
           </>
         ) : (
           <>
-            <h2 className="text-sm font-medium text-ds-text-primary">Add an FAQ</h2>
+            <CardHeader title="Add an FAQ" />
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_QUESTIONS.map((question) => (
                 <button
                   key={question}
                   type="button"
                   onClick={() => setSuggestedQuestion({ text: question })}
-                  className="border border-ds-border px-3 py-1.5 text-xs font-medium text-ds-text-secondary transition-colors hover:border-ds-border-strong hover:text-ds-text-primary"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-ds-border-strong px-3 py-1.5 text-left text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-soft"
                 >
-                  {faqs.some((faq) => faq.question.trim().toLowerCase() === question.toLowerCase()) ? <span aria-label="Added">✓ </span> : null}{question}
+                  {faqs.some((faq) => faq.question.trim().toLowerCase() === question.toLowerCase())
+                    ? <><Check className="size-4 shrink-0 text-ds-success" aria-hidden /><span aria-label="Added" className="sr-only">Added: </span></>
+                    : null}
+                  {question}
                 </button>
               ))}
             </div>
@@ -166,10 +182,11 @@ export function TrainFaqsStep({
               suggestedQuestion={suggestedQuestion}
               submitLabel="Add FAQ"
               pendingLabel="Adding…"
+              onSuccess={confirmAdded}
             />
           </>
         )}
-      </section>
+      </Card>
 
       {error ? (
         <p role="alert" className="text-sm text-ds-danger">
@@ -177,34 +194,14 @@ export function TrainFaqsStep({
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary"
-        >
-          Back
-        </button>
-        <div className="flex items-center gap-3">
-          {!valid ? (
-            <span className="text-xs text-ds-text-muted">
-              {tooShortCount > 0
-                ? `Lengthen ${tooShortCount === 1 ? "the highlighted answer" : `${tooShortCount} highlighted answers`} to at least ${FAQ_ANSWER_MIN_LENGTH} characters`
-                : stillProcessing
-                  ? "Finishing processing — this usually takes a few seconds"
-                  : `Add ${MIN_FAQS - faqs.length} more ${MIN_FAQS - faqs.length === 1 ? "FAQ" : "FAQs"} to continue`}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            {isPending ? "Saving…" : "Continue"}
-          </button>
-        </div>
-      </div>
+      <WizardActions onBack={handleBack}>
+        <WizardContinue onClick={handleContinue} pending={isPending} disabled={!valid}
+          reason={valid ? undefined : tooShortCount > 0
+            ? "Lengthen the highlighted answers to at least " + FAQ_ANSWER_MIN_LENGTH + " characters"
+            : stillProcessing
+              ? "Finishing processing. This usually takes a few seconds."
+              : "Add " + (MIN_FAQS - faqs.length) + " more to continue"} />
+      </WizardActions>
     </div>
   );
 }

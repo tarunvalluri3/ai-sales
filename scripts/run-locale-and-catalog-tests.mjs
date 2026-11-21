@@ -232,9 +232,12 @@ test("wiring: the hours form copy says one consistent thing about an unsaved sch
 // --------------------------------------------------------- sticky footer
 
 test("wiring: Continue cannot be covered on the knowledge step -- footer above content, card not sticky in the wizard", () => {
-  const shell = read("app/(dashboard)/onboarding/_components/wizard-shell.tsx");
-  assert.match(shell, /className="sticky bottom-0 z-20 border-t/);
+  const footer = read("app/(dashboard)/onboarding/_components/wizard-actions.tsx");
+  assert.match(footer, /className="onboarding-actions"/);
+  const css = read("app/(dashboard)/onboarding/onboarding.css");
+  assert.match(css, /\.onboarding-actions\s*\{[^}]*position:\s*sticky;[^}]*inset-block-end:[^;]*;[^}]*z-index:\s*20;/);
   const step = read("app/(dashboard)/onboarding/_components/steps/train-knowledge-step.tsx");
+  assert.match(step, /<WizardActions[\s\S]*?<WizardContinue onClick=\{handleContinue\}/);
   assert.match(step, /<AddKnowledgeTabs\n\s+sticky=\{false\}/);
   const tabs = read("app/(dashboard)/dashboard/knowledge/_components/add-knowledge-tabs.tsx");
   assert.match(tabs, /sticky \? "xl:sticky xl:top-4" : ""/);

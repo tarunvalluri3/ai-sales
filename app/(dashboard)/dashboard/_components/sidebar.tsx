@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, ChevronDown, PanelLeftClose, PanelLeftOpen, Settings } from "lucide-react";
-import { WavesLogo, WavesMark } from "../../_components/waves-logo";
+import { ThemedWavesLogo } from "../../_components/waves-logo";
 import { NAV_GROUPS, isNavItemActive, formatAttentionBadge, type NavGroup } from "./nav-items";
 import { useAttentionCount } from "./attention-provider";
 
@@ -173,7 +173,7 @@ export function SidebarBrand({
     return (
       <div className="flex flex-col items-center gap-3">
         <Link href="/dashboard" title="Overview" className={`flex size-9 items-center justify-center rounded-lg ${FOCUS}`}>
-          <WavesMark scale="nav" tone="light" title="Waves AI Pilot" />
+          <ThemedWavesLogo compact />
         </Link>
         {toggle}
         <div className="flex w-full justify-center border-b border-ds-border pb-3" title={businessName}>
@@ -188,7 +188,7 @@ export function SidebarBrand({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
         <Link href="/dashboard" className={`flex min-w-0 items-center rounded-lg px-2 ${FOCUS}`}>
-          <WavesLogo tone="light" />
+          <ThemedWavesLogo />
         </Link>
         {toggle}
       </div>

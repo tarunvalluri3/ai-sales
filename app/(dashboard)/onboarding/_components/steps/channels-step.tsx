@@ -1,5 +1,9 @@
 "use client";
 
+import { WizardActions, WizardContinue } from "../wizard-actions";
+import { Card, CardHeader, btnGhost, btnOutline, inputClass } from "../../../dashboard/_components/ui";
+import { LoaderCircle } from "lucide-react";
+
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
 import type { WidgetKey, WhatsappConnection, InstagramConnection } from "@/lib/supabase/types";
@@ -69,30 +73,31 @@ export function ChannelsStep({
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-medium text-ds-text-primary">Website widget</h2>
+      <Card className="flex flex-col gap-4">
+        <CardHeader title="Website widget" description="Give prospects a place to start a conversation on your site." />
         <form action={websiteAction} noValidate className="flex flex-col gap-2">
           <label htmlFor="onboarding-website" className="text-sm font-medium text-ds-text-primary">Your website address</label>
           <input id="onboarding-website" name="website" type="url" value={address}
             onChange={(event) => setAddress(event.target.value)} placeholder="https://example.com"
             aria-invalid={Boolean(websiteState.error)} aria-describedby={websiteState.error ? "onboarding-website-error" : undefined}
-            className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary" />
+            className={inputClass} />
           {websiteState.error ? <p id="onboarding-website-error" role="alert" className="text-xs text-ds-danger">{websiteState.error}</p> : null}
           {websiteState.saved ? <p role="status" className="text-xs text-ds-success">Website widget saved.</p> : null}
           <div className="flex flex-wrap items-center gap-3">
             <button type="submit" name="websiteIntent" value="save" disabled={websitePending}
-              className="bg-ds-primary px-4 py-2 text-sm text-ds-primary-on disabled:opacity-60">
+              className={btnOutline + " min-h-11"}>
+              {websitePending ? <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden /> : null}
               {websitePending ? "Saving…" : "Save website address"}
             </button>
             {!hasActiveKey ? <button type="submit" name="websiteIntent" value="skip" disabled={websitePending}
-              className="text-sm text-ds-text-secondary underline">I&rsquo;ll add my website later</button> : null}
+              className={btnGhost + " min-h-11"}>I&rsquo;ll add my website later</button> : null}
           </div>
         </form>
         {primaryKey ? <WidgetInstallGuide widgetKeys={[primaryKey]} appOrigin={appOrigin} isPublished={isPublished} onboarding /> : null}
-      </section>
+      </Card>
 
-      <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-medium text-ds-text-primary">WhatsApp Business</h2>
+      <Card className="flex flex-col gap-4">
+        <CardHeader title="WhatsApp Business" />
         {whatsapp ? (
           <WhatsappConnectionStatus connection={whatsapp} canEdit />
         ) : !whatsappEntitled ? (
@@ -106,10 +111,10 @@ export function ChannelsStep({
             </details>
           </>
         )}
-      </section>
+      </Card>
 
-      <section className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-medium text-ds-text-primary">Instagram</h2>
+      <Card className="flex flex-col gap-4">
+        <CardHeader title="Instagram" />
         <InstagramOAuthResult username={instagram?.ig_username ?? null} onboarding />
         {instagramSelection && instagramEntitled ? (
           instagramSelection.accounts ? <ChooseInstagramAccount selectionId={instagramSelection.selectionId} accounts={instagramSelection.accounts} onboarding />
@@ -122,7 +127,7 @@ export function ChannelsStep({
         ) : instagramSelection?.accounts ? null : (
           <ConnectInstagramButton onboarding />
         )}
-      </section>
+      </Card>
 
       {error ? (
         <p role="alert" className="text-sm text-ds-danger">
@@ -130,26 +135,10 @@ export function ChannelsStep({
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => router.push("/onboarding?step=persona")}
-          className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary"
-        >
-          Back
-        </button>
-        <div className="flex items-center gap-3">
-          {!valid ? <span className="text-xs text-ds-text-muted">Set up your website widget to continue</span> : null}
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            {isPending ? "Saving…" : "Continue"}
-          </button>
-        </div>
-      </div>
+      <WizardActions onBack={() => router.push("/onboarding?step=persona")}>
+        <WizardContinue onClick={handleContinue} pending={isPending} disabled={!valid}
+          reason={valid ? undefined : "Set up your website widget to continue"} />
+      </WizardActions>
     </div>
   );
 }

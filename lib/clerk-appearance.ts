@@ -114,3 +114,67 @@ export const clerkDashboardAppearance = {
     organizationSwitcherTriggerIcon: "!text-[var(--ds-text-secondary)]",
   },
 };
+
+const waveElements = {
+  rootBox: "wave-clerk-root",
+  cardBox: "wave-clerk-card-box",
+  card: "wave-clerk-card",
+  headerTitle: "wave-clerk-ink",
+  headerSubtitle: "wave-clerk-muted",
+  formFieldLabel: "wave-clerk-ink",
+  formFieldInput: "wave-clerk-input",
+  otpCodeFieldInput: "wave-clerk-input",
+  formButtonPrimary: "wave-clerk-primary",
+  socialButtonsBlockButton: "wave-clerk-secondary",
+  socialButtonsBlockButtonText: "wave-clerk-ink",
+  dividerText: "wave-clerk-muted",
+  footer: "wave-clerk-footer",
+  footerActionText: "wave-clerk-muted",
+  footerActionLink: "wave-clerk-link",
+  formFieldAction: "wave-clerk-link",
+  userButtonPopoverCard: "wave-clerk-card",
+  userButtonAvatarBox: "!size-9",
+};
+
+const waveVariables = {
+  borderRadius: "0.75rem",
+  fontFamily: "var(--font-hanken), system-ui, sans-serif",
+};
+
+// Clerk derives shades from concrete colors. These match the two .dash-shell palettes.
+export const waveClerkAppearance = {
+  dark: {
+    elements: waveElements,
+    variables: {
+      ...waveVariables,
+      colorPrimary: "#b2ff38",
+      colorPrimaryForeground: "#11160a",
+      colorBackground: "#161913",
+      colorInput: "#1b1f17",
+      colorInputForeground: "#eef1ea",
+      colorForeground: "#eef1ea",
+      colorMutedForeground: "#aab1a2",
+      colorNeutral: "#eef1ea",
+      colorDanger: "#f2806d",
+      colorSuccess: "#4fcf8c",
+      colorWarning: "#f2b84b",
+    },
+  },
+  light: {
+    elements: waveElements,
+    variables: {
+      ...waveVariables,
+      colorPrimary: "#203509",
+      colorPrimaryForeground: "#ffffff",
+      colorBackground: "#ffffff",
+      colorInput: "#ffffff",
+      colorInputForeground: "#151713",
+      colorForeground: "#151713",
+      colorMutedForeground: "#5c6158",
+      colorNeutral: "#151713",
+      colorDanger: "#b23a26",
+      colorSuccess: "#1f7a4c",
+      colorWarning: "#8a5a00",
+    },
+  },
+};

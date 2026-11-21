@@ -1,6 +1,7 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
+import { WizardActions, WizardContinue } from "../wizard-actions";
+
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { BillingPanel } from "../../../dashboard/billing/billing-panel";
@@ -142,6 +143,7 @@ export function PlanStep({
       onConfirmingChange={setConfirming}
       metaChannelNames={metaChannelNames}
       connectedChannels={connectedChannels}
+      compactPlans
     />
   );
 
@@ -150,7 +152,7 @@ export function PlanStep({
       {onTrial ? (
         <section
           aria-labelledby="trial-heading"
-          className="flex flex-col gap-3 border border-ds-text-primary bg-ds-surface-elevated p-5"
+          className="dx-card dx-card-pad flex flex-col gap-3"
         >
           <h2 id="trial-heading" className="text-base font-medium text-ds-text-primary">
             Your free trial is on — no card needed
@@ -180,12 +182,12 @@ export function PlanStep({
       )}
 
       {onTrial ? (
-        <details className="group border border-ds-border bg-ds-surface">
-          <summary className="cursor-pointer list-none px-5 py-3 text-sm font-medium text-ds-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary">
+        <details className="group min-w-0">
+          <summary className="dx-card cursor-pointer px-4 py-3 text-sm font-medium text-ds-text-primary">
             <span className="group-open:hidden">Choose a paid plan now (optional)</span>
             <span className="hidden group-open:inline">Hide plans</span>
           </summary>
-          <div className="flex flex-col gap-4 border-t border-ds-border p-5">
+          <div className="flex min-w-0 flex-col gap-4 pt-4">
             {gstNote}
             {billingPanel}
           </div>
@@ -203,35 +205,12 @@ export function PlanStep({
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => router.push("/onboarding?step=channels")}
-          className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary"
-        >
-          Back
-        </button>
-        <div className="flex items-center gap-3">
-          {!valid ? (
-            <span className="text-xs text-ds-text-muted">
-              {configured ? "Choose a plan to continue" : "Payments are not set up on this deployment yet"}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={isPending || confirming || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            {isPending ? (
-              <span className="inline-flex items-center gap-2">
-                <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-                {onTrial ? "Setting up your trial…" : "Saving…"}
-              </span>
-            ) : onTrial ? "Continue with the free trial" : "Continue"}
-          </button>
-        </div>
-      </div>
+      <WizardActions onBack={() => router.push("/onboarding?step=channels")}>
+        <WizardContinue onClick={handleContinue} pending={isPending || confirming} disabled={!valid}
+          label={onTrial ? "Continue with the free trial" : "Continue"}
+          pendingLabel={onTrial ? "Setting up your trial…" : "Saving…"}
+          reason={valid ? undefined : configured ? "Choose a plan to continue" : "Payments are unavailable on this deployment"} />
+      </WizardActions>
     </div>
   );
 }

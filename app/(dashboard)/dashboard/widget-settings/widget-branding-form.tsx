@@ -252,9 +252,8 @@ export function WidgetBrandingForm({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className={helpClass}>
                   Your schedule is set in{" "}
-                  <Link href="/dashboard/business-hours" className={`${linkAccent} text-xs`}>
+                  <Link href="/dashboard/business-hours" className="font-medium text-ds-primary underline underline-offset-2">
                     Business Hours
-                    <ArrowUpRight strokeWidth={1.75} className="size-3.5" aria-hidden="true" />
                   </Link>
                   . Without business hours, the chat is always treated as open.
                 </p>

@@ -1,7 +1,9 @@
 "use client";
 
+import { WizardActions, WizardContinue } from "../wizard-actions";
+
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import type { KnowledgeDocument } from "@/lib/supabase/types";
 import { KnowledgeForm } from "../../../dashboard/knowledge/knowledge-form";
 import { FileUploadForm } from "../../../dashboard/knowledge/_components/file-upload-form";
@@ -12,6 +14,8 @@ import { createKnowledgeDocumentAction, updateKnowledgeDocumentInPlaceAction } f
 import type { WebsiteSuggestionState } from "@/lib/schemas/website-suggestions";
 import { WebsiteSuggestionReview } from "./website-suggestion-review";
 import { advanceOnboarding } from "../../actions";
+import { Card } from "../../../dashboard/_components/ui";
+import { useToast } from "../../../dashboard/_components/toast";
 
 const MIN_SOURCES = 1;
 const POLL_INTERVAL_MS = 3000;
@@ -61,11 +65,19 @@ export function TrainKnowledgeStep({ documents, agentPublished, website, imports
   }
 
   const editingDocument = editingId ? (documents.find((d) => d.id === editingId) ?? null) : null;
+  const { toast } = useToast();
+  const confirmAdded = useCallback(() => {
+    toast({ variant: "success", title: "Knowledge added" });
+  }, [toast]);
+  const confirmEdited = useCallback(() => {
+    setEditingId(null);
+    toast({ variant: "success", title: "Knowledge saved" });
+  }, [toast]);
 
   return (
     <div className="flex flex-col gap-6">
       {editingDocument ? (
-        <div className="flex flex-col gap-4 border border-ds-border bg-ds-surface p-5">
+        <Card className="onboarding-save-form flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-ds-text-primary">Edit knowledge</h2>
             <button
@@ -84,19 +96,21 @@ export function TrainKnowledgeStep({ documents, agentPublished, website, imports
             initialContent={editingDocument.content}
             submitLabel="Save changes"
             pendingLabel="Saving…"
-            onSuccess={() => setEditingId(null)}
+            onSuccess={confirmEdited}
           />
-        </div>
+        </Card>
       ) : (
+        <div className="onboarding-save-form">
         <AddKnowledgeTabs
           sticky={false}
           websiteFirst
           manualForm={
-            <KnowledgeForm action={createKnowledgeDocumentAction} submitLabel="Add knowledge" pendingLabel="Adding…" />
+            <KnowledgeForm action={createKnowledgeDocumentAction} submitLabel="Add knowledge" pendingLabel="Adding…" onSuccess={confirmAdded} />
           }
           fileForm={<FileUploadForm />}
           urlForm={<UrlImportForm initialUrl={website} onboarding />}
         />
+        </div>
       )}
 
       <KnowledgeList documents={documents} agentPublished={agentPublished} stacked canEdit onEdit={(id) => setEditingId(id)} />
@@ -111,26 +125,12 @@ export function TrainKnowledgeStep({ documents, agentPublished, website, imports
         </p>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3">
-        <span />
-        <div className="flex items-center gap-3">
-          {!valid ? (
-            <span className="text-xs text-ds-text-muted">
-              {stillSettling
-                ? "Approve any drafts and wait for processing to finish — this usually takes a few seconds"
-                : "Add at least one knowledge source to continue"}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={isPending || !valid}
-            className="ds-btn-label bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
-          >
-            {isPending ? "Saving…" : "Continue"}
-          </button>
-        </div>
-      </div>
+      <WizardActions onBack={() => router.push("/onboarding")}>
+        <WizardContinue onClick={handleContinue} pending={isPending} disabled={!valid}
+          reason={valid ? undefined : stillSettling
+            ? "Approve any drafts and wait for processing to finish"
+            : "Add a knowledge source to continue"} />
+      </WizardActions>
     </div>
   );
 }

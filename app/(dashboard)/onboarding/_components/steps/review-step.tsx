@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ComponentProps } from "react";
+import { ArrowLeft, CircleCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ReadinessCounts, type ReadinessCountsData } from "../readiness-counts";
 import { HoursSummary } from "../hours-summary";
@@ -12,6 +13,7 @@ import { SandboxChatPanel } from "../../../dashboard/_components/sandbox-chat/sa
 import { CopyKeyButton } from "../../../dashboard/widget-settings/copy-key-button";
 import { buildWidgetSnippet } from "../../../dashboard/widget-settings/build-widget-snippet";
 import type { ReadinessReport } from "@/lib/onboarding-readiness";
+import { Card, CardHeader, btnGhost, btnPrimary, linkAccent } from "../../../dashboard/_components/ui";
 
 type Channel = { label: string; href: string; done: boolean; summary: string };
 
@@ -68,8 +70,9 @@ export function ReviewStep({
       <div className="flex flex-col gap-6">
         <div
           role="status"
-          className="flex flex-col gap-2 border border-ds-success/40 bg-ds-success-bg px-5 py-6 text-center"
+          className="flex flex-col items-center gap-2 rounded-3xl bg-ds-success-bg px-5 py-8 text-center"
         >
+          <CircleCheck className="onboarding-published-mark mb-1 size-8 text-ds-success" aria-hidden />
           <p className="text-lg font-medium text-ds-text-primary">Your agent is live</p>
           <p className="text-sm text-ds-text-secondary">
             {businessName} is answering prospects on {channelSummary}. Taking you to your dashboard…
@@ -77,16 +80,16 @@ export function ReviewStep({
         </div>
 
         {snippet ? (
-          <section className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-5">
+          <Card className="flex flex-col gap-2">
             <h2 className="text-sm font-medium text-ds-text-primary">Your widget embed code</h2>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 overflow-x-auto bg-ds-surface-elevated px-3 py-2 text-xs text-ds-text-secondary">
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="min-w-0 flex-1 basis-40 rounded-lg bg-ds-surface-soft px-3 py-2 text-xs text-ds-text-secondary">
                 {snippet}
               </code>
               <CopyKeyButton value={snippet} />
             </div>
             <p className="text-xs text-ds-text-muted">Paste this before your site&rsquo;s closing &lt;/body&gt; tag.</p>
-          </section>
+          </Card>
         ) : null}
 
         <ul className="flex flex-col gap-2 text-sm text-ds-text-secondary">
@@ -98,7 +101,7 @@ export function ReviewStep({
         <Link
           href="/dashboard?welcome=1"
           replace
-          className="ds-btn-label self-start bg-ds-primary px-5 py-2.5 text-sm font-medium text-ds-primary-on transition-colors hover:bg-ds-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ds-text-primary"
+          className={btnPrimary + " min-h-11 self-start"}
         >
           Open dashboard
         </Link>
@@ -108,8 +111,8 @@ export function ReviewStep({
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex flex-col gap-2 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-medium text-ds-text-primary">Setup summary</h2>
+      <Card className="flex flex-col gap-2">
+        <CardHeader title="Setup summary" />
         <ul className="flex flex-col divide-y divide-ds-border">
           {checklistRows.map((row) => (
             <li key={row.label} className="flex items-center justify-between gap-3 py-2.5 text-sm">
@@ -117,13 +120,13 @@ export function ReviewStep({
                 <span className={row.done ? "text-ds-text-primary" : "font-medium text-ds-warning"}>{row.label}</span>
                 <span className="text-xs text-ds-text-muted">{row.summary}</span>
               </div>
-              <Link href={row.href} className="text-xs font-medium text-ds-text-primary hover:text-ds-accent">
+              <Link href={row.href} aria-label={"Edit " + row.label} className={linkAccent + " min-h-11 shrink-0"}>
                 Edit
               </Link>
             </li>
           ))}
         </ul>
-      </section>
+      </Card>
 
       <ReadinessCounts counts={counts} />
       <ReadinessChecklist report={report} hideActionHints hoursEditorHref="#opening-hours" />
@@ -131,13 +134,7 @@ export function ReviewStep({
 
       <RecommendedDetails {...recommendedDetails} />
 
-      <section className="flex flex-col gap-3 border border-ds-border bg-ds-surface p-5">
-        <h2 className="text-sm font-medium text-ds-text-primary">Test your agent</h2>
-        <p className="text-xs text-ds-text-secondary">
-          Ask it something a real prospect might ask, based on your own products and FAQs.
-        </p>
-        <SandboxChatPanel />
-      </section>
+      <SandboxChatPanel />
 
       <PublishButton
         isPublished={published}
@@ -147,17 +144,13 @@ export function ReviewStep({
         readinessBlocked={report.gateApplies && !report.canPublish}
         blockingCount={report.blockingItems.length}
         redirectOnSuccess="/dashboard?welcome=1"
+        footerClassName="onboarding-actions"
+        backAction={(
+          <button type="button" onClick={() => router.push("/onboarding?step=plan")} className={btnGhost}>
+            <ArrowLeft className="size-4" aria-hidden /> Back
+          </button>
+        )}
       />
-
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => router.push("/onboarding?step=plan")}
-          className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-text-primary"
-        >
-          Back
-        </button>
-      </div>
     </div>
   );
 }

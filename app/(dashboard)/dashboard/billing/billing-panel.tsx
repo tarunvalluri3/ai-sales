@@ -124,6 +124,7 @@ export function BillingPanel({
   metaChannelNames,
   connectedChannels,
   aside,
+  compactPlans,
 }: {
   configured: boolean;
   entitlement: EntitlementSummary;
@@ -140,6 +141,7 @@ export function BillingPanel({
   connectedChannels: ConnectedMetaChannels;
   /** Optional card rendered beside the current-plan card (the Billing page's "Invoice details" summary). */
   aside?: ReactNode;
+  compactPlans?: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -393,7 +395,7 @@ export function BillingPanel({
           </div>
         </fieldset>
 
-        <ul className="grid gap-3 md:grid-cols-3">
+        <ul className={compactPlans ? "grid gap-3 @min-[42rem]:grid-cols-3" : "grid gap-3 md:grid-cols-3"}>
           {plans.map((plan) => {
             const selected = selectedPlan === plan.key;
             const current = entitlement.planKey === plan.key;

@@ -1,92 +1,75 @@
 "use client";
 
+import { Ellipsis, MessageCircle, Send } from "lucide-react";
 import { DEFAULT_WIDGET_PRIMARY, readableOnColor } from "@/lib/widget-colors";
-import { ReadinessCounts } from "./readiness-counts";
-import { MessageCircle } from "lucide-react";
-import { Badge } from "../../dashboard/_components/badge";
+import { Card, Pill } from "../../dashboard/_components/ui";
 import { useOnboardingPreview } from "./preview-context";
 
-/**
- * The right-hand "live agent preview" (collapsible on mobile via
- * `WizardShell`). A mock of the chat widget, not the real widget embed --
- * it never calls the AI, so it stays instant while the business is still
- * mid-setup and may have nothing retrievable yet.
- */
-export function OnboardingPreviewPanel() {
+/** An instant sample of the draft widget, with no chat or model request. */
+export function OnboardingPreviewPanel({ showTitle = true }: { showTitle?: boolean }) {
   const { preview } = useOnboardingPreview();
   const accent = preview.accent ?? DEFAULT_WIDGET_PRIMARY;
-  const percent = Math.round(((preview.requiredDone + preview.recommendedDone) / preview.readinessTotal) * 100);
+  const ink = readableOnColor(accent);
   const greeting =
     preview.greeting?.trim() ||
-    `Hi! Welcome to ${preview.businessName || "your business"}. How can I help today?`;
+    "Hi! Welcome to " + (preview.businessName || "your business") + ". How can I help today?";
+  const name = preview.agentName || preview.businessName || "Your AI sales employee";
+  const product = preview.firstProductName;
 
   return (
-    <div className="flex h-full flex-col gap-5">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium text-ds-text-primary">Readiness</p>
-          <ReadinessCounts counts={preview} />
-        </div>
-        <div
-          role="progressbar"
-          aria-valuenow={percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Setup essentials completed"
-          className="h-2 w-full overflow-hidden bg-ds-surface-raised"
-        >
-          <div className="h-full bg-ds-primary transition-all" style={{ width: `${percent}%` }} />
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col overflow-hidden border border-ds-border bg-ds-surface">
-        <div className="flex items-center justify-between gap-2 border-b border-ds-border bg-ds-surface-elevated px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-full" style={{ backgroundColor: accent, color: readableOnColor(accent) }}>
+    <figure className="mt-5 min-w-0 [overflow-wrap:anywhere]">
+      <figcaption className="mb-3 flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-ds-text-primary">
+          {showTitle ? "Live preview" : "Website widget"}
+        </span>
+        <Pill tone={preview.published ? "green" : "gray"}>{preview.published ? "Live" : "Draft"}</Pill>
+      </figcaption>
+      <Card as="div" padded={false} className="min-w-0 overflow-hidden">
+        <div className="flex items-center justify-between gap-2 border-b border-ds-border px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="relative grid size-8 shrink-0 place-items-center rounded-full" style={{ backgroundColor: accent, color: ink }}>
               {preview.agentAvatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- locally selected blob or tenant Storage URL.
-                <img src={preview.agentAvatarUrl} alt="" className="size-7 rounded-full object-cover" />
-              ) : <MessageCircle aria-hidden className="size-3.5" />}
+                <img src={preview.agentAvatarUrl} alt="" className="size-full rounded-full object-cover" />
+              ) : <MessageCircle aria-hidden className="size-4" />}
+              <span className="absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full border-2 border-ds-surface" style={{ backgroundColor: accent }} />
             </span>
-            <span className="text-sm font-medium text-ds-text-primary">
-              {preview.agentName || preview.businessName || "Your AI sales employee"}
-            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium leading-tight text-ds-text-primary">{name}</p>
+              <p className="text-xs text-ds-text-secondary">AI sales agent</p>
+            </div>
           </div>
-          <Badge tone={preview.published ? "success" : "muted"} size="sm">
-            {preview.published ? "Live" : "Draft"}
-          </Badge>
+          <Ellipsis className="size-4 shrink-0 text-ds-text-secondary" aria-hidden />
         </div>
 
-        <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
-          <div className="max-w-[85%] bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
-            {greeting}
-          </div>
-
+        <div className="flex max-h-72 min-h-36 flex-col gap-3 overflow-y-auto overscroll-contain bg-ds-bg p-4 text-sm text-ds-text-primary">
+          <p className="mr-auto max-w-[85%] rounded-2xl rounded-bl-sm bg-ds-surface-soft px-3 py-2">{greeting}</p>
           {preview.firstFaqQuestion ? (
             <>
-              <div className="ml-auto max-w-[85%] bg-ds-surface-raised px-3 py-2 text-sm text-ds-text-primary">
+              <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm px-3 py-2" style={{ backgroundColor: accent, color: ink }}>
                 {preview.firstFaqQuestion}
-              </div>
-              <div className="max-w-[85%] bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
-                {preview.firstFaqAnswer}
-              </div>
+              </p>
+              <p className="mr-auto max-w-[85%] rounded-2xl rounded-bl-sm bg-ds-surface-soft px-3 py-2">{preview.firstFaqAnswer}</p>
             </>
-          ) : preview.firstProductName ? (
-            <>
-              <div className="ml-auto max-w-[85%] bg-ds-surface-raised px-3 py-2 text-sm text-ds-text-primary">
-                Do you have {preview.firstProductName}?
-              </div>
-              <div className="max-w-[85%] bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-primary">
-                Yes, we do! Want me to tell you more about {preview.firstProductName}?
-              </div>
-            </>
-          ) : (
-            <p className="border border-dashed border-ds-border px-3 py-6 text-center text-xs text-ds-text-muted">
-              Add a product, service or FAQ and a sample conversation will appear here.
+          ) : product ? (
+            <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm px-3 py-2" style={{ backgroundColor: accent, color: ink }}>
+              Tell me about {product}.
             </p>
+          ) : (
+            <p className="text-xs text-ds-text-secondary">Add a product, service or FAQ to see it here.</p>
           )}
         </div>
-      </div>
-    </div>
+
+        <div className="border-t border-ds-border px-3 py-3">
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-ds-border-strong py-1 pr-1 pl-3" aria-hidden>
+            <span className="text-sm text-ds-text-secondary">Write a message…</span>
+            <span className="grid size-8 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: accent, color: ink }}>
+              <Send className="size-4" />
+            </span>
+          </div>
+        </div>
+      </Card>
+      <p className="mt-2 text-xs text-ds-text-secondary">Sample conversation. Try a live test in the final step.</p>
+    </figure>
   );
 }

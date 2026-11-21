@@ -118,10 +118,8 @@ export default async function OnboardingPage({
             WizardStageKey,
             string
           >}
-          eyebrow="Step 1 of 6 · Your business"
-          heading="Let's set up your AI sales employee"
-          description="Tell us who you are — this becomes your agent's identity."
-          footer={null}
+          heading="Set up your business"
+          description="Give your agent the details it needs to represent your business."
         >
           <BusinessStep business={null} readinessItems={startingReadiness.items} initialName={organization.name} initialEmail={user?.primaryEmailAddress?.emailAddress ?? ""} />
         </WizardShell>
@@ -187,12 +185,11 @@ export default async function OnboardingPage({
   const activeStage = stageForStep(activeStep);
   const stageStatus: Record<WizardStageKey, StageStatus> = Object.fromEntries(
     WIZARD_STAGES.map((s) => {
-      if (s.key === activeStage) return [s.key, "current"];
       const stepsForStage = ONBOARDING_STEP_FOR_STAGE[s.key];
       const done = stepsForStage.every((step) =>
         progress.completion[step] && stepIndexAllowed(step, business.onboarding_step),
       );
-      return [s.key, done ? "done" : "upcoming"];
+      return [s.key, done ? "done" : s.key === activeStage ? "current" : "upcoming"];
     }),
   ) as Record<WizardStageKey, StageStatus>;
   const stageHref: Record<WizardStageKey, string> = {
@@ -204,19 +201,16 @@ export default async function OnboardingPage({
     review: ROUTE_FOR_STEP.review,
   };
 
-  const { eyebrow, heading, description, content, footer } = await (async () => {
+  const { heading, description, content } = await (async () => {
     switch (activeStep) {
       case "business":
         return {
-          eyebrow: "Step 1 of 6 · Your business",
-          heading: "Let's set up your AI sales employee",
-          description: "This becomes your agent's identity.",
+          heading: "Set up your business",
+          description: "Give your agent the details it needs to represent your business.",
           content: <BusinessStep business={business} readinessItems={readiness.items} hours={await listBusinessHours(businessId)} />,
-          footer: null,
         };
       case "knowledge":
         return {
-          eyebrow: "Step 2 of 6 · Train your agent · 1/3",
           heading: "Add what your agent should know",
           description: "Import your website, upload documents, or write it yourself.",
           content: <TrainKnowledgeStep documents={knowledgeDocuments} agentPublished={isAgentPublished(business)}
@@ -224,37 +218,29 @@ export default async function OnboardingPage({
               logEvent("onboarding_website_reviews_unavailable", businessId, {}, "error");
               return [];
             })} />,
-          footer: null,
         };
       case "products":
         return {
-          eyebrow: "Step 2 of 6 · Train your agent · 2/3",
           heading: "What do you sell?",
           description: "Add at least one product or service your agent can talk about.",
           content: <TrainProductsStep products={products} services={services} industry={business.business_type} currency={business.currency} />,
-          footer: null,
         };
       case "faqs":
         return {
-          eyebrow: "Step 2 of 6 · Train your agent · 3/3",
           heading: "Common questions, answered",
           description: "Add at least 3 FAQs so your agent can answer confidently.",
           content: <TrainFaqsStep faqs={faqs} docStatusByFaqId={faqDocStatuses} />,
-          footer: null,
         };
       case "persona":
         return {
-          eyebrow: "Step 3 of 6 · Personality",
           heading: "How should your agent sound?",
           description: "Pick a tone and write the greeting prospects see first.",
           content: <PersonaStep business={business} hoursSummary={summarizeSavedHours(await listBusinessHours(businessId), business.timezone ?? "UTC")} />,
-          footer: null,
         };
       case "channels": {
         const instagramEntitled = channelAllowed(entitlement, "instagram");
         const accounts = typeof select === "string" && instagramEntitled ? await getInstagramPendingSelection(businessId, select) : null;
         return {
-          eyebrow: "Step 4 of 6 · Channels",
           heading: "Where can prospects chat with you?",
           description: "Set up your website widget. You can also connect WhatsApp or Instagram if your plan includes them.",
           content: (
@@ -273,19 +259,16 @@ export default async function OnboardingPage({
               instagramUpgradeMessage={channelNotEntitledMessage("instagram", entitlement)}
             />
           ),
-          footer: null,
         };
       }
       case "plan":
         return {
-          eyebrow: "Step 5 of 6 · Plan & billing",
           heading: entitlement.isTrial && entitlement.serving ? "Start free — no card needed" : "Choose a plan",
           description:
             entitlement.isTrial && entitlement.serving
               ? "Your free trial is already active. Choose a paid plan now or any time before it ends."
               : "Upgrades take effect straight away; downgrades at your next renewal.",
           content: await buildPlanStep(businessId, business.name, entitlement, connectedMetaChannelsFrom(whatsapp, instagram)),
-          footer: null,
         };
       case "review":
       default: {
@@ -305,7 +288,6 @@ export default async function OnboardingPage({
           ? `Free trial · ends ${trialEnd} · ${quota.repliesUsed} of ${quota.replyQuota} replies used`
           : entitlement.planName;
         return {
-          eyebrow: "Step 6 of 6 · Test & go live",
           heading: live ? "You're live" : "Ready to go live?",
           description: live ? "Your agent is answering prospects now." : "Review what's set up, test your agent, then publish.",
           content: (
@@ -339,7 +321,6 @@ export default async function OnboardingPage({
               }}
             />
           ),
-          footer: null,
         };
       }
     }
@@ -351,10 +332,9 @@ export default async function OnboardingPage({
         activeStage={activeStage}
         stageStatus={stageStatus}
         stageHref={stageHref}
-        eyebrow={eyebrow}
+        trainingPart={activeStep === "knowledge" ? 1 : activeStep === "products" ? 2 : activeStep === "faqs" ? 3 : undefined}
         heading={heading}
         description={description}
-        footer={footer}
       >
         {content}
       </WizardShell>
