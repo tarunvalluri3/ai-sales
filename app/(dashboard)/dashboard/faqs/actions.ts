@@ -9,6 +9,7 @@ import { requireBusinessContext } from "@/lib/business-context";
 import { requireMinRole } from "@/lib/auth";
 import { createFaq, updateFaq, deleteFaq, approveFaqDraft, rejectFaqDraft } from "@/lib/faqs";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { withRequestTiming, type RequestTiming } from "@/lib/request-timing";
 import { processIngestionQueue } from "@/lib/ingestion-queue";
 
 /**
@@ -54,6 +55,18 @@ export async function draftFaqAnswerAction(question: unknown): Promise<{ answer?
 }
 
 export async function createFaqAction(
+  prevState: FaqFormState,
+  formData: FormData,
+): Promise<FaqFormState> {
+  return withRequestTiming(
+    "catalog_create_faq",
+    (timing) => createFaqActionTimed(timing, prevState, formData),
+    (state) => (state.error ? "rejected" : "ok"),
+  );
+}
+
+async function createFaqActionTimed(
+  timing: RequestTiming,
   _prevState: FaqFormState,
   formData: FormData,
 ): Promise<FaqFormState> {
@@ -61,7 +74,7 @@ export async function createFaqAction(
     question: String(formData.get("question") ?? ""),
     answer: String(formData.get("answer") ?? ""),
   };
-  const { businessId, orgRole } = await requireBusinessContext();
+  const { businessId, orgRole } = await timing.time("business_context", () => requireBusinessContext());
   const authError = requireMinRole(orgRole, "org:member");
   if (authError) {
     return { values, error: authError };
@@ -76,7 +89,7 @@ export async function createFaqAction(
   }
 
   try {
-    await createFaq(businessId, parsed.data);
+    await timing.time("save", () => createFaq(businessId, parsed.data));
   } catch (error) {
     return { values, error: logAndGetUserMessage(error) };
   }

@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import { requestTimingStub } from "./lib/request-timing-stub.mjs";
 
 const require = createRequire(import.meta.url);
 const dashboard = "app/(dashboard)/dashboard/";
@@ -18,6 +19,7 @@ function loadAction(path, mocks) {
     exports, URL, File, FormData, performance, console, process,
     require: (name) => {
       if (name in mocks) return mocks[name];
+      if (name === "@/lib/request-timing") return requestTimingStub;
       if (name === "zod" || name === "node:crypto") return require(name);
       if (name === "server-only") return {};
       throw new Error("Unexpected dependency: " + name);
@@ -346,7 +348,9 @@ test("wizard wiring uses saved key, timed trial confirmation, and shared readine
   assert.match(channels, /Your website address/);
   assert.match(source(steps + "plan-step.tsx"), /<WizardContinue[\s\S]*?pending=\{isPending \|\| confirming\}[\s\S]*?Setting up your trial/);
   assert.match(source(onboarding + "_components/wizard-actions.tsx"), /pending \? <LoaderCircle[\s\S]*?animate-spin/);
-  assert.match(source(onboarding + "actions.ts"), /onboarding_trial_timing.*\{ step, durationMs:/);
+  // The trial confirmation's timings now go to the shared request_timing log
+  // (lib/request-timing.ts), for every step rather than only "review".
+  assert.match(source(onboarding + "actions.ts"), /withRequestTiming\(\s*"onboarding_advance"/);
   const page = source(onboarding + "page.tsx");
   assert.match(page, /Free trial · ends \$\{trialEnd\} · \$\{quota.repliesUsed\} of/);
   assert.match(page, /completion\[step\] && stepIndexAllowed\(step, business.onboarding_step\)/);

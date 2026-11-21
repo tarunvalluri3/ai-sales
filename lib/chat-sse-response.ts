@@ -44,6 +44,8 @@ export type SseTurnOptions<R extends SseTurnResponse> = {
   sideEffects: (response: R, interrupted: boolean) => Promise<void>;
   /** Server-side logging of an unexpected error (never sent to the client). */
   logError: (stage: "generate" | "persist" | "side_effects" | "watchdog", error: unknown) => void;
+  /** Told about every event actually written to the client (request timing logs). Must not throw; errors are ignored. */
+  onEvent?: (type: ChatStreamEvent["type"]) => void;
   /** The request's own abort signal (client disconnected). */
   clientSignal?: AbortSignal;
   keepAliveMs: number;
@@ -76,6 +78,12 @@ export function createChatSseStream<R extends SseTurnResponse>(options: SseTurnO
         } catch {
           // The connection is gone; persistence and side effects still run.
           open = false;
+          return;
+        }
+        try {
+          options.onEvent?.(event.type);
+        } catch {
+          // Observability only: never affects the stream.
         }
       };
 

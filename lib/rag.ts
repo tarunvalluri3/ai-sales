@@ -1954,6 +1954,10 @@ export async function* streamSalesEmployee(
             if (!answerStarted) {
               answerStarted = true;
               iterationTextStarted = true;
+              // Offsets from the start of the turn, persisted in stage_timings:
+              // the gap to at_first_visible_text is what the booking-claim
+              // sentence hold costs the visitor (perf/reply-and-save-speed).
+              timer.record("at_first_model_text", timer.elapsedMs());
               // The model committed to answering: overlap the metadata call.
               metadataPromise = startMetadataCall();
               outputGuard = new StreamOutputGuard(makeGuardContext());
@@ -1963,6 +1967,7 @@ export async function* streamSalesEmployee(
             const step = outputGuard!.push(text);
             noteGuardrailSignals(businessId, conversationId, step.signals);
             if (step.emit) {
+              if (!answerText) timer.record("at_first_visible_text", timer.elapsedMs());
               answerText += step.emit;
               yield { kind: "delta", text: step.emit };
             }
@@ -2176,6 +2181,8 @@ export async function* streamSalesEmployee(
         answerText = done.retract;
         yield { kind: "retract", text: done.retract };
       } else if (done.emit) {
+        // A reply with no sentence end is first shown here, at the very end.
+        if (!answerText) timer.record("at_first_visible_text", timer.elapsedMs());
         answerText += done.emit;
         yield { kind: "delta", text: done.emit };
       }

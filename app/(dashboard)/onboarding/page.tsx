@@ -42,6 +42,7 @@ import { ChannelsStep } from "./_components/steps/channels-step";
 import { PlanStep } from "./_components/steps/plan-step";
 import { ReviewStep } from "./_components/steps/review-step";
 import { isAgentPublished } from "@/lib/agent-published";
+import { withRequestTiming, type RequestTiming } from "@/lib/request-timing";
 
 /**
  * The guided `/onboarding` wizard (2026-10-29 redesign, STATE.md). Every
@@ -50,17 +51,23 @@ import { isAgentPublished } from "@/lib/agent-published";
  * on separate dashboard pages, resuming at `?step=` via the real
  * `onboarding_step` guard (lib/onboarding-steps.ts, unchanged).
  */
-export default async function OnboardingPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ step?: string; select?: string }>;
-}) {
+type OnboardingSearchParams = Promise<{ step?: string; select?: string }>;
+
+export default async function OnboardingPage({ searchParams }: { searchParams: OnboardingSearchParams }) {
+  // One identifier-free request_timing line per render, with cumulative
+  // at_* offsets for each loading phase (lib/request-timing.ts).
+  return withRequestTiming("onboarding_render", (timing) => renderOnboardingPage(timing, searchParams));
+}
+
+async function renderOnboardingPage(timing: RequestTiming, searchParams: OnboardingSearchParams) {
   const context = await requireAuthContext();
+  timing.mark("auth");
   if (!context.orgId) {
     redirect("/session-tasks/choose-organization");
   }
 
   const business = await getBusinessForOrg(context.orgId);
+  timing.mark("business");
   const { step: stepParam, select } = await searchParams;
 
   // A published agent belongs on the dashboard -- except on the review step,
@@ -129,6 +136,7 @@ export default async function OnboardingPage({
 
   const businessId = business.id;
   const progress = await computeOnboardingProgress(business);
+  timing.mark("progress");
 
   const requested = isOnboardingStep(stepParam) ? stepParam : null;
   const activeStep: OnboardingStep =
@@ -164,6 +172,7 @@ export default async function OnboardingPage({
     loadReadinessReport(businessId, business),
     headers(),
   ]);
+  timing.mark("data");
 
   const appOrigin = `${requestHeaders.get("x-forwarded-proto") ?? "https"}://${requestHeaders.get("host")}`;
   const counts = countReadinessItems(readiness.items);
@@ -325,6 +334,7 @@ export default async function OnboardingPage({
       }
     }
   })();
+  timing.mark("step");
 
   return (
     <OnboardingPreviewProvider key={activeStep} seed={previewSeed}>

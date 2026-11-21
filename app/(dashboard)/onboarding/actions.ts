@@ -34,6 +34,7 @@ import {
 import { normalizeTimezone, TIMEZONE_ERROR_MESSAGES } from "@/lib/timezones";
 import { currencyForTimezone } from "@/lib/currency";
 import { logAndGetUserMessage } from "@/lib/errors";
+import { withRequestTiming, type RequestTiming } from "@/lib/request-timing";
 
 const createBusinessSchema = z.object({
   name: businessNameSchema,
@@ -56,10 +57,22 @@ export type CreateBusinessState = {
 };
 
 export async function createBusiness(
+  prevState: CreateBusinessState,
+  formData: FormData,
+): Promise<CreateBusinessState> {
+  return withRequestTiming(
+    "onboarding_create_business",
+    (timing) => createBusinessTimed(timing, prevState, formData),
+    (state) => (state.error ? "rejected" : "ok"),
+  );
+}
+
+async function createBusinessTimed(
+  timing: RequestTiming,
   _prevState: CreateBusinessState,
   formData: FormData,
 ): Promise<CreateBusinessState> {
-  const context = await requireAuthContext({ role: "org:admin" });
+  const context = await timing.time("auth", () => requireAuthContext({ role: "org:admin" }));
 
   if (!context.orgId) {
     return { error: "Select or create an organization first." };
@@ -110,7 +123,8 @@ export async function createBusiness(
   let errorMessage = "";
 
   try {
-    await createBusinessForOrg(context.orgId, { ...parsed.data, hours: week?.days });
+    const orgId = context.orgId;
+    await timing.time("create_business", () => createBusinessForOrg(orgId, { ...parsed.data, hours: week?.days }));
   } catch (error) {
     if (!(error instanceof BusinessAlreadyExistsError)) {
       createFailed = true;
@@ -131,7 +145,10 @@ export async function createBusiness(
   // moment the row exists with these fields, so advance the cached step
   // past it. Best-effort -- a failure here must never block the redirect
   // that already created the business.
-  await saveOnboardingStep(context.orgId, "knowledge", ONBOARDING_STEPS.slice(0, ONBOARDING_STEPS.indexOf("knowledge"))).catch(() => {});
+  const orgId = context.orgId;
+  await timing.time("save_step", () =>
+    saveOnboardingStep(orgId, "knowledge", ONBOARDING_STEPS.slice(0, ONBOARDING_STEPS.indexOf("knowledge"))).catch(() => {}),
+  );
 
   redirect("/onboarding?step=knowledge");
 }
@@ -193,15 +210,15 @@ export type AdvanceOnboardingResult = { ok: true } | { ok: false; error: string 
  * never through this action.
  */
 export async function advanceOnboarding(nextStep: OnboardingStep): Promise<AdvanceOnboardingResult> {
-  async function timed<T>(step: string, call: () => Promise<T>): Promise<T> {
-    if (nextStep !== "review") return call();
-    const start = performance.now();
-    try {
-      return await call();
-    } finally {
-      console.info("onboarding_trial_timing", { step, durationMs: Math.round(performance.now() - start) });
-    }
-  }
+  return withRequestTiming(
+    "onboarding_advance",
+    (timing) => advanceOnboardingTimed(timing, nextStep),
+    (result) => (result.ok ? "ok" : "rejected"),
+  );
+}
+
+async function advanceOnboardingTimed(timing: RequestTiming, nextStep: OnboardingStep): Promise<AdvanceOnboardingResult> {
+  const timed = <T,>(stage: string, call: () => Promise<T>): Promise<T> => timing.time(stage, call);
 
   const context = await timed("authorize", () => requireAuthContext({ role: "org:admin" }));
   if (!context.orgId) {

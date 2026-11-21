@@ -13,6 +13,7 @@ import type { RecommendedItem } from "@/lib/tools/recommend-products";
 import { logAndGetUserMessage } from "@/lib/errors";
 import { DRAFT_SOURCE, loadLiveAgentSourceByVersion, type AgentSource } from "@/lib/agent-runtime";
 import { isAgentPublished } from "@/lib/agent-published";
+import { withRequestTiming, type RequestTiming } from "@/lib/request-timing";
 import {
   LIVE_SANDBOX_ENABLED,
   LIVE_SANDBOX_UNAVAILABLE_MESSAGE,
@@ -61,6 +62,22 @@ export async function sendSandboxMessage(
   message: string,
   mode: SandboxMode = "draft",
 ): Promise<SandboxChatResult> {
+  // One identifier-free request_timing line per test-chat turn (sandbox turns
+  // write no ai_response_metrics row, so this is their only timing record).
+  return withRequestTiming(
+    "sandbox_chat",
+    (timing) => runSandboxTurn(timing, conversationId, history, message, mode),
+    (result) => (result.ok ? "ok" : "rejected"),
+  );
+}
+
+async function runSandboxTurn(
+  timing: RequestTiming,
+  conversationId: string | null,
+  history: ConversationMessage[],
+  message: string,
+  mode: SandboxMode,
+): Promise<SandboxChatResult> {
   const parsedMode = sandboxModeSchema.safeParse(mode);
   if (!parsedMode.success) {
     return { ok: false, error: "Choose the draft or the live agent." };
@@ -69,6 +86,7 @@ export async function sendSandboxMessage(
     return { ok: false, error: LIVE_SANDBOX_UNAVAILABLE_MESSAGE };
   }
   const { businessId, orgId } = await requireBusinessContext();
+  timing.mark("business_context");
   const business = await getBusinessForOrg(orgId);
   if (!business) {
     return { ok: false, error: "Business not found." };
@@ -98,17 +116,20 @@ export async function sendSandboxMessage(
 
   try {
     let conversation = conversationId
-      ? await getConversationForBusiness(supabase, businessId, conversationId)
+      ? await timing.time("conversation_lookup", () => getConversationForBusiness(supabase, businessId, conversationId))
       : null;
 
     if (!conversation || conversation.source !== SANDBOX_CONVERSATION_SOURCE) {
-      conversation = await createConversation(supabase, businessId, SANDBOX_CONVERSATION_SOURCE);
+      conversation = await timing.time("conversation_create", () =>
+        createConversation(supabase, businessId, SANDBOX_CONVERSATION_SOURCE),
+      );
     }
+    const conversationRowId = conversation.id;
 
-    await createMessage(supabase, businessId, conversation.id, "user", trimmed);
+    await timing.time("user_message_write", () => createMessage(supabase, businessId, conversationRowId, "user", trimmed));
     after(() => recordGuardrailSignals(businessId, conversation.id, "sandbox", prepared.signals));
 
-    const response = await askSalesEmployee(
+    const response = await timing.time("ai_turn", () => askSalesEmployee(
       supabase,
       businessId,
       conversation.id,
@@ -148,16 +169,18 @@ export async function sendSandboxMessage(
       false,
       "dashboard",
       source,
-    );
+    ));
 
-    await createMessage(
-      supabase,
-      businessId,
-      conversation.id,
-      "assistant",
-      response.answer,
-      response.sourceChunkIds,
-      response.grounded,
+    await timing.time("assistant_message_write", () =>
+      createMessage(
+        supabase,
+        businessId,
+        conversationRowId,
+        "assistant",
+        response.answer,
+        response.sourceChunkIds,
+        response.grounded,
+      ),
     );
 
     return {
