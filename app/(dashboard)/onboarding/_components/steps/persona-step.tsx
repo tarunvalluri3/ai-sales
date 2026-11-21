@@ -7,6 +7,7 @@ import type { Business } from "@/lib/supabase/types";
 import { SUPPORTED_WIDGET_LANGUAGES, WIDGET_LANGUAGE_LABELS } from "@/lib/widget-i18n";
 import { updateAiCapabilitiesAction, updateWidgetBrandingAction, type WidgetBrandingActionState } from "../../../dashboard/widget-settings/actions";
 import { advanceOnboarding } from "../../actions";
+import { AgentPersonaFields } from "../../../dashboard/_components/agent-persona-fields";
 import { useOnboardingPreview } from "../preview-context";
 
 const inputClasses =
@@ -19,6 +20,15 @@ const TONES: { key: "friendly" | "professional" | "concise"; label: string; exam
 ];
 
 const SWATCHES = [DEFAULT_WIDGET_PRIMARY, "#dc2626", "#c2410c", "#a16207", "#15803d", "#0f766e", "#2563eb", "#7e22ce"];
+
+function capabilityForm(form: FormData) {
+  const fields = new FormData();
+  for (const key of ["appointmentSlotMinutes", "appointmentsEnabled", "recommendProductsEnabled"]) {
+    const value = form.get(key);
+    if (typeof value === "string") fields.set(key, value);
+  }
+  return fields;
+}
 
 const initialState: WidgetBrandingActionState = {};
 
@@ -52,7 +62,7 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
   async function savePersona(previous: WidgetBrandingActionState, form: FormData): Promise<WidgetBrandingActionState> {
     const branding = await updateWidgetBrandingAction(previous, form);
     if (!branding.success) return branding;
-    const capabilities = await updateAiCapabilitiesAction({}, form);
+    const capabilities = await updateAiCapabilitiesAction({}, capabilityForm(form));
     if (!capabilities.success) return capabilities;
     const next = await advanceOnboarding("channels");
     if (!next.ok) return { error: next.error };
@@ -72,15 +82,8 @@ export function PersonaStep({ business, hoursSummary }: { business: Business; ho
       <input type="hidden" name="welcomeText" value={greeting} />
       <input type="hidden" name="language" value={language} />
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ds-text-primary">Agent name</span>
-        <p className="border border-ds-border bg-ds-surface-elevated px-3 py-2 text-sm text-ds-text-secondary">
-          {business.name}
-        </p>
-        <p className="text-xs text-ds-text-muted">
-          Your agent introduces itself as your business. Change the name itself from &ldquo;Your business&rdquo;.
-        </p>
-      </div>
+      <AgentPersonaFields businessName={business.name} initialName={business.agent_name}
+        initialAvatar={business.agent_avatar_url} disabled={isPending} onPreview={update} />
 
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-ds-text-primary">Tone</span>

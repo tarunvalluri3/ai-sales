@@ -343,7 +343,7 @@ test("wiring: booking tools need booking ON and open hours; the guard knows what
   assert.equal((rag.match(/appointmentsEnabled: aiCapabilities\.appointmentsEnabled && bookingState\.bookingAvailable/g) ?? []).length, 2);
   assert.equal((rag.match(/language,\n {6}turnCapabilities,\n/g) ?? []).length, 2, "both buildTurnContext calls use the resolved capabilities");
   assert.equal((rag.match(/noteBookingOutcome\(turnOutcome, outcome\.toolCall\.name, outcome\.toolResult\)/g) ?? []).length, 2);
-  assert.equal((rag.match(/buildOutputGuardContext\(tags, businessProfile, context, toolEvidence, question, history, turnOutcome\)/g) ?? []).length, 2);
+  assert.equal((rag.match(/buildOutputGuardContext\(tags, businessProfile, context, toolEvidence, question, history, turnOutcome, language\)/g) ?? []).length, 2);
   assert.match(rag, /appointmentBooked: bookingState\.conversationHasAppointment/);
   const appointments = read("lib/appointments.ts");
   assert.match(appointments, /\.from\("business_hours"\)\.select\("day_of_week"\)\.eq\("business_id", businessId\)\.eq\("is_open", true\)/);

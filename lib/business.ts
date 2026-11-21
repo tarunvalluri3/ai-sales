@@ -179,12 +179,13 @@ export async function updateBusinessProfile(
  * `orgId` must come from a validated session; authorization (org:admin-only)
  * is enforced by the caller, same convention as `updateBusinessProfile`.
  */
-export async function updateWidgetBranding(orgId: string, input: WidgetBrandingInput): Promise<Business> {
+export async function updateWidgetBranding(orgId: string, input: WidgetBrandingInput, persona?: { name: string | null; avatar?: string | null }): Promise<Business> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("businesses")
     .update({
       widget_accent_color: input.accentColor,
+      ...(persona && { agent_name: persona.name, agent_avatar_url: persona.avatar }),
       widget_logo_url: input.logoUrl,
       widget_welcome_text: input.welcomeText,
       widget_welcome_text_closed: input.welcomeTextClosed,

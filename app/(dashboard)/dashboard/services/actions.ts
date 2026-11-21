@@ -9,6 +9,7 @@ import { requireMinRole } from "@/lib/auth";
 import { createService, updateService, deleteService, approveServiceDraft, rejectServiceDraft } from "@/lib/services";
 import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { parseCatalogForm, readCatalogFormValues, type CatalogFieldErrors, type CatalogFormValues } from "@/lib/schemas/catalog";
+import { cleanupAgentImage, uploadAgentImage } from "@/lib/agent-images";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 const serviceIdSchema = z.string().uuid();
@@ -45,7 +46,13 @@ export async function createServiceAction(
   }
 
   try {
-    await createService(businessId, parsed.data, currency);
+    const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
+    try {
+      await createService(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency);
+    } catch (error) {
+      await cleanupAgentImage(businessId, uploaded);
+      throw error;
+    }
   } catch (error) {
     return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }
@@ -88,7 +95,14 @@ export async function updateServiceInPlaceAction(
 
   let updated: boolean;
   try {
-    updated = await updateService(businessId, id, input, currency);
+    const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
+    try {
+      updated = await updateService(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      if (!updated) await cleanupAgentImage(businessId, uploaded);
+    } catch (error) {
+      await cleanupAgentImage(businessId, uploaded);
+      throw error;
+    }
   } catch (error) {
     return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }

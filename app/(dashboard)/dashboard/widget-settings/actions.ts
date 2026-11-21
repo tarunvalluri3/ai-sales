@@ -1,6 +1,8 @@
 "use server";
 
 import { z } from "zod";
+import { agentNameSchema } from "@/lib/schemas/agent-persona";
+import { cleanupAgentImage, readLiveAgentImagesForCleanup, uploadAgentImage } from "@/lib/agent-images";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { kickAnswerBankRefresh } from "@/lib/answer-bank/generate";
@@ -173,9 +175,24 @@ export async function updateWidgetBrandingAction(
     return { error: parsed.error.issues[0]?.message ?? "Enter valid widget settings." };
   }
 
+  const name = formData.get("agentName");
+  const parsedName = typeof name === "string" && name.trim() === "" && !/[\r\n\u2028\u2029]/u.test(name)
+    ? { success: true as const, data: null }
+    : agentNameSchema.safeParse(name);
+  if (name != null && !parsedName.success) return { error: parsedName.error.issues[0].message };
+  const clearAvatar = z.literal("on").optional().safeParse(formData.get("removeAgentAvatar") ?? undefined);
+  if (!clearAvatar.success) return { error: "Invalid avatar setting." };
+  let uploaded: string | null = null;
   try {
-    await updateWidgetBranding(orgId, parsed.data);
+    const previous = name != null ? await getBusinessForOrg(orgId) : null;
+    if (name != null && !clearAvatar.data) uploaded = await uploadAgentImage(businessId, "avatar", formData.get("agentAvatar"));
+    const avatar = uploaded ?? (clearAvatar.data ? null : undefined);
+    await updateWidgetBranding(orgId, parsed.data, parsedName.success ? { name: parsedName.data, avatar } : undefined);
+    if (avatar !== undefined && avatar !== previous?.agent_avatar_url) {
+      await cleanupAgentImage(businessId, previous?.agent_avatar_url);
+    }
   } catch (err) {
+    await cleanupAgentImage(businessId, uploaded);
     return { error: logAndGetUserMessage(err) };
   }
 
@@ -261,6 +278,7 @@ export async function publishBusinessAction(
     return { error: authError };
   }
 
+  const oldImages = await readLiveAgentImagesForCleanup(businessId);
   let result;
   try {
     result = await publishBusinessForOrg(orgId);
@@ -281,6 +299,7 @@ export async function publishBusinessAction(
     // Instant answers: publishing is when stored answers become servable, so
     // build them now (off the response) rather than waiting for the daily run.
     after(() => kickAnswerBankRefresh(businessId));
+    after(async () => { await Promise.all(oldImages.map((url) => cleanupAgentImage(businessId, url))); });
   }
 
   revalidatePath("/dashboard", "layout");

@@ -289,6 +289,8 @@ export type WidgetBranding = {
   language: WidgetLanguage;
   accentColor: string | null;
   logoUrl: string | null;
+  agentName: string | null;
+  agentAvatarUrl: string | null;
   welcomeText: string | null;
   welcomeTextClosed: string | null;
   ctaText: string | null;
@@ -343,6 +345,8 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
         language: config.language,
         accentColor: config.channels.accentColor,
         logoUrl: config.channels.logoUrl,
+        agentName: config.persona.agentName ?? null,
+        agentAvatarUrl: config.persona.agentAvatarUrl ?? null,
         welcomeText: config.persona.welcomeText,
         welcomeTextClosed: config.persona.welcomeTextClosed,
         ctaText: config.persona.ctaText,
@@ -366,6 +370,8 @@ export async function resolveBusinessBrandingFromWidgetKey(key: string): Promise
     language: data.businesses.widget_language,
     accentColor: data.businesses.widget_accent_color,
     logoUrl: data.businesses.widget_logo_url,
+    agentName: null,
+    agentAvatarUrl: null,
     welcomeText: data.businesses.widget_welcome_text,
     welcomeTextClosed: data.businesses.widget_welcome_text_closed,
     ctaText: data.businesses.widget_cta_text,

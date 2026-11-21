@@ -20,6 +20,8 @@ export type Business = {
   widget_cta_text: string | null;
   widget_position: WidgetPosition;
   widget_language: WidgetLanguage;
+  agent_name: string | null;
+  agent_avatar_url: string | null;
   widget_suggested_questions: string[] | null;
   recommend_products_enabled: boolean;
   published_at: string | null;
@@ -44,7 +46,7 @@ export type Business = {
 };
 
 export type WidgetPosition = "bottom-right" | "bottom-left";
-export type WidgetLanguage = "en" | "es" | "fr" | "de" | "pt" | "hi";
+export type WidgetLanguage = (typeof import("@/lib/widget-i18n").SUPPORTED_WIDGET_LANGUAGES)[number];
 export type OnboardingStep =
   | "account"
   | "verify"
@@ -156,6 +158,7 @@ export type KnowledgeDocument = {
   id: string;
   business_id: string;
   source_type: KnowledgeSourceType;
+  onboarding_website_import?: boolean;
   source_id: string | null;
   title: string;
   content: string;

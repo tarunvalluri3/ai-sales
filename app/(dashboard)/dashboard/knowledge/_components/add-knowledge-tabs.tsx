@@ -33,6 +33,7 @@ export function AddKnowledgeTabs({
   fileForm,
   urlForm,
   sticky = true,
+  websiteFirst = false,
 }: {
   manualForm: ReactNode;
   fileForm: ReactNode;
@@ -43,15 +44,17 @@ export function AddKnowledgeTabs({
    * sticky footer at 1280px+ and swallowed every click on Continue.
    */
   sticky?: boolean;
+  websiteFirst?: boolean;
 }) {
-  const [method, setMethod] = useState<AddKnowledgeMethod>("manual");
+  const tabOrder = websiteFirst ? [{ id: "url", label: "Website" } as const, ...TABS.filter((tab) => tab.id !== "url")] : TABS;
+  const [method, setMethod] = useState<AddKnowledgeMethod>(websiteFirst ? "url" : "manual");
 
   function handleTabListKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    const currentIndex = TABS.findIndex((t) => t.id === method);
+    const currentIndex = tabOrder.findIndex((t) => t.id === method);
     const delta = event.key === "ArrowRight" ? 1 : -1;
-    const next = TABS[(currentIndex + delta + TABS.length) % TABS.length];
+    const next = tabOrder[(currentIndex + delta + tabOrder.length) % tabOrder.length];
     setMethod(next.id);
     document.getElementById(`add-knowledge-tab-${next.id}`)?.focus();
   }
@@ -61,7 +64,7 @@ export function AddKnowledgeTabs({
   return (
     <section className={`dx-card flex flex-col gap-4 dx-card-pad ${sticky ? "xl:sticky xl:top-4" : ""}`}>
       <div className="flex flex-col gap-0.5">
-        <h2 className="dx-title">Add knowledge</h2>
+        <h2 className="dx-title">{websiteFirst && method === "url" ? "Import from your website" : "Add knowledge"}</h2>
         <p className="dx-subtitle">Give your AI a trusted source.</p>
       </div>
 
@@ -71,7 +74,7 @@ export function AddKnowledgeTabs({
         onKeyDown={handleTabListKeyDown}
         className="grid grid-cols-3 overflow-hidden rounded-xl border border-ds-border-strong"
       >
-        {TABS.map((t) => (
+        {tabOrder.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -92,7 +95,7 @@ export function AddKnowledgeTabs({
         ))}
       </div>
 
-      {TABS.map((t) => (
+      {tabOrder.map((t) => (
         <div key={t.id} id={`add-knowledge-panel-${t.id}`} role="tabpanel" aria-labelledby={`add-knowledge-tab-${t.id}`} hidden={method !== t.id}>
           {panels[t.id]}
         </div>

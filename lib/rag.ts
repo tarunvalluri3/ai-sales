@@ -7,6 +7,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { AIMessage, AIMessageChunk, BaseMessage } from "@langchain/core/messages";
 import { ToolMessage } from "@langchain/core/messages";
 import { searchKnowledgeChunks } from "@/lib/retrieval";
+import { agentIntroduction } from "@/lib/schemas/agent-persona";
 import { DRAFT_SOURCE, type AgentSource } from "@/lib/agent-runtime";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 import { AppError } from "@/lib/errors";
@@ -38,7 +39,7 @@ import { AGENT_UNAVAILABLE_MESSAGE } from "@/lib/agent-serving";
 import { getCachedResponse, setCachedResponse, shouldCacheResponse } from "@/lib/response-cache";
 import { embedText, isEmbeddingRateLimitError } from "@/lib/embeddings";
 import type { WidgetLanguage } from "@/lib/supabase/types";
-import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT } from "@/lib/widget-i18n";
+import { WIDGET_LANGUAGE_NAMES_FOR_PROMPT, usesLocalizedModelReplies } from "@/lib/widget-i18n";
 import { TurnTimer } from "@/lib/turn-timings";
 import { recordTurnMetrics, type DeferredTurnMetrics } from "@/lib/ai-response-metrics";
 import { recordGeminiUsage, withGeminiUsageLog, type GeminiUsageTrigger } from "@/lib/gemini-usage-log";
@@ -236,6 +237,7 @@ export type ConversationMessage = {
  * prompt, never a blank/placeholder value.
  */
 export type BusinessProfileContext = {
+  agentName?: string | null;
   description: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -261,7 +263,7 @@ export type BusinessProfileContext = {
 
 /** Phase 25a: instructs the model to reply in the business's configured widget language. English is the default and needs no special instruction (the model already replies in the prospect's own language by default; being explicit for `en` would be redundant, not incorrect, but is skipped to keep the prompt minimal for the common case). */
 function formatLanguageInstruction(language: WidgetLanguage): string {
-  if (language === "en") return "";
+  if (language === "auto") return "\nReply in the language the prospect uses in their latest message. Use the conversation language if the message is ambiguous.\n";
   return `\nAlways reply in ${WIDGET_LANGUAGE_NAMES_FOR_PROMPT[language]}, regardless of the language the prospect writes in.\n`;
 }
 
@@ -486,6 +488,7 @@ const SYSTEM_TEMPLATE = `PLATFORM RULES -- these come from the platform operator
 
 You are a sales employee of {businessName} -- not a support chatbot. Your job is to understand what this prospect actually needs, recommend the specific thing from {businessName}'s real offerings that fits, and keep the conversation moving toward a real outcome (more detail, a concrete recommendation, or getting them in touch with the team) rather than just answering a question and stopping. You represent only {businessName} to this prospect -- never any other business.
 {languageInstruction}
+{agentIntroduction}
 {recommendationInstruction}
 {appointmentInstruction}
 {capabilityChainingInstruction}
@@ -558,6 +561,7 @@ function buildOutputGuardContext(
   question: string,
   history: ConversationMessage[],
   outcome: BookingTurnOutcome,
+  language: WidgetLanguage,
 ): OutputGuardContext {
   const profileParts = [profile.description, profile.website, profile.contactEmail, profile.contactPhone].filter(
     (part): part is string => Boolean(part),
@@ -567,6 +571,7 @@ function buildOutputGuardContext(
     canary: tags.canary,
     protectedShingles: PROTECTED_SHINGLES,
     ...buildEvidence([...profileParts, context.replace(/search_query="[^"]*"/, ""), ...toolEvidence], visitorParts),
+    language,
     appointmentBooked: outcome.appointmentBooked,
     callbackRequested: outcome.callbackRequested,
   };
@@ -647,7 +652,7 @@ const sendReplyTool = {
  * call and makes every call slower. Any future change here needs its own
  * measurement; `ai_response_metrics.thinking_tokens` is what to read.
  */
-export function getChatModel(): ChatGoogleGenerativeAI {
+export function getChatModel(maxRetries = CHAT_MODEL_MAX_RETRIES): ChatGoogleGenerativeAI {
   return new ChatGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY!,
     model: process.env.GEMINI_CHAT_MODEL!,
@@ -657,7 +662,7 @@ export function getChatModel(): ChatGoogleGenerativeAI {
     // Production readiness (LAUNCH_AUDIT.md §12): LangChain's default is 6
     // retries with exponential backoff, which can't finish inside the
     // per-call abort and hammers a throttled key. See lib/chat-timeouts.ts.
-    maxRetries: CHAT_MODEL_MAX_RETRIES,
+    maxRetries,
   });
 }
 
@@ -969,7 +974,7 @@ async function prepareTurn(
   // is deliberately no "don't count this" switch.
   const firstTurn = isFirstTurn(history);
   let instantMissReason: string | undefined;
-  if (instant?.enabled) {
+  if (instant?.enabled && !usesLocalizedModelReplies(language)) {
     const local = await timer.time("instant_local", () =>
       decideLocalInstant(
         { message: question, language, isFirstTurn: firstTurn, context: instant },
@@ -1031,7 +1036,7 @@ async function prepareTurn(
   const retrieval = retriever.invoke(question);
   retrieval.catch(() => undefined);
 
-  if (instant?.enabled && faqPhaseEligible({ message: question, isFirstTurn: firstTurn, context: instant }) === null) {
+  if (instant?.enabled && !usesLocalizedModelReplies(language) && faqPhaseEligible({ message: question, isFirstTurn: firstTurn, context: instant }) === null) {
     try {
       const faq = await timer.time("faq_match", () =>
         decideFaqInstant(
@@ -1154,6 +1159,7 @@ async function buildTurnContext(
     profileTag: tags.profile,
     canary: tags.canary,
     businessName: cleanUntrustedLine(businessName, 120),
+    agentIntroduction: agentIntroduction(cleanUntrustedLine(businessName, 120), businessProfile.agentName),
     languageInstruction: formatLanguageInstruction(language),
     recommendationInstruction: formatRecommendationInstruction(aiCapabilities.recommendProductsEnabled),
     appointmentInstruction: formatAppointmentInstruction(aiCapabilities.appointmentsEnabled),
@@ -1365,7 +1371,7 @@ export async function askSalesEmployee(
     // send_reply existed (the plain system message), byte-for-byte.
     const { loopSystemMessage, plainSystemMessage, messages, tools } = await buildTurnContext(
       businessName,
-      businessProfile,
+      source.kind === "live" ? { ...businessProfile, agentName: source.snapshot.config.persona.agentName } : businessProfile,
       question,
       history,
       language,
@@ -1676,7 +1682,7 @@ export async function askSalesEmployee(
 
     // Guardrails Phase 4: the same deterministic output checks every channel
     // gets (widget JSON, WhatsApp, Instagram, sandbox all reach here).
-    const checked = checkReply(result.answer, buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome));
+    const checked = checkReply(result.answer, buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome, language));
     noteGuardrailSignals(businessId, conversationId, checked.signals);
     const response: SalesEmployeeResponse = {
       answer: checked.text,
@@ -1850,7 +1856,7 @@ export async function* streamSalesEmployee(
   // tool result this turn is known), so the evidence is complete.
   let outputGuard: StreamOutputGuard | null = null;
   const makeGuardContext = (): OutputGuardContext =>
-    buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome);
+    buildOutputGuardContext(tags, businessProfile, context, toolEvidence, question, history, turnOutcome, language);
 
   const sourceChunkIds = (): string[] => [
     ...new Set([...documents.map((document) => document.metadata.chunkId), ...additionalSourceChunkIds]),
@@ -1859,7 +1865,7 @@ export async function* streamSalesEmployee(
   try {
     const { plainSystemMessage, messages, tools } = await buildTurnContext(
       businessName,
-      businessProfile,
+      source.kind === "live" ? { ...businessProfile, agentName: source.snapshot.config.persona.agentName } : businessProfile,
       question,
       history,
       language,

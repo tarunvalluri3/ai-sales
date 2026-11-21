@@ -1,4 +1,5 @@
 import "server-only";
+import { usesLocalizedModelReplies } from "@/lib/widget-i18n";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { embedTexts } from "@/lib/embeddings";
 import { generateBankAnswer, type BusinessProfileContext } from "@/lib/rag";
@@ -200,7 +201,7 @@ async function inBatches<T>(items: T[], size: number, run: (item: T) => Promise<
 }
 
 export type RefreshResult =
-  | { status: "skipped"; reason: "not_found" | "suspended" | "not_published" }
+  | { status: "skipped"; reason: "not_found" | "suspended" | "not_published" | "localized_replies" }
   | { status: "done"; version: number; ready: number; failed: number; needsReview: number; stable: boolean };
 
 /**
@@ -217,6 +218,7 @@ export async function refreshAnswerBank(supabase: SupabaseClient, businessId: st
   // No Gemini spend for a tenant that may not serve (lib/business-lifecycle.ts).
   if (businessLifecycleBlock(business)) return { status: "skipped", reason: "suspended" };
   if (!isAgentPublished(business)) return { status: "skipped", reason: "not_published" };
+  if (usesLocalizedModelReplies(business.widget_language)) return { status: "skipped", reason: "localized_replies" };
   const version = Number(business.answer_bank_version);
   const language = business.widget_language;
 
@@ -310,6 +312,7 @@ export async function regenerateEntry(
 ): Promise<"ready" | "failed" | "not_found" | "unsupported"> {
   const business = await loadBusiness(supabase, businessId);
   if (!business) return "not_found";
+  if (usesLocalizedModelReplies(business.widget_language)) return "unsupported";
   const { data } = await supabase
     .from("answer_bank_entries")
     .select("id, kind, question_key, question_text, language")

@@ -12,6 +12,7 @@
     "test:copilot-lifecycle": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-copilot-lifecycle-tests.mjs",
     "test:plan-tax": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-plan-tax-tests.mjs",
     "test:invoices": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-invoice-tests.mjs",
+    "test:onboarding-capabilities": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-onboarding-capabilities-tests.mjs",
     "test:onboarding-flow": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-onboarding-flow-tests.mjs",
     "test:onboarding-readiness": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-onboarding-readiness-tests.mjs",
     "test:widget-access": "node --import ./scripts/lib/test-env-guard.mjs --test scripts/run-widget-access-tests.mjs",

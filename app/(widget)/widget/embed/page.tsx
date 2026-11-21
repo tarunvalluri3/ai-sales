@@ -45,12 +45,12 @@ export default async function WidgetEmbedPage({
 
   return (
     <WidgetApp
-      businessName={branding.businessName}
+      businessName={branding.agentName || branding.businessName}
       language={branding.language}
       strings={strings}
       greeting={greeting}
       accentColor={branding.accentColor}
-      logoUrl={branding.logoUrl}
+      logoUrl={branding.agentAvatarUrl || branding.logoUrl}
       ctaText={branding.ctaText ?? strings.defaultCta}
       suggestedQuestions={buildDefaultSuggestedQuestions(branding.suggestedQuestions, branding.defaultQuestionSource, {
         price: strings.defaultQuestionPrice,

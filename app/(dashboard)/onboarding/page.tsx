@@ -8,6 +8,8 @@ import type { OnboardingStep } from "@/lib/supabase/types";
 import { listServicesForBusiness } from "@/lib/services";
 import { listProductsForBusiness } from "@/lib/products";
 import { listFaqsForBusiness } from "@/lib/faqs";
+import { listWebsiteImports } from "@/lib/website-suggestion-state";
+import { logEvent } from "@/lib/logger";
 import { listKnowledgeDocumentsForBusiness } from "@/lib/knowledge";
 import { summarizeSavedHours } from "@/lib/business-hours-summary";
 import { sanitizeAccentColor } from "@/lib/widget-colors";
@@ -94,6 +96,8 @@ export default async function OnboardingPage({
     return (
       <OnboardingPreviewProvider
         seed={{
+          agentName: null,
+          agentAvatarUrl: null,
           businessName: organization.name,
           description: null,
           greeting: null,
@@ -168,6 +172,8 @@ export default async function OnboardingPage({
 
   const previewSeed = {
     businessName: business.name,
+    agentName: business.agent_name,
+    agentAvatarUrl: business.agent_avatar_url,
     description: business.description,
     greeting: business.widget_welcome_text,
     firstProductName: products[0]?.name ?? services[0]?.name ?? null,
@@ -213,7 +219,11 @@ export default async function OnboardingPage({
           eyebrow: "Step 2 of 6 · Train your agent · 1/3",
           heading: "Add what your agent should know",
           description: "Import your website, upload documents, or write it yourself.",
-          content: <TrainKnowledgeStep documents={knowledgeDocuments} agentPublished={isAgentPublished(business)} />,
+          content: <TrainKnowledgeStep documents={knowledgeDocuments} agentPublished={isAgentPublished(business)}
+            website={business.website ?? ""} imports={await listWebsiteImports(businessId).catch(() => {
+              logEvent("onboarding_website_reviews_unavailable", businessId, {}, "error");
+              return [];
+            })} />,
           footer: null,
         };
       case "products":

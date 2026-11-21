@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { faqFieldsSchema } from "@/lib/schemas/faq";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -27,11 +28,6 @@ function triggerIngestionProcessing(): void {
   after(() => processIngestionQueue("dashboard"));
 }
 
-const faqFieldsSchema = z.object({
-  question: z.string().trim().min(1, "Enter a question.").max(300, "Question must be 300 characters or fewer."),
-  answer: z.string().trim().min(1, "Enter an answer.").max(2000, "Answer must be 2000 characters or fewer."),
-});
-
 const updateFaqSchema = faqFieldsSchema.extend({
   id: z.string().uuid(),
 });
@@ -41,6 +37,21 @@ export type FaqFormState = {
   success?: boolean;
   values?: { question: string; answer: string };
 };
+
+export async function draftFaqAnswerAction(question: unknown): Promise<{ answer?: string; hint?: string; error?: string }> {
+  const { businessId, businessName, orgRole } = await requireBusinessContext();
+  const authError = requireMinRole(orgRole, "org:member");
+  if (authError) return { error: authError };
+  const parsed = faqFieldsSchema.shape.question.safeParse(question);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  try {
+    const { draftFaqAnswer } = await import("@/lib/faq-drafting");
+    return await draftFaqAnswer(businessId, businessName, parsed.data);
+  } catch (error) {
+    logAndGetUserMessage(error);
+    return { error: "Could not draft an answer. Try again, or write it yourself." };
+  }
+}
 
 export async function createFaqAction(
   _prevState: FaqFormState,

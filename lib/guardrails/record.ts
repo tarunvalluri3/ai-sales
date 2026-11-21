@@ -29,6 +29,7 @@ export async function recordGuardrailSignals(
       action: signal.action,
       mode: signal.mode,
       channel,
+      ...(signal.replyLanguage && { replyLanguage: signal.replyLanguage, languageMode: signal.languageMode }),
     });
   }
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { AgentImagePicker } from "../_components/agent-image-picker";
+
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ImageIcon, LoaderCircle, Plus } from "lucide-react";
 import type { ProductFormState } from "./actions";
@@ -82,7 +84,7 @@ export function ProductForm({
     }
   }, [state.success, id, onSuccess]);
 
-  const canPreview = /^https?:\/\//.test(previewUrl) && !previewFailed;
+  const canPreview = /^(?:https?:\/\/|blob:)/.test(previewUrl) && !previewFailed;
   const values = state.values;
   const errors = state.fieldErrors ?? {};
   const fieldError = (field: CatalogFormField) =>
@@ -229,6 +231,10 @@ export function ProductForm({
             Optional · Enables photo cards in chat.
           </p>
           {fieldError("image_url")}
+          <AgentImagePicker key={fieldsVersion} disabled={isPending} onPreview={(url) => {
+            setPreviewUrl(url);
+            setPreviewFailed(false);
+          }} />
         </div>
       </div>
       <div

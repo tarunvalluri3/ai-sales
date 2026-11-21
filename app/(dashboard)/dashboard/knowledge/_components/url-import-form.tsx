@@ -3,7 +3,7 @@
 import { LoaderCircle } from "lucide-react";
 
 import { useActionState, useEffect, useRef } from "react";
-import { createUrlKnowledgeDocumentAction } from "../actions";
+import { createOnboardingUrlImportAction, createUrlKnowledgeDocumentAction } from "../actions";
 import type { KnowledgeFormState } from "../actions";
 
 const initialState: KnowledgeFormState = {};
@@ -11,8 +11,9 @@ const initialState: KnowledgeFormState = {};
 const inputClasses =
   "w-full rounded-xl border border-ds-border-strong bg-ds-surface px-3.5 py-2.5 text-sm text-ds-text-primary placeholder:text-ds-text-faint transition-colors disabled:opacity-60";
 
-export function UrlImportForm() {
-  const [state, formAction, isPending] = useActionState(createUrlKnowledgeDocumentAction, initialState);
+export function UrlImportForm({ initialUrl = "", onboarding = false }: { initialUrl?: string; onboarding?: boolean } = {}) {
+  const action = onboarding ? createOnboardingUrlImportAction : createUrlKnowledgeDocumentAction;
+  const [state, formAction, isPending] = useActionState(action, initialState);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export function UrlImportForm() {
         <label htmlFor="url-title" className="text-sm font-medium text-ds-text-primary">
           Title
         </label>
-        <input id="url-title" name="title" type="text" required maxLength={200} disabled={isPending} className={inputClasses} />
+        <input id="url-title" name="title" type="text" defaultValue={onboarding && initialUrl ? "Website" : undefined} required maxLength={200} disabled={isPending} className={inputClasses} />
       </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="url" className="text-sm font-medium text-ds-text-primary">
@@ -38,6 +39,7 @@ export function UrlImportForm() {
           name="url"
           type="url"
           required
+          defaultValue={initialUrl}
           placeholder="https://example.com/page"
           disabled={isPending}
           className={inputClasses}

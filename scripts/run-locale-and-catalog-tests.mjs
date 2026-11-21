@@ -264,3 +264,21 @@ test("wiring: no hard-coded '$' before a catalog price anywhere a price is shown
   assert.match(rag, /this business prices everything in \$\{profile\.currency\}/);
   assert.match(rag, /executeBusinessToolCall\(supabase, businessId, conversationId, toolCall, searchedQueries, source, businessProfile\.currency[,)]/); // widget reliability item 3 appends display-only time zones
 });
+
+const { getWidgetStrings, SUPPORTED_WIDGET_LANGUAGES } = await import("../lib/widget-i18n.ts");
+const { widgetLanguageSchema } = await import("../lib/schemas/business.ts");
+test("Indic widget locales cover all chrome strings, preserve placeholders, and auto uses English", () => {
+  const english = getWidgetStrings("en");
+  for (const language of ["te", "ta", "kn", "mr", "bn"]) {
+    assert.ok(SUPPORTED_WIDGET_LANGUAGES.includes(language));
+    assert.equal(widgetLanguageSchema.parse(language), language);
+    const strings = getWidgetStrings(language);
+    for (const key of Object.keys(english)) assert.ok(strings[key], language + " misses " + key);
+    assert.match(strings.escalationBannerKnownContact, /\{contact\}/);
+    assert.match(strings.defaultQuestionPrice, /\{name\}/);
+    assert.match(strings.defaultQuestionAbout, /\{name\}/);
+    assert.notEqual(strings.openChatLabel, english.openChatLabel);
+  }
+  assert.equal(widgetLanguageSchema.parse("auto"), "auto");
+  assert.equal(getWidgetStrings("auto"), english);
+});

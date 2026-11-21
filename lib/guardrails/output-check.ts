@@ -29,6 +29,8 @@
  * promised discount look supported.
  */
 
+import type { WidgetLanguage } from "@/lib/supabase/types";
+import { diagnosticReplyLanguage, localizedBookingLanguage, localizedBookingRewrite } from "@/lib/guardrails/booking-languages";
 import { GUARDRAIL_MODES, type GuardrailMode } from "@/lib/guardrails/config";
 import type { GuardrailSignal } from "@/lib/guardrails/prepare-message";
 
@@ -49,6 +51,7 @@ export const GUARDRAIL_SAFE_REPLY =
 export const VERBATIM_LEAK_WORDS = 10;
 
 export type OutputGuardContext = {
+  language?: WidgetLanguage;
   /** This request's secret canary string (lib/guardrails/untrusted.ts). */
   canary: string;
   /** Word shingles of the platform's own instructions (buildProtectedShingles). */
@@ -253,7 +256,7 @@ const ABBREVIATIONS = new Set(["dr", "mr", "mrs", "ms", "st", "vs", "etc", "eg",
 
 function isSentenceEnd(text: string, index: number): boolean {
   const char = text[index];
-  if (char === "\n") return true;
+  if (char === "\n" || char === "।" || char === "॥") return true;
   if (char !== "." && char !== "!" && char !== "?") return false;
   const next = text[index + 1];
   if (next === undefined || !/\s/.test(next)) return false;
@@ -336,6 +339,10 @@ export const BOOKING_CLAIM_REWRITE_WITH_CALLBACK = "I've passed your details to 
 export const BOOKING_CLAIM_REWRITE_NO_CALLBACK = "I can't book a time for you here, but our team can arrange one with you directly.";
 
 export function isBookingClaim(sentence: string): boolean {
+  return isEnglishBookingClaim(sentence) || Boolean(localizedBookingLanguage(sentence));
+}
+
+function isEnglishBookingClaim(sentence: string): boolean {
   if (CLAIM_NEGATION_RE.test(sentence) || CONDITIONAL_RE.test(sentence)) return false;
   if (YOU_ARE_BOOKED_RE.test(sentence)) return true;
   if (PASSIVE_CLAIM_RE.test(sentence)) return true;
@@ -358,11 +365,15 @@ export function rewriteBookingClaims(
   alreadyRewritten = false,
 ): { text: string; signals: GuardrailSignal[]; rewritten: boolean } {
   if (ctx.appointmentBooked) return { text, signals: [], rewritten: alreadyRewritten };
-  const replacement = ctx.callbackRequested ? BOOKING_CLAIM_REWRITE_WITH_CALLBACK : BOOKING_CLAIM_REWRITE_NO_CALLBACK;
+
   let rewritten = alreadyRewritten;
   let changed = false;
   const out = splitSentences(text).map((sentence) => {
-    if (!isBookingClaim(sentence)) return sentence;
+    const detected = localizedBookingLanguage(sentence, ctx.language);
+    if (!detected && !isEnglishBookingClaim(sentence)) return sentence;
+    const specificLanguage = ctx.language === "auto" ? detected : (ctx.language ?? detected);
+    const replacement = localizedBookingRewrite(specificLanguage, Boolean(ctx.callbackRequested)) ??
+      (ctx.callbackRequested ? BOOKING_CLAIM_REWRITE_WITH_CALLBACK : BOOKING_CLAIM_REWRITE_NO_CALLBACK);
     changed = true;
     const lead = /^\s*/.exec(sentence)?.[0] ?? "";
     const trail = /\s*$/.exec(sentence)?.[0] ?? "";
@@ -457,7 +468,11 @@ export function detectServiceClaims(text: string, ctx: OutputGuardContext): Guar
       if (term) rules.add(`positive:${term}`);
     }
   }
-  return [...rules].map((rule) => ({ type: "output_service_claim", rule, action: "logged", mode }));
+  const languageMetadata = ctx.language && {
+    replyLanguage: diagnosticReplyLanguage(text, ctx.language),
+    languageMode: ctx.language,
+  };
+  return [...rules].map((rule) => ({ type: "output_service_claim", rule, action: "logged", mode, ...languageMetadata }));
 }
 
 // ------------------------------------------------------------ whole reply
@@ -571,7 +586,9 @@ export class StreamOutputGuard {
     // never see "I've booked you for Monday 6 PM" and then have it rewritten.
     // A run-on with no sentence end is released by word after
     // MAX_HELD_SENTENCE_CHARS so a missing full stop cannot stall the reply.
-    if (!this.ctx.appointmentBooked && this.full.length - this.releasedTo <= MAX_HELD_SENTENCE_CHARS) {
+    if (!this.ctx.appointmentBooked && (
+      (this.ctx.language && this.ctx.language !== "en") || this.full.length - this.releasedTo <= MAX_HELD_SENTENCE_CHARS
+    )) {
       cut = Math.min(cut, lastSentenceEnd(this.full, limit));
     }
     if (cut <= this.releasedTo) return { emit: "", signals: [] };

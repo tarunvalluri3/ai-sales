@@ -1,5 +1,6 @@
 "use client";
 
+import { AgentPersonaFields } from '../_components/agent-persona-fields';
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -27,6 +28,8 @@ const GREETING_MAX = 280;
  */
 export function WidgetBrandingForm({
   businessName,
+  initialAgentName,
+  initialAgentAvatarUrl,
   initialAccentColor,
   initialLogoUrl,
   initialWelcomeText,
@@ -41,6 +44,8 @@ export function WidgetBrandingForm({
   canEdit = true,
 }: {
   businessName: string;
+  initialAgentName: string | null;
+  initialAgentAvatarUrl: string | null;
   initialAccentColor: string;
   initialLogoUrl: string;
   initialWelcomeText: string;
@@ -65,6 +70,7 @@ export function WidgetBrandingForm({
   const [welcomeText, setWelcomeText] = useState(initialWelcomeText);
   const [closedLength, setClosedLength] = useState(initialWelcomeTextClosed.length);
   const disabled = isPending || !canEdit;
+  const [persona, setPersona] = useState({ agentName: initialAgentName, agentAvatarUrl: initialAgentAvatarUrl });
 
   return (
     <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
@@ -75,6 +81,8 @@ export function WidgetBrandingForm({
             <p className="dx-subtitle">Make the chat experience yours. Anything left blank uses a sensible default.</p>
           </div>
 
+          <AgentPersonaFields businessName={businessName} initialName={initialAgentName} initialAvatar={initialAgentAvatarUrl}
+            disabled={disabled} onPreview={setPersona} />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="accentColor" className={labelClass}>
@@ -306,9 +314,9 @@ export function WidgetBrandingForm({
           </div>
           <WidgetPreview
             showPage
-            businessName={businessName}
+            businessName={persona.agentName || businessName}
             accentColor={accentColor}
-            logoUrl={logoUrl}
+            logoUrl={persona.agentAvatarUrl || logoUrl}
             greeting={welcomeText}
             ctaText={ctaText}
             questions={suggestedQuestions}

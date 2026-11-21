@@ -291,6 +291,7 @@ export type PublishKnowledgeDocumentResult = {
   content: string;
   /** Phase B2 (STATE.md): non-null only for a file-sourced document whose original upload was stored (lib/file-ingestion.ts) -- lets the publish trigger pick the PDF-image extraction path over the text-only one when this is a PDF. */
   storagePath: string | null;
+  onboardingWebsiteImport?: boolean;
 };
 
 /**
@@ -313,7 +314,7 @@ export async function publishKnowledgeDocument(
 
   const { data: document, error: fetchError } = await supabase
     .from("knowledge_documents")
-    .select("id, title, content, version, storage_path")
+    .select("id, title, content, version, storage_path, onboarding_website_import")
     .eq("business_id", businessId)
     .eq("id", id)
     .in("source_type", ["manual", "file", "url"])
@@ -365,6 +366,7 @@ export async function publishKnowledgeDocument(
     title: document.title,
     content: document.content,
     storagePath: document.storage_path,
+    onboardingWebsiteImport: document.onboarding_website_import,
   };
 }
 

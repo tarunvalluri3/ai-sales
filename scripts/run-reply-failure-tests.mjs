@@ -100,8 +100,9 @@ test("LangChain retries: default 1, bounded 0..3, never the library default of 6
 
 test("getChatModel passes maxRetries to LangChain", () => {
   const rag = read("lib/rag.ts");
-  const body = rag.slice(rag.indexOf("export function getChatModel()"), rag.indexOf("export function getChatModel()") + 900);
-  assert.match(body, /maxRetries: CHAT_MODEL_MAX_RETRIES/);
+  const body = rag.slice(rag.indexOf("export function getChatModel("), rag.indexOf("export function getChatModel(") + 900);
+  assert.match(body, /getChatModel\(maxRetries = CHAT_MODEL_MAX_RETRIES\)/);
+  assert.match(body, /\n    maxRetries,\n/);
 });
 
 // ----------------------------------------------------- orchestration

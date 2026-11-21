@@ -33,6 +33,7 @@ test("failed FAQ save echoes both fields after React resets the form", async () 
     "next/server": {},
     "@/lib/business-context": { requireBusinessContext: async () => ({ businessId: "tenant-a", orgRole: "org:admin" }) },
     "@/lib/auth": { requireMinRole: () => null },
+    "@/lib/schemas/faq": loadAction("lib/schemas/faq.ts", {}),
     "@/lib/faqs": { createFaq: async () => { throw new Error("mock failure"); } },
     "@/lib/errors": { logAndGetUserMessage: () => "Unable to save." },
     "@/lib/ingestion-queue": {},
@@ -326,7 +327,7 @@ test("wizard wiring covers organization branding, profile defaults, training car
   assert.match(source(dashboard + "products/product-form.tsx"), /onboardingPlaceholders \? \([\s\S]*?Advanced<\/summary/);
   assert.doesNotMatch(source(steps + "train-faqs-step.tsx"), /key=\{draftQuestion\}/);
   assert.match(source(steps + "train-faqs-step.tsx"), /aria-label="Added"/);
-  assert.match(source(dashboard + "faqs/faq-form.tsx"), /type="submit"\s+disabled=\{isPending\}/);
+  assert.match(source(dashboard + "faqs/faq-form.tsx"), /type="submit"\s+disabled=\{isPending \|\| draftPending\}/);
   const persona = source(steps + "persona-step.tsx");
   assert.match(persona, /DEFAULT_WIDGET_PRIMARY, (?:"#[a-f0-9]{6}", ){6}"#[a-f0-9]{6}"/);
   assert.match(persona, /await updateWidgetBrandingAction[\s\S]*?await updateAiCapabilitiesAction[\s\S]*?await advanceOnboarding/);

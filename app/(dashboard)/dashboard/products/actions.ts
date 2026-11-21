@@ -9,6 +9,7 @@ import { requireMinRole } from "@/lib/auth";
 import { createProduct, updateProduct, deleteProduct, approveProductDraft, rejectProductDraft } from "@/lib/products";
 import { processIngestionQueue } from "@/lib/ingestion-queue";
 import { parseCatalogForm, readCatalogFormValues, type CatalogFieldErrors, type CatalogFormValues } from "@/lib/schemas/catalog";
+import { cleanupAgentImage, uploadAgentImage } from "@/lib/agent-images";
 import { logAndGetUserMessage } from "@/lib/errors";
 
 const productIdSchema = z.string().uuid();
@@ -45,7 +46,13 @@ export async function createProductAction(
   }
 
   try {
-    await createProduct(businessId, parsed.data, currency);
+    const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
+    try {
+      await createProduct(businessId, uploaded ? { ...parsed.data, image_url: uploaded } : parsed.data, currency);
+    } catch (error) {
+      await cleanupAgentImage(businessId, uploaded);
+      throw error;
+    }
   } catch (error) {
     return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }
@@ -79,7 +86,14 @@ export async function updateProductAction(
 
   let updated: boolean;
   try {
-    updated = await updateProduct(businessId, id, input, currency);
+    const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
+    try {
+      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      if (!updated) await cleanupAgentImage(businessId, uploaded);
+    } catch (error) {
+      await cleanupAgentImage(businessId, uploaded);
+      throw error;
+    }
   } catch (error) {
     return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }
@@ -127,7 +141,14 @@ export async function updateProductInPlaceAction(
 
   let updated: boolean;
   try {
-    updated = await updateProduct(businessId, id, input, currency);
+    const uploaded = await uploadAgentImage(businessId, "products", formData.get("image_file"));
+    try {
+      updated = await updateProduct(businessId, id, uploaded ? { ...input, image_url: uploaded } : input, currency);
+      if (!updated) await cleanupAgentImage(businessId, uploaded);
+    } catch (error) {
+      await cleanupAgentImage(businessId, uploaded);
+      throw error;
+    }
   } catch (error) {
     return { error: logAndGetUserMessage(error), values: readCatalogFormValues(formData) };
   }

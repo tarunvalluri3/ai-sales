@@ -76,6 +76,7 @@ export async function sendSandboxMessage(
       conversation.id,
       business.name,
       {
+        agentName: business.agent_name,
         description: business.description,
         contactEmail: business.contact_email,
         contactPhone: business.contact_phone,
