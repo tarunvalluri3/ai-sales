@@ -179,6 +179,9 @@ jobs:
         # file 052, run against staging below.)
         run: npm run test:onboarding-readiness
 
+      - name: Dashboard polish tests
+        run: npm run test:dashboard-polish
+
       - name: Test onboarding flow
         run: npm run test:onboarding-flow
 

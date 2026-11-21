@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { requireBusinessContext } from "@/lib/business-context";
+import { ensureClerkOrganizationName } from "@/lib/clerk-org-name";
 import { hasMinRole } from "@/lib/auth";
 import { listActiveAnnouncementsForCurrentBusiness } from "@/lib/announcements";
 import { getAgentPublishStatus, type AgentPublishStatus } from "@/lib/agent-publish-status";
@@ -13,7 +15,9 @@ import { AnnouncementBanner } from "./_components/announcement-banner";
 import { SubscriptionBanner } from "./_components/subscription-banner";
 
 export default async function DashboardLayout({ children }: LayoutProps<"/dashboard">) {
-  const { businessId, businessName, contactEmail, orgRole } = await requireBusinessContext();
+  const { businessId, businessName, contactEmail, orgRole, orgId } = await requireBusinessContext();
+  // Existing accounts whose Clerk org still has a Clerk default name: rename once, best-effort, off the request path.
+  if (hasMinRole(orgRole, "org:admin")) after(() => ensureClerkOrganizationName(orgId, businessName));
   const [announcements, entitlement, publishStatus] = await Promise.all([
     listActiveAnnouncementsForCurrentBusiness(),
     // Fail-soft like the publish status: a billing read must never take the

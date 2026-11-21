@@ -6,6 +6,7 @@ import { NotificationBell } from "./notification-bell";
 import { ThemeToggle } from "../../_components/theme-toggle";
 import { MobileNav } from "./mobile-nav";
 import { PublishBar, type PublishBarStatus } from "./publish-bar";
+import { OrgNameRefresh } from "./org-name-refresh";
 
 /**
  * The dashboard top bar, rendered from `dashboard/layout.tsx` (not the root
@@ -30,6 +31,7 @@ export function DashboardHeader({
 }) {
   return (
     <header className="flex w-full min-h-16 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 lg:px-6">
+      <OrgNameRefresh businessName={agentName} />
       <MobileNav businessName={agentName} />
       <PublishBar agentName={agentName} status={publishStatus} canPublish={canPublish} />
       <div className="flex items-center gap-3">
